@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="DeepDroidChanger.Tests/DeepDroidChanger.Tests.csproj" />
+  <Project Path="DeepDroidChanger/DeepDroidChanger.csproj" />
+</Solution>
