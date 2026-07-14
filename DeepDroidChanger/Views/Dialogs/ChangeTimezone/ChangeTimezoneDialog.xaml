@@ -1,0 +1,133 @@
+<Window x:Class="DeepDroidChanger.Views.ChangeTimezoneDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource ChangeTimezone_WindowTitle}"
+        Width="620"
+        Height="520"
+        MinWidth="520"
+        MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid Style="{StaticResource ChangeTimezoneRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- DEVICE INFO -->
+        <Border Grid.Row="0"
+                Style="{StaticResource ChangeTimezoneDeviceHeaderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <materialDesign:PackIcon Kind="CellphoneCog"
+                                         Style="{StaticResource ChangeTimezoneHeaderIconStyle}"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding DeviceInfoText}"
+                           Style="{StaticResource ChangeTimezoneInfoDeviceTextStyle}"/>
+            </Grid>
+        </Border>
+
+        <!-- MODE SELECTION -->
+        <GroupBox Grid.Row="1"
+                  Header="{DynamicResource ChangeTimezone_ModeGroupHeader}"
+                  Style="{StaticResource ChangeTimezoneModeGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <RadioButton Grid.Row="0"
+                             Content="{DynamicResource ChangeTimezone_ModeData}"
+                             IsChecked="{Binding IsDataMode, Mode=TwoWay}"
+                             Style="{StaticResource ChangeTimezoneModeRadioStyle}"/>
+
+                <RadioButton Grid.Row="1"
+                             Content="{DynamicResource ChangeTimezone_ModeDeviceIp}"
+                             IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
+                             Style="{StaticResource ChangeTimezoneModeRadioStyle}"/>
+            </Grid>
+        </GroupBox>
+
+        <!-- TIMEZONE SELECTOR -->
+        <Grid Grid.Row="2"
+              Style="{StaticResource ChangeTimezoneSelectorGridStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Search -->
+            <TextBox Grid.Row="0"
+                     Text="{Binding TimezoneSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource ChangeTimezoneSearchTextBoxStyle}"
+                     materialDesign:HintAssist.Hint="{DynamicResource ChangeTimezone_SearchHint}"
+                     IsEnabled="{Binding IsDataMode}"/>
+
+            <!-- Timezone ComboBox -->
+            <ComboBox x:Name="TimezoneComboBox"
+                      Grid.Row="1"
+                      ItemsSource="{Binding FilteredTimezones}"
+                      SelectedItem="{Binding SelectedTimezone, Mode=TwoWay}"
+                      IsDropDownOpen="{Binding IsTimezoneDropDownOpen, Mode=TwoWay}"
+                      Style="{StaticResource ChangeTimezoneComboBoxStyle}"
+                      IsEnabled="{Binding IsDataMode}"
+                      MaxDropDownHeight="280">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding DisplayText}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+        </Grid>
+
+        <!-- LOADING -->
+        <ProgressBar Grid.Row="3"
+                     IsIndeterminate="True"
+                     Style="{StaticResource ChangeTimezoneProgressBarStyle}"
+                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+        <!-- ACTION BUTTONS -->
+        <Grid Grid.Row="4"
+              Style="{StaticResource ChangeTimezoneActionGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="1"
+                    Command="{Binding SaveCommand}"
+                    Style="{StaticResource ChangeTimezoneSaveButtonStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Play"
+                                             Style="{StaticResource ChangeTimezoneButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeTimezone_SaveButton}"
+                               Style="{StaticResource ChangeTimezoneButtonTextStyle}"/>
+                </Grid>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

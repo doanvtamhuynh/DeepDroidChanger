@@ -1,46 +1,194 @@
-﻿using DeepDroidChanger.ViewModels;
+using System.Windows;
+using DeepDroidChanger.Constants;
+using DeepDroidChanger.Helpers;
+using DeepDroidChanger.Models;
+using DeepDroidChanger.Services;
+using DeepDroidChanger.ViewModels;
+using DeepDroidChanger.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Windows;
+using Microsoft.Extensions.Logging;
 
-namespace DeepDroidChanger
+namespace DeepDroidChanger;
+
+public sealed partial class App : Application
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
-    public partial class App : Application
+    private IHost? _host;
+
+    protected override async void OnStartup(StartupEventArgs e)
     {
-        private readonly IHost _host;
+        base.OnStartup(e);
 
-        public App()
+        AppSettings settings = new();
+        _host = Host.CreateDefaultBuilder(e.Args)
+            .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Debug))
+            .ConfigureServices((_, services) => RegisterServices(services, settings))
+            .Build();
+
+        try
         {
-            _host = Host.CreateDefaultBuilder()
-                .ConfigureServices((_, services) =>
-                {
-                    services.AddSingleton<MainWindow>();
-                    services.AddSingleton<MainViewModel>();
-                })
-                .Build();
-        }
+            await _host.StartAsync().ConfigureAwait(true);
 
-        protected override async void OnStartup(StartupEventArgs e)
-        {
-            base.OnStartup(e);
+            AppSettings loadedSettings = await _host.Services
+                .GetRequiredService<ISettingsService>()
+                .LoadAsync(CancellationToken.None)
+                .ConfigureAwait(true);
+            CopySettings(loadedSettings, settings);
 
-            await _host.StartAsync();
-            MainWindow mainWindow = _host.Services.GetRequiredService<MainWindow>();
-            mainWindow.Show();
-        }
+            _host.Services.GetRequiredService<ILocalizationService>().ApplyLanguage(settings.Language);
+            _host.Services.GetRequiredService<IThemeService>().ApplyTheme(settings.Theme);
 
-        protected override async void OnExit(ExitEventArgs e)
-        {
-            if (_host is not null)
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            bool authenticated = await _host.Services
+                .GetRequiredService<ILoginDialogService>()
+                .ShowLoginAsync(CancellationToken.None)
+                .ConfigureAwait(true);
+
+            if (!authenticated)
             {
-                await _host.StopAsync();
-                _host.Dispose();
+                Shutdown();
+                return;
             }
 
-            base.OnExit(e);
+            MainWindow mainWindow = _host.Services.GetRequiredService<MainWindow>();
+            MainWindow = mainWindow;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            mainWindow.Show();
         }
+        catch (OperationCanceledException)
+        {
+            Shutdown();
+        }
+        catch (Exception exception)
+        {
+            _host.Services.GetRequiredService<ILogger<App>>()
+                .LogError(exception, "Application startup failed.");
+            Shutdown();
+        }
+    }
+
+    protected override async void OnExit(ExitEventArgs e)
+    {
+        if (_host is not null)
+        {
+            IHost host = _host;
+            ILogger<App>? logger = host.Services.GetService<ILogger<App>>();
+            try
+            {
+                await host.StopAsync().ConfigureAwait(true);
+            }
+            catch (Exception exception)
+            {
+                logger?.LogError(exception, "Application host shutdown failed.");
+            }
+            finally
+            {
+                try
+                {
+                    host.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    logger?.LogError(exception, "Application host disposal failed.");
+                }
+
+                _host = null;
+            }
+        }
+
+        base.OnExit(e);
+    }
+
+    internal static void RegisterServices(IServiceCollection services, AppSettings settings)
+    {
+        services.AddSingleton(settings);
+
+        services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<ILocalizationService, LocalizationService>();
+        services.AddTransient<IFilePickerDialogService, FilePickerDialogService>();
+        services.AddSingleton<IRandomService, RandomService>();
+        services.AddSingleton<IProcessRunnerService, ProcessRunnerService>();
+        services.AddSingleton<IUiDispatcherService, UiDispatcherService>();
+        services.AddSingleton<IPollingService, PollingService>();
+        services.AddSingleton<IFileSystemService, FileSystemService>();
+
+        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IDeviceStoreService, DeviceStoreService>();
+        services.AddSingleton<ICarrierDataService, CarrierDataService>();
+        services.AddSingleton<ITimezoneDataService, TimezoneDataService>();
+        services.AddSingleton<IAccountStoreService, AccountStoreService>();
+
+        services.AddSingleton<IAccountAuthenticationService, AccountAuthenticationService>();
+        services.AddSingleton<IDeviceSessionService, DeviceSessionService>();
+        services.AddSingleton<IDeviceRandomApiService, DeviceRandomApiService>();
+        services.AddSingleton<IIpGeolocationService, IpGeolocationService>();
+        services.AddOptions<DeviceInfoApiOptions>()
+            .Configure(DeviceInfoApiOptionsHelper.ApplyDefaults)
+            .Validate(DeviceInfoApiOptionsHelper.IsValid, "Device Info API configuration is invalid.");
+
+        services.AddSingleton<IAdbCommandService, AdbCommandService>();
+        services.AddSingleton<IAdbDeviceService, AdbDeviceService>();
+        services.AddSingleton<IDeviceTimezoneService, DeviceTimezoneService>();
+        services.AddSingleton<IDeviceLocationService, DeviceLocationService>();
+        services.AddSingleton<IProxyService, ProxyService>();
+        services.AddSingleton<IDeviceIntegrityService, DeviceIntegrityService>();
+        services.AddSingleton<IXapkPackageService, XapkPackageService>();
+        services.AddSingleton<IPackageInstallService, PackageInstallService>();
+        services.AddSingleton<IDeviceViewerStreamService, DeviceViewerStreamService>();
+
+        services.AddSingleton<IDeviceRandomProfileService, DeviceRandomProfileService>();
+        services.AddSingleton<IDeviceListService, DeviceListService>();
+        services.AddSingleton<IDeviceSelectionService, DeviceSelectionService>();
+        services.AddSingleton<IDeviceConfigService, DeviceConfigService>();
+        services.AddSingleton<IRandomDeviceService, RandomDeviceService>();
+        services.AddSingleton<IDeviceActionService, DeviceActionService>();
+        services.AddSingleton<IProxyWorkflowService, ProxyWorkflowService>();
+        services.AddSingleton<IDeviceViewerCoordinatorService, DeviceViewerCoordinatorService>();
+
+        services.AddTransient<IAddDevicesDialogService, AddDevicesDialogService>();
+        services.AddTransient<ILoginDialogService, LoginDialogService>();
+        services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();
+        services.AddTransient<IChangeTimezoneDialogService, ChangeTimezoneDialogService>();
+        services.AddTransient<IDeleteDeviceConfirmationDialogService, DeleteDeviceConfirmationDialogService>();
+        services.AddTransient<IDeviceViewerDialogService, DeviceViewerDialogService>();
+        services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
+        services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
+        services.AddTransient<IInstallPackageDialogService, InstallPackageDialogService>();
+        services.AddSingleton<MainViewModel>();
+        services.AddSingleton<DeviceManagerViewModel>();
+        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<MainWindow>();
+        services.AddSingleton<DeviceManagerView>();
+        services.AddSingleton<SettingsView>();
+
+        services.AddTransient<LoginViewModel>();
+        services.AddTransient<AddDevicesViewModel>();
+        services.AddTransient<ChangeLocationViewModel>();
+        services.AddTransient<ChangeTimezoneViewModel>();
+        services.AddTransient<DeleteDeviceConfirmationViewModel>();
+        services.AddTransient<DeviceViewerViewModel>();
+        services.AddTransient<FakeProxyViewModel>();
+        services.AddTransient<UpdateIntegrityViewModel>();
+        services.AddTransient<InstallPackageViewModel>();
+
+        services.AddTransient<LoginDialog>();
+        services.AddTransient<AddDevicesDialog>();
+        services.AddTransient<ChangeLocationDialog>();
+        services.AddTransient<ChangeTimezoneDialog>();
+        services.AddTransient<DeleteDeviceConfirmationDialog>();
+        services.AddTransient<DeviceViewerDialog>();
+        services.AddTransient<FakeProxyDialog>();
+        services.AddTransient<UpdateIntegrityDialog>();
+        services.AddTransient<InstallPackageDialog>();
+    }
+
+    private static void CopySettings(AppSettings source, AppSettings target)
+    {
+        target.Language = source.Language;
+        target.Theme = source.Theme;
+        target.SidebarCollapsed = source.SidebarCollapsed;
+        target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
+        target.DeviceDataFilePath = source.DeviceDataFilePath;
+        target.SelectedDeviceSerial = source.SelectedDeviceSerial;
     }
 }

@@ -24,6 +24,7 @@ stays unit-testable.
 
 DeepDroidChanger/ (solution root)
   DeepDroidChanger.slnx
+  global.json
   .gitignore
   AGENTS.md
 
@@ -32,7 +33,6 @@ DeepDroidChanger/ (solution root)
     MainWindow.xaml, MainWindow.xaml.cs
     AssemblyInfo.cs
     DeepDroidChanger.csproj
-    global.json
     app.manifest
 
     Views/
@@ -45,16 +45,23 @@ DeepDroidChanger/ (solution root)
 
     Models/
       <Noun>.cs   e.g. Device.cs, Carrier.cs, Timezone.cs
+      AdbServices/<Noun>.cs
+      Authentication/<Noun>.cs
+      DeviceInfo/<Noun>.cs
 
     Services/
       Interfaces/
         I<Name>Service.cs        (shared service, no domain group)
         DialogServices/I<Name>DialogService.cs
         AdbServices/I<Name>Service.cs
+        Authentication/I<Name>Service.cs
+        DeviceInfo/I<Name>Service.cs
       Implementations/
         <Name>Service.cs
         DialogServices/<Name>DialogService.cs
         AdbServices/<Name>Service.cs
+        Authentication/<Name>Service.cs
+        DeviceInfo/<Name>Service.cs
 
     Controls/     custom control / reusable UserControl
     Converters/   IValueConverter, IMultiValueConverter
@@ -95,12 +102,17 @@ DeepDroidChanger/ (solution root)
 
   DeepDroidChanger.Tests/
     DeepDroidChanger.Tests.csproj
+    Architecture/ cross-cutting architecture, DI, security, resource,
+                  and WPF surface smoke tests
+    Fakes/        reusable test doubles only
+    Helpers/      tests mirroring production Helpers/ and test-only
+                  infrastructure shared by multiple fixtures
     ViewModels/   mirrors ViewModels/ of main project
     Services/     mirrors Services/Implementations/ of main project
 
 3. FOLDER RULES
 
-Resources/ holds only XAML ResourceDictionary: Strings, Styles, Themes.
+Resources/ holds only XAML ResourceDictionary: Strings/ and Themes/.
 Never put images, json, or binaries there.
 
 Assets/ holds only non-XAML files: images, icons, fonts, json data,
@@ -159,6 +171,9 @@ Services/Implementations/, no subfolder.
 
 DeepDroidChanger.Tests/ structure must mirror ViewModels/ and
 Services/Implementations/ of the main project exactly.
+Architecture/, Fakes/, and Helpers/ are the only permitted support
+folders outside that mirror and must not contain production business
+logic tests that belong under ViewModels/ or Services/.
 
 Prioritize testing ViewModel (business flow) and
 Services/Implementations (real logic). Views/ (pure UI) and Models/
@@ -185,6 +200,6 @@ obj/
      Resources/Strings/Views/<Name>.xaml (+ .vi.xaml version). Never
      hardcode strings in XAML or code-behind.
   8.7. If a feature-specific style is needed: add
-     Resources/Styles/<Name>.xaml, merge into App.xaml.
+     Resources/Themes/<Name>.xaml, merge into App.xaml.
   8.8. Write tests for the ViewModel and Service in
      DeepDroidChanger.Tests/.

@@ -1,0 +1,13 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="ChangeLocation_WindowTitle">Change Location</system:String>
+    <system:String x:Key="ChangeLocation_ModeGroupHeader">Change Mode</system:String>
+    <system:String x:Key="ChangeLocation_ModeConfig">Manual coordinates</system:String>
+    <system:String x:Key="ChangeLocation_ModeDeviceIp">Device IP</system:String>
+    <system:String x:Key="ChangeLocation_LatitudeLabel">Latitude</system:String>
+    <system:String x:Key="ChangeLocation_LatitudeHint">Range: -90 to 90, e.g., 21.0285</system:String>
+    <system:String x:Key="ChangeLocation_LongitudeLabel">Longitude</system:String>
+    <system:String x:Key="ChangeLocation_LongitudeHint">Range: -180 to 180, e.g., 105.8542</system:String>
+    <system:String x:Key="ChangeLocation_SaveButton">Apply</system:String>
+</ResourceDictionary>

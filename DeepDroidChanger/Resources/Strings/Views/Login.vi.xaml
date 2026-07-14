@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:String x:Key="Login_WindowTitle">Đăng nhập DeepDroidChanger</sys:String>
+    <sys:String x:Key="Login_WelcomeTitle">Đăng nhập</sys:String>
+    <sys:String x:Key="Login_Subtitle">Vui lòng đăng nhập vào tài khoản của bạn</sys:String>
+    <sys:String x:Key="Login_UsernameLabel">Tên đăng nhập / Email</sys:String>
+    <sys:String x:Key="Login_PasswordLabel">Mật khẩu</sys:String>
+    <sys:String x:Key="Login_UsernameHint">Nhập tên đăng nhập hoặc email</sys:String>
+    <sys:String x:Key="Login_PasswordHint">Mật khẩu</sys:String>
+    <sys:String x:Key="Login_RememberAccount">Lưu thông tin đăng nhập</sys:String>
+    <sys:String x:Key="Login_SignInButton">Đăng nhập</sys:String>
+    <sys:String x:Key="Login_SigningIn">Đang đăng nhập...</sys:String>
+    <sys:String x:Key="Login_ErrorMissingFields">Vui lòng nhập tên đăng nhập/email và mật khẩu.</sys:String>
+    <sys:String x:Key="Login_ErrorServiceUnavailable">Dịch vụ đăng nhập hiện không khả dụng. Vui lòng thử lại sau.</sys:String>
+    <sys:String x:Key="Login_ErrorAuthenticationFailed">Tên đăng nhập/email hoặc mật khẩu không đúng.</sys:String>
+    <sys:String x:Key="Login_ErrorAccountSaveFailed">Đăng nhập thành công nhưng không thể cập nhật tài khoản đã lưu.</sys:String>
+    <sys:String x:Key="Login_ErrorCanceled">Đã hủy đăng nhập.</sys:String>
+</ResourceDictionary>

@@ -1,0 +1,118 @@
+<Window x:Class="DeepDroidChanger.Views.AddDevicesDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource AddDevices_WindowTitle}"
+        Width="920"
+        Height="580"
+        MinWidth="720"
+        MinHeight="460"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+    <Grid Style="{StaticResource AddDevicesRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Style="{StaticResource AddDevicesHeaderGridStyle}">
+            <CheckBox HorizontalAlignment="Right"
+                      Content="{DynamicResource AddDevices_SelectAll}"
+                      IsChecked="{Binding SelectAll, Mode=TwoWay}"
+                      Style="{StaticResource DeviceCheckBoxStyle}"/>
+        </Grid>
+
+        <DataGrid x:Name="AddDevicesGrid"
+                  Grid.Row="1"
+                  ItemsSource="{Binding Devices}"
+                  Style="{StaticResource AddDevicesGridStyle}">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="0.75*"
+                                        MinWidth="100"
+                                        ElementStyle="{StaticResource DeviceGridCheckBoxStyle}"
+                                        EditingElementStyle="{StaticResource DeviceGridCheckBoxStyle}">
+                    <DataGridCheckBoxColumn.Header>
+                        <TextBlock Text="{DynamicResource AddDevices_ColumnSelectDevice}"
+                                   Style="{StaticResource AddDevicesColumnHeaderTextStyle}"/>
+                    </DataGridCheckBoxColumn.Header>
+                </DataGridCheckBoxColumn>
+                <DataGridTextColumn Binding="{Binding Serial}"
+                                    Width="1.25*"
+                                    MinWidth="150"
+                                    IsReadOnly="True"
+                                    ElementStyle="{StaticResource DeviceGridLeftCellTextStyle}">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="{DynamicResource AddDevices_ColumnSerial}"
+                                   Style="{StaticResource AddDevicesColumnHeaderTextStyle}"/>
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTemplateColumn Width="1*"
+                                        MinWidth="130"
+                                        CellStyle="{StaticResource AddDevicesCellStretchStyle}">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="{DynamicResource AddDevices_ColumnType}"
+                                   Style="{StaticResource AddDevicesColumnHeaderTextStyle}"/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ComboBox ItemsSource="{Binding DataContext.TypeOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Style="{StaticResource AddDeviceTypeComboBoxStyle}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Width="1.35*"
+                                        MinWidth="170"
+                                        CellStyle="{StaticResource AddDevicesCellStretchStyle}">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="{DynamicResource AddDevices_ColumnName}"
+                                   Style="{StaticResource AddDevicesColumnHeaderTextStyle}"/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource AddDeviceNameTextBoxStyle}"
+                                     materialDesign:HintAssist.Hint="{DynamicResource Shared_DeviceNameHint}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="2"
+              Style="{StaticResource AddDevicesActionGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="1"
+                    Command="{Binding AddCommand}"
+                    Style="{StaticResource AddDevicesActionButtonStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Plus"
+                                             Style="{StaticResource DeviceLoadButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource AddDevices_AddButton}"
+                               Style="{StaticResource DeviceLoadButtonTextStyle}"/>
+                </Grid>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

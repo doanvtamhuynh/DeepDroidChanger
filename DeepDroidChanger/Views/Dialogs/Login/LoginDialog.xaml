@@ -1,0 +1,170 @@
+<Window x:Class="DeepDroidChanger.Views.LoginDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource Login_WindowTitle}"
+        Width="640"
+        Height="580"
+        MinWidth="640"
+        MinHeight="580"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+
+    <Window.Resources>
+        <!-- Fade-in + slide-up animation for the card -->
+        <Storyboard x:Key="LoginCardEntranceStoryboard">
+            <DoubleAnimation Storyboard.TargetName="LoginCard"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0" To="1"
+                             Duration="0:0:0.4">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="LoginCardTranslate"
+                             Storyboard.TargetProperty="Y"
+                             From="24" To="0"
+                             Duration="0:0:0.4">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Window.Resources>
+
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Window.Loaded">
+            <BeginStoryboard Storyboard="{StaticResource LoginCardEntranceStoryboard}"/>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <!-- Root container -->
+    <Grid Style="{StaticResource LoginRootGridStyle}">
+
+        <!-- Card container in the center -->
+        <Border x:Name="LoginCard"
+                Style="{StaticResource LoginCardBorderStyle}"
+                Opacity="0">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="LoginCardTranslate" Y="24"/>
+            </Border.RenderTransform>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- 0: Icon circle -->
+                    <RowDefinition Height="Auto"/> <!-- 1: Title -->
+                    <RowDefinition Height="Auto"/> <!-- 2: Subtitle -->
+                    <RowDefinition Height="Auto"/> <!-- 3: Username Label -->
+                    <RowDefinition Height="Auto"/> <!-- 4: Username Input -->
+                    <RowDefinition Height="Auto"/> <!-- 5: Password Label -->
+                    <RowDefinition Height="Auto"/> <!-- 6: Password Input -->
+                    <RowDefinition Height="Auto"/> <!-- 7: CheckBox -->
+                    <RowDefinition Height="Auto"/> <!-- 8: Error message -->
+                    <RowDefinition Height="Auto"/> <!-- 9: Login Button -->
+                </Grid.RowDefinitions>
+
+                <!-- Circle Icon -->
+                <Border Grid.Row="0"
+                        Style="{StaticResource LoginLockIconCircleStyle}">
+                    <materialDesign:PackIcon Kind="LockOutline"
+                                             Style="{StaticResource LoginLockIconStyle}"/>
+                </Border>
+
+                <!-- Title -->
+                <TextBlock Grid.Row="1"
+                           Text="{DynamicResource Login_WelcomeTitle}"
+                           Style="{StaticResource LoginTitleTextStyle}"/>
+
+                <!-- Subtitle -->
+                <TextBlock Grid.Row="2"
+                           Text="{DynamicResource Login_Subtitle}"
+                           Style="{StaticResource LoginSubtitleTextStyle}"/>
+
+                <!-- Username Label -->
+                <TextBlock Grid.Row="3"
+                           Text="{DynamicResource Login_UsernameLabel}"
+                           Style="{StaticResource LoginFieldLabelStyle}"/>
+
+                <!-- Username Input -->
+                <Grid Grid.Row="4"
+                      Style="{StaticResource LoginInputHostGridStyle}">
+                    <TextBox Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="{DynamicResource Login_UsernameHint}"
+                             Style="{StaticResource LoginTextBoxStyle}"/>
+                    <materialDesign:PackIcon Kind="AccountOutline"
+                                             Style="{StaticResource LoginInputLeadingIconStyle}"/>
+                </Grid>
+
+                <!-- Password Label -->
+                <TextBlock Grid.Row="5"
+                           Text="{DynamicResource Login_PasswordLabel}"
+                           Style="{StaticResource LoginFieldLabelStyle}"/>
+
+                <!-- Password Input -->
+                <Grid Grid.Row="6"
+                      Style="{StaticResource LoginInputHostGridStyle}">
+                    <PasswordBox x:Name="LoginPasswordBox"
+                                 PasswordChanged="OnPasswordChanged"
+                                 Tag="{DynamicResource Login_PasswordHint}"
+                                 Style="{StaticResource LoginPasswordBoxStyle}"/>
+                    <TextBox x:Name="LoginPasswordTextBox"
+                             TextChanged="OnPasswordTextBoxChanged"
+                             Style="{StaticResource LoginPasswordTextBoxStyle}"
+                             Visibility="Collapsed"/>
+
+                    <materialDesign:PackIcon Kind="LockOutline"
+                                             Style="{StaticResource LoginInputLeadingIconStyle}"/>
+
+                    <Button Style="{StaticResource LoginPasswordRevealButtonStyle}"
+                            Click="OnRevealPasswordClick">
+                        <materialDesign:PackIcon x:Name="RevealIcon"
+                                                 Kind="EyeOutline"
+                                                 Style="{StaticResource LoginPasswordRevealIconStyle}"/>
+                    </Button>
+                </Grid>
+
+                <!-- CheckBox -->
+                <CheckBox Grid.Row="7"
+                          Content="{DynamicResource Login_RememberAccount}"
+                          IsChecked="{Binding RememberAccount, Mode=TwoWay}"
+                          Style="{StaticResource LoginCheckBoxStyle}"/>
+
+                <!-- Error message -->
+                <TextBlock Grid.Row="8"
+                           Text="{Binding ErrorMessage}"
+                           Style="{StaticResource LoginErrorTextStyle}"/>
+
+                <!-- Sign-in button -->
+                <Button Grid.Row="9"
+                        Command="{Binding SignInCommand}"
+                        Style="{StaticResource LoginPrimaryButtonStyle}">
+                    <Grid Style="{StaticResource LoginButtonContentGridStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <materialDesign:PackIcon Kind="Login"
+                                                 Style="{StaticResource LoginButtonIconStyle}"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{DynamicResource Login_SignInButton}"
+                                   Style="{StaticResource LoginButtonTextStyle}"/>
+                    </Grid>
+                </Button>
+
+                <!-- Loading overlay inside the card -->
+                <Grid Grid.RowSpan="10"
+                      Style="{StaticResource LoginLoadingOverlayGridStyle}">
+                    <Border Style="{StaticResource LoginLoadingBackdropStyle}"/>
+                    <StackPanel Style="{StaticResource LoginLoadingPanelStyle}">
+                        <ProgressBar Style="{StaticResource LoginLoadingProgressBarStyle}"/>
+                        <TextBlock Text="{DynamicResource Login_SigningIn}"
+                                   Style="{StaticResource LoginLoadingTextStyle}"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

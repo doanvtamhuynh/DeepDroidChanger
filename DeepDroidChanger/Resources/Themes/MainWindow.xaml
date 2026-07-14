@@ -1,0 +1,226 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <Style x:Key="SidebarTabStyle"
+           TargetType="Button">
+        <Setter Property="Height"
+                Value="44"/>
+        <Setter Property="Background"
+                Value="Transparent"/>
+        <Setter Property="BorderThickness"
+                Value="0"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextSecondary}"/>
+        <Setter Property="Cursor"
+                Value="Hand"/>
+        <Setter Property="FocusVisualStyle"
+                Value="{StaticResource AppFocusVisualStyle}"/>
+        <Setter Property="HorizontalContentAlignment"
+                Value="Left"/>
+        <Setter Property="Margin"
+                Value="0,2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="SidebarItemBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{StaticResource Radius.Medium}"
+                            Padding="12,0">
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                                     Width="20"
+                                                     Height="20"
+                                                     VerticalAlignment="Center"
+                                                     Foreground="{TemplateBinding Foreground}"/>
+                            <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="{StaticResource Metric.FontFamily}"
+                                       FontSize="{StaticResource Metric.FontSize.Body}"
+                                       FontWeight="SemiBold"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       Foreground="{TemplateBinding Foreground}"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="SidebarItemBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource Brush.SurfaceHover}"/>
+                            <Setter Property="Foreground"
+                                     Value="{DynamicResource Brush.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed"
+                                 Value="True">
+                            <Setter TargetName="SidebarItemBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource Brush.SurfacePressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Brush.TextDisabled}"/>
+                            <Setter TargetName="SidebarItemBorder"
+                                    Property="Opacity"
+                                    Value="0.62"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="BottomIconButtonStyle"
+           TargetType="Button">
+        <Setter Property="Width"
+                Value="34"/>
+        <Setter Property="Height"
+                Value="34"/>
+        <Setter Property="Background"
+                Value="Transparent"/>
+        <Setter Property="BorderThickness"
+                Value="0"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextSecondary}"/>
+        <Setter Property="Cursor"
+                Value="Hand"/>
+        <Setter Property="FocusVisualStyle"
+                Value="{StaticResource AppFocusVisualStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="BottomButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{StaticResource Radius.Medium}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver"
+                                 Value="True">
+                            <Setter TargetName="BottomButtonBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource Brush.SurfaceHover}"/>
+                            <Setter Property="Foreground"
+                                     Value="{DynamicResource Brush.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed"
+                                 Value="True">
+                            <Setter TargetName="BottomButtonBorder"
+                                    Property="Background"
+                                    Value="{DynamicResource Brush.SurfacePressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled"
+                                 Value="False">
+                            <Setter Property="Foreground"
+                                    Value="{DynamicResource Brush.TextDisabled}"/>
+                            <Setter TargetName="BottomButtonBorder"
+                                    Property="Opacity"
+                                    Value="0.62"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SidebarDeviceManagerTabStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource SidebarTabStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsDeviceManagerActive}"
+                         Value="True">
+                <Setter Property="Background"
+                        Value="{DynamicResource Brush.SurfaceSelected}"/>
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Brush.Accent}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SidebarSettingsTabStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource SidebarTabStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSettingsActive}"
+                         Value="True">
+                <Setter Property="Background"
+                        Value="{DynamicResource Brush.SurfaceSelected}"/>
+                <Setter Property="Foreground"
+                        Value="{DynamicResource Brush.Accent}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ShellToggleIconStyle"
+           TargetType="materialDesign:PackIcon">
+        <Setter Property="Width"
+                Value="18"/>
+        <Setter Property="Height"
+                Value="18"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextSecondary}"/>
+    </Style>
+
+    <Style x:Key="ShellLogoIconStyle"
+           TargetType="materialDesign:PackIcon">
+        <Setter Property="Width"
+                Value="22"/>
+        <Setter Property="Height"
+                Value="22"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="VerticalAlignment"
+                Value="Center"/>
+    </Style>
+
+    <Style x:Key="ShellLogoTextStyle"
+           TargetType="TextBlock">
+        <Setter Property="FontSize"
+                Value="{StaticResource Metric.FontSize.Subtitle}"/>
+        <Setter Property="FontWeight"
+                Value="Bold"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="Margin"
+                Value="8,0,0,0"/>
+        <Setter Property="VerticalAlignment"
+                Value="Center"/>
+    </Style>
+
+    <Style x:Key="ShellBottomIconStyle"
+           TargetType="materialDesign:PackIcon">
+        <Setter Property="Width"
+                Value="20"/>
+        <Setter Property="Height"
+                Value="20"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextSecondary}"/>
+    </Style>
+
+    <Style x:Key="ShellVersionIconStyle"
+           TargetType="materialDesign:PackIcon">
+        <Setter Property="Width"
+                Value="16"/>
+        <Setter Property="Height"
+                Value="16"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextDisabled}"/>
+        <Setter Property="VerticalAlignment"
+                Value="Center"/>
+    </Style>
+
+    <Style x:Key="ShellVersionTextStyle"
+           TargetType="TextBlock">
+        <Setter Property="FontSize"
+                Value="{StaticResource Metric.FontSize.Micro}"/>
+        <Setter Property="Foreground"
+                Value="{DynamicResource Brush.TextDisabled}"/>
+        <Setter Property="VerticalAlignment"
+                Value="Center"/>
+    </Style>
+
+</ResourceDictionary>

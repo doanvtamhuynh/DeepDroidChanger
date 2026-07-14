@@ -1,0 +1,11 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="ChangeTimezone_WindowTitle">Đổi múi giờ</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeGroupHeader">Chế độ thay đổi</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeData">Đổi múi giờ theo dữ liệu</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeDeviceIp">Đổi múi giờ theo IP thiết bị</sys:String>
+    <sys:String x:Key="ChangeTimezone_SearchHint">Tìm múi giờ...</sys:String>
+    <sys:String x:Key="ChangeTimezone_SaveButton">Áp dụng</sys:String>
+</ResourceDictionary>

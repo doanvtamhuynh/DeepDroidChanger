@@ -1,0 +1,13 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="AddDevices_WindowTitle">Add Devices</sys:String>
+    <sys:String x:Key="AddDevices_LoadFailed">Unable to refresh connected devices.</sys:String>
+    <sys:String x:Key="AddDevices_SelectAll">Select all</sys:String>
+    <sys:String x:Key="AddDevices_ColumnSelectDevice">Select devices</sys:String>
+    <sys:String x:Key="AddDevices_ColumnSerial">Serial</sys:String>
+    <sys:String x:Key="AddDevices_ColumnType">Type</sys:String>
+    <sys:String x:Key="AddDevices_ColumnName">Name</sys:String>
+    <sys:String x:Key="AddDevices_AddButton">Add</sys:String>
+</ResourceDictionary>

@@ -1,0 +1,11 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="ChangeTimezone_WindowTitle">Change Timezone</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeGroupHeader">Change Mode</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeData">Use timezone data</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeDeviceIp">Use device IP</sys:String>
+    <sys:String x:Key="ChangeTimezone_SearchHint">Search timezone...</sys:String>
+    <sys:String x:Key="ChangeTimezone_SaveButton">Apply</sys:String>
+</ResourceDictionary>

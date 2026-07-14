@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Views/App.xaml" />
+        <ResourceDictionary Source="Views/MainWindow.xaml" />
+        <ResourceDictionary Source="Views/DeviceManager.xaml" />
+        <ResourceDictionary Source="Views/AddDevices.xaml" />
+        <ResourceDictionary Source="Views/Settings.xaml" />
+        <ResourceDictionary Source="Views/ChangeTimezone.xaml" />
+        <ResourceDictionary Source="Views/ChangeLocation.xaml" />
+        <ResourceDictionary Source="Views/FakeProxy.xaml" />
+        <ResourceDictionary Source="Views/UpdateIntegrity.xaml" />
+        <ResourceDictionary Source="Views/InstallPackage.xaml" />
+        <ResourceDictionary Source="Views/DeviceViewer.xaml" />
+        <ResourceDictionary Source="Views/DeleteDeviceConfirmation.xaml" />
+        <ResourceDictionary Source="Views/Login.xaml" />
+        <ResourceDictionary Source="Views/RuntimeMessages.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>

@@ -1,0 +1,127 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <!-- ROOT -->
+    <Style x:Key="FakeProxyRootGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="20"/>
+    </Style>
+
+<!-- DEVICE INFO HEADER -->
+    <Style x:Key="FakeProxyDeviceHeaderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+    </Style>
+
+    <Style x:Key="FakeProxyHeaderIconStyle" TargetType="materialDesign:PackIcon">
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+    </Style>
+
+    <!-- DEVICE INFO -->
+    <Style x:Key="FakeProxyInfoDeviceTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <!-- SELECTOR GRID -->
+    <Style x:Key="FakeProxySelectorGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="0,0,0,16"/>
+    </Style>
+
+    <!-- INPUT LABEL -->
+    <Style x:Key="FakeProxyInputLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+        <Setter Property="Margin" Value="0,4,0,4"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- TEXT BOX -->
+    <Style x:Key="FakeProxyTextBoxStyle"
+           TargetType="TextBox"
+           BasedOn="{StaticResource FlatTextBoxStyle}">
+        <Setter Property="SelectionBrush" Value="{DynamicResource Brush.SurfaceSelected}"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <!-- COMBO BOX -->
+    <Style x:Key="FakeProxyComboBoxStyle"
+           TargetType="ComboBox"
+           BasedOn="{StaticResource FlatComboBoxStyle}">
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="ComboBoxItem"
+                       BasedOn="{StaticResource FlatComboBoxItemStyle}">
+                    <Setter Property="Padding" Value="10,6"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ACTION GRID -->
+    <Style x:Key="FakeProxyActionGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="0,8,0,0"/>
+    </Style>
+
+
+    <!-- SAVE BUTTON -->
+    <Style x:Key="FakeProxySaveButtonStyle" TargetType="Button"
+           BasedOn="{StaticResource MaterialDesignRaisedButton}">
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="Padding" Value="16,0,16,0"/>
+        <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="materialDesign:RippleAssist.Feedback"
+                Value="{DynamicResource Brush.AccentForeground}"/>
+        <Setter Property="materialDesign:RippleAssist.RippleOnTop" Value="True"/>
+        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- BUTTON CONTENT TEXT -->
+    <Style x:Key="FakeProxyButtonTextStyle" TargetType="TextBlock">
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- BUTTON CONTENT ICON -->
+    <Style x:Key="FakeProxyButtonIconStyle" TargetType="materialDesign:PackIcon">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+    </Style>
+
+    <!-- CHECKBOX -->
+    <Style x:Key="FakeProxyCheckBoxStyle"
+           TargetType="CheckBox"
+           BasedOn="{StaticResource FlatCheckBoxStyle}">
+        <Setter Property="Margin" Value="0,6,0,6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- OPTIONS GROUP BOX -->
+    <Style x:Key="FakeProxyOptionsGroupBoxStyle" TargetType="GroupBox"
+           BasedOn="{StaticResource OptionSectionGroupBoxStyle}">
+        <Setter Property="Margin" Value="0,0,0,16"/>
+    </Style>
+</ResourceDictionary>

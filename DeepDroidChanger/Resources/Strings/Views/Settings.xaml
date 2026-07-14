@@ -1,0 +1,9 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="Settings_Title">Settings</sys:String>
+    <sys:String x:Key="Settings_GeneralHeader">General</sys:String>
+    <sys:String x:Key="Settings_PlaceholderTitle">Settings workspace</sys:String>
+    <sys:String x:Key="Settings_PlaceholderDescription">Advanced settings are not implemented.</sys:String>
+</ResourceDictionary>

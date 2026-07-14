@@ -145,6 +145,7 @@ _TeamCity*
 # Coverlet is a free, cross platform Code Coverage Tool
 coverage*.json
 coverage*.xml
+!DeepDroidChanger.Tests/coverage.settings.xml
 coverage*.info
 
 # Visual Studio code coverage results
@@ -366,3 +367,5 @@ FodyWeavers.xsd
 .codex/
 PROMPT.md
 
+# Runtime state and credentials
+**/Settings/

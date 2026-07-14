@@ -1,0 +1,126 @@
+<Window x:Class="DeepDroidChanger.Views.ChangeLocationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource ChangeLocation_WindowTitle}"
+        Width="620"
+        Height="440"
+        MinWidth="520"
+        MinHeight="380"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+
+    <Grid Style="{StaticResource ChangeLocationRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- DEVICE INFO -->
+        <Border Grid.Row="0"
+                Style="{StaticResource ChangeLocationDeviceHeaderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <materialDesign:PackIcon Kind="CellphoneCog"
+                                         Style="{StaticResource ChangeLocationHeaderIconStyle}"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding DeviceInfoText}"
+                           Style="{StaticResource ChangeLocationInfoDeviceTextStyle}"/>
+            </Grid>
+        </Border>
+
+        <!-- MODE SELECTION -->
+        <GroupBox Grid.Row="1"
+                  Header="{DynamicResource ChangeLocation_ModeGroupHeader}"
+                  Style="{StaticResource ChangeLocationModeGroupBoxStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <RadioButton Grid.Row="0"
+                             Content="{DynamicResource ChangeLocation_ModeConfig}"
+                             IsChecked="{Binding IsConfigMode, Mode=TwoWay}"
+                             Style="{StaticResource ChangeLocationModeRadioStyle}"/>
+
+                <RadioButton Grid.Row="1"
+                             Content="{DynamicResource ChangeLocation_ModeDeviceIp}"
+                             IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
+                             Style="{StaticResource ChangeLocationModeRadioStyle}"/>
+            </Grid>
+        </GroupBox>
+
+        <!-- CONFIG INPUTS -->
+        <Grid Grid.Row="2"
+              Style="{StaticResource ChangeLocationSelectorGridStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0"
+                       Text="{DynamicResource ChangeLocation_LatitudeLabel}"
+                       Style="{StaticResource ChangeLocationInputLabelStyle}"/>
+            <TextBox Grid.Row="1" Grid.Column="0"
+                     Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource ChangeLocationTextBoxStyle}"
+                     IsEnabled="{Binding IsConfigMode}"/>
+            <TextBlock Grid.Row="2" Grid.Column="0"
+                       Text="{DynamicResource ChangeLocation_LatitudeHint}"
+                       Style="{StaticResource ChangeLocationHintTextStyle}"/>
+
+            <TextBlock Grid.Row="0" Grid.Column="2"
+                       Text="{DynamicResource ChangeLocation_LongitudeLabel}"
+                       Style="{StaticResource ChangeLocationInputLabelStyle}"/>
+            <TextBox Grid.Row="1" Grid.Column="2"
+                     Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource ChangeLocationTextBoxStyle}"
+                     IsEnabled="{Binding IsConfigMode}"/>
+            <TextBlock Grid.Row="2" Grid.Column="2"
+                       Text="{DynamicResource ChangeLocation_LongitudeHint}"
+                       Style="{StaticResource ChangeLocationHintTextStyle}"/>
+        </Grid>
+
+        <!-- ACTION BUTTONS -->
+        <Grid Grid.Row="3"
+              Style="{StaticResource ChangeLocationActionGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="2"
+                    Command="{Binding SaveCommand}"
+                    Style="{StaticResource ChangeLocationSaveButtonStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Play"
+                                             Style="{StaticResource ChangeLocationButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeLocation_SaveButton}"
+                               Style="{StaticResource ChangeLocationButtonTextStyle}"/>
+                </Grid>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

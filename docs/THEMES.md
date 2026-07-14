@@ -20,11 +20,14 @@ Resources/Themes/
                      Dark.xaml in Application.Resources.MergedDictionaries
                      at runtime.
 
-Load order in App.xaml matters: color file first, then Controls.xaml.
+Load order in App.xaml matters: color file first, MaterialDesign defaults,
+Controls.xaml, localization strings, then feature-specific dictionaries.
 
   <ResourceDictionary.MergedDictionaries>
     <ResourceDictionary Source="Resources/Themes/Theme.Light.xaml"/>
     <ResourceDictionary Source="Resources/Themes/Controls.xaml"/>
+    <ResourceDictionary Source="Resources/Strings/Strings.xaml"/>
+    <ResourceDictionary Source="Resources/Themes/MainWindow.xaml"/>
   </ResourceDictionary.MergedDictionaries>
 
 2. COLOR TOKENS (Brush.* - use DynamicResource, not StaticResource,
@@ -62,6 +65,12 @@ Status
   Brush.DangerPressed
   Brush.Overlay            modal backdrop overlay
 
+Device viewer
+  Brush.DeviceViewerStream stream canvas background
+  Brush.DeviceViewerBody   device frame/body
+  Brush.DeviceViewerScreen disconnected screen placeholder
+  Brush.DeviceViewerGlyph  placeholder glyph
+
 Light mode reference values: WindowBackground #F6F8FB, Surface
 #FFFFFF, TextPrimary #172033, TextSecondary #526176, Border #CBD5E1,
 Accent #2563EB, Success #15803D, Warning #B45309, Danger #DC2626.
@@ -76,13 +85,16 @@ a matching pair in both modes.
 
 3. TYPOGRAPHY
 
-Font family: Segoe UI, app-wide default.
+Font family: Metric.FontFamily (Segoe UI Variable, Segoe UI), app-wide default.
 Default weight: SemiBold, for readability (never Regular by default).
 
+  Metric.FontSize.Micro      11   compact metadata
   Metric.FontSize.Small      12   captions, hints
   Metric.FontSize.Body       14   default text, inputs, buttons
   Metric.FontSize.Subtitle   16   section subtitle
+  Metric.FontSize.SectionTitle 18 section heading
   Metric.FontSize.Title      20   page/section title, Bold weight
+  Metric.FontSize.Display    24   dialog/page display title
 
 Named text styles (Resources/Themes/Controls.xaml):
   TitleTextStyle       FontSize Title, Bold
@@ -92,14 +104,37 @@ Named text styles (Resources/Themes/Controls.xaml):
 4. SPACING AND SHAPE
 
   Metric.ControlHeight       38   default input/button height
+  Metric.ControlHeight.Comfortable 40 comfortable inputs
+  Metric.DataGridRowHeight   40   standard data row
+  Metric.DataGridEditorRowHeight 48 data row containing inline input controls
+  Metric.ToolbarMinHeight    40   standard toolbar
   Metric.BorderThickness     1    default border width
+  Metric.BorderThickness.Uniform 1 uniform Thickness resource
+  Metric.Elevation.FloatingBlurRadius     28
+  Metric.Elevation.FloatingShadowDepth    10
+  Metric.Elevation.FloatingShadowOpacity  0.24
+  Metric.Elevation.DialogBlurRadius       36
+  Metric.Elevation.DialogShadowDepth      12
+  Metric.Elevation.DialogShadowOpacity    0.28
+  Metric.Animation.HoverDuration          0:0:0.17
+  Metric.Animation.PressDuration          0:0:0.08
+  Metric.Animation.EaseOut                CubicEase/EaseOut
   Spacing.ControlPadding     12,8
   Spacing.InputPadding       12,7
   Spacing.ItemPadding        12,9
+  Spacing.PageMargin         16
+  Spacing.CardPadding        16
+  Spacing.CardPadding.Compact 12,10
+  Spacing.ButtonPadding      16,8
 
   Radius.Small    6    small controls, tags
   Radius.Medium   8    buttons, inputs, default
   Radius.Large    12   cards, panels, dialogs
+  Radius.Circle   999  circular or pill-shaped elements
+  Radius.Interactive 7 shared interactive surface
+  Radius.Overlay  10 floating overlays
+  Radius.TopMedium 8,8,0,0 top-rounded section header
+  Radius.TopLeftMedium 8,0,0,0 top-left accent strip
 
 5. CONTROL STATES (mandatory for every interactive control)
 

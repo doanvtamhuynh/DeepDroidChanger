@@ -1,0 +1,28 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="DeviceViewer_WindowTitleFormat">Device Manager - {0} ({1})</system:String>
+    <system:String x:Key="DeviceViewer_StatusChecking">Checking...</system:String>
+    <system:String x:Key="DeviceViewer_StatusConnected">Connected</system:String>
+    <system:String x:Key="DeviceViewer_StatusDisconnected">Disconnected</system:String>
+    <system:String x:Key="DeviceViewerManagerTitle">Device Manager</system:String>
+    <system:String x:Key="DeviceViewerDeviceSeparator"> - </system:String>
+    <system:String x:Key="DeviceViewerBack">Back</system:String>
+    <system:String x:Key="DeviceViewerHome">Home</system:String>
+    <system:String x:Key="DeviceViewerRecent">Recent</system:String>
+    <system:String x:Key="DeviceViewerPower">Power</system:String>
+    <system:String x:Key="DeviceViewerVolumeUp">Volume Up</system:String>
+    <system:String x:Key="DeviceViewerVolumeDown">Volume Down</system:String>
+    <system:String x:Key="DeviceViewerScreenshot">Screenshot</system:String>
+    <system:String x:Key="DeviceViewerActions">Actions</system:String>
+    <system:String x:Key="DeviceViewerInputText">INPUT TEXT</system:String>
+    <system:String x:Key="DeviceViewerInputTextHint">Enter text to send to device...</system:String>
+    <system:String x:Key="DeviceViewerSend">Send</system:String>
+    <system:String x:Key="DeviceViewerEnter">Press Enter</system:String>
+    <system:String x:Key="DeviceViewerAdbShell">ADB SHELL</system:String>
+    <system:String x:Key="DeviceViewerShellCommandHint">Enter shell command...</system:String>
+    <system:String x:Key="DeviceViewerLoadingStream">Starting scrcpy stream...</system:String>
+    <system:String x:Key="DeviceViewerStreamError">Scrcpy stream failed to start.</system:String>
+    <system:String x:Key="DeviceViewerDisconnectedAlt">Device disconnected. Waiting to reconnect...</system:String>
+    <system:String x:Key="DeviceViewerDeviceControls">DEVICE CONTROLS</system:String>
+</ResourceDictionary>

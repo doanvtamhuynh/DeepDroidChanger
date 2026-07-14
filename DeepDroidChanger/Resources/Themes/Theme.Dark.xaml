@@ -28,6 +28,10 @@
     <Color x:Key="Color.DangerHover">#EF4444</Color>
     <Color x:Key="Color.DangerPressed">#DC2626</Color>
     <Color x:Key="Color.Overlay">#99000000</Color>
+    <Color x:Key="Color.DeviceViewerStream">#000000</Color>
+    <Color x:Key="Color.DeviceViewerBody">#64748B</Color>
+    <Color x:Key="Color.DeviceViewerScreen">#020617</Color>
+    <Color x:Key="Color.DeviceViewerGlyph">#F8FAFC</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="Brush.WindowBackground" Color="{StaticResource Color.WindowBackground}"/>
@@ -56,4 +60,9 @@
     <SolidColorBrush x:Key="Brush.DangerHover" Color="{StaticResource Color.DangerHover}"/>
     <SolidColorBrush x:Key="Brush.DangerPressed" Color="{StaticResource Color.DangerPressed}"/>
     <SolidColorBrush x:Key="Brush.Overlay" Color="{StaticResource Color.Overlay}"/>
+    <SolidColorBrush x:Key="Brush.DeviceViewerStream" Color="{StaticResource Color.DeviceViewerStream}"/>
+    <SolidColorBrush x:Key="Brush.DeviceViewerBody" Color="{StaticResource Color.DeviceViewerBody}"/>
+    <SolidColorBrush x:Key="Brush.DeviceViewerScreen" Color="{StaticResource Color.DeviceViewerScreen}"/>
+    <SolidColorBrush x:Key="Brush.DeviceViewerGlyph" Color="{StaticResource Color.DeviceViewerGlyph}"/>
+
 </ResourceDictionary>

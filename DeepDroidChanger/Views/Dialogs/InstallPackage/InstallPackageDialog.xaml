@@ -1,0 +1,176 @@
+<Window x:Class="DeepDroidChanger.Views.InstallPackageDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource InstallPackage_WindowTitle}"
+        Width="780"
+        Height="660"
+        MinWidth="680"
+        MinHeight="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+
+    <Grid Style="{StaticResource InstallPackageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Style="{StaticResource InstallPackageHeaderBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <materialDesign:PackIcon Kind="CellphoneCog"
+                                         Style="{StaticResource InstallPackageHeaderIconStyle}"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding DeviceInfoText}"
+                           Style="{StaticResource InstallPackageHeaderTextStyle}"/>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="{DynamicResource InstallPackage_OptionsHeader}"
+                  Style="{StaticResource InstallPackageOptionsGroupStyle}">
+            <StackPanel Style="{StaticResource InstallPackageOptionsStackStyle}">
+                <TextBlock Text="{DynamicResource InstallPackage_OptionsHelp}"
+                           Style="{StaticResource InstallPackageOptionHelpTextStyle}"/>
+                <Border Style="{StaticResource InstallPackageOptionRowStyle}"
+                        IsEnabled="{Binding CanEditQueue}">
+                    <StackPanel Style="{StaticResource InstallPackageOptionContentStyle}">
+                        <CheckBox Content="{DynamicResource InstallPackage_GrantPermissions}"
+                                  IsChecked="{Binding GrantPermissions, Mode=TwoWay}"
+                                  Style="{StaticResource InstallPackageCheckBoxStyle}"/>
+                        <TextBlock Text="{DynamicResource InstallPackage_GrantPermissionsDescription}"
+                                   Style="{StaticResource InstallPackageOptionDescriptionTextStyle}"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource InstallPackageOptionRowStyle}"
+                        IsEnabled="{Binding CanEditQueue}">
+                    <StackPanel Style="{StaticResource InstallPackageOptionContentStyle}">
+                        <CheckBox Content="{DynamicResource InstallPackage_AllowDowngrade}"
+                                  IsChecked="{Binding AllowDowngrade, Mode=TwoWay}"
+                                  Style="{StaticResource InstallPackageCheckBoxStyle}"/>
+                        <TextBlock Text="{DynamicResource InstallPackage_AllowDowngradeDescription}"
+                                   Style="{StaticResource InstallPackageOptionDescriptionTextStyle}"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </GroupBox>
+
+        <DataGrid Grid.Row="2"
+                  ItemsSource="{Binding Packages}"
+                  SelectedItem="{Binding SelectedPackage, Mode=TwoWay}"
+                  Style="{StaticResource InstallPackageGridStyle}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Binding="{Binding FileName}"
+                                    Width="2.3*"
+                                    MinWidth="260"
+                                    ElementStyle="{StaticResource InstallPackageCellTextStyle}">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="{DynamicResource InstallPackage_ColumnFile}"
+                                   Style="{StaticResource InstallPackageColumnHeaderTextStyle}"/>
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTextColumn Binding="{Binding StatusText}"
+                                    Width="1.4*"
+                                    MinWidth="170"
+                                    ElementStyle="{StaticResource InstallPackageCenterCellTextStyle}">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="{DynamicResource InstallPackage_ColumnStatus}"
+                                   Style="{StaticResource InstallPackageColumnHeaderTextStyle}"/>
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTemplateColumn Width="1*"
+                                        MinWidth="140">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="{DynamicResource InstallPackage_ColumnProgress}"
+                                   Style="{StaticResource InstallPackageColumnHeaderTextStyle}"/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ProgressBar Value="{Binding Progress}"
+                                         Style="{StaticResource InstallPackageProgressBarStyle}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Border Grid.Row="3"
+                Style="{StaticResource InstallPackageSummaryBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding SummaryText}"
+                           Style="{StaticResource InstallPackageSummaryTextStyle}"/>
+                <ProgressBar Grid.Column="1"
+                             MinWidth="160"
+                             MaxWidth="180"
+                             Value="{Binding OverallProgress}"
+                             Style="{StaticResource InstallPackageProgressBarStyle}"/>
+            </Grid>
+        </Border>
+
+        <WrapPanel Grid.Row="4"
+                   Style="{StaticResource InstallPackageActionWrapPanelStyle}">
+            <Button Command="{Binding AddFilesCommand}"
+                    Style="{StaticResource InstallPackageButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Plus"
+                                             Style="{StaticResource InstallPackageButtonIconStyle}"/>
+                    <TextBlock Text="{DynamicResource InstallPackage_AddFiles}"
+                               Style="{StaticResource InstallPackageButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding RemoveSelectedPackageCommand}"
+                    Style="{StaticResource InstallPackageButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Delete"
+                                             Style="{StaticResource InstallPackageButtonIconStyle}"/>
+                    <TextBlock Text="{DynamicResource InstallPackage_Remove}"
+                               Style="{StaticResource InstallPackageButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding CancelCommand}"
+                    Style="{StaticResource InstallPackageCancelButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Close"
+                                             Style="{StaticResource InstallPackageButtonIconStyle}"/>
+                    <TextBlock Text="{DynamicResource InstallPackage_Cancel}"
+                               Style="{StaticResource InstallPackageButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding StartInstallCommand}"
+                    Style="{StaticResource InstallPackageStartButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Play"
+                                             Style="{StaticResource InstallPackageButtonIconStyle}"/>
+                    <TextBlock Text="{DynamicResource InstallPackage_Start}"
+                               Style="{StaticResource InstallPackageButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding CloseCommand}"
+                    Style="{StaticResource InstallPackageCloseButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Check"
+                                             Style="{StaticResource InstallPackageButtonIconStyle}"/>
+                    <TextBlock Text="{DynamicResource InstallPackage_Close}"
+                               Style="{StaticResource InstallPackageButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+        </WrapPanel>
+    </Grid>
+</Window>

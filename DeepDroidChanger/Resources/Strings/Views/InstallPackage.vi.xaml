@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <sys:String x:Key="InstallPackage_WindowTitle">Cài APK/XAPK</sys:String>
+    <sys:String x:Key="InstallPackage_OptionsHeader">Tùy chọn cài đặt</sys:String>
+    <sys:String x:Key="InstallPackage_OptionsHelp">Thiết lập mặc định phù hợp với hầu hết trường hợp.</sys:String>
+    <sys:String x:Key="InstallPackage_GrantPermissions">Tự cấp quyền ứng dụng</sys:String>
+    <sys:String x:Key="InstallPackage_GrantPermissionsDescription">Khuyến nghị. Tự cấp các quyền ứng dụng yêu cầu khi cài, giảm hộp thoại xin quyền sau khi mở ứng dụng.</sys:String>
+    <sys:String x:Key="InstallPackage_AllowDowngrade">Cài phiên bản cũ hơn nếu cần</sys:String>
+    <sys:String x:Key="InstallPackage_AllowDowngradeDescription">Tắt mặc định. Chỉ bật khi muốn thay ứng dụng đang cài bằng APK/XAPK có phiên bản thấp hơn.</sys:String>
+    <sys:String x:Key="InstallPackage_ColumnFile">Tệp</sys:String>
+    <sys:String x:Key="InstallPackage_ColumnStatus">Trạng thái</sys:String>
+    <sys:String x:Key="InstallPackage_ColumnProgress">Tiến trình</sys:String>
+    <sys:String x:Key="InstallPackage_AddFiles">Thêm tệp</sys:String>
+    <sys:String x:Key="InstallPackage_Remove">Xóa</sys:String>
+    <sys:String x:Key="InstallPackage_Start">Bắt đầu cài</sys:String>
+    <sys:String x:Key="InstallPackage_Cancel">Hủy</sys:String>
+    <sys:String x:Key="InstallPackage_Close">Đóng</sys:String>
+</ResourceDictionary>

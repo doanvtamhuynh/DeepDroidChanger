@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using System.Windows;
 
 namespace DeepDroidChanger.Themes;
@@ -12,8 +10,8 @@ public enum AppTheme
 
 public static class ThemeManager
 {
-    private const string LightThemePath = "Resources/Themes/Theme.Light.xaml";
-    private const string DarkThemePath = "Resources/Themes/Theme.Dark.xaml";
+    private const string LightThemePath = "/DeepDroidChanger;component/Resources/Themes/Theme.Light.xaml";
+    private const string DarkThemePath = "/DeepDroidChanger;component/Resources/Themes/Theme.Dark.xaml";
 
     public static void Apply(AppTheme theme)
     {

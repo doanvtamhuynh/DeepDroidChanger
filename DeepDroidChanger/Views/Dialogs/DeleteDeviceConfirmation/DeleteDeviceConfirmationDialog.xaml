@@ -1,0 +1,98 @@
+<Window x:Class="DeepDroidChanger.Views.DeleteDeviceConfirmationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource DeleteDeviceConfirmation_WindowTitle}"
+        Width="460"
+        Height="260"
+        MinWidth="420"
+        MinHeight="240"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+    <Grid Style="{StaticResource DeleteDeviceConfirmationRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Style="{StaticResource DeleteDeviceConfirmationHeaderGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <materialDesign:PackIcon Kind="DeleteAlert"
+                                     Style="{StaticResource DeleteDeviceConfirmationHeaderIconStyle}"/>
+            <TextBlock Grid.Column="1"
+                       Text="{DynamicResource DeleteDeviceConfirmation_Title}"
+                       Style="{StaticResource DeleteDeviceConfirmationTitleTextStyle}"/>
+        </Grid>
+
+        <Grid Grid.Row="1"
+              Style="{StaticResource DeleteDeviceConfirmationContentGridStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Text="{DynamicResource DeleteDeviceConfirmation_Message}"
+                       Style="{StaticResource DeleteDeviceConfirmationMessageTextStyle}"/>
+
+            <TextBlock Grid.Row="1"
+                       Text="{Binding DeviceName}"
+                       Style="{StaticResource DeleteDeviceConfirmationDeviceNameTextStyle}"/>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding DeviceSerial}"
+                       Style="{StaticResource DeleteDeviceConfirmationSerialTextStyle}"/>
+        </Grid>
+
+        <Grid Grid.Row="2"
+              Style="{StaticResource DeleteDeviceConfirmationActionGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="1"
+                    Command="{Binding CancelCommand}"
+                    Style="{StaticResource DeleteDeviceConfirmationSecondaryButtonStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Close"
+                                             Style="{StaticResource DeleteDeviceConfirmationButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource DeleteDeviceConfirmation_CancelButton}"
+                               Style="{StaticResource DeleteDeviceConfirmationButtonTextStyle}"/>
+                </Grid>
+            </Button>
+
+            <Button Grid.Column="2"
+                    Command="{Binding ConfirmCommand}"
+                    Style="{StaticResource DeleteDeviceConfirmationDangerButtonStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Delete"
+                                             Style="{StaticResource DeleteDeviceConfirmationButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource DeleteDeviceConfirmation_DeleteButton}"
+                               Style="{StaticResource DeleteDeviceConfirmationButtonTextStyle}"/>
+                </Grid>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

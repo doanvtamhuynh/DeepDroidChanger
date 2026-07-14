@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <CodeCoverage>
+    <ModulePaths>
+      <Include>
+        <ModulePath>.*DeepDroidChanger\.dll$</ModulePath>
+      </Include>
+      <Exclude>
+        <ModulePath>.*DeepDroidChanger\.Tests\.dll$</ModulePath>
+      </Exclude>
+    </ModulePaths>
+    <Functions>
+      <Include>
+        <Function>^DeepDroidChanger\.(Services|ViewModels)\..*</Function>
+      </Include>
+      <Exclude>
+        <Function>.*\.InitializeComponent\(.*</Function>
+      </Exclude>
+    </Functions>
+    <Attributes>
+      <Exclude>
+        <Attribute>^System\.Diagnostics\.CodeAnalysis\.ExcludeFromCodeCoverageAttribute$</Attribute>
+        <Attribute>^System\.CodeDom\.Compiler\.GeneratedCodeAttribute$</Attribute>
+        <Attribute>^System\.Runtime\.CompilerServices\.CompilerGeneratedAttribute$</Attribute>
+      </Exclude>
+    </Attributes>
+  </CodeCoverage>
+</Configuration>

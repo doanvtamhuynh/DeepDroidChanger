@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="UpdateIntegrity_IntegrityFileFilter">JSON files (*.json)|*.json</system:String>
+    <system:String x:Key="UpdateIntegrity_IntegrityFileTitle">Select Integrity PIF JSON file</system:String>
+    <system:String x:Key="UpdateIntegrity_KeyboxFileFilter">XML files (*.xml)|*.xml</system:String>
+    <system:String x:Key="UpdateIntegrity_KeyboxFileTitle">Select Keybox XML file</system:String>
+    <system:String x:Key="UpdateIntegrity_WindowTitle">Update Integrity</system:String>
+    <system:String x:Key="UpdateIntegrity_SourceGroupHeader">Source configuration</system:String>
+    <system:String x:Key="UpdateIntegrity_SourceServer">Use online source</system:String>
+    <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Update targets</system:String>
+    <system:String x:Key="UpdateIntegrity_TargetIntegrity">Integrity (PIF)</system:String>
+    <system:String x:Key="UpdateIntegrity_TargetKeybox">Keybox</system:String>
+    <system:String x:Key="UpdateIntegrity_IntegrityFileLabel">PIF JSON file path</system:String>
+    <system:String x:Key="UpdateIntegrity_KeyboxFileLabel">Keybox XML file path</system:String>
+    <system:String x:Key="UpdateIntegrity_BrowseButton">Browse...</system:String>
+    <system:String x:Key="UpdateIntegrity_UpdateButton">Update</system:String>
+</ResourceDictionary>

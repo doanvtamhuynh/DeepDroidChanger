@@ -1,0 +1,244 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <Style x:Key="InstallPackageRootGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="20"/>
+    </Style>
+
+    <Style x:Key="InstallPackageHeaderBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
+    <Style x:Key="InstallPackageHeaderIconStyle" TargetType="materialDesign:PackIcon">
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+    </Style>
+
+    <Style x:Key="InstallPackageHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <Style x:Key="InstallPackageOptionsGroupStyle"
+           TargetType="GroupBox"
+           BasedOn="{StaticResource OptionSectionGroupBoxStyle}">
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
+    <Style x:Key="InstallPackageCheckBoxStyle"
+           TargetType="CheckBox"
+           BasedOn="{StaticResource FlatCheckBoxStyle}">
+        <Setter Property="Margin" Value="0,0,0,4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style x:Key="InstallPackageOptionsStackStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Vertical"/>
+    </Style>
+
+    <Style x:Key="InstallPackageOptionHelpTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <Style x:Key="InstallPackageOptionRowStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="InstallPackageOptionContentStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Vertical"/>
+    </Style>
+
+    <Style x:Key="InstallPackageOptionDescriptionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="26,0,0,0"/>
+    </Style>
+
+    <Style x:Key="InstallPackageGridStyle"
+           TargetType="DataGrid"
+           BasedOn="{StaticResource FlatDataGridStyle}">
+        <Setter Property="AutoGenerateColumns" Value="False"/>
+        <Setter Property="CanUserAddRows" Value="False"/>
+        <Setter Property="CanUserDeleteRows" Value="False"/>
+        <Setter Property="CanUserResizeRows" Value="False"/>
+        <Setter Property="CanUserSortColumns" Value="False"/>
+        <Setter Property="SelectionMode" Value="Single"/>
+        <Setter Property="SelectionUnit" Value="FullRow"/>
+        <Setter Property="IsReadOnly" Value="True"/>
+        <Setter Property="RowHeight" Value="38"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+    </Style>
+
+    <Style x:Key="InstallPackageColumnHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="InstallPackageCellTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        <Setter Property="Margin" Value="12,0"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridCell}}"
+                         Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="InstallPackageCenterCellTextStyle"
+           TargetType="TextBlock"
+           BasedOn="{StaticResource InstallPackageCellTextStyle}">
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="InstallPackageProgressBarStyle" TargetType="ProgressBar">
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="Minimum" Value="0"/>
+        <Setter Property="Maximum" Value="100"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+    </Style>
+
+    <Style x:Key="InstallPackageSummaryBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Margin" Value="0,12,0,0"/>
+    </Style>
+
+    <Style x:Key="InstallPackageSummaryTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="TextTrimming" Value="None"/>
+        <Setter Property="Margin" Value="0,0,12,0"/>
+    </Style>
+
+    <Style x:Key="InstallPackageActionWrapPanelStyle" TargetType="WrapPanel">
+        <Setter Property="Margin" Value="0,14,0,0"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="InstallPackageButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource FlatButtonStyle}">
+        <Setter Property="MinWidth" Value="104"/>
+        <Setter Property="Margin" Value="0,0,8,8"/>
+        <Setter Property="Padding" Value="12,0"/>
+    </Style>
+
+    <Style x:Key="InstallPackagePrimaryButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource MaterialDesignRaisedButton}">
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+        <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+        <Setter Property="MinWidth" Value="128"/>
+        <Setter Property="Margin" Value="0,0,8,8"/>
+        <Setter Property="Padding" Value="14,0"/>
+        <Setter Property="materialDesign:ButtonAssist.CornerRadius"
+                Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="materialDesign:RippleAssist.Feedback"
+                Value="{DynamicResource Brush.AccentForeground}"/>
+        <Setter Property="materialDesign:RippleAssist.RippleOnTop" Value="True"/>
+        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style x:Key="InstallPackageCancelButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource InstallPackageButtonStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding HasCompleted}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="InstallPackageStartButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource InstallPackagePrimaryButtonStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding HasCompleted}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="InstallPackageCloseButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource InstallPackagePrimaryButtonStyle}">
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding HasCompleted}" Value="True">
+                <Setter Property="Visibility" Value="Visible"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="InstallPackageButtonIconStyle" TargetType="materialDesign:PackIcon">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,6,0"/>
+    </Style>
+
+    <Style x:Key="InstallPackageButtonTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+</ResourceDictionary>
