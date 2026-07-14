@@ -50,12 +50,18 @@ change.
 
   - Temporary extraction folders (e.g. unzip scratch folders, /tmp
     working directories)
-  - User settings or runtime device data (see docs/DESIGN.md section
-    on runtime data; this data must never exist under source control
-    in the first place)
+  - User settings or runtime device data generated under
+    `bin/<Configuration>/net10.0-windows/Settings/` (see docs/DESIGN.md
+    section 7; `bin/` already excludes it from source control)
   - Secrets, API keys, tokens, connection strings, .env files
   - bin/, obj/, .vs/, *.user (already covered by .gitignore; verify
     before committing if unsure)
+
+Do not interpret the runtime-data rule as permission to ignore every path
+named `Settings`. The application's Settings feature (Views, ViewModels,
+services, models, strings, and themes) is normal source and must remain
+trackable. Never add a broad `Settings/` pattern to `.gitignore`; distinguish
+paths by their full location as defined in docs/DESIGN.md section 7.
 
 7. CHECK BEFORE EDITING
 

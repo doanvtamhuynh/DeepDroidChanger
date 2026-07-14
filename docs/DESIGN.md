@@ -186,6 +186,22 @@ obj/
 .vs/
 *.user
 
+Do not add a repository-wide `Settings/` ignore pattern. Two different
+concepts use the word "Settings" in this project:
+
+- Runtime data is created beside the executable under
+  `bin/<Configuration>/net10.0-windows/Settings/` (for example,
+  `settings.json`, `devices.json`, and `account.json`). It is already ignored
+  because the entire `bin/` build output is ignored.
+- The Settings application feature is source code and resources, including
+  `Views/Settings/`, `ViewModels/SettingsViewModel.cs`, Settings services and
+  models, and `Resources/Strings/Views/Settings*.xaml` /
+  `Resources/Themes/Settings.xaml`. These files must remain trackable.
+
+Before changing `.gitignore` for a path named `Settings`, first resolve its
+actual location. Ignore the build-output path through `bin/`; never ignore a
+source feature merely because its name is Settings.
+
 8. CHECKLIST FOR ADDING A NEW FEATURE
 
   8.1. Create Models/<Name>.cs if new data is involved.
