@@ -35,6 +35,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IDeviceSelectionService _deviceSelectionService;
         private readonly IDeviceConfigService _deviceConfigService;
         private readonly IRandomDeviceService _randomDeviceService;
+        private readonly ISimProfileService _simProfileService;
         private readonly IDeviceActionService _deviceActionService;
         private readonly ILocalizationService _localizationService;
         private readonly AppSettings _settings;
@@ -43,6 +44,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IPollingService _pollingService;
         private readonly SemaphoreSlim _deviceRefreshLock = new(1, 1);
         private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+        private readonly SemaphoreSlim _randomProfileLock = new(1, 1);
         private readonly object _pendingDeviceEditsLock = new();
         private readonly Dictionary<string, PendingDeviceEdit> _pendingDeviceEdits = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _pendingProfileEditLock = new();
@@ -96,6 +98,7 @@ namespace DeepDroidChanger.ViewModels
             IDeviceSelectionService deviceSelectionService,
             IDeviceConfigService deviceConfigService,
             IRandomDeviceService randomDeviceService,
+            ISimProfileService simProfileService,
             IDeviceActionService deviceActionService,
             ILocalizationService localizationService,
             AppSettings settings,
@@ -122,6 +125,7 @@ namespace DeepDroidChanger.ViewModels
             _deviceSelectionService = deviceSelectionService;
             _deviceConfigService = deviceConfigService;
             _randomDeviceService = randomDeviceService;
+            _simProfileService = simProfileService;
             _deviceActionService = deviceActionService;
             _localizationService = localizationService;
             _settings = settings;
@@ -505,24 +509,15 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand]
         private async Task RandomDeviceAsync(CancellationToken cancellationToken)
         {
-            if (SelectedDevice == null)
-            {
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.SelectDeviceFirst, cancellationToken).ConfigureAwait(true);
+            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            if (device == null)
                 return;
-            }
 
-            var device = SelectedDevice;
-            SelectSingleDevice(device);
-
-            if (device.ConnectionStatus != AdbDeviceStatus.Online)
-            {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.DeviceMustBeOnline, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
-                return;
-            }
-
+            var randomProfileLockTaken = false;
             try
             {
+                await _randomProfileLock.WaitAsync(cancellationToken).ConfigureAwait(true);
+                randomProfileLockTaken = true;
                 SetDeviceLog(device, DeviceLogResourceKeys.RandomDevice);
                 var randomResult = await _randomDeviceService
                     .CreateRandomProfileAsync(
@@ -564,6 +559,11 @@ namespace DeepDroidChanger.ViewModels
                 await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, CancellationToken.None).ConfigureAwait(true);
                 SetDeviceLog(device, DeviceLogResourceKeys.Ready);
             }
+            finally
+            {
+                if (randomProfileLockTaken)
+                    _randomProfileLock.Release();
+            }
         }
 
         [RelayCommand]
@@ -593,13 +593,54 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand]
         private async Task RandomSimAsync(CancellationToken cancellationToken)
         {
-            if (SelectedDevice == null)
+            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            if (device == null)
+                return;
+
+            var randomProfileLockTaken = false;
+            try
+            {
+                await _randomProfileLock.WaitAsync(cancellationToken).ConfigureAwait(true);
+                randomProfileLockTaken = true;
+                SetDeviceLog(device, DeviceLogResourceKeys.RandomSim);
+                SimProfile simProfile = _simProfileService.CreateRandomProfile(SelectedCountry, SelectedCarrier);
+                ApplyRandomSimInfo(simProfile);
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomSimSuccess, cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
+            catch (OperationCanceledException)
+            {
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to generate random SIM information.");
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomSimFailed, CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
+            finally
+            {
+                if (randomProfileLockTaken)
+                    _randomProfileLock.Release();
+            }
+        }
+
+        private async Task<DeviceRowViewModel?> GetSelectedOnlineDeviceAsync(CancellationToken cancellationToken)
+        {
+            DeviceRowViewModel? device = SelectedDevice;
+            if (device == null)
             {
                 await ShowToolbarLogAsync(DeviceLogResourceKeys.SelectDeviceFirst, cancellationToken).ConfigureAwait(true);
-                return;
+                return null;
             }
-            await ShowDeviceLogAsync(SelectedDevice, DeviceLogResourceKeys.RandomSim, cancellationToken).ConfigureAwait(true);
-            SetDeviceLog(SelectedDevice, DeviceLogResourceKeys.Ready);
+
+            SelectSingleDevice(device);
+            if (device.ConnectionStatus == AdbDeviceStatus.Online)
+                return device;
+
+            await ShowDeviceLogAsync(device, DeviceLogResourceKeys.DeviceMustBeOnline, cancellationToken).ConfigureAwait(true);
+            SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            return null;
         }
 
         [RelayCommand]
@@ -1796,6 +1837,26 @@ namespace DeepDroidChanger.ViewModels
                 : randomDevice.SimOperatorName;
             DeviceInfo.PhoneNumber = randomDevice.SimPhoneNumber;
             DeviceInfo.Mac = randomDevice.WifiMacAddress;
+        }
+
+        private void ApplyRandomSimInfo(SimProfile simProfile)
+        {
+            DeviceInfo.Iccid = simProfile.Iccid;
+            DeviceInfo.Imsi = simProfile.Imsi;
+            DeviceInfo.Operator = string.IsNullOrWhiteSpace(simProfile.OperatorName)
+                ? simProfile.OperatorNumeric
+                : simProfile.OperatorName;
+            DeviceInfo.PhoneNumber = simProfile.PhoneNumber;
+
+            if (_lastRandomDeviceInfo == null)
+                return;
+
+            _lastRandomDeviceInfo.Iccid = simProfile.Iccid;
+            _lastRandomDeviceInfo.Imsi = simProfile.Imsi;
+            _lastRandomDeviceInfo.SimPhoneNumber = simProfile.PhoneNumber;
+            _lastRandomDeviceInfo.SimOperatorNumeric = simProfile.OperatorNumeric;
+            _lastRandomDeviceInfo.SimOperatorCountry = simProfile.OperatorCountry;
+            _lastRandomDeviceInfo.SimOperatorName = simProfile.OperatorName;
         }
 
         private static string GetAndroidVersionDisplay(string? release, string? sdk)

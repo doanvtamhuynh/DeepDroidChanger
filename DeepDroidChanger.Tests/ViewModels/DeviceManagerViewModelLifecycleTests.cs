@@ -412,6 +412,211 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
+    public async Task RandomSim_UpdatesOnlySimFieldsForSelectedCarrier()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                CountryIso = "vn",
+                CountryName = "Vietnam",
+                Carrier = "Viettel",
+                CarrierMcc = "452",
+                CarrierMnc = "04"
+            }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns(
+            [new CarrierProfile("vn", "84", "Vietnam", "Viettel", "452", "04")]);
+        ISimProfileService simProfileService = Substitute.For<ISimProfileService>();
+        simProfileService.CreateRandomProfile(Arg.Any<CarrierCountryOption?>(), Arg.Any<CarrierOption?>())
+            .Returns(new SimProfile
+            {
+                Imsi = "452041234567890",
+                Iccid = "8984041234567890123",
+                PhoneNumber = "+84901234567",
+                OperatorNumeric = "45204",
+                OperatorCountry = "vn",
+                OperatorName = "Viettel"
+            });
+        var viewModel = CreateViewModel(deviceList, carriers, simProfileService: simProfileService);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.DeviceInfo.Model = "Existing model";
+
+        await viewModel.RandomSimCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("452041234567890", viewModel.DeviceInfo.Imsi);
+        Assert.AreEqual("8984041234567890123", viewModel.DeviceInfo.Iccid);
+        Assert.AreEqual("+84901234567", viewModel.DeviceInfo.PhoneNumber);
+        Assert.AreEqual("Viettel", viewModel.DeviceInfo.Operator);
+        Assert.AreEqual("Existing model", viewModel.DeviceInfo.Model);
+        simProfileService.Received(1).CreateRandomProfile(
+            Arg.Is<CarrierCountryOption>(country => country.CountryIso == "vn"),
+            Arg.Is<CarrierOption>(carrier => carrier.Mcc == "452" && carrier.Mnc == "04"));
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RandomSim_OfflineDevice_DoesNotGenerateOrChangeSimFields()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, []));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        ISimProfileService simProfileService = Substitute.For<ISimProfileService>();
+        var viewModel = CreateViewModel(deviceList, carriers, simProfileService: simProfileService);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.DeviceInfo.Imsi = "existing-imsi";
+        viewModel.DeviceInfo.Iccid = "existing-iccid";
+        viewModel.DeviceInfo.PhoneNumber = "existing-phone";
+        viewModel.DeviceInfo.Operator = "existing-operator";
+
+        await viewModel.RandomSimCommand.ExecuteAsync(null);
+
+        simProfileService.DidNotReceiveWithAnyArgs().CreateRandomProfile(default, default);
+        Assert.AreEqual("existing-imsi", viewModel.DeviceInfo.Imsi);
+        Assert.AreEqual("existing-iccid", viewModel.DeviceInfo.Iccid);
+        Assert.AreEqual("existing-phone", viewModel.DeviceInfo.PhoneNumber);
+        Assert.AreEqual("existing-operator", viewModel.DeviceInfo.Operator);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RandomSim_AfterRandomDevice_KeepsFullProfileInSync()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var generatedDevice = new DeviceInfoApiDevice { Model = "Generated model" };
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, generatedDevice));
+        ISimProfileService simProfileService = Substitute.For<ISimProfileService>();
+        simProfileService.CreateRandomProfile(Arg.Any<CarrierCountryOption?>(), Arg.Any<CarrierOption?>())
+            .Returns(new SimProfile
+            {
+                Imsi = "452041234567890",
+                Iccid = "8984041234567890123",
+                PhoneNumber = "+84901234567",
+                OperatorNumeric = "45204",
+                OperatorCountry = "vn",
+                OperatorName = "Viettel"
+            });
+        IRandomDeviceInfoDialogService randomDeviceInfoDialog = Substitute.For<IRandomDeviceInfoDialogService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            randomDeviceInfoDialog: randomDeviceInfoDialog,
+            simProfileService: simProfileService);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await viewModel.RandomSimCommand.ExecuteAsync(null);
+        await viewModel.ViewRandomDeviceInfoCommand.ExecuteAsync(null);
+
+        await randomDeviceInfoDialog.Received(1).ShowRandomDeviceInfoAsync(
+            Arg.Is<DeviceInfoApiDevice>(device =>
+                device.Imsi == "452041234567890"
+                && device.Iccid == "8984041234567890123"
+                && device.SimPhoneNumber == "+84901234567"
+                && device.SimOperatorNumeric == "45204"
+                && device.SimOperatorCountry == "vn"
+                && device.SimOperatorName == "Viettel"),
+            Arg.Any<CancellationToken>());
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RandomSim_WhileRandomDeviceIsRunning_WaitsAndWinsInInvocationOrder()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var randomDeviceStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var randomDeviceCompletion = new TaskCompletionSource<RandomDeviceResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                randomDeviceStarted.TrySetResult();
+                return randomDeviceCompletion.Task;
+            });
+        ISimProfileService simProfileService = Substitute.For<ISimProfileService>();
+        simProfileService.CreateRandomProfile(Arg.Any<CarrierCountryOption?>(), Arg.Any<CarrierOption?>())
+            .Returns(new SimProfile
+            {
+                Imsi = "sim-imsi",
+                Iccid = "sim-iccid",
+                PhoneNumber = "sim-phone",
+                OperatorName = "SIM operator"
+            });
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            simProfileService: simProfileService);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task randomDeviceTask = viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await randomDeviceStarted.Task;
+        Task randomSimTask = viewModel.RandomSimCommand.ExecuteAsync(null);
+        simProfileService.DidNotReceiveWithAnyArgs().CreateRandomProfile(default, default);
+
+        randomDeviceCompletion.SetResult(new RandomDeviceResult(
+            RandomDeviceStatus.Created,
+            new DeviceInfoApiDevice
+            {
+                Model = "Generated model",
+                Imsi = "device-imsi",
+                Iccid = "device-iccid",
+                SimPhoneNumber = "device-phone",
+                SimOperatorName = "Device operator"
+            }));
+        await Task.WhenAll(randomDeviceTask, randomSimTask);
+
+        simProfileService.Received(1).CreateRandomProfile(
+            Arg.Any<CarrierCountryOption?>(),
+            Arg.Any<CarrierOption?>());
+        Assert.AreEqual("sim-imsi", viewModel.DeviceInfo.Imsi);
+        Assert.AreEqual("sim-iccid", viewModel.DeviceInfo.Iccid);
+        Assert.AreEqual("sim-phone", viewModel.DeviceInfo.PhoneNumber);
+        Assert.AreEqual("SIM operator", viewModel.DeviceInfo.Operator);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
     public void SelectedBrand_FiltersAndroidVersionsAndClearsIncompatibleSelection()
     {
         var viewModel = CreateViewModel(
@@ -482,6 +687,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IPollingService? polling = null,
         IRandomDeviceService? randomDevice = null,
         IRandomDeviceInfoDialogService? randomDeviceInfoDialog = null,
+        ISimProfileService? simProfileService = null,
         AppSettings? settings = null)
     {
         return new DeviceManagerViewModel(
@@ -504,6 +710,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             new DeviceSelectionService(),
             deviceConfig ?? Substitute.For<IDeviceConfigService>(),
             randomDevice ?? Substitute.For<IRandomDeviceService>(),
+            simProfileService ?? Substitute.For<ISimProfileService>(),
             Substitute.For<IDeviceActionService>(),
             CreateLocalizationService(),
             settings ?? new AppSettings(),

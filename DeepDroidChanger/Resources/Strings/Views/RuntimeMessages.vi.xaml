@@ -24,7 +24,9 @@
     <sys:String x:Key="Log_DeviceMustBeOnline">Thiết bị phải đang trực tuyến</sys:String>
     <sys:String x:Key="Log_ChangeDevice">Đổi thiết bị hiện chưa được triển khai.</sys:String>
     <sys:String x:Key="Log_RandomAndChangeDevice">Tạo ngẫu nhiên và đổi thiết bị hiện chưa được triển khai.</sys:String>
-    <sys:String x:Key="Log_RandomSim">Tạo SIM ngẫu nhiên hiện chưa được triển khai.</sys:String>
+    <sys:String x:Key="Log_RandomSim">Đang tạo thông tin SIM ngẫu nhiên...</sys:String>
+    <sys:String x:Key="Log_RandomSimSuccess">Đã tạo thông tin SIM ngẫu nhiên</sys:String>
+    <sys:String x:Key="Log_RandomSimFailed">Tạo thông tin SIM ngẫu nhiên thất bại</sys:String>
     <sys:String x:Key="Log_ChangeSim">Đổi SIM hiện chưa được triển khai.</sys:String>
     <sys:String x:Key="Log_ResolvingByIp">Đang lấy dữ liệu theo IP...</sys:String>
     <sys:String x:Key="Log_ApplyingLocation">Đang áp dụng vị trí...</sys:String>

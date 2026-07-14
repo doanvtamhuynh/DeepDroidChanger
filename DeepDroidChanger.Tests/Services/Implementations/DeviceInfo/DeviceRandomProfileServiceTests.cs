@@ -21,7 +21,7 @@ public sealed class DeviceRandomProfileServiceTests
         };
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
             .Returns(apiDevice);
-        var service = new DeviceRandomProfileService(api, new DeterministicRandomService());
+        DeviceRandomProfileService service = CreateService(api);
         var session = CreateSession();
         var request = new RandomDeviceRequest
         {
@@ -43,7 +43,7 @@ public sealed class DeviceRandomProfileServiceTests
         Assert.AreEqual("34", result.Sdk);
         Assert.AreEqual("45204", result.SimOperatorNumeric);
         Assert.AreEqual("vn", result.SimOperatorCountry);
-        Assert.AreEqual("Viettel", result.SimOperatorName);
+        Assert.AreEqual("Viettel - Mobile", result.SimOperatorName);
         Assert.StartsWith("+84", result.SimPhoneNumber);
         Assert.AreEqual(15, result.Imei!.Length);
         Assert.AreEqual(15, result.Imei1!.Length);
@@ -59,7 +59,7 @@ public sealed class DeviceRandomProfileServiceTests
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
             .Returns(new DeviceInfoApiDevice { Model = "Model" });
-        var service = new DeviceRandomProfileService(api, new DeterministicRandomService());
+        DeviceRandomProfileService service = CreateService(api);
 
         DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
             CreateSession(),
@@ -79,7 +79,7 @@ public sealed class DeviceRandomProfileServiceTests
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
             .Returns(new DeviceInfoApiDevice { Model = "OnePlus", Fingerprint = "short/value" });
-        var service = new DeviceRandomProfileService(api, new DeterministicRandomService());
+        DeviceRandomProfileService service = CreateService(api);
 
         await service.CreateRandomProfileAsync(
             CreateSession(),
@@ -98,7 +98,7 @@ public sealed class DeviceRandomProfileServiceTests
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
             .Returns(new DeviceInfoApiDevice());
-        var service = new DeviceRandomProfileService(api, new DeterministicRandomService());
+        DeviceRandomProfileService service = CreateService(api);
 
         await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.CreateRandomProfileAsync(
             CreateSession(), new RandomDeviceRequest(), CancellationToken.None));
@@ -108,7 +108,7 @@ public sealed class DeviceRandomProfileServiceTests
     public async Task CreateRandomProfileAsync_NullRequest_ThrowsBeforeApiCall()
     {
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
-        var service = new DeviceRandomProfileService(api, new DeterministicRandomService());
+        DeviceRandomProfileService service = CreateService(api);
 
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => service.CreateRandomProfileAsync(
             CreateSession(), null!, CancellationToken.None));
@@ -116,6 +116,12 @@ public sealed class DeviceRandomProfileServiceTests
     }
 
     private static AccountSession CreateSession() => new("https://example.test/graphql", "authorization", "token");
+
+    private static DeviceRandomProfileService CreateService(IDeviceRandomApiService api)
+    {
+        var randomService = new DeterministicRandomService();
+        return new DeviceRandomProfileService(api, randomService, new SimProfileService(randomService));
+    }
 
     private sealed class DeterministicRandomService : IRandomService
     {

@@ -24,7 +24,9 @@
     <sys:String x:Key="Log_DeviceMustBeOnline">Device must be online</sys:String>
     <sys:String x:Key="Log_ChangeDevice">Change Device is not implemented yet.</sys:String>
     <sys:String x:Key="Log_RandomAndChangeDevice">Random &amp; Change Device is not implemented yet.</sys:String>
-    <sys:String x:Key="Log_RandomSim">Random SIM is not implemented yet.</sys:String>
+    <sys:String x:Key="Log_RandomSim">Generating random SIM information...</sys:String>
+    <sys:String x:Key="Log_RandomSimSuccess">Random SIM information generated</sys:String>
+    <sys:String x:Key="Log_RandomSimFailed">Failed to generate random SIM information</sys:String>
     <sys:String x:Key="Log_ChangeSim">Change SIM is not implemented yet.</sys:String>
     <sys:String x:Key="Log_ResolvingByIp">Resolving by IP...</sys:String>
     <sys:String x:Key="Log_ApplyingLocation">Applying location...</sys:String>

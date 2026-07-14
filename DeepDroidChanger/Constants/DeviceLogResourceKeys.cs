@@ -26,6 +26,8 @@ public static class DeviceLogResourceKeys
     public const string ChangeDevice = "Log_ChangeDevice";
     public const string RandomAndChangeDevice = "Log_RandomAndChangeDevice";
     public const string RandomSim = "Log_RandomSim";
+    public const string RandomSimSuccess = "Log_RandomSimSuccess";
+    public const string RandomSimFailed = "Log_RandomSimFailed";
     public const string ChangeSim = "Log_ChangeSim";
     public const string ResolvingByIp = "Log_ResolvingByIp";
     public const string ApplyingLocation = "Log_ApplyingLocation";

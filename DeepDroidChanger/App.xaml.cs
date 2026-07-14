@@ -137,6 +137,7 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceViewerStreamService, DeviceViewerStreamService>();
 
         services.AddSingleton<IDeviceRandomProfileService, DeviceRandomProfileService>();
+        services.AddSingleton<ISimProfileService, SimProfileService>();
         services.AddSingleton<IDeviceListService, DeviceListService>();
         services.AddSingleton<IDeviceSelectionService, DeviceSelectionService>();
         services.AddSingleton<IDeviceConfigService, DeviceConfigService>();

@@ -9,12 +9,6 @@ namespace DeepDroidChanger.Services
 
         private const string DefaultBrand = "samsung";
         private const int DefaultSdk = 33;
-        private const string DefaultMcc = "310";
-        private const string DefaultMnc = "260";
-        private const string DefaultCountryCode = "1";
-        private const string DefaultCountryIso = "us";
-        private const string DefaultCarrierName = "T-Mobile";
-
         private static readonly string[] BrandsPool = { "google", "OnePlus", "OPPO", "samsung", "vivo", "Xiaomi" };
         private static readonly IReadOnlyList<string> SupportedSdkLevels =
             DeviceProfileOptions.SupportedAndroidVersions
@@ -38,11 +32,16 @@ namespace DeepDroidChanger.Services
 
         private readonly IDeviceRandomApiService _deviceRandomApiService;
         private readonly IRandomService _randomService;
+        private readonly ISimProfileService _simProfileService;
 
-        public DeviceRandomProfileService(IDeviceRandomApiService deviceRandomApiService, IRandomService randomService)
+        public DeviceRandomProfileService(
+            IDeviceRandomApiService deviceRandomApiService,
+            IRandomService randomService,
+            ISimProfileService simProfileService)
         {
             _deviceRandomApiService = deviceRandomApiService;
             _randomService = randomService;
+            _simProfileService = simProfileService;
         }
 
         public async Task<DeviceInfoApiDevice> CreateRandomProfileAsync(AccountSession session, RandomDeviceRequest request, CancellationToken cancellationToken)
@@ -114,20 +113,13 @@ namespace DeepDroidChanger.Services
 
         private void ApplyGeneratedValues(DeviceInfoApiDevice device, RandomDeviceRequest request)
         {
-            var mcc = NormalizeDigits(request.Carrier?.Mcc, DefaultMcc);
-            var mnc = NormalizeDigits(request.Carrier?.Mnc, DefaultMnc);
-            var countryCode = NormalizeDigits(request.Country?.CountryCode, DefaultCountryCode);
-            var countryIso = string.IsNullOrWhiteSpace(request.Country?.CountryIso)
-                ? DefaultCountryIso
-                : request.Country.CountryIso.Trim().ToLowerInvariant();
-            var carrierName = NormalizeCarrierName(request.Carrier?.CarrierName);
-
-            device.Imsi = _randomService.GenerateImsi(mcc, mnc);
-            device.Iccid = _randomService.GenerateIccid(countryCode, mnc);
-            device.SimPhoneNumber = string.Concat("+", countryCode, _randomService.GeneratePhoneNumber());
-            device.SimOperatorNumeric = string.Concat(mcc, mnc);
-            device.SimOperatorCountry = countryIso;
-            device.SimOperatorName = carrierName;
+            SimProfile simProfile = _simProfileService.CreateRandomProfile(request.Country, request.Carrier);
+            device.Imsi = simProfile.Imsi;
+            device.Iccid = simProfile.Iccid;
+            device.SimPhoneNumber = simProfile.PhoneNumber;
+            device.SimOperatorNumeric = simProfile.OperatorNumeric;
+            device.SimOperatorCountry = simProfile.OperatorCountry;
+            device.SimOperatorName = simProfile.OperatorName;
         }
 
         private void NormalizeFingerprint(DeviceInfoApiDevice device)
@@ -226,20 +218,5 @@ namespace DeepDroidChanger.Services
             };
         }
 
-        private static string NormalizeDigits(string? value, string fallback)
-        {
-            var digits = string.Concat((value ?? string.Empty).Where(char.IsDigit));
-            return digits.Length == 0 ? fallback : digits;
-        }
-
-        private static string NormalizeCarrierName(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return DefaultCarrierName;
-
-            var carrierName = value.Trim();
-            var delimiterIndex = carrierName.LastIndexOf('-');
-            return delimiterIndex > 0 ? carrierName[..delimiterIndex].Trim() : carrierName;
-        }
     }
 }
