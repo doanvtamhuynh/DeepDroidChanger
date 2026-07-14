@@ -11,6 +11,12 @@ public sealed partial class DeviceInfoFormViewModel : ObservableObject
     private string _model = string.Empty;
 
     [ObservableProperty]
+    private string _brand = string.Empty;
+
+    [ObservableProperty]
+    private string _androidVersion = string.Empty;
+
+    [ObservableProperty]
     private string _serial = string.Empty;
 
     [ObservableProperty]

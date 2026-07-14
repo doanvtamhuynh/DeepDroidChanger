@@ -49,6 +49,8 @@ public sealed class UiSurfaceSmokeTests
                         MeasureDialog<LoginDialog, LoginViewModel>(provider);
                         MeasureDialog<AddDevicesDialog, AddDevicesViewModel>(provider);
                         MeasureDialog<DeleteDeviceConfirmationDialog, DeleteDeviceConfirmationViewModel>(provider);
+                        MeasureDialog<RandomDeviceInfoDialog, RandomDeviceInfoViewModel>(provider);
+                        VerifyRandomDeviceInfoUpdateButton(provider);
                         MeasureDialog<ChangeLocationDialog, ChangeLocationViewModel>(provider);
                         MeasureDialog<ChangeTimezoneDialog, ChangeTimezoneViewModel>(provider);
                         MeasureDialog<FakeProxyDialog, FakeProxyViewModel>(provider);
@@ -113,6 +115,23 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreEqual(56d, sidebarColumn.Width.Value);
         toggleButton.Command.Execute(null);
         Assert.AreEqual(248d, sidebarColumn.Width.Value);
+    }
+
+    private static void VerifyRandomDeviceInfoUpdateButton(IServiceProvider provider)
+    {
+        RandomDeviceInfoDialog dialog = provider.GetRequiredService<RandomDeviceInfoDialog>();
+        var button = Assert.IsInstanceOfType<Button>(dialog.FindName("UpdateRandomDeviceInfoButton"));
+        Assert.IsInstanceOfType<System.Windows.Controls.Grid>(button.Content);
+        var icon = Assert.IsInstanceOfType<MaterialDesignThemes.Wpf.PackIcon>(
+            dialog.FindName("UpdateRandomDeviceInfoIcon"));
+        var text = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("UpdateRandomDeviceInfoText"));
+        object accentForeground = Application.Current.FindResource("Brush.AccentForeground");
+
+        Assert.AreSame(Application.Current.FindResource("MaterialDesignRaisedButton"), button.Style.BasedOn);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.PlayArrow, icon.Kind);
+        Assert.AreSame(accentForeground, button.Foreground);
+        Assert.AreSame(accentForeground, icon.Foreground);
+        Assert.AreSame(accentForeground, text.Foreground);
     }
 
     private static void VerifyInteractiveStyles()
@@ -225,8 +244,30 @@ public sealed class UiSurfaceSmokeTests
             .ToArray();
         CollectionAssert.AreEquivalent(DeviceTableColumnSettings.DefaultRatios.Keys.ToArray(), columnKeys);
         Assert.AreEqual(columnKeys.Length, columnKeys.Distinct(StringComparer.Ordinal).Count());
+        var deviceManagerRootGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceManagerRootGrid"));
+        Assert.AreEqual(new GridLength(360d), deviceManagerRootGrid.RowDefinitions[2].Height);
+        var deviceProfilePanelScrollViewer = Assert.IsInstanceOfType<ScrollViewer>(deviceManagerView.FindName("DeviceProfilePanelScrollViewer"));
+        Assert.AreEqual(ScrollBarVisibility.Auto, deviceProfilePanelScrollViewer.VerticalScrollBarVisibility);
+        Assert.AreEqual(ScrollBarVisibility.Disabled, deviceProfilePanelScrollViewer.HorizontalScrollBarVisibility);
+        var deviceProfilePanelContentGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceProfilePanelContentGrid"));
+        Assert.AreEqual(new Thickness(0d, 10d, 16d, 0d), deviceProfilePanelContentGrid.Margin);
+        var deviceActionGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceActionGrid"));
+        Assert.IsFalse(deviceActionGrid.Parent is ScrollViewer);
+        var viewAllDeviceInfoButton = Assert.IsInstanceOfType<Button>(deviceManagerView.FindName("ViewAllDeviceInfoButton"));
+        Assert.IsFalse(viewAllDeviceInfoButton.IsEnabled);
+        Assert.AreSame(Application.Current.FindResource("DeviceActionButtonStyle"), viewAllDeviceInfoButton.Style.BasedOn);
+        AssertGridPosition(deviceManagerView, "DeviceInfoNameTextBox", 0, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoOperatorTextBox", 0, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoBrandTextBox", 1, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoPhoneNumberTextBox", 1, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoAndroidVersionTextBox", 2, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoIccidTextBox", 2, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoSerialTextBox", 3, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoImsiTextBox", 3, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoImeiTextBox", 4, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoMacTextBox", 4, 3);
         var deviceConfigGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceConfigFormGrid"));
-        Assert.HasCount(5, deviceConfigGrid.RowDefinitions);
+        Assert.HasCount(6, deviceConfigGrid.RowDefinitions);
         Assert.IsFalse(deviceConfigGrid.Children
             .OfType<System.Windows.Controls.TextBlock>()
             .Any(textBlock => string.Equals(textBlock.Text, "Timezone", StringComparison.OrdinalIgnoreCase)
@@ -260,12 +301,50 @@ public sealed class UiSurfaceSmokeTests
             new CarrierOption("Viettel", "452", "04"),
             "Viettel (MCC 452 / MNC 04)");
 
+        RandomDeviceInfoDialog randomDeviceInfoDialog = provider.GetRequiredService<RandomDeviceInfoDialog>();
+        var randomDeviceInfoFields = Assert.IsInstanceOfType<ItemsControl>(randomDeviceInfoDialog.FindName("RandomDeviceInfoFields"));
+        var randomDeviceInfoPanel = Assert.IsInstanceOfType<UniformGrid>(randomDeviceInfoFields.ItemsPanel.LoadContent());
+        Assert.AreEqual(2, randomDeviceInfoPanel.Columns);
+        Assert.IsInstanceOfType<Button>(randomDeviceInfoDialog.FindName("UpdateRandomDeviceInfoButton"));
+        Style randomDeviceInfoInputStyle = Assert.IsInstanceOfType<Style>(
+            Application.Current.FindResource("RandomDeviceInfoInputStyle"));
+        foreach (string fieldKey in new[] { "Fingerprint", "Serial" })
+        {
+            var input = new TextBox
+            {
+                DataContext = new RandomDeviceInfoField(fieldKey, fieldKey, $"long/{fieldKey}/value"),
+                Style = randomDeviceInfoInputStyle
+            };
+            input.Measure(new Size(300, double.PositiveInfinity));
+            input.ApplyTemplate();
+            var contentHost = Assert.IsInstanceOfType<ScrollViewer>(
+                input.Template.FindName("PART_ContentHost", input));
+
+            Assert.IsTrue(double.IsNaN(input.Height));
+            Assert.AreEqual(TextWrapping.Wrap, input.TextWrapping);
+            Assert.AreEqual(ScrollBarVisibility.Disabled, input.HorizontalScrollBarVisibility);
+            Assert.AreEqual(ScrollBarVisibility.Disabled, input.VerticalScrollBarVisibility);
+            Assert.AreEqual(ScrollBarVisibility.Disabled, contentHost.HorizontalScrollBarVisibility);
+            Assert.AreEqual(ScrollBarVisibility.Disabled, contentHost.VerticalScrollBarVisibility);
+        }
+
         ChangeTimezoneDialog timezoneDialog = provider.GetRequiredService<ChangeTimezoneDialog>();
         AssertTemplateText(
             timezoneDialog,
             "TimezoneComboBox",
             new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "UTC +07:00", "Vietnam — Asia/Ho_Chi_Minh (UTC +07:00)"),
             "Vietnam — Asia/Ho_Chi_Minh (UTC +07:00)");
+    }
+
+    private static void AssertGridPosition(
+        FrameworkElement owner,
+        string elementName,
+        int expectedRow,
+        int expectedColumn)
+    {
+        var element = Assert.IsInstanceOfType<FrameworkElement>(owner.FindName(elementName));
+        Assert.AreEqual(expectedRow, System.Windows.Controls.Grid.GetRow(element), elementName);
+        Assert.AreEqual(expectedColumn, System.Windows.Controls.Grid.GetColumn(element), elementName);
     }
 
     private static void AssertTemplateText(

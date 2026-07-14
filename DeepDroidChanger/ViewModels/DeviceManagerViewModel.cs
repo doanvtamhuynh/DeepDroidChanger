@@ -16,8 +16,6 @@ namespace DeepDroidChanger.ViewModels
         private const int DeviceNameSaveDebounceMilliseconds = 300;
         private const string DefaultCountryIso = "us";
 
-        private static readonly string[] BrandOptions = { "Random", "Google", "Samsung", "Xiaomi", "OnePlus", "OPPO", "vivo" };
-        private static readonly string[] AndroidVersionOptions = { "Random", "Android 13", "Android 14", "Android 15" };
         private readonly IAddDevicesDialogService _addDevicesDialogService;
         private readonly ICarrierDataService _carrierDataService;
         private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
@@ -32,6 +30,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IInstallPackageDialogService _installPackageDialogService;
         private readonly IDeviceViewerDialogService _deviceViewerDialogService;
         private readonly IDeleteDeviceConfirmationDialogService _deleteDeviceConfirmationDialogService;
+        private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
         private readonly IDeviceListService _deviceListService;
         private readonly IDeviceSelectionService _deviceSelectionService;
         private readonly IDeviceConfigService _deviceConfigService;
@@ -52,6 +51,7 @@ namespace DeepDroidChanger.ViewModels
         private Task? _pollTask;
         private List<StoredDeviceConfig> _storedDevices = new();
         private List<CarrierProfile> _carrierProfiles = new();
+        private DeviceInfoApiDevice? _lastRandomDeviceInfo;
 
         private DeviceRowViewModel? _selectedDevice;
         private bool _isRefreshingRows;
@@ -91,6 +91,7 @@ namespace DeepDroidChanger.ViewModels
             IInstallPackageDialogService installPackageDialogService,
             IDeviceViewerDialogService deviceViewerDialogService,
             IDeleteDeviceConfirmationDialogService deleteDeviceConfirmationDialogService,
+            IRandomDeviceInfoDialogService randomDeviceInfoDialogService,
             IDeviceListService deviceListService,
             IDeviceSelectionService deviceSelectionService,
             IDeviceConfigService deviceConfigService,
@@ -116,6 +117,7 @@ namespace DeepDroidChanger.ViewModels
             _installPackageDialogService = installPackageDialogService;
             _deviceViewerDialogService = deviceViewerDialogService;
             _deleteDeviceConfirmationDialogService = deleteDeviceConfirmationDialogService;
+            _randomDeviceInfoDialogService = randomDeviceInfoDialogService;
             _deviceListService = deviceListService;
             _deviceSelectionService = deviceSelectionService;
             _deviceConfigService = deviceConfigService;
@@ -129,10 +131,11 @@ namespace DeepDroidChanger.ViewModels
             Devices = new ObservableCollection<DeviceRowViewModel>();
             Countries = new ObservableCollection<CarrierCountryOption>();
             Carriers = new ObservableCollection<CarrierOption>();
+            AndroidVersions = new ObservableCollection<string>();
             DeviceInfo = CreateDefaultDeviceInfo();
 
-            Brands = BrandOptions;
-            AndroidVersions = AndroidVersionOptions;
+            Brands = DeviceProfileOptions.Brands;
+            UpdateAndroidVersionOptions(DeviceProfileOptions.Random, null);
             TypeOptions = DeviceTypeOptions.All;
             NewDeviceCountText = string.Format(_localizationService.GetString("DeviceManager_NewDeviceCount"), 0);
 
@@ -144,7 +147,7 @@ namespace DeepDroidChanger.ViewModels
         public ObservableCollection<DeviceRowViewModel> Devices { get; }
         public DeviceInfoFormViewModel DeviceInfo { get; }
         public IReadOnlyList<string> Brands { get; }
-        public IReadOnlyList<string> AndroidVersions { get; }
+        public ObservableCollection<string> AndroidVersions { get; }
         public ObservableCollection<CarrierCountryOption> Countries { get; }
         public ObservableCollection<CarrierOption> Carriers { get; }
         public IReadOnlyList<string> TypeOptions { get; }
@@ -262,6 +265,8 @@ namespace DeepDroidChanger.ViewModels
 
         partial void OnSelectedBrandChanged(string? value)
         {
+            UpdateAndroidVersionOptions(value, SelectedAndroidVersion);
+
             if (!_isApplyingDeviceConfig)
                 QueueSelectedDeviceProfileSave();
         }
@@ -739,6 +744,24 @@ namespace DeepDroidChanger.ViewModels
             {
                 _deviceRefreshLock.Release();
             }
+        }
+
+        private bool CanViewRandomDeviceInfo()
+        {
+            return _lastRandomDeviceInfo != null;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanViewRandomDeviceInfo))]
+        private async Task ViewRandomDeviceInfoAsync(CancellationToken cancellationToken)
+        {
+            if (_lastRandomDeviceInfo == null)
+                return;
+
+            bool updated = await _randomDeviceInfoDialogService
+                .ShowRandomDeviceInfoAsync(_lastRandomDeviceInfo, cancellationToken)
+                .ConfigureAwait(true);
+            if (updated)
+                ApplyRandomDeviceInfo(_lastRandomDeviceInfo);
         }
 
         private async Task SaveLocationConfigAsync(
@@ -1450,8 +1473,8 @@ namespace DeepDroidChanger.ViewModels
                     ?? FindCountryOption(DefaultCountryIso)
                     ?? Countries.FirstOrDefault();
 
-                SelectedBrand = FindOption(Brands, storedDevice?.Brand) ?? Brands.FirstOrDefault();
-                SelectedAndroidVersion = FindOption(AndroidVersions, storedDevice?.AndroidVersion) ?? AndroidVersions.FirstOrDefault();
+                SelectedBrand = FindOption(Brands, storedDevice?.Brand) ?? DeviceProfileOptions.Random;
+                UpdateAndroidVersionOptions(SelectedBrand, storedDevice?.AndroidVersion);
                 IsChangeSimEnabled = storedDevice?.ChangeSimEnabled ?? true;
                 SelectedCountry = selectedCountry;
                 UpdateCarrierOptionsForCountry(selectedCountry?.CountryIso, storedDevice);
@@ -1532,6 +1555,23 @@ namespace DeepDroidChanger.ViewModels
             return string.IsNullOrWhiteSpace(value)
                 ? null
                 : options.FirstOrDefault(option => string.Equals(option, value.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void UpdateAndroidVersionOptions(string? brand, string? preferredVersion)
+        {
+            IReadOnlyList<string> compatibleVersions = string.IsNullOrWhiteSpace(brand)
+                || string.Equals(brand, DeviceProfileOptions.Random, StringComparison.OrdinalIgnoreCase)
+                || !DeviceProfileOptions.AndroidVersionsByBrand.TryGetValue(brand, out IReadOnlyList<string>? versions)
+                    ? DeviceProfileOptions.SupportedAndroidVersions
+                    : versions;
+
+            AndroidVersions.Clear();
+            AndroidVersions.Add(DeviceProfileOptions.Random);
+            foreach (string version in compatibleVersions)
+                AndroidVersions.Add(version);
+
+            SelectedAndroidVersion = FindOption(AndroidVersions, preferredVersion)
+                ?? DeviceProfileOptions.Random;
         }
 
         private void QueueSelectedDeviceProfileSave()
@@ -1741,8 +1781,12 @@ namespace DeepDroidChanger.ViewModels
 
         private void ApplyRandomDeviceInfo(DeviceInfoApiDevice randomDevice)
         {
+            _lastRandomDeviceInfo = randomDevice;
+            ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
             DeviceInfo.Name = GetFirstValue(randomDevice.Name, randomDevice.Board, randomDevice.Code);
             DeviceInfo.Model = randomDevice.Model ?? string.Empty;
+            DeviceInfo.Brand = GetFirstValue(randomDevice.Brand, randomDevice.Manufacturer);
+            DeviceInfo.AndroidVersion = GetAndroidVersionDisplay(randomDevice.Release, randomDevice.Sdk);
             DeviceInfo.Serial = randomDevice.Serial;
             DeviceInfo.Imei = randomDevice.Imei ?? string.Empty;
             DeviceInfo.Iccid = randomDevice.Iccid;
@@ -1752,6 +1796,22 @@ namespace DeepDroidChanger.ViewModels
                 : randomDevice.SimOperatorName;
             DeviceInfo.PhoneNumber = randomDevice.SimPhoneNumber;
             DeviceInfo.Mac = randomDevice.WifiMacAddress;
+        }
+
+        private static string GetAndroidVersionDisplay(string? release, string? sdk)
+        {
+            if (!string.IsNullOrWhiteSpace(release))
+                return release.StartsWith("Android ", StringComparison.OrdinalIgnoreCase)
+                    ? release
+                    : string.Concat("Android ", release.Trim());
+
+            return sdk?.Trim() switch
+            {
+                "33" => DeviceProfileOptions.Android13,
+                "34" => DeviceProfileOptions.Android14,
+                "35" => DeviceProfileOptions.Android15,
+                _ => string.Empty
+            };
         }
 
         private static string GetFirstValue(params string?[] values)
@@ -1765,6 +1825,8 @@ namespace DeepDroidChanger.ViewModels
             {
                 Name = string.Empty,
                 Model = string.Empty,
+                Brand = string.Empty,
+                AndroidVersion = string.Empty,
                 Serial = string.Empty,
                 Imei = string.Empty,
                 Iccid = string.Empty,

@@ -8,13 +8,14 @@
              Background="Transparent">
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-        <Grid Style="{StaticResource DeviceManagerRootGridStyle}">
+        <Grid x:Name="DeviceManagerRootGrid"
+              Style="{StaticResource DeviceManagerRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"
                            MinHeight="220"/>
-            <RowDefinition Height="Auto"
-                           MinHeight="300"/>
+            <RowDefinition Height="360"
+                           MinHeight="360"/>
         </Grid.RowDefinitions>
         <Grid Grid.Row="0"
               Style="{StaticResource DeviceLoadToolbarStyle}">
@@ -192,8 +193,12 @@
                     MinHeight="300">
             <TabItem Header="{DynamicResource DeviceManager_TabChangeInfoSingle}"
                      Style="{StaticResource DeviceTabItemStyle}">
-                <Grid Margin="0,10,0,0"
-                      MinHeight="260">
+                <ScrollViewer x:Name="DeviceProfilePanelScrollViewer"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid x:Name="DeviceProfilePanelContentGrid"
+                          Margin="{StaticResource DeviceProfilePanelContentMargin}"
+                          MinHeight="260">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2.2*"/>
                         <ColumnDefinition Width="1.35*"/>
@@ -212,12 +217,30 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="CellphoneCog"
                                                          Style="{StaticResource DeviceSectionIconStyle}"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{DynamicResource DeviceManager_DeviceInfoHeader}"
                                            Style="{StaticResource DeviceSectionTitleTextStyle}"/>
+                                <Button x:Name="ViewAllDeviceInfoButton"
+                                        Grid.Column="2"
+                                        Command="{Binding ViewRandomDeviceInfoCommand}"
+                                        ToolTip="{DynamicResource DeviceManager_ActionViewAllDeviceInfo}"
+                                        Style="{StaticResource DeviceInfoDetailsButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                                 Style="{StaticResource DeviceInfoDetailsButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource DeviceManager_ActionViewAllDeviceInfo}"
+                                                   Style="{StaticResource DeviceInfoDetailsButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
                             </Grid>
 
                             <Grid Grid.Row="1"
@@ -239,73 +262,91 @@
                                 <TextBlock Grid.Row="0"
                                            Text="{DynamicResource DeviceManager_FieldName}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
-                                <TextBox Grid.Row="0"
+                                <TextBox x:Name="DeviceInfoNameTextBox"
+                                         Grid.Row="0"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="0"
                                            Grid.Column="2"
-                                           Text="{DynamicResource DeviceManager_FieldImsi}"
-                                           Style="{StaticResource DeviceFormSecondaryLabelStyle}"/>
-                                <TextBox Grid.Row="0"
-                                         Grid.Column="3"
-                                         Text="{Binding DeviceInfo.Imsi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource DeviceTextBoxStyle}"/>
-
-                                <TextBlock Grid.Row="1"
-                                           Text="{DynamicResource DeviceManager_FieldModel}"
-                                           Style="{StaticResource DeviceFormLabelStyle}"/>
-                                <TextBox Grid.Row="1"
-                                         Grid.Column="1"
-                                         Text="{Binding DeviceInfo.Model, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource DeviceTextBoxStyle}"/>
-                                <TextBlock Grid.Row="1"
-                                           Grid.Column="2"
                                            Text="{DynamicResource DeviceManager_FieldOperator}"
                                            Style="{StaticResource DeviceFormSecondaryLabelStyle}"/>
-                                <TextBox Grid.Row="1"
+                                <TextBox x:Name="DeviceInfoOperatorTextBox"
+                                         Grid.Row="0"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.Operator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
 
-                                <TextBlock Grid.Row="2"
-                                           Text="{DynamicResource DeviceManager_FieldSerial}"
+                                <TextBlock Grid.Row="1"
+                                           Text="{DynamicResource DeviceManager_FieldBrand}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
-                                <TextBox Grid.Row="2"
+                                <TextBox x:Name="DeviceInfoBrandTextBox"
+                                         Grid.Row="1"
                                          Grid.Column="1"
-                                         Text="{Binding DeviceInfo.Serial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Text="{Binding DeviceInfo.Brand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
-                                <TextBlock Grid.Row="2"
+                                <TextBlock Grid.Row="1"
                                            Grid.Column="2"
                                            Text="{DynamicResource DeviceManager_FieldPhoneNumber}"
                                            Style="{StaticResource DeviceFormSecondaryLabelStyle}"/>
-                                <TextBox Grid.Row="2"
+                                <TextBox x:Name="DeviceInfoPhoneNumberTextBox"
+                                         Grid.Row="1"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.PhoneNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
 
-                                <TextBlock Grid.Row="3"
-                                           Text="{DynamicResource DeviceManager_FieldImei}"
+                                <TextBlock Grid.Row="2"
+                                           Text="{DynamicResource DeviceManager_FieldOsVersion}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
-                                <TextBox Grid.Row="3"
+                                <TextBox x:Name="DeviceInfoAndroidVersionTextBox"
+                                         Grid.Row="2"
                                          Grid.Column="1"
-                                         Text="{Binding DeviceInfo.Imei, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Text="{Binding DeviceInfo.AndroidVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource DeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource DeviceManager_FieldIccid}"
+                                           Style="{StaticResource DeviceFormSecondaryLabelStyle}"/>
+                                <TextBox x:Name="DeviceInfoIccidTextBox"
+                                         Grid.Row="2"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Iccid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource DeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="3"
+                                           Text="{DynamicResource DeviceManager_FieldSerial}"
+                                           Style="{StaticResource DeviceFormLabelStyle}"/>
+                                <TextBox x:Name="DeviceInfoSerialTextBox"
+                                         Grid.Row="3"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Serial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="3"
                                            Grid.Column="2"
-                                           Text="{DynamicResource DeviceManager_FieldMac}"
+                                           Text="{DynamicResource DeviceManager_FieldImsi}"
                                            Style="{StaticResource DeviceFormSecondaryLabelStyle}"/>
-                                <TextBox Grid.Row="3"
+                                <TextBox x:Name="DeviceInfoImsiTextBox"
+                                         Grid.Row="3"
                                          Grid.Column="3"
-                                         Text="{Binding DeviceInfo.Mac, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Text="{Binding DeviceInfo.Imsi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="4"
-                                           Text="{DynamicResource DeviceManager_FieldIccid}"
+                                           Text="{DynamicResource DeviceManager_FieldImei}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
-                                <TextBox Grid.Row="4"
+                                <TextBox x:Name="DeviceInfoImeiTextBox"
+                                         Grid.Row="4"
                                          Grid.Column="1"
-                                         Text="{Binding DeviceInfo.Iccid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Text="{Binding DeviceInfo.Imei, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource DeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource DeviceManager_FieldMac}"
+                                           Style="{StaticResource DeviceFormSecondaryLabelStyle}"/>
+                                <TextBox x:Name="DeviceInfoMacTextBox"
+                                         Grid.Row="4"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Mac, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource DeviceTextBoxStyle}"/>
                             </Grid>
                         </Grid>
@@ -344,6 +385,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Grid.Row="0"
@@ -363,7 +405,7 @@
                                 </ComboBox>
 
                                 <TextBlock Grid.Row="1"
-                                           Text="{DynamicResource DeviceManager_FieldAndroidVersion}"
+                                           Text="{DynamicResource DeviceManager_FieldOsVersion}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
                                 <ComboBox x:Name="AndroidVersionComboBox"
                                           Grid.Row="1"
@@ -379,10 +421,18 @@
                                 </ComboBox>
 
                                 <TextBlock Grid.Row="2"
+                                           Text="{DynamicResource DeviceManager_FieldModel}"
+                                           Style="{StaticResource DeviceFormLabelStyle}"/>
+                                <TextBox Grid.Row="2"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Model, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource DeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="3"
                                            Text="{DynamicResource DeviceManager_FieldCountry}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
                                 <ComboBox x:Name="CountryComboBox"
-                                          Grid.Row="2"
+                                          Grid.Row="3"
                                           Grid.Column="1"
                                           ItemsSource="{Binding Countries}"
                                           SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
@@ -394,11 +444,11 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
 
-                                <TextBlock Grid.Row="3"
+                                <TextBlock Grid.Row="4"
                                            Text="{DynamicResource DeviceManager_FieldCarrier}"
                                            Style="{StaticResource DeviceFormLabelStyle}"/>
                                 <ComboBox x:Name="CarrierComboBox"
-                                          Grid.Row="3"
+                                          Grid.Row="4"
                                           Grid.Column="1"
                                           ItemsSource="{Binding Carriers}"
                                           SelectedItem="{Binding SelectedCarrier, Mode=TwoWay}"
@@ -410,7 +460,7 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
 
-                                <CheckBox Grid.Row="4"
+                                <CheckBox Grid.Row="5"
                                           Grid.ColumnSpan="2"
                                           Content="{DynamicResource DeviceManager_OptionChangeSim}"
                                           IsChecked="{Binding IsChangeSimEnabled, Mode=TwoWay}"
@@ -439,10 +489,8 @@
                                            Style="{StaticResource DeviceSectionTitleTextStyle}"/>
                             </Grid>
 
-                            <ScrollViewer Grid.Row="1"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                            <Grid>
+                            <Grid x:Name="DeviceActionGrid"
+                                  Grid.Row="1">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -666,10 +714,10 @@
                                 </Grid>
                             </Button>
                             </Grid>
-                            </ScrollViewer>
                         </Grid>
                     </Border>
-                </Grid>
+                    </Grid>
+                </ScrollViewer>
             </TabItem>
 
             <TabItem Header="{DynamicResource DeviceManager_TabFlashRom}"

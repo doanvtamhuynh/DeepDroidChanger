@@ -31,7 +31,7 @@
     <sys:String x:Key="DeviceManager_FieldPhoneNumber">Số điện thoại</sys:String>
     <sys:String x:Key="DeviceManager_FieldMac">MAC</sys:String>
     <sys:String x:Key="DeviceManager_FieldBrand">Hãng</sys:String>
-    <sys:String x:Key="DeviceManager_FieldAndroidVersion">Phiên bản Android</sys:String>
+    <sys:String x:Key="DeviceManager_FieldOsVersion">Phiên bản OS</sys:String>
     <sys:String x:Key="DeviceManager_FieldCountry">Quốc gia</sys:String>
     <sys:String x:Key="DeviceManager_FieldCarrier">Nhà mạng</sys:String>
     <sys:String x:Key="DeviceManager_OptionChangeSim">Đổi SIM</sys:String>
@@ -47,6 +47,7 @@
     <sys:String x:Key="DeviceManager_ActionFakeProxy">Fake Proxy</sys:String>
     <sys:String x:Key="DeviceManager_ActionStopFakeProxy">Dừng Fake Proxy</sys:String>
     <sys:String x:Key="DeviceManager_ActionViewDevice">Xem thiết bị</sys:String>
+    <sys:String x:Key="DeviceManager_ActionViewAllDeviceInfo">Xem toàn bộ thông tin</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuDeleteDevice">Xóa thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuDeleteShortcut">Del</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuRebootDevice">Khởi động lại thiết bị</sys:String>

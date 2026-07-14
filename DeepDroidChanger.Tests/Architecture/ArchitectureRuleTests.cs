@@ -33,6 +33,18 @@ public sealed class ArchitectureRuleTests
 
         AssertResourceKeysUsePrefix(canonicalStrings, "DeviceManager_");
         AssertResourceKeysUsePrefix(canonicalVietnameseStrings, "DeviceManager_");
+        AssertLocalizedResourceKeysMatch(canonicalStrings, canonicalVietnameseStrings);
+        AssertLocalizedResourceKeysMatch(
+            Path.Combine(projectRoot, "Resources", "Strings", "Views", "RandomDeviceInfo.xaml"),
+            Path.Combine(projectRoot, "Resources", "Strings", "Views", "RandomDeviceInfo.vi.xaml"));
+        string englishStrings = File.ReadAllText(canonicalStrings);
+        string vietnameseStrings = File.ReadAllText(canonicalVietnameseStrings);
+        StringAssert.Contains(englishStrings, "DeviceManager_FieldOsVersion\">OS Version");
+        StringAssert.Contains(vietnameseStrings, "DeviceManager_FieldOsVersion\">Phiên bản OS");
+        Assert.DoesNotContain("DeviceManager_FieldAndroidVersion", englishStrings, StringComparison.Ordinal);
+        Assert.DoesNotContain("DeviceManager_FieldAndroidVersion", vietnameseStrings, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Android Version<", englishStrings, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Phiên bản Android<", vietnameseStrings, StringComparison.Ordinal);
         AssertResourceKeysUsePrefix(
             Path.Combine(projectRoot, "Resources", "Strings", "Views", "AddDevices.xaml"),
             "AddDevices_");
@@ -258,6 +270,20 @@ public sealed class ArchitectureRuleTests
         Assert.IsTrue(
             keys.All(key => key.StartsWith(prefix, StringComparison.Ordinal)),
             $"Resource dictionary '{resourcePath}' contains a key outside the '{prefix}' namespace.");
+    }
+
+    private static void AssertLocalizedResourceKeysMatch(string englishPath, string vietnamesePath)
+    {
+        string[] englishKeys = Regex.Matches(File.ReadAllText(englishPath), "x:Key=\"([^\"]+)\"")
+            .Select(match => match.Groups[1].Value)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToArray();
+        string[] vietnameseKeys = Regex.Matches(File.ReadAllText(vietnamesePath), "x:Key=\"([^\"]+)\"")
+            .Select(match => match.Groups[1].Value)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(englishKeys, vietnameseKeys, Path.GetFileName(englishPath));
     }
 
     private static string GetRelativeDirectory(string root, string file)

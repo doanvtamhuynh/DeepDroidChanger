@@ -181,10 +181,35 @@ public sealed class DeviceStoreServiceTests
         IReadOnlyList<StoredDeviceConfig> loaded = await service.LoadAsync(CancellationToken.None);
 
         Assert.HasCount(1, loaded);
-        Assert.AreEqual("Samsung", loaded[0].Brand);
+        Assert.AreEqual(string.Empty, loaded[0].Brand);
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        Assert.AreEqual(2, document.RootElement.GetProperty("version").GetInt32());
         JsonElement savedDevice = document.RootElement.GetProperty("devices")[0];
+        Assert.AreEqual(string.Empty, savedDevice.GetProperty("brand").GetString());
         Assert.IsFalse(savedDevice.TryGetProperty("deviceInfoModel", out _));
         Assert.IsFalse(savedDevice.TryGetProperty("deviceInfoImei", out _));
+    }
+
+    [TestMethod]
+    public async Task LoadAsync_PreCompatibilityDocument_ClearsOldBrandAndAndroidVersionOnce()
+    {
+        using var fixture = new TestTempDirectory();
+        string path = Path.Combine(fixture.Path, "devices.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"devices\":[{\"serial\":\"SERIAL\",\"brand\":\"OPPO\",\"androidVersion\":\"Android 15\"}]}");
+        var service = new DeviceStoreService(path, NullLogger<DeviceStoreService>.Instance);
+
+        IReadOnlyList<StoredDeviceConfig> migrated = await service.LoadAsync(CancellationToken.None);
+        Assert.AreEqual(string.Empty, migrated[0].Brand);
+        Assert.AreEqual(string.Empty, migrated[0].AndroidVersion);
+
+        migrated[0].Brand = "OPPO";
+        migrated[0].AndroidVersion = "Android 14";
+        await service.SaveAsync(migrated, CancellationToken.None);
+        IReadOnlyList<StoredDeviceConfig> reloaded = await service.LoadAsync(CancellationToken.None);
+
+        Assert.AreEqual("OPPO", reloaded[0].Brand);
+        Assert.AreEqual("Android 14", reloaded[0].AndroidVersion);
     }
 }

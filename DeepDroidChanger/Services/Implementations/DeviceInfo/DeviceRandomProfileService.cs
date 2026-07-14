@@ -1,9 +1,11 @@
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
+
 namespace DeepDroidChanger.Services
 {
     public sealed class DeviceRandomProfileService : IDeviceRandomProfileService
     {
-        public const string RandomOption = "Random";
+        public const string RandomOption = DeviceProfileOptions.Random;
 
         private const string DefaultBrand = "samsung";
         private const int DefaultSdk = 33;
@@ -13,17 +15,17 @@ namespace DeepDroidChanger.Services
         private const string DefaultCountryIso = "us";
         private const string DefaultCarrierName = "T-Mobile";
 
-        private static readonly string[] OsAll = { "33", "34", "35" };
         private static readonly string[] BrandsPool = { "google", "OnePlus", "OPPO", "samsung", "vivo", "Xiaomi" };
-        private static readonly IReadOnlyDictionary<string, string[]> BrandOsMap = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["google"] = new[] { "33", "34", "35" },
-            ["OnePlus"] = new[] { "33" },
-            ["OPPO"] = new[] { "34" },
-            ["samsung"] = new[] { "33", "34", "35" },
-            ["vivo"] = new[] { "34" },
-            ["Xiaomi"] = new[] { "33", "34", "35" }
-        };
+        private static readonly IReadOnlyList<string> SupportedSdkLevels =
+            DeviceProfileOptions.SupportedAndroidVersions
+                .Select(NormalizeSdk)
+                .Select(sdk => sdk.ToString())
+                .ToArray();
+        private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> BrandOsMap =
+            DeviceProfileOptions.AndroidVersionsByBrand.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<string>)pair.Value.Select(NormalizeSdk).Select(sdk => sdk.ToString()).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
         private static readonly IReadOnlyDictionary<string, string> BrandAlias = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["samsung"] = "samsung",
@@ -183,7 +185,9 @@ namespace DeepDroidChanger.Services
 
         private int PickRandomSdkForBrand(string brand)
         {
-            var validOs = BrandOsMap.TryGetValue(brand, out var osList) ? osList : OsAll;
+            var validOs = BrandOsMap.TryGetValue(brand, out var osList)
+                ? osList
+                : SupportedSdkLevels;
             return int.Parse(_randomService.PickRandom(validOs));
         }
 

@@ -80,6 +80,7 @@ public sealed partial class ThemeResourceTests
             "Login.xaml",
             "AddDevices.xaml",
             "DeleteDeviceConfirmation.xaml",
+            "RandomDeviceInfo.xaml",
             "ChangeLocation.xaml",
             "ChangeTimezone.xaml",
             "FakeProxy.xaml",

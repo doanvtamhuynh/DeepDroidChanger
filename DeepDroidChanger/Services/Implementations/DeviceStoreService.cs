@@ -8,6 +8,7 @@ namespace DeepDroidChanger.Services
 {
     public sealed class DeviceStoreService : IDeviceStoreService
     {
+        private const int CurrentDocumentVersion = 2;
         private const string SettingsDirectoryName = "Settings";
         private const string DevicesFileName = "devices.json";
 
@@ -48,7 +49,9 @@ namespace DeepDroidChanger.Services
 
                 var json = await File.ReadAllTextAsync(_devicesPath, cancellationToken).ConfigureAwait(false);
                 var document = JsonSerializer.Deserialize<DeviceStoreDocument>(json, JsonOptions) ?? new DeviceStoreDocument();
-                var devices = Normalize(document.Devices);
+                var devices = Normalize(
+                    document.Devices,
+                    clearLegacyDeviceProfile: document.Version < CurrentDocumentVersion);
                 await WriteDocumentAsync(devices, cancellationToken).ConfigureAwait(false);
                 return devices;
             }
@@ -185,6 +188,7 @@ namespace DeepDroidChanger.Services
         {
             var document = new DeviceStoreDocument
             {
+                Version = CurrentDocumentVersion,
                 Devices = Normalize(devices).ToList()
             };
 
@@ -214,7 +218,9 @@ namespace DeepDroidChanger.Services
             }
         }
 
-        private static IReadOnlyList<StoredDeviceConfig> Normalize(IEnumerable<StoredDeviceConfig>? devices)
+        private static IReadOnlyList<StoredDeviceConfig> Normalize(
+            IEnumerable<StoredDeviceConfig>? devices,
+            bool clearLegacyDeviceProfile = false)
         {
             var result = new List<StoredDeviceConfig>();
             var seenSerials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -235,8 +241,8 @@ namespace DeepDroidChanger.Services
                     Carrier = NormalizeValue(device.Carrier),
                     CarrierMcc = NormalizeValue(device.CarrierMcc),
                     CarrierMnc = NormalizeValue(device.CarrierMnc),
-                    Brand = NormalizeValue(device.Brand),
-                    AndroidVersion = NormalizeValue(device.AndroidVersion),
+                    Brand = clearLegacyDeviceProfile ? string.Empty : NormalizeValue(device.Brand),
+                    AndroidVersion = clearLegacyDeviceProfile ? string.Empty : NormalizeValue(device.AndroidVersion),
                     ChangeSimEnabled = device.ChangeSimEnabled,
                     UpdateIntegrityFromServer = device.UpdateIntegrityFromServer,
                     UpdateIntegrityFile = NormalizeValue(device.UpdateIntegrityFile),

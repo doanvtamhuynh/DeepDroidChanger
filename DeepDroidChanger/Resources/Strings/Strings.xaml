@@ -13,6 +13,7 @@
         <ResourceDictionary Source="Views/InstallPackage.xaml" />
         <ResourceDictionary Source="Views/DeviceViewer.xaml" />
         <ResourceDictionary Source="Views/DeleteDeviceConfirmation.xaml" />
+        <ResourceDictionary Source="Views/RandomDeviceInfo.xaml" />
         <ResourceDictionary Source="Views/Login.xaml" />
         <ResourceDictionary Source="Views/RuntimeMessages.xaml" />
     </ResourceDictionary.MergedDictionaries>

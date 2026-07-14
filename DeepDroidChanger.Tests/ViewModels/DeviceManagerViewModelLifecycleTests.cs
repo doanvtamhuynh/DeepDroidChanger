@@ -345,36 +345,57 @@ public sealed class DeviceManagerViewModelLifecycleTests
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        IRandomDeviceInfoDialogService randomDeviceInfoDialog = Substitute.For<IRandomDeviceInfoDialogService>();
+        var generatedProfile = new DeviceInfoApiDevice
+        {
+            Name = "Generated device",
+            Model = "SM-S928B",
+            Brand = "samsung",
+            Release = "15",
+            Serial = "GENERATED-SERIAL",
+            Imei = "123456789012345",
+            Iccid = "8984041234567890123",
+            Imsi = "452041234567890",
+            SimOperatorName = "Viettel",
+            SimPhoneNumber = "+84901234567",
+            WifiMacAddress = "00:11:22:33:44:55"
+        };
+        randomDeviceInfoDialog.ShowRandomDeviceInfoAsync(
+                generatedProfile,
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                generatedProfile.Name = "Edited device";
+                generatedProfile.Model = "Edited model";
+                generatedProfile.Brand = "edited brand";
+                generatedProfile.Release = "14";
+                return true;
+            });
         randomDevice.CreateRandomProfileAsync(
                 Arg.Any<RandomDeviceRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(
                 RandomDeviceStatus.Created,
-                new DeviceInfoApiDevice
-                {
-                    Name = "Generated device",
-                    Model = "SM-S928B",
-                    Serial = "GENERATED-SERIAL",
-                    Imei = "123456789012345",
-                    Iccid = "8984041234567890123",
-                    Imsi = "452041234567890",
-                    SimOperatorName = "Viettel",
-                    SimPhoneNumber = "+84901234567",
-                    WifiMacAddress = "00:11:22:33:44:55"
-                }));
+                generatedProfile));
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
             deviceConfig: deviceConfig,
-            randomDevice: randomDevice);
+            randomDevice: randomDevice,
+            randomDeviceInfoDialog: randomDeviceInfoDialog);
         await viewModel.InitializeAsync(CancellationToken.None);
         deviceConfig.ClearReceivedCalls();
+        Assert.IsFalse(viewModel.ViewRandomDeviceInfoCommand.CanExecute(null));
 
         await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        Assert.IsTrue(viewModel.ViewRandomDeviceInfoCommand.CanExecute(null));
+        await viewModel.ViewRandomDeviceInfoCommand.ExecuteAsync(null);
         await viewModel.DeactivateAsync();
 
-        Assert.AreEqual("Generated device", viewModel.DeviceInfo.Name);
-        Assert.AreEqual("SM-S928B", viewModel.DeviceInfo.Model);
+        Assert.AreEqual("Edited device", viewModel.DeviceInfo.Name);
+        Assert.AreEqual("Edited model", viewModel.DeviceInfo.Model);
+        Assert.AreEqual("edited brand", viewModel.DeviceInfo.Brand);
+        Assert.AreEqual("Android 14", viewModel.DeviceInfo.AndroidVersion);
         Assert.AreEqual("GENERATED-SERIAL", viewModel.DeviceInfo.Serial);
         Assert.AreEqual("123456789012345", viewModel.DeviceInfo.Imei);
         Assert.AreEqual("8984041234567890123", viewModel.DeviceInfo.Iccid);
@@ -384,6 +405,43 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.AreEqual("00:11:22:33:44:55", viewModel.DeviceInfo.Mac);
         await deviceConfig.DidNotReceiveWithAnyArgs().SaveDeviceProfileAsync(
             default!, default!, default!, default);
+        await randomDeviceInfoDialog.Received(1).ShowRandomDeviceInfoAsync(
+            generatedProfile,
+            Arg.Any<CancellationToken>());
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public void SelectedBrand_FiltersAndroidVersionsAndClearsIncompatibleSelection()
+    {
+        var viewModel = CreateViewModel(
+            Substitute.For<IDeviceListService>(),
+            Substitute.For<ICarrierDataService>());
+
+        viewModel.SelectedAndroidVersion = "Android 15";
+        viewModel.SelectedBrand = "OPPO";
+
+        CollectionAssert.AreEqual(
+            new[] { "Random", "Android 14" },
+            viewModel.AndroidVersions.ToArray());
+        Assert.AreEqual("Random", viewModel.SelectedAndroidVersion);
+
+        var expectedVersions = new Dictionary<string, string[]>
+        {
+            ["Google"] = ["Random", "Android 13", "Android 14", "Android 15"],
+            ["Samsung"] = ["Random", "Android 13", "Android 14", "Android 15"],
+            ["Xiaomi"] = ["Random", "Android 13", "Android 14", "Android 15"],
+            ["OnePlus"] = ["Random", "Android 13"],
+            ["OPPO"] = ["Random", "Android 14"],
+            ["vivo"] = ["Random", "Android 14"]
+        };
+
+        foreach ((string brand, string[] versions) in expectedVersions)
+        {
+            viewModel.SelectedBrand = brand;
+            CollectionAssert.AreEqual(versions, viewModel.AndroidVersions.ToArray(), brand);
+        }
+
         viewModel.Dispose();
     }
 
@@ -423,6 +481,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IDeviceConfigService? deviceConfig = null,
         IPollingService? polling = null,
         IRandomDeviceService? randomDevice = null,
+        IRandomDeviceInfoDialogService? randomDeviceInfoDialog = null,
         AppSettings? settings = null)
     {
         return new DeviceManagerViewModel(
@@ -440,6 +499,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Substitute.For<IInstallPackageDialogService>(),
             Substitute.For<IDeviceViewerDialogService>(),
             Substitute.For<IDeleteDeviceConfirmationDialogService>(),
+            randomDeviceInfoDialog ?? Substitute.For<IRandomDeviceInfoDialogService>(),
             deviceList,
             new DeviceSelectionService(),
             deviceConfig ?? Substitute.For<IDeviceConfigService>(),

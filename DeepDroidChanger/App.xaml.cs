@@ -150,6 +150,7 @@ public sealed partial class App : Application
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();
         services.AddTransient<IChangeTimezoneDialogService, ChangeTimezoneDialogService>();
         services.AddTransient<IDeleteDeviceConfirmationDialogService, DeleteDeviceConfirmationDialogService>();
+        services.AddTransient<IRandomDeviceInfoDialogService, RandomDeviceInfoDialogService>();
         services.AddTransient<IDeviceViewerDialogService, DeviceViewerDialogService>();
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
@@ -166,6 +167,7 @@ public sealed partial class App : Application
         services.AddTransient<ChangeLocationViewModel>();
         services.AddTransient<ChangeTimezoneViewModel>();
         services.AddTransient<DeleteDeviceConfirmationViewModel>();
+        services.AddTransient<RandomDeviceInfoViewModel>();
         services.AddTransient<DeviceViewerViewModel>();
         services.AddTransient<FakeProxyViewModel>();
         services.AddTransient<UpdateIntegrityViewModel>();
@@ -176,6 +178,7 @@ public sealed partial class App : Application
         services.AddTransient<ChangeLocationDialog>();
         services.AddTransient<ChangeTimezoneDialog>();
         services.AddTransient<DeleteDeviceConfirmationDialog>();
+        services.AddTransient<RandomDeviceInfoDialog>();
         services.AddTransient<DeviceViewerDialog>();
         services.AddTransient<FakeProxyDialog>();
         services.AddTransient<UpdateIntegrityDialog>();
