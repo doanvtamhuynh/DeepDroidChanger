@@ -386,6 +386,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Grid.Row="0"
@@ -464,6 +465,12 @@
                                           Grid.ColumnSpan="2"
                                           Content="{DynamicResource DeviceManager_OptionChangeSim}"
                                           IsChecked="{Binding IsChangeSimEnabled, Mode=TwoWay}"
+                                          Style="{StaticResource DeviceCheckBoxStyle}"/>
+                                <CheckBox x:Name="UseIntegritySecurityPatchCheckBox"
+                                          Grid.Row="6"
+                                          Grid.ColumnSpan="2"
+                                          Content="{DynamicResource DeviceManager_OptionUseIntegritySecurityPatch}"
+                                          IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"
                                           Style="{StaticResource DeviceCheckBoxStyle}"/>
                             </Grid>
                         </Grid>

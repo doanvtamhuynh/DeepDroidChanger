@@ -33,6 +33,38 @@ public sealed class DeviceIntegrityServiceTests
     }
 
     [TestMethod]
+    public async Task TryGetRandomSecurityPatchAsync_ValidServerData_ReturnsSelectedPatch()
+    {
+        const string pifJson = "[{\"SECURITY_PATCH\":\"2026-06-01\"},{\"SECURITY_PATCH\":\"2026-07-01\"}]";
+        IRandomService random = Substitute.For<IRandomService>();
+        random.PickRandom(Arg.Any<IReadOnlyList<Integrity>>())
+            .Returns(callInfo => callInfo.Arg<IReadOnlyList<Integrity>>()[1]);
+        var service = new DeviceIntegrityService(
+            Substitute.For<IAdbCommandService>(),
+            random,
+            NullLogger<DeviceIntegrityService>.Instance,
+            (_, _, _) => Task.FromResult(pifJson));
+
+        string? result = await service.TryGetRandomSecurityPatchAsync(CancellationToken.None);
+
+        Assert.AreEqual("2026-07-01", result);
+    }
+
+    [TestMethod]
+    public async Task TryGetRandomSecurityPatchAsync_InvalidServerData_ReturnsNullForCallerFallback()
+    {
+        var service = new DeviceIntegrityService(
+            Substitute.For<IAdbCommandService>(),
+            Substitute.For<IRandomService>(),
+            NullLogger<DeviceIntegrityService>.Instance,
+            (_, _, _) => Task.FromResult("not-json"));
+
+        string? result = await service.TryGetRandomSecurityPatchAsync(CancellationToken.None);
+
+        Assert.IsNull(result);
+    }
+
+    [TestMethod]
     public async Task UpdateIntegrityAsync_LocalFile_AppliesValidatedPifWithoutNetwork()
     {
         string jsonPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");

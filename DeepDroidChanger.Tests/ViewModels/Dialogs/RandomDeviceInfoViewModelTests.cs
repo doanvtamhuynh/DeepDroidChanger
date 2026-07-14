@@ -25,7 +25,7 @@ public sealed class RandomDeviceInfoViewModelTests
         viewModel.Initialize(profile);
 
         Assert.AreEqual(typeof(DeviceInfoApiDevice).GetProperties().Length, viewModel.Fields.Count);
-        Assert.HasCount(33, viewModel.Fields);
+        Assert.HasCount(43, viewModel.Fields);
         Assert.AreEqual("RandomDeviceInfo_FieldModel", viewModel.Fields[0].Label);
         Assert.AreEqual("Pixel 9", viewModel.Fields[0].Value);
         Assert.AreEqual("15", viewModel.Fields.Single(field => field.Label == "RandomDeviceInfo_FieldOsVersion").Value);
@@ -82,7 +82,17 @@ public sealed class RandomDeviceInfoViewModelTests
             [nameof(DeviceInfoApiDevice.SimOperatorCountry)] = "OperatorCountry",
             [nameof(DeviceInfoApiDevice.SimOperatorName)] = "OperatorName",
             [nameof(DeviceInfoApiDevice.WifiMacAddress)] = "WifiMac",
-            [nameof(DeviceInfoApiDevice.BluetoothMacAddress)] = "BluetoothMac"
+            [nameof(DeviceInfoApiDevice.BluetoothMacAddress)] = "BluetoothMac",
+            [nameof(DeviceInfoApiDevice.BuildId)] = "BuildId",
+            [nameof(DeviceInfoApiDevice.BuildIncremental)] = "BuildIncremental",
+            [nameof(DeviceInfoApiDevice.BuildDescription)] = "BuildDescription",
+            [nameof(DeviceInfoApiDevice.BuildFlavor)] = "BuildFlavor",
+            [nameof(DeviceInfoApiDevice.BuildUser)] = "BuildUser",
+            [nameof(DeviceInfoApiDevice.SettingDeviceName)] = "SettingDeviceName",
+            [nameof(DeviceInfoApiDevice.SettingBluetoothName)] = "SettingBluetoothName",
+            [nameof(DeviceInfoApiDevice.WifiBssid)] = "WifiBssid",
+            [nameof(DeviceInfoApiDevice.WifiSsid)] = "WifiSsid",
+            [nameof(DeviceInfoApiDevice.VbmetaDigest)] = "VbmetaDigest"
         };
         foreach (string fieldKey in propertyToField.Values)
             viewModel.Fields.Single(field => field.Key == fieldKey).Value = string.Concat(" edited-", fieldKey, " ");

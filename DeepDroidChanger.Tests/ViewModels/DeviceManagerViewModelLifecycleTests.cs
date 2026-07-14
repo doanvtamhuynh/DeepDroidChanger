@@ -257,6 +257,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 Brand = "Samsung",
                 AndroidVersion = "Android 15",
                 ChangeSimEnabled = false,
+                UseIntegritySecurityPatch = true,
                 CountryIso = "vn",
                 CountryName = "Vietnam",
                 Carrier = "Viettel",
@@ -278,6 +279,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.AreEqual("Samsung", viewModel.SelectedBrand);
         Assert.AreEqual("Android 15", viewModel.SelectedAndroidVersion);
         Assert.IsFalse(viewModel.IsChangeSimEnabled);
+        Assert.IsTrue(viewModel.UseIntegritySecurityPatch);
         Assert.AreEqual("Vietnam (VN)", viewModel.SelectedCountry?.DisplayName);
         Assert.AreEqual("Viettel (MCC 452 / MNC 04)", viewModel.SelectedCarrier?.DisplayName);
         Assert.AreEqual(string.Empty, viewModel.DeviceInfo.Name);
@@ -335,7 +337,14 @@ public sealed class DeviceManagerViewModelLifecycleTests
     {
         StoredDeviceConfig[] storedDevices =
         [
-            new() { Serial = "A", Name = "Phone", Type = "Phone", Brand = "Samsung" }
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                Brand = "Samsung",
+                UseIntegritySecurityPatch = true
+            }
         ];
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
@@ -372,7 +381,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 return true;
             });
         randomDevice.CreateRandomProfileAsync(
-                Arg.Any<RandomDeviceRequest>(),
+                Arg.Is<RandomDeviceRequest>(request => request.UseIntegritySecurityPatch),
                 Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(
                 RandomDeviceStatus.Created,
@@ -408,6 +417,38 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await randomDeviceInfoDialog.Received(1).ShowRandomDeviceInfoAsync(
             generatedProfile,
             Arg.Any<CancellationToken>());
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RandomDevice_OfflineSelection_StillPreparesProfileForLaterChange()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Offline phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Offline)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice { Model = "Pixel 8", Name = "husky" }));
+        var viewModel = CreateViewModel(deviceList, carriers, randomDevice: randomDevice);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("Pixel 8", viewModel.DeviceInfo.Model);
+        Assert.IsTrue(viewModel.ViewRandomDeviceInfoCommand.CanExecute(null));
+        await randomDevice.Received(1).CreateRandomProfileAsync(
+            Arg.Any<RandomDeviceRequest>(),
+            Arg.Any<CancellationToken>());
+        await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
 

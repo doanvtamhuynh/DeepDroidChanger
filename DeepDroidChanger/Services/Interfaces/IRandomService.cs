@@ -9,6 +9,8 @@ namespace DeepDroidChanger.Services
         string GenerateImsi(string mcc, string mnc);
         string GenerateIccid(string countryCode, string mnc);
         string GeneratePhoneNumber();
+        string GenerateName(bool requireSingle = false);
+        string GenerateImei(string brand, string? preferredTac = null);
         string GenerateMacAddress();
         string GenerateWifiMacAddress(string brand);
     }

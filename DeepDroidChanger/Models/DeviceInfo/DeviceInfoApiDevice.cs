@@ -73,5 +73,15 @@ namespace DeepDroidChanger.Models
         public string SimOperatorName { get; set; } = string.Empty;
         public string WifiMacAddress { get; set; } = string.Empty;
         public string BluetoothMacAddress { get; set; } = string.Empty;
+        public string BuildId { get; set; } = string.Empty;
+        public string BuildIncremental { get; set; } = string.Empty;
+        public string BuildDescription { get; set; } = string.Empty;
+        public string BuildFlavor { get; set; } = string.Empty;
+        public string BuildUser { get; set; } = string.Empty;
+        public string SettingDeviceName { get; set; } = string.Empty;
+        public string SettingBluetoothName { get; set; } = string.Empty;
+        public string WifiBssid { get; set; } = string.Empty;
+        public string WifiSsid { get; set; } = string.Empty;
+        public string VbmetaDigest { get; set; } = string.Empty;
     }
 }

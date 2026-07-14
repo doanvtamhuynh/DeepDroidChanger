@@ -41,6 +41,40 @@ namespace DeepDroidChanger.Services
             _downloadString = downloadString ?? DownloadStringBoundedAsync;
         }
 
+        public async Task<string?> TryGetRandomSecurityPatchAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                string pifJson = await _downloadString(
+                        IntegrityConstants.PifUrl,
+                        IntegrityConstants.MaxPifBytes,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                EnsureContentSize(pifJson, IntegrityConstants.MaxPifBytes, "PIF JSON");
+
+                IReadOnlyList<Integrity> candidates = ParsePifJson(pifJson)?
+                    .Where(item => !string.IsNullOrWhiteSpace(item.SECURITY_PATCH))
+                    .ToArray()
+                    ?? Array.Empty<Integrity>();
+                if (candidates.Count == 0)
+                {
+                    _logger.LogWarning("Integrity security patch download contained no usable records.");
+                    return null;
+                }
+
+                return _randomService.PickRandom(candidates).SECURITY_PATCH!.Trim();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Unable to load Integrity security patch; the random-device value will be used.");
+                return null;
+            }
+        }
+
         public async Task UpdateIntegrityAsync(string serial, bool fromServer, string? jsonPath, CancellationToken cancellationToken)
         {
             _logger.LogInformation(

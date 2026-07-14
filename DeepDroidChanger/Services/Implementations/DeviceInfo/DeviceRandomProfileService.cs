@@ -31,15 +31,18 @@ namespace DeepDroidChanger.Services
         };
 
         private readonly IDeviceRandomApiService _deviceRandomApiService;
+        private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IRandomService _randomService;
         private readonly ISimProfileService _simProfileService;
 
         public DeviceRandomProfileService(
             IDeviceRandomApiService deviceRandomApiService,
+            IDeviceIntegrityService deviceIntegrityService,
             IRandomService randomService,
             ISimProfileService simProfileService)
         {
             _deviceRandomApiService = deviceRandomApiService;
+            _deviceIntegrityService = deviceIntegrityService;
             _randomService = randomService;
             _simProfileService = simProfileService;
         }
@@ -51,7 +54,16 @@ namespace DeepDroidChanger.Services
             var selection = SelectRandomValue(request.SelectedBrand, request.SelectedAndroidVersion);
             var device = await _deviceRandomApiService.GetRandomDeviceAsync(session, selection, cancellationToken).ConfigureAwait(false);
             NormalizeDeviceResponse(device, selection);
+            if (request.UseIntegritySecurityPatch)
+            {
+                string? integritySecurityPatch = await _deviceIntegrityService
+                    .TryGetRandomSecurityPatchAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(integritySecurityPatch))
+                    device.SecurityPatch = integritySecurityPatch;
+            }
             ApplyGeneratedValues(device, request);
+            ValidateProfileForChange(device);
             return device;
         }
 
@@ -84,31 +96,73 @@ namespace DeepDroidChanger.Services
 
         private void NormalizeDeviceResponse(DeviceInfoApiDevice device, RandomDeviceSelection selection)
         {
-            if (string.IsNullOrWhiteSpace(device.Model))
+            if (IsMissingOrUnknown(device.Model))
                 throw new DeviceRandomApiException("Random device result is incomplete.");
 
             NormalizeFingerprint(device);
 
-            if (string.IsNullOrWhiteSpace(device.Manufacturer))
+            if (IsMissingOrUnknown(device.Manufacturer))
                 device.Manufacturer = selection.Brand;
 
-            if (string.IsNullOrWhiteSpace(device.Brand))
+            if (IsMissingOrUnknown(device.Brand))
                 device.Brand = NormalizeBrand(device.Manufacturer);
 
-            if (string.IsNullOrWhiteSpace(device.Name) || string.Equals(device.Name, "unknown", StringComparison.OrdinalIgnoreCase))
-                device.Name = string.IsNullOrWhiteSpace(device.Board) ? device.Code : device.Board;
+            if (IsMissingOrUnknown(device.Name))
+                device.Name = GetFirstValue(device.Code, device.Board, device.Model);
 
-            if (string.IsNullOrWhiteSpace(device.Imei))
-                device.Imei = GenerateImei();
+            device.Board = GetFirstValue(device.Board, device.Code, device.Product);
+            device.Hardware = GetFirstValue(device.Hardware, device.Board, device.Code);
+            device.Platform = GetFirstValue(device.Platform, device.Hardware, device.Board);
 
-            if (string.IsNullOrWhiteSpace(device.Imei1))
-                device.Imei1 = GenerateImei();
+            if (IsMissingOrUnknown(device.Bootloader))
+                device.Bootloader = device.BuildIncremental;
+
+            if (IsMissingOrUnknown(device.Baseband))
+                device.Baseband = device.BuildIncremental;
+
+            if (IsMissingOrUnknown(device.BuildDisplayId)
+                && !string.IsNullOrWhiteSpace(device.BuildId)
+                && !string.IsNullOrWhiteSpace(device.BuildIncremental))
+            {
+                device.BuildDisplayId = string.Concat(device.BuildId, ".", device.BuildIncremental);
+            }
+
+            device.BuildFlavor = string.IsNullOrWhiteSpace(device.Product)
+                ? string.Empty
+                : string.Concat(device.Product, "-user");
+            device.BuildDescription = CreateBuildDescription(device);
+            device.BuildUser = string.Concat("android-", device.Product);
+
+            if (IsMissingOrUnknown(device.BuildHost))
+                device.BuildHost = device.BuildUser;
+
+            string imeiBrand = GetFirstValue(device.Brand, device.Manufacturer, selection.Brand);
+            if (!IsValidImei(device.Imei))
+            {
+                string? validServerImei1 = IsValidImei(device.Imei1) ? device.Imei1 : null;
+                device.Imei = GenerateDistinctImei(
+                    imeiBrand,
+                    validServerImei1?[..8],
+                    validServerImei1);
+            }
+
+            if (!IsValidImei(device.Imei1)
+                || string.Equals(device.Imei, device.Imei1, StringComparison.Ordinal))
+            {
+                device.Imei1 = GenerateDistinctImei(imeiBrand, device.Imei![..8], device.Imei);
+            }
 
             device.Sdk = selection.Sdk.ToString();
             device.AndroidId = _randomService.GetRandomHexString(16)[..16];
             device.Serial = _randomService.GetRandomHexString(16)[.._randomService.RandomInRange(8, 13)];
             device.WifiMacAddress = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
-            device.BluetoothMacAddress = _randomService.GenerateMacAddress();
+            device.BluetoothMacAddress = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
+            string deviceNamePrefix = GetFirstValue(device.Model, device.Manufacturer, "Android");
+            device.SettingDeviceName = CreateRandomDeviceName(deviceNamePrefix);
+            device.SettingBluetoothName = CreateRandomDeviceName(deviceNamePrefix);
+            device.WifiBssid = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
+            device.WifiSsid = CreateRandomDeviceName(deviceNamePrefix);
+            device.VbmetaDigest = _randomService.GetRandomHexString(64)[..64];
         }
 
         private void ApplyGeneratedValues(DeviceInfoApiDevice device, RandomDeviceRequest request)
@@ -125,19 +179,33 @@ namespace DeepDroidChanger.Services
         private void NormalizeFingerprint(DeviceInfoApiDevice device)
         {
             if (string.IsNullOrWhiteSpace(device.Fingerprint))
-                return;
+                throw new DeviceRandomApiException("Random device fingerprint is missing.");
 
             var parts = device.Fingerprint.Split('/');
             if (parts.Length < 5)
-                return;
+                throw new DeviceRandomApiException("Random device fingerprint is invalid.");
 
-            device.Product = parts[1];
+            device.Product = parts[1].Trim();
             var versionPart = parts[2];
             var colonIndex = versionPart.IndexOf(':', StringComparison.Ordinal);
-            if (colonIndex > 0)
+            if (colonIndex <= 0 || colonIndex == versionPart.Length - 1)
+                throw new DeviceRandomApiException("Random device fingerprint version is invalid.");
+
+            device.Code = versionPart[..colonIndex].Trim();
+            device.Release = versionPart[(colonIndex + 1)..].Trim();
+
+            device.BuildId = parts[3].Trim();
+            int buildVariantIndex = parts[4].IndexOf(':', StringComparison.Ordinal);
+            device.BuildIncremental = buildVariantIndex > 0
+                ? parts[4][..buildVariantIndex].Trim()
+                : parts[4].Trim();
+
+            if (string.IsNullOrWhiteSpace(device.Product)
+                || string.IsNullOrWhiteSpace(device.Code)
+                || string.IsNullOrWhiteSpace(device.BuildId)
+                || string.IsNullOrWhiteSpace(device.BuildIncremental))
             {
-                device.Code = versionPart[..colonIndex];
-                device.Release = versionPart[(colonIndex + 1)..];
+                throw new DeviceRandomApiException("Random device fingerprint is incomplete.");
             }
 
             device.Sdk = device.Release switch
@@ -149,11 +217,115 @@ namespace DeepDroidChanger.Services
             };
         }
 
-        private string GenerateImei()
+        private string GenerateDistinctImei(string brand, string? preferredTac, string? excludedImei)
         {
-            const string defaultTac = "35527335";
-            var body = string.Concat(defaultTac, _randomService.RandomInRange(0, 999999).ToString("D6"));
-            return string.Concat(body, GenerateLuhnCheckDigit(body));
+            const int maximumAttempts = 16;
+            for (var attempt = 0; attempt < maximumAttempts; attempt++)
+            {
+                string candidate = _randomService.GenerateImei(brand, preferredTac);
+                if (IsValidImei(candidate)
+                    && !string.Equals(candidate, excludedImei, StringComparison.Ordinal))
+                {
+                    return candidate;
+                }
+            }
+
+            throw new DeviceRandomApiException("Unable to generate distinct valid IMEI values.");
+        }
+
+        private string CreateRandomDeviceName(string prefix)
+        {
+            string normalizedPrefix = string.Concat(prefix.Where(char.IsLetterOrDigit));
+            if (normalizedPrefix.Length == 0)
+                normalizedPrefix = "Android";
+
+            string randomName = _randomService.GenerateName().Trim();
+            if (randomName.Length == 0)
+                randomName = "Android";
+
+            return string.Concat(normalizedPrefix, "_", randomName);
+        }
+
+        private static string CreateBuildDescription(DeviceInfoApiDevice device)
+        {
+            string value = string.Join(
+                " ",
+                new[] { device.Product, device.Release, device.BuildId, device.BuildIncremental }
+                    .Where(item => !string.IsNullOrWhiteSpace(item)));
+            return value.Length == 0 ? string.Empty : string.Concat(value, " release-keys");
+        }
+
+        private static string GetFirstValue(params string?[] values)
+        {
+            return values.FirstOrDefault(value => !IsMissingOrUnknown(value))?.Trim() ?? string.Empty;
+        }
+
+        private static bool IsMissingOrUnknown(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                || string.Equals(value.Trim(), "unknown", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsValidImei(string? value)
+        {
+            return value is { Length: 15 }
+                && value.All(char.IsDigit)
+                && value[14] - '0' == GenerateLuhnCheckDigit(value[..14]);
+        }
+
+        private static void ValidateProfileForChange(DeviceInfoApiDevice device)
+        {
+            (string Name, string? Value)[] requiredValues =
+            [
+                (nameof(device.Model), device.Model),
+                (nameof(device.Fingerprint), device.Fingerprint),
+                (nameof(device.Manufacturer), device.Manufacturer),
+                (nameof(device.Brand), device.Brand),
+                (nameof(device.Product), device.Product),
+                (nameof(device.Code), device.Code),
+                (nameof(device.Name), device.Name),
+                (nameof(device.Release), device.Release),
+                (nameof(device.Sdk), device.Sdk),
+                (nameof(device.BuildId), device.BuildId),
+                (nameof(device.BuildIncremental), device.BuildIncremental),
+                (nameof(device.BuildDisplayId), device.BuildDisplayId),
+                (nameof(device.BuildDescription), device.BuildDescription),
+                (nameof(device.BuildFlavor), device.BuildFlavor),
+                (nameof(device.BuildUser), device.BuildUser),
+                (nameof(device.BuildHost), device.BuildHost),
+                (nameof(device.Board), device.Board),
+                (nameof(device.Hardware), device.Hardware),
+                (nameof(device.Platform), device.Platform),
+                (nameof(device.Bootloader), device.Bootloader),
+                (nameof(device.Baseband), device.Baseband),
+                (nameof(device.SecurityPatch), device.SecurityPatch),
+                (nameof(device.Serial), device.Serial),
+                (nameof(device.AndroidId), device.AndroidId),
+                (nameof(device.WifiMacAddress), device.WifiMacAddress),
+                (nameof(device.BluetoothMacAddress), device.BluetoothMacAddress),
+                (nameof(device.SettingDeviceName), device.SettingDeviceName),
+                (nameof(device.SettingBluetoothName), device.SettingBluetoothName),
+                (nameof(device.WifiBssid), device.WifiBssid),
+                (nameof(device.WifiSsid), device.WifiSsid),
+                (nameof(device.VbmetaDigest), device.VbmetaDigest),
+                (nameof(device.Imsi), device.Imsi),
+                (nameof(device.Iccid), device.Iccid),
+                (nameof(device.SimPhoneNumber), device.SimPhoneNumber),
+                (nameof(device.SimOperatorNumeric), device.SimOperatorNumeric),
+                (nameof(device.SimOperatorCountry), device.SimOperatorCountry),
+                (nameof(device.SimOperatorName), device.SimOperatorName)
+            ];
+
+            (string Name, string? Value) missing = requiredValues.FirstOrDefault(item => IsMissingOrUnknown(item.Value));
+            if (missing.Name != null)
+                throw new DeviceRandomApiException($"Random device result is incomplete: {missing.Name} is missing.");
+
+            if (!IsValidImei(device.Imei)
+                || !IsValidImei(device.Imei1)
+                || string.Equals(device.Imei, device.Imei1, StringComparison.Ordinal))
+            {
+                throw new DeviceRandomApiException("Random device result contains invalid IMEI values.");
+            }
         }
 
         private static int GenerateLuhnCheckDigit(string body)

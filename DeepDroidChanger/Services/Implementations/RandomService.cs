@@ -1,5 +1,6 @@
 using DeepDroidChanger.Helpers;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace DeepDroidChanger.Services
@@ -7,8 +8,27 @@ namespace DeepDroidChanger.Services
     public sealed class RandomService : IRandomService
     {
         private const string MacVendorsResourcePath = "Assets/Data/mac_vendors.json";
-        private const string DefaultMacPrefix = "d4:88:90";
+        private const string ImeiTacsResourcePath = "Assets/Data/imei_tacs.json";
+        private const string NamesResourcePath = "Assets/Data/names.txt";
+        private static readonly IReadOnlyList<string> FallbackNames =
+            ["Alex", "Jordan", "Morgan", "Taylor"];
+        internal static readonly IReadOnlyList<string> FallbackMacPrefixes =
+        [
+            "84:ab:1a", "bc:52:74", "a4:d9:90", "a8:05:56", "e4:b5:55",
+            "fc:19:10", "bc:e1:43", "00:24:e9", "18:70:3b", "28:a0:2b",
+            "28:bd:89", "94:0c:98", "00:0d:93", "80:04:5f", "64:44:7b",
+            "d8:cf:9c", "bc:2e:f6", "30:66:d0", "8c:58:77", "e0:62:67"
+        ];
+        internal static readonly IReadOnlyList<string> FallbackImeiTacs =
+        [
+            "35527335", "35529153", "35531042", "35531436", "35536179", "35538821",
+            "35547998", "35549649", "35549782", "35552257", "35167418", "35167506",
+            "35167509", "35167530", "35167549", "35167564", "35167584", "35167656",
+            "35167682", "35167709"
+        ];
+        private IReadOnlyDictionary<string, IReadOnlyList<string>>? _imeiTacs;
         private IReadOnlyDictionary<string, IReadOnlyList<string>>? _macPrefixes;
+        private IReadOnlyList<string>? _names;
 
         public int RandomInRange(int minValue, int maxValue)
         {
@@ -32,9 +52,10 @@ namespace DeepDroidChanger.Services
 
         public string GetRandomHexString(int minimumLength)
         {
-            var bytes = new byte[Math.Max(8, minimumLength / 2 + 1)];
-            Random.Shared.NextBytes(bytes);
-            return Convert.ToHexString(bytes).ToLowerInvariant();
+            int length = Math.Max(1, minimumLength);
+            var bytes = new byte[(length + 1) / 2];
+            RandomNumberGenerator.Fill(bytes);
+            return Convert.ToHexString(bytes).ToLowerInvariant()[..length];
         }
 
         public string GenerateImsi(string mcc, string mnc)
@@ -61,6 +82,23 @@ namespace DeepDroidChanger.Services
             return RandomInRange(100000000, 999999999).ToString();
         }
 
+        public string GenerateName(bool requireSingle = false)
+        {
+            _names ??= LoadNames();
+            bool isSingleWord = RandomInRange(1, 7) % 4 != 0;
+            if (isSingleWord || requireSingle)
+                return PickRandom(_names);
+
+            return string.Concat(PickRandom(_names), " ", PickRandom(_names));
+        }
+
+        public string GenerateImei(string brand, string? preferredTac = null)
+        {
+            string tac = IsValidTac(preferredTac) ? preferredTac! : PickImeiTac(brand);
+            string body = string.Concat(tac, GenerateDigits(6));
+            return string.Concat(body, GenerateLuhnCheckDigit(body));
+        }
+
         public string GenerateMacAddress()
         {
             return string.Join(":", Enumerable.Range(0, 6).Select(_ => RandomInRange(0, 256).ToString("x2")));
@@ -81,7 +119,45 @@ namespace DeepDroidChanger.Services
             if (_macPrefixes.TryGetValue(normalizedBrand, out var prefixes) && prefixes.Count > 0)
                 return PickRandom(prefixes);
 
-            return DefaultMacPrefix;
+            return PickRandom(FallbackMacPrefixes);
+        }
+
+        private string PickImeiTac(string brand)
+        {
+            _imeiTacs ??= LoadImeiTacs();
+            string normalizedBrand = string.IsNullOrWhiteSpace(brand)
+                ? string.Empty
+                : brand.Trim().ToLowerInvariant();
+
+            if (_imeiTacs.TryGetValue(normalizedBrand, out IReadOnlyList<string>? tacs) && tacs.Count > 0)
+                return PickRandom(tacs);
+
+            return PickRandom(FallbackImeiTacs);
+        }
+
+        private static IReadOnlyDictionary<string, IReadOnlyList<string>> LoadImeiTacs()
+        {
+            try
+            {
+                string json = AssetDataReader.ReadText(ImeiTacsResourcePath);
+                Dictionary<string, string[]>? source = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
+                return source?.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IReadOnlyList<string>)pair.Value
+                        .Where(IsValidTac)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray(),
+                    StringComparer.OrdinalIgnoreCase)
+                    ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch (IOException)
+            {
+                return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch (JsonException)
+            {
+                return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            }
         }
 
         private static IReadOnlyDictionary<string, IReadOnlyList<string>> LoadMacPrefixes()
@@ -106,9 +182,31 @@ namespace DeepDroidChanger.Services
             }
         }
 
-        private static string GenerateDigits(int length)
+        private static IReadOnlyList<string> LoadNames()
         {
-            return string.Concat(Enumerable.Range(0, length).Select(_ => Random.Shared.Next(0, 10).ToString()));
+            try
+            {
+                string text = AssetDataReader.ReadText(NamesResourcePath);
+                string[] names = text
+                    .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(name => name.Length > 0)
+                    .ToArray();
+                return names.Length > 0 ? names : FallbackNames;
+            }
+            catch (IOException)
+            {
+                return FallbackNames;
+            }
+        }
+
+        private static bool IsValidTac(string? value)
+        {
+            return value is { Length: 8 } && value.All(char.IsDigit);
+        }
+
+        private string GenerateDigits(int length)
+        {
+            return string.Concat(Enumerable.Range(0, length).Select(_ => RandomInRange(0, 10).ToString()));
         }
 
         private static string NormalizeDigits(string value)
@@ -133,6 +231,25 @@ namespace DeepDroidChanger.Services
             }
 
             return sum * 9 % 10;
+        }
+
+        private static int GenerateLuhnCheckDigit(string body)
+        {
+            var sum = 0;
+            for (var index = 0; index < body.Length; index++)
+            {
+                var digit = body[index] - '0';
+                if ((index + 1) % 2 == 0)
+                {
+                    digit *= 2;
+                    if (digit > 9)
+                        digit -= 9;
+                }
+
+                sum += digit;
+            }
+
+            return (10 - sum % 10) % 10;
         }
     }
 }

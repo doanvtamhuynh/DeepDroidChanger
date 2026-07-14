@@ -244,6 +244,7 @@ namespace DeepDroidChanger.Services
                     Brand = clearLegacyDeviceProfile ? string.Empty : NormalizeValue(device.Brand),
                     AndroidVersion = clearLegacyDeviceProfile ? string.Empty : NormalizeValue(device.AndroidVersion),
                     ChangeSimEnabled = device.ChangeSimEnabled,
+                    UseIntegritySecurityPatch = device.UseIntegritySecurityPatch,
                     UpdateIntegrityFromServer = device.UpdateIntegrityFromServer,
                     UpdateIntegrityFile = NormalizeValue(device.UpdateIntegrityFile),
                     UpdateKeyboxFile = NormalizeValue(device.UpdateKeyboxFile),

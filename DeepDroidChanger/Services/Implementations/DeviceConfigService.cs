@@ -171,6 +171,7 @@ namespace DeepDroidChanger.Services
             device.Brand = Normalize(profile.Brand);
             device.AndroidVersion = Normalize(profile.AndroidVersion);
             device.ChangeSimEnabled = profile.ChangeSimEnabled;
+            device.UseIntegritySecurityPatch = profile.UseIntegritySecurityPatch;
             device.CountryIso = Normalize(profile.CountryIso).ToLowerInvariant();
             device.CountryName = Normalize(profile.CountryName);
             device.Carrier = Normalize(profile.Carrier);

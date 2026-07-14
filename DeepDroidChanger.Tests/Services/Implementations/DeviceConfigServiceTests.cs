@@ -59,6 +59,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations
                 Brand = "Samsung",
                 AndroidVersion = "Android 15",
                 ChangeSimEnabled = false,
+                UseIntegritySecurityPatch = true,
                 CountryIso = "vn",
                 CountryName = "Vietnam",
                 Carrier = "Viettel",
@@ -77,6 +78,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations
             Assert.AreEqual("Samsung", config.Brand);
             Assert.AreEqual("Android 15", config.AndroidVersion);
             Assert.IsFalse(config.ChangeSimEnabled);
+            Assert.IsTrue(config.UseIntegritySecurityPatch);
             Assert.AreEqual("vn", config.CountryIso);
             Assert.AreEqual("Viettel", config.Carrier);
             Assert.AreEqual("452", config.CarrierMcc);

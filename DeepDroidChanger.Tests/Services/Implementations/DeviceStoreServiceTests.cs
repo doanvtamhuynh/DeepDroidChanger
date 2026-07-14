@@ -57,6 +57,7 @@ public sealed class DeviceStoreServiceTests
 
         Assert.HasCount(1, devices);
         Assert.IsTrue(devices[0].ChangeSimEnabled);
+        Assert.IsFalse(devices[0].UseIntegritySecurityPatch);
         Assert.AreEqual(string.Empty, devices[0].Brand);
         Assert.AreEqual(string.Empty, devices[0].AndroidVersion);
         Assert.AreEqual(string.Empty, devices[0].Timezone);
@@ -115,6 +116,7 @@ public sealed class DeviceStoreServiceTests
             Brand = "Google",
             AndroidVersion = "Android 14",
             ChangeSimEnabled = false,
+            UseIntegritySecurityPatch = true,
             CountryIso = "us",
             CountryName = "United States",
             Carrier = "T-Mobile",
@@ -146,6 +148,7 @@ public sealed class DeviceStoreServiceTests
         Assert.AreEqual("Google", restored.Brand);
         Assert.AreEqual("Android 14", restored.AndroidVersion);
         Assert.IsFalse(restored.ChangeSimEnabled);
+        Assert.IsTrue(restored.UseIntegritySecurityPatch);
         Assert.AreEqual("us", restored.CountryIso);
         Assert.AreEqual("United States", restored.CountryName);
         Assert.AreEqual("T-Mobile", restored.Carrier);

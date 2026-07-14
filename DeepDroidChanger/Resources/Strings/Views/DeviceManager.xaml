@@ -35,6 +35,7 @@
     <sys:String x:Key="DeviceManager_FieldCountry">Country</sys:String>
     <sys:String x:Key="DeviceManager_FieldCarrier">Carrier</sys:String>
     <sys:String x:Key="DeviceManager_OptionChangeSim">Change SIM</sys:String>
+    <sys:String x:Key="DeviceManager_OptionUseIntegritySecurityPatch">Use Integrity security patch</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomDevice">Random Device</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeDevice">Change Device</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomAndChangeDevice">Random &amp; Change Device</sys:String>

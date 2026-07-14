@@ -59,7 +59,17 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
             Field("OperatorCountry", device.SimOperatorCountry),
             Field("OperatorName", device.SimOperatorName),
             Field("WifiMac", device.WifiMacAddress),
-            Field("BluetoothMac", device.BluetoothMacAddress)
+            Field("BluetoothMac", device.BluetoothMacAddress),
+            Field("BuildId", device.BuildId),
+            Field("BuildIncremental", device.BuildIncremental),
+            Field("BuildDescription", device.BuildDescription),
+            Field("BuildFlavor", device.BuildFlavor),
+            Field("BuildUser", device.BuildUser),
+            Field("SettingDeviceName", device.SettingDeviceName),
+            Field("SettingBluetoothName", device.SettingBluetoothName),
+            Field("WifiBssid", device.WifiBssid),
+            Field("WifiSsid", device.WifiSsid),
+            Field("VbmetaDigest", device.VbmetaDigest)
         ];
     }
 
@@ -103,6 +113,16 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
         _device.SimOperatorName = values["OperatorName"];
         _device.WifiMacAddress = values["WifiMac"];
         _device.BluetoothMacAddress = values["BluetoothMac"];
+        _device.BuildId = values["BuildId"];
+        _device.BuildIncremental = values["BuildIncremental"];
+        _device.BuildDescription = values["BuildDescription"];
+        _device.BuildFlavor = values["BuildFlavor"];
+        _device.BuildUser = values["BuildUser"];
+        _device.SettingDeviceName = values["SettingDeviceName"];
+        _device.SettingBluetoothName = values["SettingBluetoothName"];
+        _device.WifiBssid = values["WifiBssid"];
+        _device.WifiSsid = values["WifiSsid"];
+        _device.VbmetaDigest = values["VbmetaDigest"];
         UpdateRequested?.Invoke(this, EventArgs.Empty);
     }
 

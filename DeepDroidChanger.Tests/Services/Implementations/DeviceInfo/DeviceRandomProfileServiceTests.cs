@@ -16,12 +16,17 @@ public sealed class DeviceRandomProfileServiceTests
             Model = "Pixel 8",
             Board = "husky",
             Fingerprint = "google/husky/husky:14/AP1A/123456:user/release-keys",
-            Manufacturer = " ",
+            Manufacturer = "unknown",
+            Brand = "unknown",
             Name = "unknown",
+            Hardware = "tensor",
+            Platform = "gs201",
+            SecurityPatch = "2025-01-01",
         };
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
             .Returns(apiDevice);
-        DeviceRandomProfileService service = CreateService(api);
+        var randomService = new DeterministicRandomService();
+        DeviceRandomProfileService service = CreateService(api, randomService: randomService);
         var session = CreateSession();
         var request = new RandomDeviceRequest
         {
@@ -41,12 +46,28 @@ public sealed class DeviceRandomProfileServiceTests
         Assert.AreEqual("husky", result.Code);
         Assert.AreEqual("14", result.Release);
         Assert.AreEqual("34", result.Sdk);
+        Assert.AreEqual("AP1A", result.BuildId);
+        Assert.AreEqual("123456", result.BuildIncremental);
+        Assert.AreEqual("AP1A.123456", result.BuildDisplayId);
+        Assert.AreEqual("husky-user", result.BuildFlavor);
+        Assert.AreEqual("husky 14 AP1A 123456 release-keys", result.BuildDescription);
+        Assert.AreEqual("android-husky", result.BuildUser);
+        Assert.AreEqual("android-husky", result.BuildHost);
+        Assert.AreEqual("Pixel8_Robinson", result.SettingDeviceName);
+        Assert.AreEqual("Pixel8_Simmons", result.SettingBluetoothName);
+        Assert.AreEqual("66:77:88:99:aa:bb", result.BluetoothMacAddress);
+        Assert.AreEqual("66:77:88:99:aa:bb", result.WifiBssid);
+        Assert.AreEqual("Pixel8_Potter", result.WifiSsid);
+        Assert.HasCount(64, result.VbmetaDigest);
         Assert.AreEqual("45204", result.SimOperatorNumeric);
         Assert.AreEqual("vn", result.SimOperatorCountry);
-        Assert.AreEqual("Viettel - Mobile", result.SimOperatorName);
+        Assert.AreEqual("Viettel", result.SimOperatorName);
         Assert.StartsWith("+84", result.SimPhoneNumber);
         Assert.AreEqual(15, result.Imei!.Length);
         Assert.AreEqual(15, result.Imei1!.Length);
+        Assert.AreNotEqual(result.Imei, result.Imei1);
+        Assert.AreEqual(result.Imei[..8], result.Imei1[..8]);
+        CollectionAssert.AreEqual(new[] { "samsung", "samsung" }, randomService.ImeiBrands);
         await api.Received(1).GetRandomDeviceAsync(
             session,
             Arg.Is<RandomDeviceSelection>(selection => selection.Brand == "samsung" && selection.Sdk == 34),
@@ -54,11 +75,55 @@ public sealed class DeviceRandomProfileServiceTests
     }
 
     [TestMethod]
+    public async Task CreateRandomProfileAsync_ValidServerImeis_ArePreservedWithoutFallbackGeneration()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        DeviceInfoApiDevice apiDevice = CreateApiDevice("Pixel");
+        apiDevice.Imei = "355273350000000";
+        apiDevice.Imei1 = "355273350000018";
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(apiDevice);
+        var randomService = new DeterministicRandomService();
+        DeviceRandomProfileService service = CreateService(api, randomService: randomService);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { SelectedBrand = "google", SelectedAndroidVersion = "Android 13" },
+            CancellationToken.None);
+
+        Assert.AreEqual("355273350000000", result.Imei);
+        Assert.AreEqual("355273350000018", result.Imei1);
+        Assert.IsEmpty(randomService.ImeiBrands);
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_OnlyValidSecondaryServerImei_PreservesItAndGeneratesPrimary()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        DeviceInfoApiDevice apiDevice = CreateApiDevice("Pixel");
+        apiDevice.Imei = null;
+        apiDevice.Imei1 = "355273350000018";
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(apiDevice);
+        var randomService = new DeterministicRandomService();
+        DeviceRandomProfileService service = CreateService(api, randomService: randomService);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { SelectedBrand = "google", SelectedAndroidVersion = "Android 13" },
+            CancellationToken.None);
+
+        Assert.AreEqual("355273350000000", result.Imei);
+        Assert.AreEqual("355273350000018", result.Imei1);
+        CollectionAssert.AreEqual(new[] { "google" }, randomService.ImeiBrands);
+    }
+
+    [TestMethod]
     public async Task CreateRandomProfileAsync_RandomBrandWithFixedSdk_UsesCompatibleBrandAndDefaults()
     {
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
-            .Returns(new DeviceInfoApiDevice { Model = "Model" });
+            .Returns(CreateApiDevice("Model", release: "15"));
         DeviceRandomProfileService service = CreateService(api);
 
         DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
@@ -78,7 +143,7 @@ public sealed class DeviceRandomProfileServiceTests
     {
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
         api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
-            .Returns(new DeviceInfoApiDevice { Model = "OnePlus", Fingerprint = "short/value" });
+            .Returns(CreateApiDevice("OnePlus", release: "13"));
         DeviceRandomProfileService service = CreateService(api);
 
         await service.CreateRandomProfileAsync(
@@ -105,6 +170,89 @@ public sealed class DeviceRandomProfileServiceTests
     }
 
     [TestMethod]
+    public async Task CreateRandomProfileAsync_MissingFingerprint_ThrowsTypedApiException()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(new DeviceInfoApiDevice { Model = "Pixel" });
+        DeviceRandomProfileService service = CreateService(api);
+
+        await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.CreateRandomProfileAsync(
+            CreateSession(), new RandomDeviceRequest(), CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_IntegrityPatchEnabled_OverridesApiSecurityPatch()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(CreateApiDevice("Pixel", securityPatch: "2024-01-01"));
+        IDeviceIntegrityService integrity = Substitute.For<IDeviceIntegrityService>();
+        integrity.TryGetRandomSecurityPatchAsync(Arg.Any<CancellationToken>()).Returns("2026-06-01");
+        DeviceRandomProfileService service = CreateService(api, integrity);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { UseIntegritySecurityPatch = true },
+            CancellationToken.None);
+
+        Assert.AreEqual("2026-06-01", result.SecurityPatch);
+        await integrity.Received(1).TryGetRandomSecurityPatchAsync(CancellationToken.None);
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_IntegrityPatchUnavailable_KeepsApiSecurityPatch()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(CreateApiDevice("Pixel", securityPatch: "2024-01-01"));
+        IDeviceIntegrityService integrity = Substitute.For<IDeviceIntegrityService>();
+        integrity.TryGetRandomSecurityPatchAsync(Arg.Any<CancellationToken>()).Returns((string?)null);
+        DeviceRandomProfileService service = CreateService(api, integrity);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { UseIntegritySecurityPatch = true },
+            CancellationToken.None);
+
+        Assert.AreEqual("2024-01-01", result.SecurityPatch);
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_NoSecurityPatchFromEitherSource_RejectsIncompleteProfile()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(CreateApiDevice("Pixel", securityPatch: string.Empty));
+        IDeviceIntegrityService integrity = Substitute.For<IDeviceIntegrityService>();
+        integrity.TryGetRandomSecurityPatchAsync(Arg.Any<CancellationToken>()).Returns((string?)null);
+        DeviceRandomProfileService service = CreateService(api, integrity);
+
+        await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { UseIntegritySecurityPatch = true },
+            CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_IntegrityPatchDisabled_DoesNotContactIntegrityServer()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(CreateApiDevice("Pixel", securityPatch: "2024-01-01"));
+        IDeviceIntegrityService integrity = Substitute.For<IDeviceIntegrityService>();
+        DeviceRandomProfileService service = CreateService(api, integrity);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { UseIntegritySecurityPatch = false },
+            CancellationToken.None);
+
+        Assert.AreEqual("2024-01-01", result.SecurityPatch);
+        await integrity.DidNotReceiveWithAnyArgs().TryGetRandomSecurityPatchAsync(default);
+    }
+
+    [TestMethod]
     public async Task CreateRandomProfileAsync_NullRequest_ThrowsBeforeApiCall()
     {
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
@@ -117,14 +265,45 @@ public sealed class DeviceRandomProfileServiceTests
 
     private static AccountSession CreateSession() => new("https://example.test/graphql", "authorization", "token");
 
-    private static DeviceRandomProfileService CreateService(IDeviceRandomApiService api)
+    private static DeviceInfoApiDevice CreateApiDevice(
+        string model,
+        string securityPatch = "2025-01-01",
+        string release = "13")
     {
-        var randomService = new DeterministicRandomService();
-        return new DeviceRandomProfileService(api, randomService, new SimProfileService(randomService));
+        return new DeviceInfoApiDevice
+        {
+            Model = model,
+            Board = "board",
+            Hardware = "hardware",
+            Platform = "platform",
+            Manufacturer = "google",
+            Fingerprint = $"google/product/device:{release}/BUILD/123456:user/release-keys",
+            SecurityPatch = securityPatch
+        };
+    }
+
+    private static DeviceRandomProfileService CreateService(
+        IDeviceRandomApiService api,
+        IDeviceIntegrityService? integrity = null,
+        IRandomService? randomService = null)
+    {
+        randomService ??= new DeterministicRandomService();
+        return new DeviceRandomProfileService(
+            api,
+            integrity ?? Substitute.For<IDeviceIntegrityService>(),
+            randomService,
+            new SimProfileService(randomService));
     }
 
     private sealed class DeterministicRandomService : IRandomService
     {
+        private readonly string[] _names = ["Robinson", "Simmons", "Potter"];
+        private readonly string[] _imeis = ["355273350000000", "355273350000018"];
+        private int _nameIndex;
+        private int _imeiIndex;
+
+        public List<string> ImeiBrands { get; } = [];
+
         public int RandomInRange(int minValue, int maxValue) => minValue;
         public T PickRandom<T>(IReadOnlyList<T> values) => values[0];
         public string GetRandomLocalIp() => "192.168.20.20";
@@ -132,6 +311,15 @@ public sealed class DeviceRandomProfileServiceTests
         public string GenerateImsi(string mcc, string mnc) => string.Concat(mcc, mnc, "0000000000");
         public string GenerateIccid(string countryCode, string mnc) => string.Concat("89", countryCode, mnc, "0000000000000");
         public string GeneratePhoneNumber() => "100000000";
+        public string GenerateName(bool requireSingle = false) => _names[_nameIndex++ % _names.Length];
+        public string GenerateImei(string brand, string? preferredTac = null)
+        {
+            ImeiBrands.Add(brand);
+            string imei = _imeis[_imeiIndex++ % _imeis.Length];
+            return preferredTac is { Length: 8 }
+                ? string.Concat(preferredTac, imei[8..])
+                : imei;
+        }
         public string GenerateMacAddress() => "00:11:22:33:44:55";
         public string GenerateWifiMacAddress(string brand) => "66:77:88:99:aa:bb";
     }

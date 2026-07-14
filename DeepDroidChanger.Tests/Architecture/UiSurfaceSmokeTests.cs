@@ -267,7 +267,10 @@ public sealed class UiSurfaceSmokeTests
         AssertGridPosition(deviceManagerView, "DeviceInfoImeiTextBox", 4, 1);
         AssertGridPosition(deviceManagerView, "DeviceInfoMacTextBox", 4, 3);
         var deviceConfigGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceConfigFormGrid"));
-        Assert.HasCount(6, deviceConfigGrid.RowDefinitions);
+        Assert.HasCount(7, deviceConfigGrid.RowDefinitions);
+        var integrityPatchCheckBox = Assert.IsInstanceOfType<CheckBox>(
+            deviceManagerView.FindName("UseIntegritySecurityPatchCheckBox"));
+        Assert.AreEqual(6, System.Windows.Controls.Grid.GetRow(integrityPatchCheckBox));
         Assert.IsFalse(deviceConfigGrid.Children
             .OfType<System.Windows.Controls.TextBlock>()
             .Any(textBlock => string.Equals(textBlock.Text, "Timezone", StringComparison.OrdinalIgnoreCase)

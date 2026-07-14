@@ -25,7 +25,7 @@ public sealed class SimProfileServiceTests
         Assert.AreEqual("+84901234567", result.PhoneNumber);
         Assert.AreEqual("45204", result.OperatorNumeric);
         Assert.AreEqual("vn", result.OperatorCountry);
-        Assert.AreEqual("Viettel - Mobile", result.OperatorName);
+        Assert.AreEqual("Viettel", result.OperatorName);
     }
 
     [TestMethod]

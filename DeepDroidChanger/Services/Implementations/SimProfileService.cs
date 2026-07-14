@@ -27,7 +27,7 @@ public sealed class SimProfileService : ISimProfileService
             : country.CountryIso.Trim().ToLowerInvariant();
         string carrierName = string.IsNullOrWhiteSpace(carrier?.CarrierName)
             ? DefaultCarrierName
-            : carrier.CarrierName.Trim();
+            : NormalizeCarrierName(carrier.CarrierName);
 
         return new SimProfile
         {
@@ -44,5 +44,12 @@ public sealed class SimProfileService : ISimProfileService
     {
         string digits = string.Concat((value ?? string.Empty).Where(char.IsDigit));
         return digits.Length == 0 ? fallback : digits;
+    }
+
+    private static string NormalizeCarrierName(string value)
+    {
+        string normalized = value.Trim();
+        int separatorIndex = normalized.LastIndexOf(" - ", StringComparison.Ordinal);
+        return separatorIndex > 0 ? normalized[..separatorIndex].Trim() : normalized;
     }
 }

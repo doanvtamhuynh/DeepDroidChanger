@@ -62,6 +62,8 @@ namespace DeepDroidChanger.ViewModels
         private bool _isUpdatingCarrierOptions;
         [ObservableProperty]
         private bool _isChangeSimEnabled = true;
+        [ObservableProperty]
+        private bool _useIntegritySecurityPatch;
         private bool _isLoadingDevices;
         private string _newDeviceCountText = string.Empty;
         [ObservableProperty]
@@ -282,6 +284,12 @@ namespace DeepDroidChanger.ViewModels
         }
 
         partial void OnIsChangeSimEnabledChanged(bool value)
+        {
+            if (!_isApplyingDeviceConfig)
+                QueueSelectedDeviceProfileSave();
+        }
+
+        partial void OnUseIntegritySecurityPatchChanged(bool value)
         {
             if (!_isApplyingDeviceConfig)
                 QueueSelectedDeviceProfileSave();
@@ -509,9 +517,14 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand]
         private async Task RandomDeviceAsync(CancellationToken cancellationToken)
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            DeviceRowViewModel? device = SelectedDevice;
             if (device == null)
+            {
+                await ShowToolbarLogAsync(DeviceLogResourceKeys.SelectDeviceFirst, cancellationToken).ConfigureAwait(true);
                 return;
+            }
+
+            SelectSingleDevice(device);
 
             var randomProfileLockTaken = false;
             try
@@ -525,6 +538,7 @@ namespace DeepDroidChanger.ViewModels
                         {
                             SelectedBrand = SelectedBrand,
                             SelectedAndroidVersion = SelectedAndroidVersion,
+                            UseIntegritySecurityPatch = UseIntegritySecurityPatch,
                             Country = SelectedCountry,
                             Carrier = SelectedCarrier
                         },
@@ -1517,6 +1531,7 @@ namespace DeepDroidChanger.ViewModels
                 SelectedBrand = FindOption(Brands, storedDevice?.Brand) ?? DeviceProfileOptions.Random;
                 UpdateAndroidVersionOptions(SelectedBrand, storedDevice?.AndroidVersion);
                 IsChangeSimEnabled = storedDevice?.ChangeSimEnabled ?? true;
+                UseIntegritySecurityPatch = storedDevice?.UseIntegritySecurityPatch ?? false;
                 SelectedCountry = selectedCountry;
                 UpdateCarrierOptionsForCountry(selectedCountry?.CountryIso, storedDevice);
             }
@@ -1643,6 +1658,7 @@ namespace DeepDroidChanger.ViewModels
                 Brand = SelectedBrand ?? string.Empty,
                 AndroidVersion = SelectedAndroidVersion ?? string.Empty,
                 ChangeSimEnabled = IsChangeSimEnabled,
+                UseIntegritySecurityPatch = UseIntegritySecurityPatch,
                 CountryIso = SelectedCountry?.CountryIso ?? string.Empty,
                 CountryName = SelectedCountry?.CountryName ?? string.Empty,
                 Carrier = SelectedCarrier?.CarrierName ?? string.Empty,

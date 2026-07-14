@@ -39,4 +39,14 @@
     <sys:String x:Key="RandomDeviceInfo_FieldOperatorName">Operator Name</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldWifiMac">Wi-Fi MAC</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldBluetoothMac">Bluetooth MAC</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildId">Build ID</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildIncremental">Build Incremental</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildDescription">Build Description</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildFlavor">Build Flavor</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildUser">Build User</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldSettingDeviceName">System Device Name</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldSettingBluetoothName">Bluetooth Name</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldWifiBssid">Wi-Fi BSSID</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldWifiSsid">Wi-Fi SSID</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldVbmetaDigest">VBMeta Digest</sys:String>
 </ResourceDictionary>
