@@ -13,10 +13,6 @@
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{StaticResource Metric.FontFamily}">
 
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-    </Window.Resources>
-
     <Grid Style="{StaticResource UpdateIntegrityRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
