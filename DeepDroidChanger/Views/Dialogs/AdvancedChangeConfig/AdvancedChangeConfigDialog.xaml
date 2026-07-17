@@ -1,0 +1,263 @@
+<Window x:Class="DeepDroidChanger.Views.AdvancedChangeConfigDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource AdvancedChangeConfig_WindowTitle}"
+        Width="980"
+        Height="780"
+        MinWidth="860"
+        MinHeight="680"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid Margin="{StaticResource Spacing.PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <materialDesign:PackIcon Kind="TuneVariant"
+                                     Style="{StaticResource AdvancedChangeConfigHeaderIconStyle}"/>
+            <TextBlock x:Name="AdvancedChangeConfigTitle"
+                       Grid.Column="1"
+                       Text="{DynamicResource AdvancedChangeConfig_Title}"
+                       Style="{StaticResource TitleTextStyle}"/>
+        </Grid>
+
+        <Border Grid.Row="1"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="{StaticResource Spacing.CardPadding.Compact}">
+            <StackPanel>
+                <TextBlock Text="{DynamicResource AdvancedChangeConfig_ChangeSectionTitle}"
+                           Style="{StaticResource SubtitleTextStyle}"/>
+                <TextBlock Text="{DynamicResource AdvancedChangeConfig_ChangeSectionDescription}"
+                           Style="{StaticResource SecondaryTextStyle}"/>
+                <UniformGrid Columns="3"
+                             Rows="1"
+                             Margin="0,12,0,0">
+                    <CheckBox x:Name="ChangeAndroidIdCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_ChangeAndroidId}"
+                              IsChecked="{Binding ChangeAndroidId, Mode=TwoWay}"/>
+                    <CheckBox x:Name="ChangeMacAddressCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_ChangeMac}"
+                              IsChecked="{Binding ChangeMacAddress, Mode=TwoWay}"/>
+                    <CheckBox x:Name="UseRmRfForPackageCleanupCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_UseRmRfForPackageCleanup}"
+                              ToolTip="{DynamicResource AdvancedChangeConfig_UseRmRfForPackageCleanupDescription}"
+                              IsChecked="{Binding UseRmRfForPackageCleanup, Mode=TwoWay}"/>
+                </UniformGrid>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="{StaticResource Spacing.CardPadding.Compact}">
+            <StackPanel>
+                <TextBlock Text="{DynamicResource AdvancedChangeConfig_WipeSectionTitle}"
+                           Style="{StaticResource SubtitleTextStyle}"/>
+                <TextBlock Text="{DynamicResource AdvancedChangeConfig_WipeSectionDescription}"
+                           Style="{StaticResource SecondaryTextStyle}"/>
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <GroupBox x:Name="PrimaryWipeOptionsGroup"
+                              Grid.Column="0"
+                              Header="{DynamicResource AdvancedChangeConfig_PrimaryWipeOptions}">
+                        <StackPanel>
+                            <CheckBox x:Name="ClearAllPackagesCheckBox"
+                                      Content="{DynamicResource AdvancedChangeConfig_ClearAllPackages}"
+                                      IsChecked="{Binding ClearAllPackages, Mode=TwoWay}"
+                                      Margin="0,6,0,0"/>
+                            <CheckBox x:Name="ClearGoogleAccountsCheckBox"
+                                      Content="{DynamicResource AdvancedChangeConfig_ClearGoogleAccounts}"
+                                      IsChecked="{Binding ClearGoogleAccounts, Mode=TwoWay}"
+                                      Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox x:Name="SelectiveWipeOptionsGroup"
+                              Grid.Column="2"
+                              Header="{DynamicResource AdvancedChangeConfig_SelectiveWipeOptions}"
+                              Style="{StaticResource AdvancedChangeConfigSelectiveGroupStyle}"
+                              IsEnabled="{Binding IsSelectiveWipeEnabled}">
+                        <StackPanel>
+                            <CheckBox x:Name="ClearGooglePackagesCheckBox"
+                                      Content="{DynamicResource AdvancedChangeConfig_ClearGooglePackages}"
+                                      IsChecked="{Binding ClearGooglePackages, Mode=TwoWay}"
+                                      Margin="0,6,0,0"/>
+                            <CheckBox x:Name="ClearSelectedPackagesCheckBox"
+                                      Content="{DynamicResource AdvancedChangeConfig_ClearSelectedPackages}"
+                                      IsChecked="{Binding ClearSelectedPackages, Mode=TwoWay}"
+                                      Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </GroupBox>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border x:Name="PackageSelectionPanel"
+                Grid.Row="3"
+                Style="{StaticResource AdvancedChangeConfigPackagePanelStyle}"
+                Margin="{StaticResource Spacing.CardPadding.Compact}"
+                IsEnabled="{Binding IsPackageSelectionActive}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="LoadPackagesButton"
+                            Command="{Binding LoadPackagesCommand}"
+                            Style="{StaticResource AdvancedChangeConfigPrimaryButtonStyle}">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Download"
+                                                     Style="{StaticResource AdvancedChangeConfigButtonIconStyle}"/>
+                            <TextBlock x:Name="LoadPackagesButtonText"
+                                       Text="{DynamicResource AdvancedChangeConfig_LoadPackages}"
+                                       Style="{StaticResource AdvancedChangeConfigButtonTextStyle}"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource AdvancedChangeConfig_PackageScope}"
+                               Style="{StaticResource AppLabelTextStyle}"
+                               VerticalAlignment="Center"
+                               Margin="12,0,8,0"/>
+                    <ComboBox x:Name="PackageScopeComboBox"
+                              Grid.Column="2"
+                              Width="190"
+                              ItemsSource="{Binding PackageScopes}"
+                              SelectedItem="{Binding SelectedPackageScope, Mode=TwoWay}"
+                              DisplayMemberPath="DisplayName"
+                              Style="{StaticResource FlatComboBoxStyle}"/>
+                    <ProgressBar Grid.Column="3"
+                                 Width="120"
+                                 Height="4"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Center"
+                                 IsIndeterminate="True"
+                                 Visibility="{Binding IsLoadingPackages, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </Grid>
+
+                <Grid Grid.Row="1"
+                      Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="{DynamicResource AdvancedChangeConfig_AvailablePackages}"
+                                   Style="{StaticResource SubtitleTextStyle}"/>
+                        <ListBox x:Name="AvailablePackagesListBox"
+                                 Grid.Row="1"
+                                 ItemsSource="{Binding AvailablePackages}"
+                                 SelectedItem="{Binding SelectedAvailablePackage, Mode=TwoWay}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 Margin="0,8,0,0"/>
+                    </Grid>
+
+                    <StackPanel Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Margin="12,0">
+                        <Button Command="{Binding AddSelectedPackageCommand}"
+                                Style="{StaticResource FlatButtonStyle}"
+                                ToolTip="{DynamicResource AdvancedChangeConfig_AddSelectedPackage}">
+                            <materialDesign:PackIcon Kind="ChevronRight"/>
+                        </Button>
+                        <Button Command="{Binding RemoveSelectedPackageCommand}"
+                                Style="{StaticResource FlatButtonStyle}"
+                                ToolTip="{DynamicResource AdvancedChangeConfig_RemoveSelectedPackage}">
+                            <materialDesign:PackIcon Kind="ChevronLeft"/>
+                        </Button>
+                        <Button Command="{Binding AddAllPackagesCommand}"
+                                Style="{StaticResource FlatButtonStyle}"
+                                ToolTip="{DynamicResource AdvancedChangeConfig_AddAllPackages}">
+                            <materialDesign:PackIcon Kind="ChevronDoubleRight"/>
+                        </Button>
+                        <Button Command="{Binding RemoveAllPackagesCommand}"
+                                Style="{StaticResource FlatButtonStyle}"
+                                ToolTip="{DynamicResource AdvancedChangeConfig_RemoveAllPackages}">
+                            <materialDesign:PackIcon Kind="ChevronDoubleLeft"/>
+                        </Button>
+                    </StackPanel>
+
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="{DynamicResource AdvancedChangeConfig_SelectedWipePackages}"
+                                   Style="{StaticResource SubtitleTextStyle}"/>
+                        <ListBox x:Name="SelectedWipePackagesListBox"
+                                 Grid.Row="1"
+                                 ItemsSource="{Binding SelectedPackages}"
+                                 SelectedItem="{Binding SelectedWipePackage, Mode=TwoWay}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 Margin="0,8,0,0"/>
+                    </Grid>
+                </Grid>
+
+                <TextBlock Grid.Row="2"
+                           Text="{Binding PackageLoadStatus}"
+                           Style="{StaticResource SecondaryTextStyle}"
+                           Margin="0,8,0,0"/>
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="4"
+                   Text="{Binding ValidationMessage}"
+                   Foreground="{DynamicResource Brush.Danger}"
+                   Style="{StaticResource SecondaryTextStyle}"/>
+
+        <Grid Grid.Row="5"
+              Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="SaveAdvancedConfigButton"
+                    Grid.Column="1"
+                    Command="{Binding ConfirmCommand}"
+                    Style="{StaticResource AdvancedChangeConfigPrimaryButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="ContentSaveOutline"
+                                             Style="{StaticResource AdvancedChangeConfigButtonIconStyle}"/>
+                    <TextBlock x:Name="SaveAdvancedConfigButtonText"
+                               Text="{DynamicResource AdvancedChangeConfig_Save}"
+                               Style="{StaticResource AdvancedChangeConfigButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

@@ -36,6 +36,7 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
             Field("Fingerprint", device.Fingerprint),
             Field("BuildDisplayId", device.BuildDisplayId),
             Field("Manufacturer", device.Manufacturer),
+            Field("BuildDate", device.BuildDate),
             Field("BuildDateUtc", device.BuildDateUtc),
             Field("Hardware", device.Hardware),
             Field("Imei", device.Imei),
@@ -89,6 +90,7 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
         _device.Fingerprint = values["Fingerprint"];
         _device.BuildDisplayId = values["BuildDisplayId"];
         _device.Manufacturer = values["Manufacturer"];
+        _device.BuildDate = values["BuildDate"];
         _device.BuildDateUtc = values["BuildDateUtc"];
         _device.Hardware = values["Hardware"];
         _device.Imei = values["Imei"];

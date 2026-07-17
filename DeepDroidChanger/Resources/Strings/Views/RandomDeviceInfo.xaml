@@ -15,6 +15,7 @@
     <sys:String x:Key="RandomDeviceInfo_FieldFingerprint">Fingerprint</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldBuildDisplayId">Build Display ID</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldManufacturer">Manufacturer</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildDate">Build Date</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldBuildDateUtc">Build Date (UTC)</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldHardware">Hardware</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldImei">IMEI</sys:String>

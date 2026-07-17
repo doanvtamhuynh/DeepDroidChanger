@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:String x:Key="AdvancedChangeConfig_WindowTitle">Cấu hình đổi thiết bị nâng cao</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_Title">Đổi thiết bị nâng cao</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeSectionTitle">Cấu hình Change</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeSectionDescription">Chọn thông tin định danh được áp dụng từ profile mới.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Đổi Android ID</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Đổi MAC Wi-Fi/Bluetooth</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseRmRfForPackageCleanup">Dùng "rm -rf" để xóa dữ liệu gói</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseRmRfForPackageCleanupDescription">Buộc dừng từng gói rồi chạy "rm -rf" trên tám đường dẫn dữ liệu ứng dụng và hồ sơ ART. Thao tác này xóa cả thư mục dữ liệu gói. Chế độ mặc định không dùng tùy chọn này.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_WipeSectionTitle">Cấu hình Wipe</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_WipeSectionDescription">Xóa thông thường dùng Trình quản lý gói Android. Khi bật, "rm -rf" sẽ xóa trực tiếp các thư mục dữ liệu gói. APK đã cài được giữ nguyên.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_PrimaryWipeOptions">Wipe toàn bộ và tài khoản</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_SelectiveWipeOptions">Wipe package có chọn lọc</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearAllPackages">Xóa dữ liệu tất cả package</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearGoogleAccounts">Xóa dữ liệu tài khoản Google</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearGooglePackages">Xóa dữ liệu package Google</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearSelectedPackages">Xóa dữ liệu package được chọn</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadPackages">Load packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_PackageScope">Nguồn package</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AllPackages">Tất cả package</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UserPackages">Package người dùng cài</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AvailablePackages">Package có sẵn</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_SelectedWipePackages">Package sẽ wipe</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AddSelectedPackage">Thêm package đang chọn</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_RemoveSelectedPackage">Bỏ package đang chọn</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AddAllPackages">Thêm toàn bộ package đã load</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_RemoveAllPackages">Bỏ toàn bộ package đã chọn</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadPackagesPrompt">Chọn nguồn package rồi nhấn Load packages.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadingPackages">Đang lấy package từ thiết bị đã kết nối…</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadedPackages">Đã load {0} package.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadPackagesFailed">Load package thất bại. Hãy kiểm tra thiết bị đang online rồi thử lại.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_SelectPackageValidation">Hãy thêm ít nhất một package vào danh sách wipe hoặc tắt “Xóa dữ liệu package được chọn”.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_Save">Lưu cấu hình</sys:String>
+</ResourceDictionary>

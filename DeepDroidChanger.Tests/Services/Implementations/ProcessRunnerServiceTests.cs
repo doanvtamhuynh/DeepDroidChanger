@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Tests.Fakes;
 
@@ -17,6 +18,24 @@ public sealed class ProcessRunnerServiceTests
 
         await service.RunAsync("cmd.exe", $"/d /c echo {secret}", CancellationToken.None);
 
+        Assert.IsFalse(logger.Messages.Any(message => message.Contains(secret, StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_StandardInput_IsStreamedWithoutLoggingItsContent()
+    {
+        const string secret = "stdin-secret-should-not-be-logged";
+        var logger = new TestLogger<ProcessRunnerService>();
+        var service = new ProcessRunnerService(logger);
+
+        CommandResult result = await service.RunAsync(
+            "powershell.exe",
+            "-NoProfile -NonInteractive -Command \"[Console]::In.ReadToEnd()\"",
+            secret,
+            CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.Contains(secret, result.StandardOutput, StringComparison.Ordinal);
         Assert.IsFalse(logger.Messages.Any(message => message.Contains(secret, StringComparison.Ordinal)));
     }
 

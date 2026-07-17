@@ -15,12 +15,35 @@ namespace DeepDroidChanger.Services
             _logger = logger;
         }
 
-        public async Task<CommandResult> RunAsync(string fileName, string arguments, CancellationToken cancellationToken)
+        public Task<CommandResult> RunAsync(
+            string fileName,
+            string arguments,
+            CancellationToken cancellationToken)
+        {
+            return RunCoreAsync(fileName, arguments, null, cancellationToken);
+        }
+
+        public Task<CommandResult> RunAsync(
+            string fileName,
+            string arguments,
+            string standardInput,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(standardInput);
+            return RunCoreAsync(fileName, arguments, standardInput, cancellationToken);
+        }
+
+        private async Task<CommandResult> RunCoreAsync(
+            string fileName,
+            string arguments,
+            string? standardInput,
+            CancellationToken cancellationToken)
         {
             _logger.LogDebug(
-                "Starting process {FileName}. ArgumentLength: {ArgumentLength}",
+                "Starting process {FileName}. ArgumentLength: {ArgumentLength}; StandardInputLength: {StandardInputLength}",
                 Path.GetFileName(fileName),
-                arguments.Length);
+                arguments.Length,
+                standardInput?.Length ?? 0);
 
             using var process = new Process();
             process.StartInfo = new ProcessStartInfo
@@ -30,7 +53,8 @@ namespace DeepDroidChanger.Services
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
-                RedirectStandardError = true
+                RedirectStandardError = true,
+                RedirectStandardInput = standardInput != null
             };
 
             process.Start();
@@ -41,6 +65,15 @@ namespace DeepDroidChanger.Services
             string error;
             try
             {
+                if (standardInput != null)
+                {
+                    await process.StandardInput
+                        .WriteAsync(standardInput.AsMemory(), cancellationToken)
+                        .ConfigureAwait(false);
+                    await process.StandardInput.FlushAsync(cancellationToken).ConfigureAwait(false);
+                    process.StandardInput.Close();
+                }
+
                 await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
                 output = await outputTask.ConfigureAwait(false);
                 error = await errorTask.ConfigureAwait(false);

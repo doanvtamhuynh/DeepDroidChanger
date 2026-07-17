@@ -15,6 +15,7 @@
     <sys:String x:Key="RandomDeviceInfo_FieldFingerprint">Fingerprint</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldBuildDisplayId">ID hiển thị bản dựng</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldManufacturer">Nhà sản xuất</sys:String>
+    <sys:String x:Key="RandomDeviceInfo_FieldBuildDate">Ngày build</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldBuildDateUtc">Ngày build (UTC)</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldHardware">Phần cứng</sys:String>
     <sys:String x:Key="RandomDeviceInfo_FieldImei">IMEI</sys:String>

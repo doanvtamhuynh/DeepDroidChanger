@@ -177,6 +177,7 @@ namespace DeepDroidChanger.Services
             device.Carrier = Normalize(profile.Carrier);
             device.CarrierMcc = Normalize(profile.CarrierMcc);
             device.CarrierMnc = Normalize(profile.CarrierMnc);
+            device.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(profile.ChangeOptions);
         }
     }
 }

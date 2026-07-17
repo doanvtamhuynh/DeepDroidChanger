@@ -25,7 +25,7 @@ public sealed class RandomDeviceInfoViewModelTests
         viewModel.Initialize(profile);
 
         Assert.AreEqual(typeof(DeviceInfoApiDevice).GetProperties().Length, viewModel.Fields.Count);
-        Assert.HasCount(43, viewModel.Fields);
+        Assert.HasCount(44, viewModel.Fields);
         Assert.AreEqual("RandomDeviceInfo_FieldModel", viewModel.Fields[0].Label);
         Assert.AreEqual("Pixel 9", viewModel.Fields[0].Value);
         Assert.AreEqual("15", viewModel.Fields.Single(field => field.Label == "RandomDeviceInfo_FieldOsVersion").Value);
@@ -59,6 +59,7 @@ public sealed class RandomDeviceInfoViewModelTests
             [nameof(DeviceInfoApiDevice.Fingerprint)] = "Fingerprint",
             [nameof(DeviceInfoApiDevice.BuildDisplayId)] = "BuildDisplayId",
             [nameof(DeviceInfoApiDevice.Manufacturer)] = "Manufacturer",
+            [nameof(DeviceInfoApiDevice.BuildDate)] = "BuildDate",
             [nameof(DeviceInfoApiDevice.BuildDateUtc)] = "BuildDateUtc",
             [nameof(DeviceInfoApiDevice.Hardware)] = "Hardware",
             [nameof(DeviceInfoApiDevice.Imei)] = "Imei",

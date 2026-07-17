@@ -117,6 +117,18 @@ public sealed class DeviceStoreServiceTests
             AndroidVersion = "Android 14",
             ChangeSimEnabled = false,
             UseIntegritySecurityPatch = true,
+            ChangeOptions = new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ClearAllPackages = false,
+                ChangeAndroidId = true,
+                ClearSelectedPackages = true,
+                ChangeMacAddress = false,
+                UseRmRfForPackageCleanup = true,
+                ClearGooglePackages = true,
+                ClearGoogleAccounts = true,
+                SelectedPackages = ["com.example.app"]
+            },
             CountryIso = "us",
             CountryName = "United States",
             Carrier = "T-Mobile",
@@ -149,6 +161,14 @@ public sealed class DeviceStoreServiceTests
         Assert.AreEqual("Android 14", restored.AndroidVersion);
         Assert.IsFalse(restored.ChangeSimEnabled);
         Assert.IsTrue(restored.UseIntegritySecurityPatch);
+        Assert.IsFalse(restored.ChangeOptions.UseDefaultMode);
+        Assert.IsTrue(restored.ChangeOptions.ClearSelectedPackages);
+        Assert.IsFalse(restored.ChangeOptions.ChangeMacAddress);
+        Assert.IsTrue(restored.ChangeOptions.ChangeAndroidId);
+        Assert.IsTrue(restored.ChangeOptions.UseRmRfForPackageCleanup);
+        Assert.IsTrue(restored.ChangeOptions.ClearGooglePackages);
+        Assert.IsTrue(restored.ChangeOptions.ClearGoogleAccounts);
+        CollectionAssert.AreEqual(new[] { "com.example.app" }, restored.ChangeOptions.SelectedPackages);
         Assert.AreEqual("us", restored.CountryIso);
         Assert.AreEqual("United States", restored.CountryName);
         Assert.AreEqual("T-Mobile", restored.Carrier);
@@ -186,7 +206,7 @@ public sealed class DeviceStoreServiceTests
         Assert.HasCount(1, loaded);
         Assert.AreEqual(string.Empty, loaded[0].Brand);
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        Assert.AreEqual(2, document.RootElement.GetProperty("version").GetInt32());
+        Assert.AreEqual(4, document.RootElement.GetProperty("version").GetInt32());
         JsonElement savedDevice = document.RootElement.GetProperty("devices")[0];
         Assert.AreEqual(string.Empty, savedDevice.GetProperty("brand").GetString());
         Assert.IsFalse(savedDevice.TryGetProperty("deviceInfoModel", out _));

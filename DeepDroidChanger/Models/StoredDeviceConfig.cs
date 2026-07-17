@@ -14,6 +14,7 @@ namespace DeepDroidChanger.Models
         public string AndroidVersion { get; set; } = string.Empty;
         public bool ChangeSimEnabled { get; set; } = true;
         public bool UseIntegritySecurityPatch { get; set; }
+        public DeviceChangeOptions ChangeOptions { get; set; } = new();
         public bool UpdateIntegrityFromServer { get; set; } = true;
         public string UpdateIntegrityFile { get; set; } = string.Empty;
         public string UpdateKeyboxFile { get; set; } = string.Empty;

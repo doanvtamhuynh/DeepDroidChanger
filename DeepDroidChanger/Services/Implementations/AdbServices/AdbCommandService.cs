@@ -1,5 +1,6 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Constants;
+using System.Collections.Concurrent;
 using System.IO;
 using Microsoft.Extensions.Logging;
 
@@ -15,6 +16,8 @@ namespace DeepDroidChanger.Services
         private const string SpaceText = " ";
         private const string SendInputTextPurpose = "send input text";
 
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _readOnlyPropertyLocks =
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly IProcessRunnerService _commandRunner;
         private readonly ILogger<AdbCommandService> _logger;
 
@@ -44,6 +47,34 @@ namespace DeepDroidChanger.Services
             return RunAdbAsync(serial, $"shell {shellCommand}", cancellationToken);
         }
 
+        public async Task<CommandResult> RunAdbShellScriptAsync(
+            string serial,
+            string shellScript,
+            CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            ArgumentException.ThrowIfNullOrWhiteSpace(shellScript);
+
+            string adbPath = await ResolveToolPathAsync(
+                    AdbToolConstants.AdbExecutableName,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            string arguments = $"{AdbToolConstants.SerialSelectorArgument} {QuoteProcessArgument(serial)} shell sh";
+            string normalizedScript = shellScript
+                .Replace(WindowsNewLine, "\n", StringComparison.Ordinal)
+                .Replace(CarriageReturn, NewLine);
+            if (!normalizedScript.EndsWith(NewLine))
+                normalizedScript += NewLine;
+
+            _logger.LogDebug(
+                "Running ADB shell script on {Serial}. ScriptLength: {ScriptLength}",
+                serial,
+                normalizedScript.Length);
+            return await _commandRunner
+                .RunAsync(adbPath, arguments, normalizedScript, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         public async Task<CommandResult> RunFastbootAsync(string arguments, CancellationToken cancellationToken)
         {
             var fastbootPath = await ResolveToolPathAsync(AdbToolConstants.FastbootExecutableName, cancellationToken).ConfigureAwait(false);
@@ -63,8 +94,83 @@ namespace DeepDroidChanger.Services
 
         public async Task SetPropertyAsync(string serial, string propertyName, string value, CancellationToken cancellationToken)
         {
-            var command = $"setprop {propertyName} {QuoteShellValue(value)}";
-            var result = await RunAdbShellAsync(serial, command, cancellationToken).ConfigureAwait(false);
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
+            ArgumentNullException.ThrowIfNull(value);
+
+            if (!propertyName.StartsWith(PropertyConstants.ReadOnlyPrefix, StringComparison.Ordinal))
+            {
+                await SetPropertyCoreAsync(serial, propertyName, value, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            SemaphoreSlim propertyLock = _readOnlyPropertyLocks.GetOrAdd(
+                serial,
+                static _ => new SemaphoreSlim(1, 1));
+            await propertyLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await SetReadOnlyPropertyAsync(serial, propertyName, value, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                propertyLock.Release();
+            }
+        }
+
+        private async Task SetReadOnlyPropertyAsync(
+            string serial,
+            string propertyName,
+            string value,
+            CancellationToken cancellationToken)
+        {
+            Exception? primaryException = null;
+            try
+            {
+                await SetPropertyCoreAsync(
+                        serial,
+                        DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
+                        DeviceSpoofPropertyConstants.BypassEnabledValue,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                await SetPropertyCoreAsync(serial, propertyName, value, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                primaryException = exception;
+                throw;
+            }
+            finally
+            {
+                try
+                {
+                    await SetPropertyCoreAsync(
+                            serial,
+                            DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
+                            DeviceSpoofPropertyConstants.BypassDisabledValue,
+                            CancellationToken.None)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception exception) when (primaryException is not null)
+                {
+                    _logger.LogError(
+                        exception,
+                        "Failed to disable read-only property bypass on device {Serial} after setting {PropertyName} failed.",
+                        serial,
+                        propertyName);
+                }
+            }
+        }
+
+        private async Task SetPropertyCoreAsync(
+            string serial,
+            string propertyName,
+            string value,
+            CancellationToken cancellationToken)
+        {
+            string command = $"setprop {propertyName} {QuoteShellValue(value)}";
+            CommandResult result = await RunAdbShellAsync(serial, command, cancellationToken).ConfigureAwait(false);
             ProcessCommandResult(result, serial, $"set property {propertyName}", isWrite: true);
         }
 

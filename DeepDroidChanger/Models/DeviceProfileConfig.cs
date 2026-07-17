@@ -11,4 +11,5 @@ public sealed class DeviceProfileConfig
     public string Carrier { get; set; } = string.Empty;
     public string CarrierMcc { get; set; } = string.Empty;
     public string CarrierMnc { get; set; } = string.Empty;
+    public DeviceChangeOptions ChangeOptions { get; set; } = new();
 }

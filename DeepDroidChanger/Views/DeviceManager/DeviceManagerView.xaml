@@ -360,16 +360,35 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <Grid Style="{StaticResource DeviceSectionHeaderGridStyle}">
+                            <Grid x:Name="DeviceConfigHeaderGrid"
+                                  Style="{StaticResource DeviceSectionHeaderGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="TuneVariant"
                                                          Style="{StaticResource DeviceSectionIconStyle}"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{DynamicResource DeviceManager_DeviceConfigHeader}"
                                            Style="{StaticResource DeviceSectionTitleTextStyle}"/>
+                                <Button x:Name="AdvancedChangeConfigButton"
+                                        Grid.Column="2"
+                                        Command="{Binding OpenAdvancedChangeConfigCommand}"
+                                        ToolTip="{DynamicResource DeviceManager_ActionAdvancedChangeConfig}"
+                                        Style="{StaticResource DeviceInfoDetailsButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Tune"
+                                                                 Style="{StaticResource DeviceInfoDetailsButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource DeviceManager_ActionAdvancedChangeConfig}"
+                                                   Style="{StaticResource DeviceInfoDetailsButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
                             </Grid>
 
                             <Grid x:Name="DeviceConfigFormGrid"
@@ -380,6 +399,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -471,6 +491,12 @@
                                           Grid.ColumnSpan="2"
                                           Content="{DynamicResource DeviceManager_OptionUseIntegritySecurityPatch}"
                                           IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"
+                                          Style="{StaticResource DeviceCheckBoxStyle}"/>
+                                <CheckBox x:Name="UseDefaultChangeModeCheckBox"
+                                          Grid.Row="7"
+                                          Grid.ColumnSpan="2"
+                                          Content="{DynamicResource DeviceManager_OptionDefaultChangeMode}"
+                                          IsChecked="{Binding UseDefaultChangeMode, Mode=TwoWay}"
                                           Style="{StaticResource DeviceCheckBoxStyle}"/>
                             </Grid>
                         </Grid>

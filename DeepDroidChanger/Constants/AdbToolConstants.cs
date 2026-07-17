@@ -14,6 +14,8 @@ namespace DeepDroidChanger.Constants
         public const string ScrcpyWindowBorderlessArgument = "--window-borderless";
         public const string ScrcpyNoAudioArgument = "--no-audio";
 
+        public const string AdbRootCommand = "root";
+        public const string AdbWaitForDeviceCommand = "wait-for-device";
         public const string AdbRebootCommand = "reboot";
     }
 }

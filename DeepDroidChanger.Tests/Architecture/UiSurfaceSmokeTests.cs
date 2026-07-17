@@ -49,6 +49,9 @@ public sealed class UiSurfaceSmokeTests
                         MeasureDialog<LoginDialog, LoginViewModel>(provider);
                         MeasureDialog<AddDevicesDialog, AddDevicesViewModel>(provider);
                         MeasureDialog<DeleteDeviceConfirmationDialog, DeleteDeviceConfirmationViewModel>(provider);
+                        MeasureDialog<ChangeDeviceConfirmationDialog, ChangeDeviceConfirmationViewModel>(provider);
+                        MeasureDialog<AdvancedChangeConfigDialog, AdvancedChangeConfigViewModel>(provider);
+                        VerifyAdvancedChangeConfigDialog(provider);
                         MeasureDialog<RandomDeviceInfoDialog, RandomDeviceInfoViewModel>(provider);
                         VerifyRandomDeviceInfoUpdateButton(provider);
                         MeasureDialog<ChangeLocationDialog, ChangeLocationViewModel>(provider);
@@ -132,6 +135,74 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreSame(accentForeground, button.Foreground);
         Assert.AreSame(accentForeground, icon.Foreground);
         Assert.AreSame(accentForeground, text.Foreground);
+    }
+
+    private static void VerifyAdvancedChangeConfigDialog(IServiceProvider provider)
+    {
+        AdvancedChangeConfigDialog dialog = provider.GetRequiredService<AdvancedChangeConfigDialog>();
+        AdvancedChangeConfigViewModel viewModel = provider.GetRequiredService<AdvancedChangeConfigViewModel>();
+        viewModel.Initialize("SERIAL", new DeviceChangeOptions());
+        dialog.DataContext = viewModel;
+        MeasureSurface(dialog);
+
+        Assert.AreEqual(980d, dialog.Width);
+        Assert.AreEqual(780d, dialog.Height);
+        Assert.AreEqual(860d, dialog.MinWidth);
+        Assert.AreEqual(680d, dialog.MinHeight);
+
+        var changeAndroidId = Assert.IsInstanceOfType<CheckBox>(dialog.FindName("ChangeAndroidIdCheckBox"));
+        var changeMac = Assert.IsInstanceOfType<CheckBox>(dialog.FindName("ChangeMacAddressCheckBox"));
+        var useRmRfForPackageCleanup = Assert.IsInstanceOfType<CheckBox>(
+            dialog.FindName("UseRmRfForPackageCleanupCheckBox"));
+        var clearAllPackages = Assert.IsInstanceOfType<CheckBox>(dialog.FindName("ClearAllPackagesCheckBox"));
+        var clearGoogleAccounts = Assert.IsInstanceOfType<CheckBox>(dialog.FindName("ClearGoogleAccountsCheckBox"));
+        var clearGooglePackages = Assert.IsInstanceOfType<CheckBox>(dialog.FindName("ClearGooglePackagesCheckBox"));
+        var primaryWipeGroup = Assert.IsInstanceOfType<GroupBox>(dialog.FindName("PrimaryWipeOptionsGroup"));
+        var selectiveWipeGroup = Assert.IsInstanceOfType<GroupBox>(dialog.FindName("SelectiveWipeOptionsGroup"));
+        var packagePanel = Assert.IsInstanceOfType<Border>(dialog.FindName("PackageSelectionPanel"));
+        var packageScope = Assert.IsInstanceOfType<ComboBox>(dialog.FindName("PackageScopeComboBox"));
+        var loadPackagesButton = Assert.IsInstanceOfType<Button>(dialog.FindName("LoadPackagesButton"));
+        var loadPackagesText = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("LoadPackagesButtonText"));
+        var saveButton = Assert.IsInstanceOfType<Button>(dialog.FindName("SaveAdvancedConfigButton"));
+        var saveButtonText = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("SaveAdvancedConfigButtonText"));
+        object accentForeground = Application.Current.FindResource("Brush.AccentForeground");
+
+        Assert.IsFalse(changeAndroidId.IsChecked);
+        Assert.IsTrue(changeMac.IsChecked);
+        Assert.IsFalse(useRmRfForPackageCleanup.IsChecked);
+        Assert.IsTrue(clearAllPackages.IsChecked);
+        Assert.IsTrue(clearGoogleAccounts.IsChecked);
+        Assert.IsFalse(clearGooglePackages.IsChecked);
+        Assert.IsTrue(primaryWipeGroup.IsEnabled);
+        Assert.IsFalse(selectiveWipeGroup.IsEnabled);
+        Assert.AreEqual(0.48d, selectiveWipeGroup.Opacity);
+        Assert.AreEqual(Visibility.Visible, packagePanel.Visibility);
+        Assert.IsFalse(packagePanel.IsEnabled);
+        Assert.AreEqual(0.48d, packagePanel.Opacity);
+        Assert.HasCount(2, packageScope.Items);
+        Assert.AreSame(accentForeground, loadPackagesButton.Foreground);
+        Assert.AreSame(accentForeground, loadPackagesText.Foreground);
+        Assert.AreSame(accentForeground, saveButton.Foreground);
+        Assert.AreSame(accentForeground, saveButtonText.Foreground);
+
+        viewModel.ClearAllPackages = false;
+        dialog.UpdateLayout();
+        Assert.IsTrue(selectiveWipeGroup.IsEnabled);
+        Assert.AreEqual(1d, selectiveWipeGroup.Opacity);
+
+        viewModel.ClearSelectedPackages = true;
+        dialog.UpdateLayout();
+        Assert.AreEqual(Visibility.Visible, packagePanel.Visibility);
+        Assert.IsTrue(packagePanel.IsEnabled);
+
+        viewModel.ClearAllPackages = true;
+        dialog.UpdateLayout();
+        Assert.AreEqual(Visibility.Visible, packagePanel.Visibility);
+        Assert.IsFalse(packagePanel.IsEnabled);
+        Assert.IsTrue(primaryWipeGroup.IsEnabled);
+        Assert.IsFalse(selectiveWipeGroup.IsEnabled);
+        Assert.AreEqual(0.48d, selectiveWipeGroup.Opacity);
+        Assert.AreEqual(0.48d, packagePanel.Opacity);
     }
 
     private static void VerifyInteractiveStyles()
@@ -267,10 +338,26 @@ public sealed class UiSurfaceSmokeTests
         AssertGridPosition(deviceManagerView, "DeviceInfoImeiTextBox", 4, 1);
         AssertGridPosition(deviceManagerView, "DeviceInfoMacTextBox", 4, 3);
         var deviceConfigGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceConfigFormGrid"));
-        Assert.HasCount(7, deviceConfigGrid.RowDefinitions);
+        Assert.HasCount(8, deviceConfigGrid.RowDefinitions);
         var integrityPatchCheckBox = Assert.IsInstanceOfType<CheckBox>(
             deviceManagerView.FindName("UseIntegritySecurityPatchCheckBox"));
         Assert.AreEqual(6, System.Windows.Controls.Grid.GetRow(integrityPatchCheckBox));
+        var defaultChangeModeCheckBox = Assert.IsInstanceOfType<CheckBox>(
+            deviceManagerView.FindName("UseDefaultChangeModeCheckBox"));
+        Assert.AreEqual(7, System.Windows.Controls.Grid.GetRow(defaultChangeModeCheckBox));
+        Assert.IsTrue(defaultChangeModeCheckBox.IsChecked);
+        var advancedChangeConfigButton = Assert.IsInstanceOfType<Button>(
+            deviceManagerView.FindName("AdvancedChangeConfigButton"));
+        var deviceConfigHeaderGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(
+            deviceManagerView.FindName("DeviceConfigHeaderGrid"));
+        Assert.AreSame(deviceConfigHeaderGrid, advancedChangeConfigButton.Parent);
+        Assert.AreEqual(2, System.Windows.Controls.Grid.GetColumn(advancedChangeConfigButton));
+        Assert.IsFalse(advancedChangeConfigButton.IsEnabled);
+        Assert.AreSame(
+            Application.Current.FindResource("DeviceActionButtonStyle"),
+            advancedChangeConfigButton.Style.BasedOn);
+        Assert.AreEqual(new Thickness(8d, 0d, 0d, 0d), advancedChangeConfigButton.Margin);
+        Assert.IsInstanceOfType<System.Windows.Controls.Grid>(advancedChangeConfigButton.Content);
         Assert.IsFalse(deviceConfigGrid.Children
             .OfType<System.Windows.Controls.TextBlock>()
             .Any(textBlock => string.Equals(textBlock.Text, "Timezone", StringComparison.OrdinalIgnoreCase)

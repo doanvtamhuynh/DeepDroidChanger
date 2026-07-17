@@ -41,6 +41,12 @@ public sealed class ArchitectureRuleTests
         string vietnameseStrings = File.ReadAllText(canonicalVietnameseStrings);
         StringAssert.Contains(englishStrings, "DeviceManager_FieldOsVersion\">OS Version");
         StringAssert.Contains(vietnameseStrings, "DeviceManager_FieldOsVersion\">Phiên bản OS");
+        StringAssert.Contains(
+            englishStrings,
+            "DeviceManager_OptionDefaultChangeMode\">Change and Wipe default");
+        StringAssert.Contains(
+            vietnameseStrings,
+            "DeviceManager_OptionDefaultChangeMode\">Đổi và Wipe mặc định");
         Assert.DoesNotContain("DeviceManager_FieldAndroidVersion", englishStrings, StringComparison.Ordinal);
         Assert.DoesNotContain("DeviceManager_FieldAndroidVersion", vietnameseStrings, StringComparison.Ordinal);
         Assert.DoesNotContain(">Android Version<", englishStrings, StringComparison.Ordinal);

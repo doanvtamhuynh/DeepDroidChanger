@@ -30,6 +30,8 @@ namespace DeepDroidChanger.ViewModels
         private readonly IInstallPackageDialogService _installPackageDialogService;
         private readonly IDeviceViewerDialogService _deviceViewerDialogService;
         private readonly IDeleteDeviceConfirmationDialogService _deleteDeviceConfirmationDialogService;
+        private readonly IChangeDeviceConfirmationDialogService _changeDeviceConfirmationDialogService;
+        private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
         private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
         private readonly IDeviceListService _deviceListService;
         private readonly IDeviceSelectionService _deviceSelectionService;
@@ -37,6 +39,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IRandomDeviceService _randomDeviceService;
         private readonly ISimProfileService _simProfileService;
         private readonly IDeviceActionService _deviceActionService;
+        private readonly IDeviceChangeService _deviceChangeService;
         private readonly ILocalizationService _localizationService;
         private readonly AppSettings _settings;
         private readonly ILogger<DeviceManagerViewModel> _logger;
@@ -54,6 +57,7 @@ namespace DeepDroidChanger.ViewModels
         private List<StoredDeviceConfig> _storedDevices = new();
         private List<CarrierProfile> _carrierProfiles = new();
         private DeviceInfoApiDevice? _lastRandomDeviceInfo;
+        private DeviceChangeOptions _deviceChangeOptions = new();
 
         private DeviceRowViewModel? _selectedDevice;
         private bool _isRefreshingRows;
@@ -64,6 +68,8 @@ namespace DeepDroidChanger.ViewModels
         private bool _isChangeSimEnabled = true;
         [ObservableProperty]
         private bool _useIntegritySecurityPatch;
+        [ObservableProperty]
+        private bool _useDefaultChangeMode = true;
         private bool _isLoadingDevices;
         private string _newDeviceCountText = string.Empty;
         [ObservableProperty]
@@ -95,6 +101,8 @@ namespace DeepDroidChanger.ViewModels
             IInstallPackageDialogService installPackageDialogService,
             IDeviceViewerDialogService deviceViewerDialogService,
             IDeleteDeviceConfirmationDialogService deleteDeviceConfirmationDialogService,
+            IChangeDeviceConfirmationDialogService changeDeviceConfirmationDialogService,
+            IAdvancedChangeConfigDialogService advancedChangeConfigDialogService,
             IRandomDeviceInfoDialogService randomDeviceInfoDialogService,
             IDeviceListService deviceListService,
             IDeviceSelectionService deviceSelectionService,
@@ -102,6 +110,7 @@ namespace DeepDroidChanger.ViewModels
             IRandomDeviceService randomDeviceService,
             ISimProfileService simProfileService,
             IDeviceActionService deviceActionService,
+            IDeviceChangeService deviceChangeService,
             ILocalizationService localizationService,
             AppSettings settings,
             IUiDispatcherService uiDispatcher,
@@ -122,6 +131,8 @@ namespace DeepDroidChanger.ViewModels
             _installPackageDialogService = installPackageDialogService;
             _deviceViewerDialogService = deviceViewerDialogService;
             _deleteDeviceConfirmationDialogService = deleteDeviceConfirmationDialogService;
+            _changeDeviceConfirmationDialogService = changeDeviceConfirmationDialogService;
+            _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
             _randomDeviceInfoDialogService = randomDeviceInfoDialogService;
             _deviceListService = deviceListService;
             _deviceSelectionService = deviceSelectionService;
@@ -129,8 +140,13 @@ namespace DeepDroidChanger.ViewModels
             _randomDeviceService = randomDeviceService;
             _simProfileService = simProfileService;
             _deviceActionService = deviceActionService;
+            _deviceChangeService = deviceChangeService;
             _localizationService = localizationService;
             _settings = settings;
+            _deviceChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                settings.ChangeOptions,
+                settings.ChangeOptions?.UseDefaultMode ?? true);
+            _useDefaultChangeMode = _deviceChangeOptions.UseDefaultMode;
             _uiDispatcher = uiDispatcher;
             _pollingService = pollingService;
             _logger = logger;
@@ -293,6 +309,18 @@ namespace DeepDroidChanger.ViewModels
         {
             if (!_isApplyingDeviceConfig)
                 QueueSelectedDeviceProfileSave();
+        }
+
+        partial void OnUseDefaultChangeModeChanged(bool value)
+        {
+            _deviceChangeOptions.UseDefaultMode = value;
+            _settings.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                _deviceChangeOptions,
+                value);
+            OpenAdvancedChangeConfigCommand.NotifyCanExecuteChanged();
+
+            if (!_isApplyingDeviceConfig)
+                TrackSilentSave(SaveSettingsAsync(GetActiveToken()), "Failed to save global Change Device settings.");
         }
 
         public void Dispose()
@@ -580,16 +608,127 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanChangeDevice))]
         private async Task ChangeDeviceAsync(CancellationToken cancellationToken)
         {
-            if (SelectedDevice == null)
-            {
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.SelectDeviceFirst, cancellationToken).ConfigureAwait(true);
+            DeviceRowViewModel? device = SelectedDevice;
+            DeviceInfoApiDevice? profile = _lastRandomDeviceInfo;
+            if (device == null || device.ConnectionStatus != AdbDeviceStatus.Online || profile == null)
                 return;
+
+            SelectSingleDevice(device);
+            SetDeviceLog(device, DeviceLogResourceKeys.ChangeDevice);
+
+            try
+            {
+                DeviceChangeOptions changeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                    _deviceChangeOptions,
+                    UseDefaultChangeMode);
+                bool confirmed = await _changeDeviceConfirmationDialogService
+                    .ShowChangeDeviceConfirmationAsync(
+                        device.Name,
+                        device.Serial,
+                        changeOptions,
+                        cancellationToken)
+                    .ConfigureAwait(true);
+                if (!confirmed)
+                {
+                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceCanceled, cancellationToken).ConfigureAwait(true);
+                    return;
+                }
+
+                CopyFormValuesToProfile(profile);
+                var progress = new Progress<DeviceChangeStage>(stage =>
+                    SetDeviceLog(device, GetDeviceChangeLogKey(stage)));
+                await _deviceChangeService
+                    .ChangeAsync(
+                        device.Serial,
+                        profile,
+                        IsChangeSimEnabled,
+                        changeOptions,
+                        progress,
+                        cancellationToken)
+                    .ConfigureAwait(true);
+
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceSuccess, cancellationToken).ConfigureAwait(true);
             }
-            await ShowDeviceLogAsync(SelectedDevice, DeviceLogResourceKeys.ChangeDevice, cancellationToken).ConfigureAwait(true);
-            SetDeviceLog(SelectedDevice, DeviceLogResourceKeys.Ready);
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to change device {Serial}.", device.Serial);
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceFailed, CancellationToken.None).ConfigureAwait(true);
+            }
+            finally
+            {
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
+        }
+
+        private bool CanChangeDevice()
+        {
+            return SelectedDevice?.ConnectionStatus == AdbDeviceStatus.Online
+                && _lastRandomDeviceInfo != null;
+        }
+
+        private bool CanOpenAdvancedChangeConfig()
+        {
+            return !UseDefaultChangeMode
+                && SelectedDevice?.ConnectionStatus == AdbDeviceStatus.Online;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanOpenAdvancedChangeConfig))]
+        private async Task OpenAdvancedChangeConfigAsync(CancellationToken cancellationToken)
+        {
+            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            if (device == null || UseDefaultChangeMode)
+                return;
+
+            SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
+            try
+            {
+                DeviceChangeOptions? result = await _advancedChangeConfigDialogService
+                    .ShowAdvancedChangeConfigAsync(
+                        device.Serial,
+                        DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                            _deviceChangeOptions,
+                            useDefaultMode: false),
+                        cancellationToken)
+                    .ConfigureAwait(true);
+                if (result == null)
+                    return;
+
+                _deviceChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                    result,
+                    useDefaultMode: false);
+                UseDefaultChangeMode = false;
+                _settings.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                    _deviceChangeOptions,
+                    useDefaultMode: false);
+                await SaveSettingsAsync(cancellationToken).ConfigureAwait(true);
+                await ShowDeviceLogAsync(
+                        device,
+                        DeviceLogResourceKeys.AdvancedChangeConfigSaved,
+                        cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to configure advanced Change Device options for {Serial}.", device.Serial);
+                await ShowDeviceLogAsync(
+                        device,
+                        DeviceLogResourceKeys.AdvancedChangeConfigFailed,
+                        CancellationToken.None)
+                    .ConfigureAwait(true);
+            }
+            finally
+            {
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
         }
 
         [RelayCommand]
@@ -1269,6 +1408,8 @@ namespace DeepDroidChanger.ViewModels
             }
 
             ApplyDeviceFilter();
+            ChangeDeviceCommand.NotifyCanExecuteChanged();
+            OpenAdvancedChangeConfigCommand.NotifyCanExecuteChanged();
         }
 
         private void RefreshDeviceRows(IReadOnlyList<StoredDeviceConfig> storedDevices, IReadOnlyList<AdbDevice> connectedDevices)
@@ -1430,6 +1571,9 @@ namespace DeepDroidChanger.ViewModels
 
             if (referenceChanged)
                 ApplyStoredDeviceConfig(selectedDevice);
+
+            ChangeDeviceCommand.NotifyCanExecuteChanged();
+            OpenAdvancedChangeConfigCommand.NotifyCanExecuteChanged();
         }
 
         private void QueueDeviceRowEdit(DeviceRowViewModel deviceRow)
@@ -1663,7 +1807,10 @@ namespace DeepDroidChanger.ViewModels
                 CountryName = SelectedCountry?.CountryName ?? string.Empty,
                 Carrier = SelectedCarrier?.CarrierName ?? string.Empty,
                 CarrierMcc = SelectedCarrier?.Mcc ?? string.Empty,
-                CarrierMnc = SelectedCarrier?.Mnc ?? string.Empty
+                CarrierMnc = SelectedCarrier?.Mnc ?? string.Empty,
+                ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                    _deviceChangeOptions,
+                    UseDefaultChangeMode)
             };
         }
 
@@ -1840,6 +1987,7 @@ namespace DeepDroidChanger.ViewModels
         {
             _lastRandomDeviceInfo = randomDevice;
             ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
+            ChangeDeviceCommand.NotifyCanExecuteChanged();
             DeviceInfo.Name = GetFirstValue(randomDevice.Name, randomDevice.Board, randomDevice.Code);
             DeviceInfo.Model = randomDevice.Model ?? string.Empty;
             DeviceInfo.Brand = GetFirstValue(randomDevice.Brand, randomDevice.Manufacturer);
@@ -1913,6 +2061,38 @@ namespace DeepDroidChanger.ViewModels
                 Mac = string.Empty,
                 Latitude = string.Empty,
                 Longitude = string.Empty
+            };
+        }
+
+        private void CopyFormValuesToProfile(DeviceInfoApiDevice profile)
+        {
+            profile.Name = DeviceInfo.Name.Trim();
+            profile.Model = DeviceInfo.Model.Trim();
+            profile.Brand = DeviceInfo.Brand.Trim();
+            profile.Release = DeviceInfo.AndroidVersion
+                .Replace("Android ", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Trim();
+            profile.Serial = DeviceInfo.Serial.Trim();
+            profile.Imei = DeviceInfo.Imei.Trim();
+            profile.Iccid = DeviceInfo.Iccid.Trim();
+            profile.Imsi = DeviceInfo.Imsi.Trim();
+            profile.SimOperatorName = DeviceInfo.Operator.Trim();
+            profile.SimPhoneNumber = DeviceInfo.PhoneNumber.Trim();
+            profile.WifiMacAddress = DeviceInfo.Mac.Trim();
+        }
+
+        private static string GetDeviceChangeLogKey(DeviceChangeStage stage)
+        {
+            return stage switch
+            {
+                DeviceChangeStage.Preparing => DeviceLogResourceKeys.ChangeDevicePreparing,
+                DeviceChangeStage.ApplyingProfile => DeviceLogResourceKeys.ChangeDeviceApplyingProfile,
+                DeviceChangeStage.ClearingData => DeviceLogResourceKeys.ChangeDeviceClearingData,
+                DeviceChangeStage.Rebooting => DeviceLogResourceKeys.ChangeDeviceRebooting,
+                DeviceChangeStage.WaitingForDevice => DeviceLogResourceKeys.WaitingForDevice,
+                DeviceChangeStage.Verifying => DeviceLogResourceKeys.ChangeDeviceVerifying,
+                DeviceChangeStage.Completed => DeviceLogResourceKeys.ChangeDeviceSuccess,
+                _ => DeviceLogResourceKeys.ChangeDevice
             };
         }
 

@@ -132,6 +132,9 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceLocationService, DeviceLocationService>();
         services.AddSingleton<IProxyService, ProxyService>();
         services.AddSingleton<IDeviceIntegrityService, DeviceIntegrityService>();
+        services.AddSingleton<IDevicePackageService, DevicePackageService>();
+        services.AddSingleton<IDeviceDataCleanupService, DeviceDataCleanupService>();
+        services.AddSingleton<IDeviceChangeService, DeviceChangeService>();
         services.AddSingleton<IXapkPackageService, XapkPackageService>();
         services.AddSingleton<IPackageInstallService, PackageInstallService>();
         services.AddSingleton<IDeviceViewerStreamService, DeviceViewerStreamService>();
@@ -151,6 +154,8 @@ public sealed partial class App : Application
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();
         services.AddTransient<IChangeTimezoneDialogService, ChangeTimezoneDialogService>();
         services.AddTransient<IDeleteDeviceConfirmationDialogService, DeleteDeviceConfirmationDialogService>();
+        services.AddTransient<IChangeDeviceConfirmationDialogService, ChangeDeviceConfirmationDialogService>();
+        services.AddTransient<IAdvancedChangeConfigDialogService, AdvancedChangeConfigDialogService>();
         services.AddTransient<IRandomDeviceInfoDialogService, RandomDeviceInfoDialogService>();
         services.AddTransient<IDeviceViewerDialogService, DeviceViewerDialogService>();
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
@@ -168,6 +173,8 @@ public sealed partial class App : Application
         services.AddTransient<ChangeLocationViewModel>();
         services.AddTransient<ChangeTimezoneViewModel>();
         services.AddTransient<DeleteDeviceConfirmationViewModel>();
+        services.AddTransient<ChangeDeviceConfirmationViewModel>();
+        services.AddTransient<AdvancedChangeConfigViewModel>();
         services.AddTransient<RandomDeviceInfoViewModel>();
         services.AddTransient<DeviceViewerViewModel>();
         services.AddTransient<FakeProxyViewModel>();
@@ -179,6 +186,8 @@ public sealed partial class App : Application
         services.AddTransient<ChangeLocationDialog>();
         services.AddTransient<ChangeTimezoneDialog>();
         services.AddTransient<DeleteDeviceConfirmationDialog>();
+        services.AddTransient<ChangeDeviceConfirmationDialog>();
+        services.AddTransient<AdvancedChangeConfigDialog>();
         services.AddTransient<RandomDeviceInfoDialog>();
         services.AddTransient<DeviceViewerDialog>();
         services.AddTransient<FakeProxyDialog>();
@@ -194,5 +203,6 @@ public sealed partial class App : Application
         target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
         target.DeviceDataFilePath = source.DeviceDataFilePath;
         target.SelectedDeviceSerial = source.SelectedDeviceSerial;
+        target.ChangeOptions = source.ChangeOptions;
     }
 }

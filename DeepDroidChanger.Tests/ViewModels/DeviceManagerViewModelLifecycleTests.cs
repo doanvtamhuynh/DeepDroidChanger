@@ -453,6 +453,263 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
+    public async Task ChangeDevice_OnlinePreparedDevice_ConfirmsAndRunsWorkflow()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone", ChangeSimEnabled = false }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        var profile = new DeviceInfoApiDevice
+        {
+            Brand = "samsung",
+            Model = "SM-S928B",
+            Code = "e3q",
+            Name = "e3qxxx",
+            Fingerprint = "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
+            Serial = "NEW-SERIAL",
+            AndroidId = "0123456789abcdef"
+        };
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, profile));
+        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        DeviceChangeOptions? confirmedOptions = null;
+        confirmation.ShowChangeDeviceConfirmationAsync(
+            "Phone",
+            "A",
+            Arg.Any<DeviceChangeOptions>(),
+            Arg.Any<CancellationToken>()).Returns(callInfo =>
+            {
+                confirmedOptions = callInfo.ArgAt<DeviceChangeOptions>(2);
+                return true;
+            });
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            changeDeviceConfirmation: confirmation,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsFalse(viewModel.IsChangeSimEnabled);
+        Assert.IsFalse(viewModel.ChangeDeviceCommand.CanExecute(null));
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        Assert.IsTrue(viewModel.ChangeDeviceCommand.CanExecute(null));
+        await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
+
+        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+            "Phone",
+            "A",
+            Arg.Is<DeviceChangeOptions>(options => options.UseDefaultMode),
+            Arg.Any<CancellationToken>());
+        await deviceChange.Received(1).ChangeAsync(
+            "A",
+            profile,
+            false,
+            Arg.Is<DeviceChangeOptions>(options =>
+                ReferenceEquals(options, confirmedOptions)
+                && options.UseDefaultMode
+                && !options.ChangeAndroidId
+                && options.ChangeMacAddress
+                && options.ClearAllPackages
+                && options.ClearGoogleAccounts),
+            Arg.Any<IProgress<DeviceChangeStage>>(),
+            Arg.Any<CancellationToken>());
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task ChangeDevice_ConfirmationCanceled_DoesNotRunWorkflow()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice { Model = "Pixel 9" }));
+        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        confirmation.ShowChangeDeviceConfirmationAsync(
+            "Phone",
+            "A",
+            Arg.Any<DeviceChangeOptions>(),
+            Arg.Any<CancellationToken>()).Returns(false);
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            changeDeviceConfirmation: confirmation,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+
+        await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
+
+        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+            "Phone",
+            "A",
+            Arg.Any<DeviceChangeOptions>(),
+            Arg.Any<CancellationToken>());
+        await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
+            default!, default!, default, default!, default, default);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task ChangeDevice_OfflinePreparedDevice_RemainsDisabled()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, []));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice { Model = "Pixel 8" }));
+        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            changeDeviceConfirmation: confirmation,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+
+        Assert.IsFalse(viewModel.ChangeDeviceCommand.CanExecute(null));
+        await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(
+            default!, default!, default!, default);
+        await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
+            default!, default!, default, default!, default, default);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task AdvancedChangeConfig_DefaultModeDisabled_OpensImmediatelyAndPersistsDialogResult()
+    {
+        var settings = new AppSettings
+        {
+            ChangeOptions = new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ClearAllPackages = false,
+                ClearGoogleAccounts = true
+            }
+        };
+        StoredDeviceConfig[] storedDevices =
+        [
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                ChangeOptions = new DeviceChangeOptions()
+            }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IAdvancedChangeConfigDialogService dialog = Substitute.For<IAdvancedChangeConfigDialogService>();
+        dialog.ShowAdvancedChangeConfigAsync(
+                "A",
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ClearAllPackages = false,
+                ClearSelectedPackages = true,
+                SelectedPackages = ["com.example.app"],
+                ChangeMacAddress = false,
+                ChangeAndroidId = true,
+                ClearGooglePackages = true,
+                ClearGoogleAccounts = true
+            });
+        IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceConfig: deviceConfig,
+            advancedChangeConfig: dialog,
+            settings: settings);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsFalse(viewModel.UseDefaultChangeMode);
+        Assert.IsTrue(viewModel.OpenAdvancedChangeConfigCommand.CanExecute(null));
+
+        await viewModel.OpenAdvancedChangeConfigCommand.ExecuteAsync(null);
+
+        await dialog.Received(1).ShowAdvancedChangeConfigAsync(
+            "A",
+            Arg.Is<DeviceChangeOptions>(options => !options.UseDefaultMode),
+            Arg.Any<CancellationToken>());
+        Assert.IsFalse(settings.ChangeOptions.UseDefaultMode);
+        Assert.IsTrue(settings.ChangeOptions.ClearSelectedPackages);
+        Assert.IsFalse(settings.ChangeOptions.ChangeMacAddress);
+        Assert.IsTrue(settings.ChangeOptions.ChangeAndroidId);
+        Assert.IsTrue(settings.ChangeOptions.ClearGooglePackages);
+        Assert.IsTrue(settings.ChangeOptions.ClearGoogleAccounts);
+        CollectionAssert.AreEqual(new[] { "com.example.app" }, settings.ChangeOptions.SelectedPackages);
+        await deviceConfig.Received().SaveSettingsAsync(Arg.Any<CancellationToken>());
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task AdvancedChangeConfig_DefaultModeSelected_KeepsButtonDisabled()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var viewModel = CreateViewModel(deviceList, carriers);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsTrue(viewModel.UseDefaultChangeMode);
+        Assert.IsFalse(viewModel.OpenAdvancedChangeConfigCommand.CanExecute(null));
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
     public async Task RandomSim_UpdatesOnlySimFieldsForSelectedCarrier()
     {
         StoredDeviceConfig[] storedDevices =
@@ -729,6 +986,9 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IRandomDeviceService? randomDevice = null,
         IRandomDeviceInfoDialogService? randomDeviceInfoDialog = null,
         ISimProfileService? simProfileService = null,
+        IChangeDeviceConfirmationDialogService? changeDeviceConfirmation = null,
+        IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
+        IDeviceChangeService? deviceChange = null,
         AppSettings? settings = null)
     {
         return new DeviceManagerViewModel(
@@ -746,6 +1006,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Substitute.For<IInstallPackageDialogService>(),
             Substitute.For<IDeviceViewerDialogService>(),
             Substitute.For<IDeleteDeviceConfirmationDialogService>(),
+            changeDeviceConfirmation ?? Substitute.For<IChangeDeviceConfirmationDialogService>(),
+            advancedChangeConfig ?? Substitute.For<IAdvancedChangeConfigDialogService>(),
             randomDeviceInfoDialog ?? Substitute.For<IRandomDeviceInfoDialogService>(),
             deviceList,
             new DeviceSelectionService(),
@@ -753,6 +1015,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             randomDevice ?? Substitute.For<IRandomDeviceService>(),
             simProfileService ?? Substitute.For<ISimProfileService>(),
             Substitute.For<IDeviceActionService>(),
+            deviceChange ?? Substitute.For<IDeviceChangeService>(),
             CreateLocalizationService(),
             settings ?? new AppSettings(),
             new ImmediateDispatcherService(),

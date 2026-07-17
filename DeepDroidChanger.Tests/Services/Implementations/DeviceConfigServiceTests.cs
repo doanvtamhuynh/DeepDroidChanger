@@ -64,7 +64,19 @@ namespace DeepDroidChanger.Tests.Services.Implementations
                 CountryName = "Vietnam",
                 Carrier = "Viettel",
                 CarrierMcc = "452",
-                CarrierMnc = "04"
+                CarrierMnc = "04",
+                ChangeOptions = new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ClearAllPackages = false,
+                    ChangeAndroidId = true,
+                    ClearSelectedPackages = true,
+                    ChangeMacAddress = false,
+                    UseRmRfForPackageCleanup = true,
+                    ClearGooglePackages = true,
+                    ClearGoogleAccounts = true,
+                    SelectedPackages = ["com.example.two", "com.example.one", "com.example.two"]
+                }
             };
 
             bool saved = await service.SaveDeviceProfileAsync(
@@ -83,6 +95,16 @@ namespace DeepDroidChanger.Tests.Services.Implementations
             Assert.AreEqual("Viettel", config.Carrier);
             Assert.AreEqual("452", config.CarrierMcc);
             Assert.AreEqual("04", config.CarrierMnc);
+            Assert.IsFalse(config.ChangeOptions.UseDefaultMode);
+            Assert.IsTrue(config.ChangeOptions.ClearSelectedPackages);
+            Assert.IsFalse(config.ChangeOptions.ChangeMacAddress);
+            Assert.IsTrue(config.ChangeOptions.ChangeAndroidId);
+            Assert.IsTrue(config.ChangeOptions.UseRmRfForPackageCleanup);
+            Assert.IsTrue(config.ChangeOptions.ClearGooglePackages);
+            Assert.IsTrue(config.ChangeOptions.ClearGoogleAccounts);
+            CollectionAssert.AreEqual(
+                new[] { "com.example.one", "com.example.two" },
+                config.ChangeOptions.SelectedPackages);
             await store.Received(1).UpdateAsync(
                 "serial",
                 Arg.Any<Action<StoredDeviceConfig>>(),

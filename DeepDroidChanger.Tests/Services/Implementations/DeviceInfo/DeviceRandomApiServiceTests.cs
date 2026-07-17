@@ -1,4 +1,5 @@
 using System.Net;
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -110,6 +111,37 @@ public sealed class DeviceRandomApiServiceTests
         Assert.AreEqual("Pixel 8", device.Model);
         Assert.IsNotNull(capturedRequest);
         Assert.AreEqual("test-token", capturedRequest.Headers.GetValues("X-Test-Auth").Single());
+    }
+
+    [TestMethod]
+    public async Task GetRandomDeviceAsync_NullResponses_RetriesUpToFourAttempts()
+    {
+        const string nullJson = "{\"data\":{\"GetDeviceV4\":null}}";
+        const string validJson = "{\"data\":{\"GetDeviceV4\":{\"model\":\"Pixel 9\"}}}";
+        int responseIndex = 0;
+        var handler = new StubHttpMessageHandler((_, _) =>
+        {
+            responseIndex++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    responseIndex < DeviceInfoApiConstants.RandomDeviceMaximumAttempts
+                        ? nullJson
+                        : validJson)
+            });
+        });
+        using var httpClient = new HttpClient(handler);
+        using var service = new DeviceRandomApiService(
+            httpClient,
+            NullLogger<DeviceRandomApiService>.Instance);
+
+        DeviceInfoApiDevice device = await service.GetRandomDeviceAsync(
+            CreateSession(),
+            new RandomDeviceSelection("Google", 35),
+            CancellationToken.None);
+
+        Assert.AreEqual("Pixel 9", device.Model);
+        Assert.AreEqual(DeviceInfoApiConstants.RandomDeviceMaximumAttempts, handler.RequestCount);
     }
 
     private static AccountSession CreateSession()

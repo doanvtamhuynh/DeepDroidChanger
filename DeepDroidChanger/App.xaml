@@ -14,6 +14,7 @@
                 <ResourceDictionary Source="Resources/Strings/Strings.xaml" />
                 <ResourceDictionary Source="Resources/Themes/MainWindow.xaml" />
                 <ResourceDictionary Source="Resources/Themes/DeviceManager.xaml" />
+                <ResourceDictionary Source="Resources/Themes/AdvancedChangeConfig.xaml" />
                 <ResourceDictionary Source="Resources/Themes/AddDevices.xaml" />
                 <ResourceDictionary Source="Resources/Themes/Settings.xaml" />
                 <ResourceDictionary Source="Resources/Themes/ChangeTimezone.xaml" />

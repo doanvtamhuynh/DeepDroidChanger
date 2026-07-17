@@ -11,5 +11,6 @@ namespace DeepDroidChanger.Models
         public Dictionary<string, double> DeviceTableColumnRatios { get; set; } = new(DeviceTableColumnSettings.DefaultRatios);
         public string DeviceDataFilePath { get; set; } = DefaultDeviceDataFilePath;
         public string SelectedDeviceSerial { get; set; } = string.Empty;
+        public DeviceChangeOptions ChangeOptions { get; set; } = new();
     }
 }

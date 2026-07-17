@@ -8,7 +8,7 @@ namespace DeepDroidChanger.Services
 {
     public sealed class DeviceStoreService : IDeviceStoreService
     {
-        private const int CurrentDocumentVersion = 2;
+        private const int CurrentDocumentVersion = 4;
         private const string SettingsDirectoryName = "Settings";
         private const string DevicesFileName = "devices.json";
 
@@ -51,7 +51,7 @@ namespace DeepDroidChanger.Services
                 var document = JsonSerializer.Deserialize<DeviceStoreDocument>(json, JsonOptions) ?? new DeviceStoreDocument();
                 var devices = Normalize(
                     document.Devices,
-                    clearLegacyDeviceProfile: document.Version < CurrentDocumentVersion);
+                    clearLegacyDeviceProfile: document.Version < 2);
                 await WriteDocumentAsync(devices, cancellationToken).ConfigureAwait(false);
                 return devices;
             }
@@ -245,6 +245,7 @@ namespace DeepDroidChanger.Services
                     AndroidVersion = clearLegacyDeviceProfile ? string.Empty : NormalizeValue(device.AndroidVersion),
                     ChangeSimEnabled = device.ChangeSimEnabled,
                     UseIntegritySecurityPatch = device.UseIntegritySecurityPatch,
+                    ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(device.ChangeOptions),
                     UpdateIntegrityFromServer = device.UpdateIntegrityFromServer,
                     UpdateIntegrityFile = NormalizeValue(device.UpdateIntegrityFile),
                     UpdateKeyboxFile = NormalizeValue(device.UpdateKeyboxFile),
@@ -269,5 +270,6 @@ namespace DeepDroidChanger.Services
         {
             return value?.Trim() ?? string.Empty;
         }
+
     }
 }

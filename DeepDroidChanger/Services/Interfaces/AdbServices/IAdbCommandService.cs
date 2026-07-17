@@ -7,6 +7,7 @@ namespace DeepDroidChanger.Services
         Task<CommandResult> RunAdbAsync(string arguments, CancellationToken cancellationToken);
         Task<CommandResult> RunAdbAsync(string serial, string arguments, CancellationToken cancellationToken);
         Task<CommandResult> RunAdbShellAsync(string serial, string shellCommand, CancellationToken cancellationToken);
+        Task<CommandResult> RunAdbShellScriptAsync(string serial, string shellScript, CancellationToken cancellationToken);
         Task<CommandResult> RunFastbootAsync(string arguments, CancellationToken cancellationToken);
 
         Task<string> GetPropertyAsync(string serial, string propertyName, CancellationToken cancellationToken);

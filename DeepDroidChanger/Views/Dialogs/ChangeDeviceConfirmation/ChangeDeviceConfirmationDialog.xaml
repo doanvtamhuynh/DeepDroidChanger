@@ -1,0 +1,79 @@
+<Window x:Class="DeepDroidChanger.Views.ChangeDeviceConfirmationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource ChangeDeviceConfirmation_WindowTitle}"
+        Width="520"
+        Height="350"
+        MinWidth="480"
+        MinHeight="320"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+    <Grid Margin="{StaticResource Spacing.PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Padding="{StaticResource Spacing.CardPadding.Compact}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialDesign:PackIcon Kind="Alert"
+                                         Width="24"
+                                         Height="24"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource Brush.Warning}"/>
+                <TextBlock Grid.Column="1"
+                           Text="{DynamicResource ChangeDeviceConfirmation_Title}"
+                           Style="{StaticResource AppTitleTextStyle}"
+                           TextWrapping="Wrap"/>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                Style="{StaticResource CardBorderStyle}"
+                Padding="{StaticResource Spacing.CardPadding}">
+            <StackPanel>
+                <TextBlock Text="{Binding ProfileNotice}"
+                           Style="{StaticResource AppLabelTextStyle}"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding CleanNotice}"
+                           Style="{StaticResource AppLabelTextStyle}"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding GoogleNotice}"
+                           Style="{StaticResource SecondaryTextStyle}"
+                           TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding DeviceName}"
+                           Style="{StaticResource SubtitleTextStyle}"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding DeviceSerial}"
+                           Style="{StaticResource SecondaryTextStyle}"
+                           TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1"
+                    Command="{Binding CancelCommand}"
+                    Style="{StaticResource FlatButtonStyle}"
+                    Content="{DynamicResource ChangeDeviceConfirmation_CancelButton}"/>
+            <Button Grid.Column="2"
+                    Command="{Binding ConfirmCommand}"
+                    Style="{StaticResource DangerButtonStyle}"
+                    Content="{DynamicResource ChangeDeviceConfirmation_ConfirmButton}"/>
+        </Grid>
+    </Grid>
+</Window>

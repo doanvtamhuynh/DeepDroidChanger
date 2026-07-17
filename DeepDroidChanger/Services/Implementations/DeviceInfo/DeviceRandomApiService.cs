@@ -69,16 +69,25 @@ namespace DeepDroidChanger.Services
             ArgumentNullException.ThrowIfNull(session);
             ArgumentNullException.ThrowIfNull(selection);
 
-            var device = await SendRandomDeviceQueryAsync(session, selection, cancellationToken).ConfigureAwait(false);
-            if (device != null)
-                return device;
+            for (int attempt = 1; attempt <= DeviceInfoApiConstants.RandomDeviceMaximumAttempts; attempt++)
+            {
+                DeviceInfoApiDevice? device = await SendRandomDeviceQueryAsync(
+                        session,
+                        selection,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (device != null)
+                    return device;
 
-            _logger.LogDebug("Random device API returned null. Retrying once for brand {Brand} and SDK {Sdk}.", selection.Brand, selection.Sdk);
-            device = await SendRandomDeviceQueryAsync(session, selection, cancellationToken).ConfigureAwait(false);
-            if (device == null)
-                throw new DeviceRandomApiException("Random device request returned no result.");
+                _logger.LogDebug(
+                    "Random device API returned null on attempt {Attempt}/{MaximumAttempts} for brand {Brand} and SDK {Sdk}.",
+                    attempt,
+                    DeviceInfoApiConstants.RandomDeviceMaximumAttempts,
+                    selection.Brand,
+                    selection.Sdk);
+            }
 
-            return device;
+            throw new DeviceRandomApiException("Random device request returned no result.");
         }
 
         public void Dispose()

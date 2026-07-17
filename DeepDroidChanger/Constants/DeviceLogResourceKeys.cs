@@ -24,6 +24,16 @@ public static class DeviceLogResourceKeys
     public const string RandomDeviceLoginRequired = "Log_RandomDeviceLoginRequired";
     public const string DeviceMustBeOnline = "Log_DeviceMustBeOnline";
     public const string ChangeDevice = "Log_ChangeDevice";
+    public const string ChangeDeviceCanceled = "Log_ChangeDeviceCanceled";
+    public const string ChangeDevicePreparing = "Log_ChangeDevicePreparing";
+    public const string ChangeDeviceApplyingProfile = "Log_ChangeDeviceApplyingProfile";
+    public const string ChangeDeviceClearingData = "Log_ChangeDeviceClearingData";
+    public const string ChangeDeviceRebooting = "Log_ChangeDeviceRebooting";
+    public const string ChangeDeviceVerifying = "Log_ChangeDeviceVerifying";
+    public const string ChangeDeviceSuccess = "Log_ChangeDeviceSuccess";
+    public const string ChangeDeviceFailed = "Log_ChangeDeviceFailed";
+    public const string AdvancedChangeConfigSaved = "Log_AdvancedChangeConfigSaved";
+    public const string AdvancedChangeConfigFailed = "Log_AdvancedChangeConfigFailed";
     public const string RandomAndChangeDevice = "Log_RandomAndChangeDevice";
     public const string RandomSim = "Log_RandomSim";
     public const string RandomSimSuccess = "Log_RandomSimSuccess";

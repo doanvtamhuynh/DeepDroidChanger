@@ -76,6 +76,7 @@ public sealed partial class ThemeResourceTests
             "Controls.xaml",
             "MainWindow.xaml",
             "DeviceManager.xaml",
+            "AdvancedChangeConfig.xaml",
             "Settings.xaml",
             "Login.xaml",
             "AddDevices.xaml",

@@ -1,125 +1,124 @@
 # DeepDroidChanger
 
-DeepDroidChanger là ứng dụng desktop WPF dành cho Windows, dùng để quản lý và thực hiện các workflow cấu hình trên thiết bị Android thông qua ADB. Dự án được tái cấu trúc từ phiên bản DeepDroidChanger cũ, giữ lại luồng sử dụng chính nhưng chuyển sang kiến trúc MVVM, dependency injection và service abstraction để dễ kiểm thử, bảo trì và mở rộng.
+DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đổi cấu hình thiết bị Android qua ADB. Dự án sử dụng .NET 10, MVVM, dependency injection và service abstraction; Android Platform Tools cùng scrcpy được đóng gói trong `DeepDroidChanger/Assets/Tools`.
 
-Ứng dụng tích hợp sẵn Android Platform Tools và scrcpy trong thư mục `Assets/Tools`, hỗ trợ giao diện Light/Dark, tiếng Anh/tiếng Việt và Per-Monitor DPI.
+> [!WARNING]
+> **Change Device là thao tác phá hủy dữ liệu.** Flow mặc định xóa dữ liệu package, tài khoản và nhiều trạng thái hệ thống trước khi áp dụng profile mới rồi reboot. Chỉ dùng trên thiết bị đã backup, có ADB root và ROM/module tương thích.
 
-## Chức năng chính
+## Chức năng hiện có
 
-### Đăng nhập và phiên làm việc
+### Đăng nhập và giao diện
 
-- Hiển thị cửa sổ đăng nhập trước khi mở giao diện chính; hủy đăng nhập sẽ đóng ứng dụng.
-- Xác thực tài khoản bằng Amazon Cognito SRP.
-- Hiển thị/ẩn mật khẩu, kiểm tra dữ liệu nhập và ánh xạ lỗi đăng nhập thành thông báo thân thiện.
-- Tùy chọn ghi nhớ tài khoản. Mật khẩu được bảo vệ bằng Windows DPAPI với phạm vi `CurrentUser`.
-- Token xác thực chỉ được giữ trong bộ nhớ trong thời gian chạy, không ghi xuống tệp cấu hình.
-
-### Giao diện chính
-
-- Sidebar có thể thu gọn/mở rộng và ghi nhớ trạng thái giữa các lần chạy.
+- Đăng nhập bằng Amazon Cognito SRP trước khi mở cửa sổ chính.
+- Ghi nhớ tài khoản theo lựa chọn; mật khẩu được bảo vệ bằng Windows DPAPI `CurrentUser`.
+- Token phiên chỉ tồn tại trong bộ nhớ, không được ghi xuống cấu hình.
+- Sidebar có thể thu gọn; hỗ trợ Light/Dark, tiếng Anh/tiếng Việt và Per-Monitor DPI.
 - Điều hướng giữa Device Manager và Settings.
-- Chuyển đổi Light/Dark theme ngay khi ứng dụng đang chạy.
-- Chuyển đổi tiếng Anh/tiếng Việt bằng resource dictionary.
-- Giao diện responsive, hỗ trợ resize và DPI PerMonitorV2.
 
 ### Quản lý thiết bị
 
-- Tự động dò thiết bị qua ADB và polling trạng thái kết nối.
-- Phân biệt thiết bị online, offline và unauthorized.
-- Thêm thiết bị mới từ danh sách ADB, chọn nhiều thiết bị và gán loại thiết bị trước khi lưu.
-- Xóa thiết bị có hộp thoại xác nhận.
-- Lọc theo trạng thái kết nối hoặc trạng thái Active/Inactive.
-- Chọn một thiết bị tại một thời điểm; ghi nhớ thiết bị đang chọn.
-- Chỉnh sửa trực tiếp Name và Type trong DataGrid.
-- Thay đổi kích thước cột và lưu tỉ lệ cột cho lần chạy tiếp theo.
-- Context menu cho xem thiết bị, xem thông tin, reboot và xóa.
-- Hiển thị tiến trình/trạng thái của từng thiết bị ngay trong bảng.
+- Dò thiết bị bằng ADB và polling trạng thái `Online`, `Offline`, `Unauthorized`.
+- Thêm nhiều thiết bị từ danh sách ADB, gán loại thiết bị và lưu theo serial.
+- Chọn một thiết bị tại một thời điểm; lọc theo trạng thái kết nối hoặc Active/Inactive.
+- Sửa Name/Type trực tiếp trong bảng, lưu thiết bị đang chọn và tỉ lệ cột.
+- Reboot, xem thông tin, mở Device Viewer và xóa thiết bị có xác nhận.
+- Hiển thị trạng thái/tiến trình của action trên từng dòng thiết bị.
 
-### Hồ sơ thiết bị và Random Device
+### Random Device và SIM
 
-- Quản lý Brand, Android version, Country và Carrier theo MCC/MNC.
-- Đọc dữ liệu carrier, timezone, MAC vendor và dữ liệu tạo ngẫu nhiên từ `Assets/Data`.
-- Gọi Device Info API bằng phiên đã xác thực để lấy profile thiết bị ngẫu nhiên.
-- Tạo và chuẩn hóa IMEI, IMSI, ICCID, Wi-Fi MAC, serial, số điện thoại và thông tin SIM.
-- Random Device chỉ cập nhật form trong phiên hiện tại; không tự động áp dụng profile lên điện thoại.
+- Lấy profile ngẫu nhiên từ Device Info API theo Brand, Android version, Country và Carrier.
+- Chuẩn hóa identity gồm fingerprint/build, serial, Android ID, IMEI, IMSI, ICCID, số điện thoại, Wi-Fi/Bluetooth MAC và thông tin SIM.
+- Dữ liệu cục bộ dùng cho việc tạo profile nằm trong `Assets/Data`: carrier, timezone, TAC IMEI, MAC vendor, tên và word list.
+- **Random Device** và **Random SIM** chỉ cập nhật form. Dữ liệu chỉ được ghi lên điện thoại khi chạy **Change Device**.
 
-### Thay đổi vị trí
+### Change Device
 
-- Nhập latitude/longitude thủ công hoặc lấy vị trí theo IP của thiết bị.
-- Kiểm tra phạm vi và định dạng tọa độ trước khi thực thi.
-- Lưu cấu hình riêng cho từng thiết bị.
-- Chỉ áp dụng thay đổi qua ADB sau khi người dùng xác nhận.
+Nút **Change Device** chỉ khả dụng khi đã chọn thiết bị `Online` và đã tạo được một profile Random Device. Trước khi thực thi, ứng dụng luôn hiển thị dialog mô tả các thông tin sẽ đổi và dữ liệu sẽ bị xóa; người dùng phải xác nhận mới tiếp tục.
 
-### Thay đổi múi giờ
+Flow hiện tại:
 
-- Chọn múi giờ từ dữ liệu IANA và tìm kiếm theo tên quốc gia, khu vực hoặc timezone ID.
-- Dùng cấu hình đã chọn hoặc tự xác định theo IP thiết bị.
-- Khôi phục lựa chọn đã lưu cho từng thiết bị và áp dụng qua ADB.
+1. Kiểm tra thiết bị online và profile hợp lệ.
+2. Hiển thị dialog xác nhận với đúng cấu hình Default/Advanced hiện tại.
+3. Khởi động lại `adbd` ở quyền root, chờ thiết bị và xác minh `id -u = 0`.
+4. Tắt Wi-Fi và đọc Android ID hiện tại để đối chiếu sau khi thay đổi.
+5. `SetPropertyAsync` chỉ bật bypass theo phạm vi một lệnh khi property bắt đầu bằng `ro.`, rồi luôn tắt bypass ngay sau `setprop`.
+6. Xóa data cũ theo policy đã chọn.
+7. Áp dụng build/device/SIM/MAC/Android ID và Android settings từ profile.
+8. Đồng bộ dữ liệu, reboot và chờ `sys.boot_completed = 1`.
+9. Đọc lại Android ID để xác minh kết quả; lỗi ở bước bắt buộc sẽ không được báo thành công giả.
+
+Mỗi serial có lock riêng để tránh hai Change Device chạy đồng thời trên cùng thiết bị.
+
+#### Chế độ Default
+
+- Áp dụng toàn bộ profile mới, gồm Android ID, MAC Wi-Fi/Bluetooth và SIM.
+- Lấy danh sách package đã cài rồi xóa data bằng `pm clear`; giữ nguyên APK.
+- Xóa dữ liệu các package Google/account liên quan.
+- Xóa file account và nội dung file dưới `/data/system_ce` và `/data/system_de`, nhưng giữ lại cây thư mục để Android có thể tái sử dụng đúng path/permission.
+- Xóa database hệ thống khớp `/data/system/*.db*`, trừ các file registry bắt đầu bằng `/data/system/package`.
+
+#### Chế độ Advanced
+
+- Chọn có đổi Android ID, MAC và SIM hay không.
+- Chọn xóa toàn bộ package, package Google hoặc danh sách package cụ thể.
+- Chọn riêng việc xóa account Google và CE/DE state.
+- Mặc định vẫn dùng `pm clear`. Tùy chọn `rm -rf` chỉ áp dụng cho data của package được chọn và xóa tám path package/data/ART profile đã định nghĩa trong service.
+
+Ở cả Default và Advanced, cleanup residual vẫn chạy: ứng dụng dùng `find ... -not -type d -delete` để xóa file bên trong các vùng log/cache/state nhưng giữ lại directory root. Cách này giải quyết trường hợp một số thư mục hệ thống không được tạo lại đúng khi xóa cả path. `/data/misc/bluetooth` và `/data/misc/bluedroid` vẫn nằm trong danh sách cleanup (xóa nội dung nhưng giữ root); package registry, `/data/app`, kho `/data/property/persistent_properties` và dữ liệu Wi-Fi APEX được bảo vệ khỏi danh sách cleanup.
+
+Cleanup được hợp nhất thành một shell script và truyền thẳng qua standard input của `adb -s <serial> shell sh`; script không nằm trong Windows command line và không cần push tệp `.sh` lên thiết bị. Khi cần xóa package, tổng số ADB process của cleanup là một lần list package và một lần chạy script.
+
+### Location và Timezone
+
+- Nhập latitude/longitude hoặc lấy vị trí theo IP thiết bị; validate trước khi áp dụng.
+- Chọn timezone IANA hoặc xác định theo IP thiết bị.
+- Lưu và khôi phục cấu hình riêng theo serial.
+- Chỉ áp dụng thay đổi sau khi người dùng xác nhận dialog.
 
 ### SOCKS5 Proxy
 
-- Nhập proxy ở dạng đầy đủ hoặc theo từng trường host, port, username và password.
-- Kiểm tra cú pháp, port và credential trước khi kết nối.
-- Start/stop proxy theo từng thiết bị.
-- Có thể tự động đổi location và timezone theo IP proxy sau khi kết nối thành công.
-- Có rollback và thông báo lỗi khi proxy hoặc workflow sau kết nối thất bại.
+- Nhập proxy dạng đầy đủ hoặc theo host, port, username và password.
+- Validate endpoint/credential, start/stop proxy theo thiết bị.
+- Có thể đổi location và timezone theo IP proxy sau khi kết nối.
+- Rollback proxy khi workflow sau kết nối thất bại.
 
 ### Update Integrity
 
-- Cập nhật Integrity/PIF và Keybox độc lập hoặc cùng lúc.
-- Hỗ trợ nguồn trực tuyến và tệp cục bộ.
-- Chọn PIF JSON và Keybox XML bằng file picker.
-- Kiểm tra tệp, kích thước và nội dung XML trước khi gửi sang thiết bị.
-- Ghi nhớ lựa chọn riêng theo thiết bị và tự phục hồi khi đường dẫn tệp đã lưu không còn tồn tại.
+- Cập nhật PIF/Integrity JSON và Keybox XML độc lập hoặc cùng lúc.
+- Hỗ trợ nguồn server và tệp cục bộ; kiểm tra file trước khi push.
+- Lưu lựa chọn theo thiết bị và xử lý đường dẫn đã lưu không còn tồn tại.
 
 ### Cài APK/XAPK
 
-- Thêm nhiều APK/XAPK vào hàng đợi, xóa item và theo dõi trạng thái từng tệp.
-- Tùy chọn tự cấp quyền ứng dụng và cho phép downgrade.
-- Hiển thị progress, hỗ trợ hủy và tổng hợp kết quả cài đặt.
-- Xử lý split APK và OBB trong XAPK.
-- Chống path traversal khi giải nén XAPK và luôn dọn thư mục tạm.
-- Ánh xạ các lỗi thường gặp: APK không hợp lệ, sai ABI, version downgrade, thiếu dung lượng và lỗi ADB.
+- Hàng đợi nhiều APK/XAPK, trạng thái từng file, progress và cancellation.
+- Tùy chọn auto-grant permission và cho phép downgrade.
+- Hỗ trợ split APK, OBB và dọn thư mục giải nén tạm.
+- Chặn path traversal trong XAPK và ánh xạ các lỗi ADB/install thường gặp.
 
 ### Device Viewer
 
-- Mở phiên scrcpy theo từng thiết bị và tự quản lý vòng đời process/session.
-- Giữ đúng tỉ lệ màn hình khi resize và hỗ trợ Per-Monitor DPI.
-- Reconnect/restart phiên stream khi cần.
-- Các phím điều khiển Back, Home, Recent, Power, Volume Up/Down và Enter.
-- Chụp ảnh màn hình, gửi text và chạy lệnh ADB shell.
-- Dừng sạch stream/process khi đóng cửa sổ.
+- Mở và quản lý phiên scrcpy riêng theo thiết bị.
+- Resize giữ đúng tỉ lệ, reconnect/restart stream và dừng process khi đóng.
+- Back, Home, Recent, Power, Volume, Enter, screenshot, gửi text và chạy ADB shell.
 
-## Chức năng hiện chưa triển khai
+## Chức năng chưa hoàn thiện
 
-Các surface sau được giữ lại để bảo toàn luồng giao diện của dự án cũ nhưng hiện chỉ hiển thị thông báo, không báo thành công giả và không chạy ADB:
+Các surface sau vẫn là placeholder hoặc mới chỉ có phần tạo dữ liệu form; chúng không thực thi flow ADB hoàn chỉnh:
 
-- Change Device.
 - Random & Change Device.
-- Random SIM.
-- Change SIM.
+- Change SIM độc lập.
 - Flash ROM.
-- Advanced Settings; màn hình Settings hiện là workspace placeholder.
+- Advanced Settings; trang Settings hiện chủ yếu quản lý theme/language và là workspace cho tính năng tiếp theo.
 
-## Luồng sử dụng cơ bản
+## Yêu cầu
 
-1. Bật Developer options và USB debugging trên thiết bị Android.
-2. Kết nối thiết bị với máy tính và chấp nhận RSA authorization nếu được hỏi.
-3. Chạy DeepDroidChanger và đăng nhập bằng tài khoản hợp lệ.
-4. Mở Device Manager, chọn **Add New Devices** để lưu thiết bị cần quản lý.
-5. Chọn một thiết bị trong DataGrid rồi sử dụng các thao tác profile, location, timezone, proxy, integrity, package installation hoặc viewer.
-
-Một số thao tác chuyên sâu phụ thuộc ROM, quyền root và các thành phần được cài trên thiết bị. Khả năng thiết bị xuất hiện trong `adb devices` không đảm bảo mọi workflow đều được ROM đó hỗ trợ.
-
-## Yêu cầu phát triển
-
-- Windows 10 hoặc Windows 11.
-- .NET 10 SDK.
-- PowerShell.
+- Windows 10/11.
+- .NET 10 SDK và PowerShell để phát triển.
 - Kết nối mạng cho Cognito, Device Info API và IP geolocation.
-- Thiết bị Android có ADB authorization để chạy các chức năng liên quan đến thiết bị thật.
+- USB debugging và ADB authorization cho các action thông thường.
+- **ADB root thực sự** (`adb root` và `id -u` trả `0`) cùng ROM/module hiểu các property spoof cho Change Device.
 
-ADB, fastboot và scrcpy cần thiết cho ứng dụng đã được đóng gói trong `DeepDroidChanger/Assets/Tools/platform-tools` và được copy sang output khi build.
+Khả năng thiết bị xuất hiện trong `adb devices` không đảm bảo ROM hỗ trợ mọi workflow. Không dùng Change Device trên máy chính hoặc thiết bị còn dữ liệu chưa backup.
 
 ## Build và chạy
 
@@ -139,72 +138,60 @@ dotnet build .\DeepDroidChanger.slnx -c Release
 
 ## Kiểm thử
 
-Chạy toàn bộ test:
-
 ```powershell
 dotnet test .\DeepDroidChanger.slnx --no-build --no-restore
-```
-
-Chạy package vulnerability audit và coverage gate:
-
-```powershell
 powershell -ExecutionPolicy Bypass -File .\DeepDroidChanger.Tests\verify-coverage.ps1
 ```
 
-Coverage gate hiện yêu cầu tối thiểu 70% line coverage, 55% branch coverage và 80% line coverage cho các service/ViewModel trọng yếu. Test suite không gọi Cognito, HTTP API hoặc ADB thật; các dependency bên ngoài được thay bằng fake/mock.
+Test suite dùng fake/mock cho Cognito, HTTP API và ADB. Việc xác nhận tương thích ROM, quyền root và hành vi cleanup cuối cùng vẫn cần test có kiểm soát trên thiết bị thật.
 
 ## Dữ liệu runtime và bảo mật
 
-Các tệp runtime nằm cạnh executable trong thư mục `Settings/` và đã được loại khỏi Git:
+Các file runtime nằm cạnh executable trong `Settings/`; thư mục output `bin/` đã được Git ignore.
 
 | Tệp | Nội dung |
 | --- | --- |
-| `Settings/settings.json` | Theme, ngôn ngữ, trạng thái sidebar, thiết bị đang chọn và tỉ lệ cột |
+| `Settings/settings.json` | Theme, ngôn ngữ, sidebar, thiết bị đang chọn, tỉ lệ cột và cấu hình action |
 | `Settings/devices.json` | Danh sách thiết bị và cấu hình riêng theo serial |
 | `Settings/account.json` | Username và mật khẩu đã mã hóa khi bật Remember account |
 
-- JSON được ghi atomically để giảm nguy cơ mất dữ liệu khi ứng dụng bị đóng giữa lúc ghi.
-- Tệp cấu hình hỏng được chuyển sang tên quarantine trước khi ứng dụng tạo cấu hình mặc định.
-- `account.json` chỉ giải mã được bởi cùng Windows user đã tạo tệp.
-- Không commit thư mục `Settings/`, token, credential hoặc dữ liệu thiết bị runtime.
+- JSON được ghi atomically; file hỏng được quarantine trước khi tạo cấu hình mặc định.
+- `account.json` chỉ giải mã được bởi cùng Windows user đã tạo file.
+- Không commit runtime data, credential, token, file tạm hoặc dữ liệu lấy từ thiết bị.
 
 ## Kiến trúc
-
-Ứng dụng tuân theo luồng:
 
 ```text
 View -> ViewModel -> Workflow/Service -> ADB/API/Persistence -> Typed result -> ViewModel
 ```
 
-- **Views** chỉ chứa binding và UI event thuần túy.
-- **ViewModels** quản lý state, validation và command.
-- **Services** xử lý ADB, process, HTTP, file I/O, persistence và orchestration.
-- **Models** là POCO/typed result, không chứa I/O hoặc service call.
+- `Views`: binding và UI event thuần túy.
+- `ViewModels`: state, validation và command.
+- `Services`: ADB/process, HTTP, file I/O, persistence và orchestration.
+- `Models`: POCO và typed result, không chứa I/O.
 - Dependency được đăng ký tập trung trong `App.xaml.cs` bằng `Microsoft.Extensions.Hosting`.
-- Singleton được dùng cho settings, session, hạ tầng và main workspace; dialog/ViewModel của dialog dùng transient lifetime.
-
-Quy tắc kiến trúc, theme và Git nằm trong:
-
-- `AGENTS.md`
-- `docs/DESIGN.md`
-- `docs/THEMES.md`
-- `docs/GIT.md`
+- Service hạ tầng/main workspace dùng singleton; dialog và dialog ViewModel dùng transient.
 
 ## Cấu trúc repository
 
 ```text
 DeepDroidChanger/
 ├── DeepDroidChanger/                 # Ứng dụng WPF
-│   ├── Views/                        # Main feature và dialog
+│   ├── Views/                        # Feature view và dialog
 │   ├── ViewModels/                   # State, validation, command
 │   ├── Services/                     # Interface và implementation
 │   ├── Models/                       # POCO và typed result
 │   ├── Resources/                    # Localization và XAML theme
 │   └── Assets/                       # Data, icons và bundled tools
 ├── DeepDroidChanger.Tests/           # MSTest, fake/mock và architecture tests
-├── docs/                             # Architecture, theme và Git rules
+├── docs/                             # Rule và tài liệu reverse engineering
 └── DeepDroidChanger.slnx
 ```
+
+Tài liệu liên quan:
+
+- [`AGENTS.md`](AGENTS.md), [`docs/DESIGN.md`](docs/DESIGN.md), [`docs/THEMES.md`](docs/THEMES.md), [`docs/GIT.md`](docs/GIT.md): quy tắc bắt buộc của repository.
+- [`docs/MiChangerPlus_Dump.md`](docs/MiChangerPlus_Dump.md): kết quả dump/phân tích tĩnh MiChangerPlus dùng làm nguồn đối chiếu hành vi.
 
 ## Công nghệ chính
 

@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:String x:Key="AdvancedChangeConfig_WindowTitle">Advanced Change Device Configuration</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_Title">Advanced Change Device</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeSectionTitle">Change configuration</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeSectionDescription">Choose which generated identity values are applied.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Change Android ID</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Change Wi-Fi/Bluetooth MAC</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseRmRfForPackageCleanup">Use "rm -rf" for clear package</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseRmRfForPackageCleanupDescription">Force-stop each package, then run "rm -rf" on its eight app-data and ART-profile paths. This removes the package directories themselves. Default mode never uses this option.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_WipeSectionTitle">Wipe configuration</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_WipeSectionDescription">Standard wipe uses Android Package Manager. When enabled, "rm -rf" removes package data directories directly. Installed APK files are kept.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_PrimaryWipeOptions">Full wipe and account</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_SelectiveWipeOptions">Selective package wipe</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearAllPackages">Clear all package data</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearGoogleAccounts">Clear Google account data</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearGooglePackages">Clear Google package data</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ClearSelectedPackages">Clear selected package data</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadPackages">Load packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_PackageScope">Package source</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AllPackages">All packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UserPackages">User packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AvailablePackages">Available packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_SelectedWipePackages">Packages to wipe</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AddSelectedPackage">Add selected package</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_RemoveSelectedPackage">Remove selected package</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_AddAllPackages">Add all loaded packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_RemoveAllPackages">Remove all selected packages</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadPackagesPrompt">Choose a package source, then press Load packages.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadingPackages">Loading packages from the connected device…</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadedPackages">Loaded {0} package(s).</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_LoadPackagesFailed">Package loading failed. Confirm that the device is online and try again.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_SelectPackageValidation">Add at least one package to the wipe list or turn off “Clear selected package data”.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_Save">Save configuration</sys:String>
+</ResourceDictionary>

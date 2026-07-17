@@ -34,6 +34,9 @@ namespace DeepDroidChanger.Models
         [JsonPropertyName("buildDateUtc")]
         public string? BuildDateUtc { get; set; }
 
+        [JsonPropertyName("buildDate")]
+        public string? BuildDate { get; set; }
+
         [JsonPropertyName("hardware")]
         public string? Hardware { get; set; }
 

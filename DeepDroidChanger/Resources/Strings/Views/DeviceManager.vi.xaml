@@ -36,8 +36,10 @@
     <sys:String x:Key="DeviceManager_FieldCarrier">Nhà mạng</sys:String>
     <sys:String x:Key="DeviceManager_OptionChangeSim">Đổi SIM</sys:String>
     <sys:String x:Key="DeviceManager_OptionUseIntegritySecurityPatch">Sử dụng bản vá bảo mật Integrity</sys:String>
+    <sys:String x:Key="DeviceManager_OptionDefaultChangeMode">Đổi và Wipe mặc định</sys:String>
+    <sys:String x:Key="DeviceManager_ActionAdvancedChangeConfig">Advanced</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomDevice">Tạo thiết bị ngẫu nhiên</sys:String>
-    <sys:String x:Key="DeviceManager_ActionChangeDevice">Đổi thiết bị</sys:String>
+    <sys:String x:Key="DeviceManager_ActionChangeDevice">Đổi &amp; Xóa dữ liệu thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomAndChangeDevice">Tạo ngẫu nhiên và đổi thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomSim">Tạo SIM ngẫu nhiên</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeSim">Đổi SIM</sys:String>
