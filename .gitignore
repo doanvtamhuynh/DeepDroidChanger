@@ -364,5 +364,7 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Codex agents config
-.codex/
 PROMPT.md
+.codex/
+.agent/
+.artifacts/
