@@ -1,6 +1,7 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using NSubstitute;
+using System.Globalization;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.DeviceInfo;
 
@@ -53,6 +54,14 @@ public sealed class DeviceRandomProfileServiceTests
         Assert.AreEqual("husky 14 AP1A 123456 release-keys", result.BuildDescription);
         Assert.AreEqual("android-husky", result.BuildUser);
         Assert.AreEqual("android-husky", result.BuildHost);
+        Assert.AreEqual("123456", result.Bootloader);
+        Assert.AreEqual("123456", result.Baseband);
+        Assert.AreEqual("Sun Oct 05 00:00:00 UTC 2025", result.BuildDate);
+        Assert.AreEqual(
+            new DateTimeOffset(2025, 10, 5, 0, 0, 0, TimeSpan.Zero)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture),
+            result.BuildDateUtc);
         Assert.AreEqual("Pixel8_Robinson", result.SettingDeviceName);
         Assert.AreEqual("Pixel8_Simmons", result.SettingBluetoothName);
         Assert.AreEqual("66:77:88:99:aa:bb", result.BluetoothMacAddress);
@@ -119,6 +128,68 @@ public sealed class DeviceRandomProfileServiceTests
     }
 
     [TestMethod]
+    public async Task CreateRandomProfileAsync_ValidServerBuildDateUtc_PreservesTimestampAndDerivesDisplayDate()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        DeviceInfoApiDevice apiDevice = CreateApiDevice("Pixel");
+        apiDevice.BuildDateUtc = " 1760000000 ";
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(apiDevice);
+        DeviceRandomProfileService service = CreateService(api);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { SelectedBrand = "google", SelectedAndroidVersion = "Android 13" },
+            CancellationToken.None);
+
+        DateTimeOffset expected = DateTimeOffset.FromUnixTimeSeconds(1760000000);
+        Assert.AreEqual("1760000000", result.BuildDateUtc);
+        Assert.AreEqual(
+            expected.ToString("ddd MMM dd HH:mm:ss 'UTC' yyyy", CultureInfo.InvariantCulture),
+            result.BuildDate);
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_InvalidServerBuildDateUtc_FallsBackFromSecurityPatch()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        DeviceInfoApiDevice apiDevice = CreateApiDevice("Pixel", securityPatch: "2026-06-01");
+        apiDevice.BuildDateUtc = "N/A";
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(apiDevice);
+        DeviceRandomProfileService service = CreateService(api);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { SelectedBrand = "google", SelectedAndroidVersion = "Android 13" },
+            CancellationToken.None);
+
+        DateTimeOffset expected = new(2026, 6, 4, 0, 0, 0, TimeSpan.Zero);
+        Assert.AreEqual(expected.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), result.BuildDateUtc);
+        Assert.AreEqual("Thu Jun 04 00:00:00 UTC 2026", result.BuildDate);
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_PlaceholderBootloaderAndBaseband_UseBuildIncremental()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        DeviceInfoApiDevice apiDevice = CreateApiDevice("Pixel");
+        apiDevice.Bootloader = "N/A";
+        apiDevice.Baseband = "null";
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(apiDevice);
+        DeviceRandomProfileService service = CreateService(api);
+
+        DeviceInfoApiDevice result = await service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { SelectedBrand = "google", SelectedAndroidVersion = "Android 13" },
+            CancellationToken.None);
+
+        Assert.AreEqual("123456", result.Bootloader);
+        Assert.AreEqual("123456", result.Baseband);
+    }
+
+    [TestMethod]
     public async Task CreateRandomProfileAsync_RandomBrandWithFixedSdk_UsesCompatibleBrandAndDefaults()
     {
         IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
@@ -155,6 +226,20 @@ public sealed class DeviceRandomProfileServiceTests
             Arg.Any<AccountSession>(),
             Arg.Is<RandomDeviceSelection>(selection => selection.Brand == "OnePlus" && selection.Sdk == 33),
             Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task CreateRandomProfileAsync_ServerSdkDoesNotMatchRequest_RejectsInconsistentProfile()
+    {
+        IDeviceRandomApiService api = Substitute.For<IDeviceRandomApiService>();
+        api.GetRandomDeviceAsync(Arg.Any<AccountSession>(), Arg.Any<RandomDeviceSelection>(), Arg.Any<CancellationToken>())
+            .Returns(CreateApiDevice("Pixel", release: "14"));
+        DeviceRandomProfileService service = CreateService(api);
+
+        await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.CreateRandomProfileAsync(
+            CreateSession(),
+            new RandomDeviceRequest { SelectedBrand = "google", SelectedAndroidVersion = "Android 13" },
+            CancellationToken.None));
     }
 
     [TestMethod]
@@ -197,6 +282,12 @@ public sealed class DeviceRandomProfileServiceTests
             CancellationToken.None);
 
         Assert.AreEqual("2026-06-01", result.SecurityPatch);
+        Assert.AreEqual("Thu Jun 04 00:00:00 UTC 2026", result.BuildDate);
+        Assert.AreEqual(
+            new DateTimeOffset(2026, 6, 4, 0, 0, 0, TimeSpan.Zero)
+                .ToUnixTimeSeconds()
+                .ToString(CultureInfo.InvariantCulture),
+            result.BuildDateUtc);
         await integrity.Received(1).TryGetRandomSecurityPatchAsync(CancellationToken.None);
     }
 
@@ -305,6 +396,7 @@ public sealed class DeviceRandomProfileServiceTests
         public List<string> ImeiBrands { get; } = [];
 
         public int RandomInRange(int minValue, int maxValue) => minValue;
+        public long RandomInRange(long minValue, long maxValue) => minValue;
         public T PickRandom<T>(IReadOnlyList<T> values) => values[0];
         public string GetRandomLocalIp() => "192.168.20.20";
         public string GetRandomHexString(int minimumLength) => new('a', Math.Max(32, minimumLength));

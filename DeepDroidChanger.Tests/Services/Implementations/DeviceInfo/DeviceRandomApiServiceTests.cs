@@ -88,7 +88,7 @@ public sealed class DeviceRandomApiServiceTests
     [TestMethod]
     public async Task GetRandomDeviceAsync_ValidResponse_ReturnsDeviceAndSendsTokenHeader()
     {
-        const string json = "{\"data\":{\"GetDeviceV4\":{\"model\":\"Pixel 8\",\"manufacturer\":\"Google\",\"imei\":\"123456789012345\"}}}";
+        const string json = "{\"data\":{\"GetDeviceV4\":{\"model\":\"Pixel 8\",\"manufacturer\":\"Google\",\"imei\":\"123456789012345\",\"buildDateUtc\":\"1760000000\",\"bootloader\":\"cloudripper-14.5\"}}}";
         HttpRequestMessage? capturedRequest = null;
         var handler = new StubHttpMessageHandler((request, _) =>
         {
@@ -109,6 +109,8 @@ public sealed class DeviceRandomApiServiceTests
             CancellationToken.None);
 
         Assert.AreEqual("Pixel 8", device.Model);
+        Assert.AreEqual("1760000000", device.BuildDateUtc);
+        Assert.AreEqual("cloudripper-14.5", device.Bootloader);
         Assert.IsNotNull(capturedRequest);
         Assert.AreEqual("test-token", capturedRequest.Headers.GetValues("X-Test-Auth").Single());
     }

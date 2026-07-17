@@ -3,6 +3,7 @@ namespace DeepDroidChanger.Services
     public interface IRandomService
     {
         int RandomInRange(int minValue, int maxValue);
+        long RandomInRange(long minValue, long maxValue);
         T PickRandom<T>(IReadOnlyList<T> values);
         string GetRandomLocalIp();
         string GetRandomHexString(int minimumLength);

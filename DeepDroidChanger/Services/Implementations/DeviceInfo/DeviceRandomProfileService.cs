@@ -1,5 +1,6 @@
 using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
+using System.Globalization;
 
 namespace DeepDroidChanger.Services
 {
@@ -9,6 +10,9 @@ namespace DeepDroidChanger.Services
 
         private const string DefaultBrand = "samsung";
         private const int DefaultSdk = 33;
+        private const string BuildDateFormat = "ddd MMM dd HH:mm:ss 'UTC' yyyy";
+        private static readonly DateTimeOffset FallbackBuildDateStartUtc =
+            new(2025, 10, 5, 0, 0, 0, TimeSpan.Zero);
         private static readonly string[] BrandsPool = { "google", "OnePlus", "OPPO", "samsung", "vivo", "Xiaomi" };
         private static readonly IReadOnlyList<string> SupportedSdkLevels =
             DeviceProfileOptions.SupportedAndroidVersions
@@ -62,6 +66,7 @@ namespace DeepDroidChanger.Services
                 if (!string.IsNullOrWhiteSpace(integritySecurityPatch))
                     device.SecurityPatch = integritySecurityPatch;
             }
+            NormalizeBuildDates(device);
             ApplyGeneratedValues(device, request);
             ValidateProfileForChange(device);
             return device;
@@ -100,6 +105,9 @@ namespace DeepDroidChanger.Services
                 throw new DeviceRandomApiException("Random device result is incomplete.");
 
             NormalizeFingerprint(device);
+
+            if (!string.Equals(device.Sdk, selection.Sdk.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
+                throw new DeviceRandomApiException("Random device result does not match the requested Android SDK.");
 
             if (IsMissingOrUnknown(device.Manufacturer))
                 device.Manufacturer = selection.Brand;
@@ -152,7 +160,6 @@ namespace DeepDroidChanger.Services
                 device.Imei1 = GenerateDistinctImei(imeiBrand, device.Imei![..8], device.Imei);
             }
 
-            device.Sdk = selection.Sdk.ToString();
             device.AndroidId = _randomService.GetRandomHexString(16)[..16];
             device.Serial = _randomService.GetRandomHexString(16)[.._randomService.RandomInRange(8, 13)];
             device.WifiMacAddress = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
@@ -255,6 +262,63 @@ namespace DeepDroidChanger.Services
             return value.Length == 0 ? string.Empty : string.Concat(value, " release-keys");
         }
 
+        private void NormalizeBuildDates(DeviceInfoApiDevice device)
+        {
+            DateTimeOffset buildDateUtc;
+            if (!TryParseBuildDateUtc(device.BuildDateUtc, out buildDateUtc))
+                buildDateUtc = GenerateFallbackBuildDateUtc(device.SecurityPatch);
+
+            device.BuildDateUtc = buildDateUtc.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+            device.BuildDate = buildDateUtc.ToString(BuildDateFormat, CultureInfo.InvariantCulture);
+        }
+
+        private DateTimeOffset GenerateFallbackBuildDateUtc(string? securityPatch)
+        {
+            DateTimeOffset start = FallbackBuildDateStartUtc;
+            if (DateTime.TryParseExact(
+                    securityPatch?.Trim(),
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out DateTime securityPatchDate))
+            {
+                DateTimeOffset securityPatchStart = new DateTimeOffset(securityPatchDate).AddDays(3);
+                if (securityPatchStart > start)
+                    start = securityPatchStart;
+            }
+
+            DateTimeOffset end = DateTimeOffset.UtcNow.AddHours(-3);
+            long totalSeconds = Math.Max(0, (long)(end - start).TotalSeconds);
+            if (totalSeconds == 0)
+                return start;
+
+            long randomOffset = _randomService.RandomInRange(0L, totalSeconds);
+            return start.AddSeconds(randomOffset);
+        }
+
+        private static bool TryParseBuildDateUtc(string? value, out DateTimeOffset buildDateUtc)
+        {
+            buildDateUtc = default;
+            if (!long.TryParse(
+                    value?.Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out long unixSeconds))
+            {
+                return false;
+            }
+
+            try
+            {
+                buildDateUtc = DateTimeOffset.FromUnixTimeSeconds(unixSeconds);
+                return true;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+        }
+
         private static string GetFirstValue(params string?[] values)
         {
             return values.FirstOrDefault(value => !IsMissingOrUnknown(value))?.Trim() ?? string.Empty;
@@ -262,8 +326,13 @@ namespace DeepDroidChanger.Services
 
         private static bool IsMissingOrUnknown(string? value)
         {
-            return string.IsNullOrWhiteSpace(value)
-                || string.Equals(value.Trim(), "unknown", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(value))
+                return true;
+
+            string normalized = value.Trim();
+            return string.Equals(normalized, "unknown", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "null", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "n/a", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsValidImei(string? value)
@@ -293,6 +362,8 @@ namespace DeepDroidChanger.Services
                 (nameof(device.BuildFlavor), device.BuildFlavor),
                 (nameof(device.BuildUser), device.BuildUser),
                 (nameof(device.BuildHost), device.BuildHost),
+                (nameof(device.BuildDate), device.BuildDate),
+                (nameof(device.BuildDateUtc), device.BuildDateUtc),
                 (nameof(device.Board), device.Board),
                 (nameof(device.Hardware), device.Hardware),
                 (nameof(device.Platform), device.Platform),

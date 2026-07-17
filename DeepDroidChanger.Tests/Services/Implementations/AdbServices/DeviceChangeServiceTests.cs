@@ -31,6 +31,21 @@ public sealed class DeviceChangeServiceTests
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
+            DeviceSpoofPropertyConstants.BuildDate,
+            profile.BuildDate!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.BuildDateUtc,
+            profile.BuildDateUtc!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.Bootloader,
+            profile.Bootloader!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
             DeviceSpoofPropertyConstants.AndroidId,
             profile.AndroidId,
             Arg.Any<CancellationToken>());
@@ -459,6 +474,9 @@ public sealed class DeviceChangeServiceTests
             Name = "e3qxxx",
             Manufacturer = "samsung",
             Fingerprint = "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
+            BuildDate = "Thu Jun 04 00:00:00 UTC 2026",
+            BuildDateUtc = "1780531200",
+            Bootloader = "test",
             Serial = "NEW-SERIAL",
             AndroidId = "0123456789abcdef",
             Imei = "123456789012345",

@@ -35,6 +35,11 @@ namespace DeepDroidChanger.Services
             return Random.Shared.Next(minValue, maxValue);
         }
 
+        public long RandomInRange(long minValue, long maxValue)
+        {
+            return Random.Shared.NextInt64(minValue, maxValue);
+        }
+
         public T PickRandom<T>(IReadOnlyList<T> values)
         {
             ArgumentNullException.ThrowIfNull(values);
