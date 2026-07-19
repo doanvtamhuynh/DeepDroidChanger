@@ -92,13 +92,13 @@ namespace DeepDroidChanger.Services
             CancellationToken cancellationToken)
         {
             var toolPath = await ResolveToolPathAsync(cancellationToken).ConfigureAwait(false);
-            var platformToolsPath = Path.GetDirectoryName(toolPath) ?? AppContext.BaseDirectory;
+            var viewScreenPath = Path.GetDirectoryName(toolPath) ?? AppContext.BaseDirectory;
             var windowTitle = CreateWindowTitle(serial);
 
             var startInfo = new ProcessStartInfo
             {
                 FileName = toolPath,
-                WorkingDirectory = platformToolsPath,
+                WorkingDirectory = viewScreenPath,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardError = true
@@ -234,17 +234,17 @@ namespace DeepDroidChanger.Services
             return $"{AdbToolConstants.ScrcpyWindowTitlePrefix}-{serial}-{Guid.NewGuid():N}";
         }
 
-        private static async Task<string> ResolveToolPathAsync(CancellationToken cancellationToken)
+        internal static async Task<string> ResolveToolPathAsync(CancellationToken cancellationToken)
         {
             var outputPath = Path.Combine(
                 AppContext.BaseDirectory,
                 AdbToolConstants.ToolsRootRelativePath,
-                AdbToolConstants.PlatformToolsDirectoryName,
+                AdbToolConstants.ViewScreenDirectoryName,
                 AdbToolConstants.ScrcpyExecutableName);
             var projectPath = Path.Combine(
                 Environment.CurrentDirectory,
                 AdbToolConstants.ToolsRootRelativePath,
-                AdbToolConstants.PlatformToolsDirectoryName,
+                AdbToolConstants.ViewScreenDirectoryName,
                 AdbToolConstants.ScrcpyExecutableName);
 
             if (await FileExistsAsync(outputPath, cancellationToken).ConfigureAwait(false))

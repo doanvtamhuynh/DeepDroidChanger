@@ -1,26 +1,38 @@
 using System.IO;
+using System.Reflection;
 using System.Text;
 
 namespace DeepDroidChanger.Helpers;
 
 public static class AssetDataReader
 {
+    private const string DataRootPath = "Assets/Data/";
+
     public static string ReadText(string relativePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
 
         string normalizedRelativePath = relativePath
-            .Replace('/', Path.DirectorySeparatorChar)
-            .TrimStart(Path.DirectorySeparatorChar);
-        string baseDirectory = Path.GetFullPath(AppContext.BaseDirectory);
-        string fullPath = Path.GetFullPath(Path.Combine(baseDirectory, normalizedRelativePath));
+            .Replace('\\', '/')
+            .TrimStart('/');
+        string[] pathSegments = normalizedRelativePath.Split('/');
 
-        if (!fullPath.StartsWith(baseDirectory, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Asset path resolves outside the application directory.");
+        if (!normalizedRelativePath.StartsWith(DataRootPath, StringComparison.Ordinal)
+            || pathSegments.Any(segment => segment.Length == 0 || segment is "." or ".."))
+        {
+            throw new InvalidOperationException("Asset path must resolve inside the embedded data directory.");
+        }
 
-        if (!File.Exists(fullPath))
-            throw new FileNotFoundException("Application data asset was not found.", fullPath);
+        Assembly assembly = typeof(AssetDataReader).Assembly;
+        string resourceName = string.Concat(
+            assembly.GetName().Name,
+            ".",
+            normalizedRelativePath.Replace('/', '.'));
+        using Stream? stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream is null)
+            throw new FileNotFoundException("Embedded application data asset was not found.", normalizedRelativePath);
 
-        return File.ReadAllText(fullPath, Encoding.UTF8);
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 }

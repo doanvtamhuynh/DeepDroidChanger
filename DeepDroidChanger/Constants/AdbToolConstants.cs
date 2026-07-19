@@ -8,6 +8,7 @@ namespace DeepDroidChanger.Constants
         public const string SerialSelectorArgument = "-s";
         public const string ToolsRootRelativePath = "Assets/Tools";
         public const string PlatformToolsDirectoryName = "platform-tools";
+        public const string ViewScreenDirectoryName = "viewscreen";
         public const string ScrcpyWindowTitlePrefix = "DeepDroidChangerScrcpy";
         public const string ScrcpySerialArgument = "--serial";
         public const string ScrcpyWindowTitleArgument = "--window-title";

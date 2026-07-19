@@ -1,3 +1,4 @@
+using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Services;
 using System.Text.Json;
 
@@ -53,9 +54,8 @@ public sealed class RandomServiceTests
     public void GenerateWifiMacAddress_KnownAndUnknownBrands_UseDatabaseAndFallbackPrefixes()
     {
         const string resourcePath = "Assets/Data/mac_vendors.json";
-        string fullPath = Path.Combine(AppContext.BaseDirectory, resourcePath.Replace('/', Path.DirectorySeparatorChar));
         Dictionary<string, string[]> database = JsonSerializer.Deserialize<Dictionary<string, string[]>>(
-            File.ReadAllText(fullPath))!;
+            AssetDataReader.ReadText(resourcePath))!;
         var service = new RandomService();
 
         Assert.HasCount(8, database);
@@ -82,9 +82,8 @@ public sealed class RandomServiceTests
     public void GenerateImei_KnownAndUnknownBrands_UseDatabaseAndFallbackTacs()
     {
         const string resourcePath = "Assets/Data/imei_tacs.json";
-        string fullPath = Path.Combine(AppContext.BaseDirectory, resourcePath.Replace('/', Path.DirectorySeparatorChar));
         Dictionary<string, string[]> database = JsonSerializer.Deserialize<Dictionary<string, string[]>>(
-            File.ReadAllText(fullPath))!;
+            AssetDataReader.ReadText(resourcePath))!;
         var service = new RandomService();
 
         Assert.HasCount(8, database);

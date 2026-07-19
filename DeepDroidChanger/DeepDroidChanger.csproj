@@ -26,13 +26,17 @@
     <None Remove="Assets\Icons\**\*.*" />
     <None Remove="Assets\Tools\**\*.*" />
 
-    <Content Include="Assets\Data\**\*.*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <EmbeddedResource Include="Assets\Data\**\*.*" />
     <Resource Include="Assets\Icons\**\*.*" />
     <Content Include="Assets\Tools\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <Target Name="RemoveLooseDataAssetsFromOutput" BeforeTargets="CopyFilesToOutputDirectory">
+    <RemoveDir
+      Directories="$(TargetDir)Assets\Data"
+      Condition="Exists('$(TargetDir)Assets\Data')" />
+  </Target>
 
 </Project>

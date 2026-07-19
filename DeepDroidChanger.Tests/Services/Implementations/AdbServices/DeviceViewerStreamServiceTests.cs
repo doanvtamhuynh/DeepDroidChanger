@@ -1,3 +1,4 @@
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Services;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
@@ -5,6 +6,20 @@ namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
 [TestClass]
 public sealed class DeviceViewerStreamServiceTests
 {
+    [TestMethod]
+    public async Task ResolveToolPathAsync_UsesBundledViewScreenDirectory()
+    {
+        string expectedPath = Path.Combine(
+            AppContext.BaseDirectory,
+            AdbToolConstants.ToolsRootRelativePath,
+            AdbToolConstants.ViewScreenDirectoryName,
+            AdbToolConstants.ScrcpyExecutableName);
+
+        string actualPath = await DeviceViewerStreamService.ResolveToolPathAsync(CancellationToken.None);
+
+        Assert.AreEqual(expectedPath, actualPath);
+    }
+
     [TestMethod]
     public void Service_ImplementsDeterministicApplicationShutdownCleanup()
     {

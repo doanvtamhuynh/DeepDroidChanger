@@ -28,7 +28,7 @@ DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đ
 
 - Lấy profile ngẫu nhiên từ Device Info API theo Brand, Android version, Country và Carrier.
 - Chuẩn hóa identity gồm fingerprint/build, serial, Android ID, IMEI, IMSI, ICCID, số điện thoại, Wi-Fi/Bluetooth MAC và thông tin SIM.
-- Dữ liệu cục bộ dùng cho việc tạo profile nằm trong `Assets/Data`: carrier, timezone, TAC IMEI, MAC vendor, tên và word list.
+- Dữ liệu cục bộ dùng cho việc tạo profile nằm trong `Assets/Data` và được nhúng vào assembly khi build: carrier, timezone, TAC IMEI, MAC vendor, tên và word list.
 - **Random Device** và **Random SIM** chỉ cập nhật form. Dữ liệu chỉ được ghi lên điện thoại khi chạy **Change Device**.
 
 ### Change Device
