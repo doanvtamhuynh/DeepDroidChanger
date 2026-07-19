@@ -893,7 +893,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task RandomSim_OfflineDevice_DoesNotGenerateOrChangeSimFields()
+    public async Task RandomSim_OfflineDevice_StillGeneratesSimFields()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -906,6 +906,14 @@ public sealed class DeviceManagerViewModelLifecycleTests
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         ISimProfileService simProfileService = Substitute.For<ISimProfileService>();
+        simProfileService.CreateRandomProfile(Arg.Any<CarrierCountryOption?>(), Arg.Any<CarrierOption?>())
+            .Returns(new SimProfile
+            {
+                Imsi = "generated-imsi",
+                Iccid = "generated-iccid",
+                PhoneNumber = "generated-phone",
+                OperatorName = "Generated operator"
+            });
         var viewModel = CreateViewModel(deviceList, carriers, simProfileService: simProfileService);
         await viewModel.InitializeAsync(CancellationToken.None);
         viewModel.DeviceInfo.Imsi = "existing-imsi";
@@ -915,11 +923,104 @@ public sealed class DeviceManagerViewModelLifecycleTests
 
         await viewModel.RandomSimCommand.ExecuteAsync(null);
 
-        simProfileService.DidNotReceiveWithAnyArgs().CreateRandomProfile(default, default);
-        Assert.AreEqual("existing-imsi", viewModel.DeviceInfo.Imsi);
-        Assert.AreEqual("existing-iccid", viewModel.DeviceInfo.Iccid);
-        Assert.AreEqual("existing-phone", viewModel.DeviceInfo.PhoneNumber);
-        Assert.AreEqual("existing-operator", viewModel.DeviceInfo.Operator);
+        simProfileService.Received(1).CreateRandomProfile(
+            Arg.Any<CarrierCountryOption?>(),
+            Arg.Any<CarrierOption?>());
+        Assert.AreEqual("generated-imsi", viewModel.DeviceInfo.Imsi);
+        Assert.AreEqual("generated-iccid", viewModel.DeviceInfo.Iccid);
+        Assert.AreEqual("generated-phone", viewModel.DeviceInfo.PhoneNumber);
+        Assert.AreEqual("Generated operator", viewModel.DeviceInfo.Operator);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task OfflineToOnlineStatus_UpdatesEveryOnlineOnlyActionAndKeepsRandomGeneratorsAvailable()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, []));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice { Model = "Generated model" }));
+        ISimProfileService simProfileService = Substitute.For<ISimProfileService>();
+        simProfileService.CreateRandomProfile(Arg.Any<CarrierCountryOption?>(), Arg.Any<CarrierOption?>())
+            .Returns(new SimProfile
+            {
+                Imsi = "generated-imsi",
+                Iccid = "generated-iccid"
+            });
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            simProfileService: simProfileService);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await viewModel.RandomSimCommand.ExecuteAsync(null);
+
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        Assert.IsTrue(viewModel.RandomSimCommand.CanExecute(null));
+        Assert.IsTrue(GetOnlineOnlyActionStates(viewModel).All(pair => !pair.Value),
+            CreateActionStateMessage(GetOnlineOnlyActionStates(viewModel)));
+
+        var canExecuteChangedCount = 0;
+        viewModel.ChangeLocationCommand.CanExecuteChanged += (_, _) => canExecuteChangedCount++;
+        viewModel.ApplyDeviceListSnapshot(new DeviceListSnapshot(
+            storedDevices,
+            [new AdbDevice("A", AdbDeviceStatus.Online)]));
+
+        Dictionary<string, bool> onlineActionStates = GetOnlineOnlyActionStates(viewModel);
+        Assert.IsTrue(onlineActionStates.All(pair => pair.Value), CreateActionStateMessage(onlineActionStates));
+        Assert.IsGreaterThan(0, canExecuteChangedCount);
+        await randomDevice.Received(1).CreateRandomProfileAsync(
+            Arg.Any<RandomDeviceRequest>(),
+            Arg.Any<CancellationToken>());
+        simProfileService.Received(1).CreateRandomProfile(
+            Arg.Any<CarrierCountryOption?>(),
+            Arg.Any<CarrierOption?>());
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task ContextMenuActions_RequireOnlineTargetAndRefreshWhenStatusChanges()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, []));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var viewModel = CreateViewModel(deviceList, carriers);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Dictionary<string, bool> offlineMenuStates = GetContextMenuActionStates(viewModel);
+        Assert.IsTrue(offlineMenuStates.All(pair => !pair.Value), CreateActionStateMessage(offlineMenuStates));
+
+        var canExecuteChangedCount = 0;
+        viewModel.DeleteDeviceCommand.CanExecuteChanged += (_, _) => canExecuteChangedCount++;
+        viewModel.ApplyDeviceListSnapshot(new DeviceListSnapshot(
+            storedDevices,
+            [new AdbDevice("A", AdbDeviceStatus.Online)]));
+
+        Dictionary<string, bool> onlineMenuStates = GetContextMenuActionStates(viewModel);
+        Assert.IsTrue(onlineMenuStates.All(pair => pair.Value), CreateActionStateMessage(onlineMenuStates));
+        Assert.IsGreaterThan(0, canExecuteChangedCount);
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
@@ -1158,6 +1259,41 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.Contains(nameof(DeviceManagerViewModel.DeviceTableColumnRatios), changedProperties);
         await deviceConfig.Received(1).SaveSettingsAsync(Arg.Any<CancellationToken>());
         viewModel.Dispose();
+    }
+
+    private static Dictionary<string, bool> GetOnlineOnlyActionStates(DeviceManagerViewModel viewModel)
+    {
+        return new Dictionary<string, bool>
+        {
+            [nameof(DeviceManagerViewModel.ChangeDeviceCommand)] = viewModel.ChangeDeviceCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.ChangeWithoutWipeCommand)] = viewModel.ChangeWithoutWipeCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.WipeWithoutChangeCommand)] = viewModel.WipeWithoutChangeCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.RandomAndChangeDeviceCommand)] = viewModel.RandomAndChangeDeviceCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.ChangeSimCommand)] = viewModel.ChangeSimCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.ChangeLocationCommand)] = viewModel.ChangeLocationCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.ChangeTimezoneCommand)] = viewModel.ChangeTimezoneCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.UpdateIntegrityCommand)] = viewModel.UpdateIntegrityCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.InstallApkCommand)] = viewModel.InstallApkCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.FakeProxyCommand)] = viewModel.FakeProxyCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.StopFakeProxyCommand)] = viewModel.StopFakeProxyCommand.CanExecute(null)
+        };
+    }
+
+    private static Dictionary<string, bool> GetContextMenuActionStates(DeviceManagerViewModel viewModel)
+    {
+        DeviceRowViewModel? targetDevice = viewModel.SelectedDevice;
+        return new Dictionary<string, bool>
+        {
+            [nameof(DeviceManagerViewModel.ViewDeviceCommand)] = viewModel.ViewDeviceCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.ViewDeviceInfoCommand)] = viewModel.ViewDeviceInfoCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.RebootDeviceCommand)] = viewModel.RebootDeviceCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.DeleteDeviceCommand)] = viewModel.DeleteDeviceCommand.CanExecute(targetDevice)
+        };
+    }
+
+    private static string CreateActionStateMessage(IReadOnlyDictionary<string, bool> actionStates)
+    {
+        return string.Join(", ", actionStates.Select(pair => $"{pair.Key}={pair.Value}"));
     }
 
     private static DeviceManagerViewModel CreateViewModel(
