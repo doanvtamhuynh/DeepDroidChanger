@@ -8,4 +8,9 @@ public interface IDeviceDataCleanupService
         string serial,
         DeviceChangeOptions options,
         CancellationToken cancellationToken);
+
+    Task CleanPreservingSsaidAsync(
+        string serial,
+        DeviceChangeOptions options,
+        CancellationToken cancellationToken);
 }

@@ -324,6 +324,13 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreEqual(new Thickness(0d, 10d, 16d, 0d), deviceProfilePanelContentGrid.Margin);
         var deviceActionGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceActionGrid"));
         Assert.IsFalse(deviceActionGrid.Parent is ScrollViewer);
+        Assert.HasCount(7, deviceActionGrid.RowDefinitions);
+        AssertGridPosition(deviceManagerView, "RandomDeviceButton", 0, 0);
+        AssertGridPosition(deviceManagerView, "WipeWithoutChangeButton", 1, 0);
+        AssertGridPosition(deviceManagerView, "RandomSimButton", 2, 0);
+        AssertGridPosition(deviceManagerView, "ChangeDeviceButton", 0, 1);
+        AssertGridPosition(deviceManagerView, "ChangeWithoutWipeButton", 1, 1);
+        AssertGridPosition(deviceManagerView, "ChangeSimButton", 2, 1);
         var viewAllDeviceInfoButton = Assert.IsInstanceOfType<Button>(deviceManagerView.FindName("ViewAllDeviceInfoButton"));
         Assert.IsFalse(viewAllDeviceInfoButton.IsEnabled);
         Assert.AreSame(Application.Current.FindResource("DeviceActionButtonStyle"), viewAllDeviceInfoButton.Style.BasedOn);

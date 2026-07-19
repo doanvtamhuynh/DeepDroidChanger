@@ -6,6 +6,8 @@ namespace DeepDroidChanger.Services;
 
 public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
 {
+    internal const string SsaidFilePattern = "/data/system/users/*/settings_ssaid.xml*";
+
     private static readonly HashSet<string> ProtectedPackages = new(StringComparer.Ordinal)
     {
         "com.android.shell"
@@ -135,7 +137,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         "/data/system/users/*/package-restrictions.xml*",
         "/data/system/users/*/runtime-permissions.xml*",
         "/data/system/users/*/settings_config.xml*",
-        "/data/system/users/*/settings_ssaid.xml*",
+        SsaidFilePattern,
         "/data/system/users/*/wallpaper*",
         "/data/system/watchlist*"
     ];
@@ -184,9 +186,26 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         _logger = logger;
     }
 
-    public async Task CleanAsync(
+    public Task CleanAsync(
         string serial,
         DeviceChangeOptions options,
+        CancellationToken cancellationToken)
+    {
+        return CleanAsync(serial, options, preserveSsaid: false, cancellationToken);
+    }
+
+    public Task CleanPreservingSsaidAsync(
+        string serial,
+        DeviceChangeOptions options,
+        CancellationToken cancellationToken)
+    {
+        return CleanAsync(serial, options, preserveSsaid: true, cancellationToken);
+    }
+
+    private async Task CleanAsync(
+        string serial,
+        DeviceChangeOptions options,
+        bool preserveSsaid,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
@@ -207,17 +226,23 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             packagesToClear,
             useRmRfForPackageCleanup,
             clearGoogleAccounts,
-            options.UseDefaultMode);
+            options.UseDefaultMode,
+            preserveSsaid);
         await RunRequiredScriptAsync(serial, cleanupScript, cancellationToken).ConfigureAwait(false);
 
+        int residualFilePatternCount = preserveSsaid
+            ? ResidualFilePatterns.Length - 1
+            : ResidualFilePatterns.Length;
+
         _logger.LogWarning(
-            "Cleared device data on {Serial}. Package stores: {PackageCount}; clear all packages: {ClearAllPackages}; clear Google accounts and CE/DE state: {ClearGoogleAccounts}; residual directory patterns: {DirectoryPatternCount}; residual file patterns: {FilePatternCount}.",
+            "Cleared device data on {Serial}. Package stores: {PackageCount}; clear all packages: {ClearAllPackages}; clear Google accounts and CE/DE state: {ClearGoogleAccounts}; preserve SSAID: {PreserveSsaid}; residual directory patterns: {DirectoryPatternCount}; residual file patterns: {FilePatternCount}.",
             serial,
             packagesToClear.Count,
             clearAllPackages,
             clearGoogleAccounts,
+            preserveSsaid,
             ResidualDirectoryPatterns.Length,
-            ResidualFilePatterns.Length);
+            residualFilePatternCount);
     }
 
     internal static bool IsGooglePackage(string packageName)
@@ -230,7 +255,8 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         IReadOnlyCollection<string> packagesToClear,
         bool useRmRfForPackageCleanup,
         bool clearGoogleAccounts,
-        bool useDefaultMode)
+        bool useDefaultMode,
+        bool preserveSsaid = false)
     {
         ArgumentNullException.ThrowIfNull(packagesToClear);
         List<string> commands =
@@ -257,7 +283,10 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         commands.Add(AdbCleanupCommandBuilder.CreatePreserveDirectoryCommand(
             string.Join(' ', ResidualDirectoryPatterns),
             ProtectedDirectoryPaths));
-        commands.Add(AdbCleanupCommandBuilder.CreateRemoveFilesCommand(ResidualFilePatterns));
+        IEnumerable<string> residualFilePatterns = preserveSsaid
+            ? ResidualFilePatterns.Where(pattern => pattern != SsaidFilePattern)
+            : ResidualFilePatterns;
+        commands.Add(AdbCleanupCommandBuilder.CreateRemoveFilesCommand(residualFilePatterns));
         commands.Add("pm trim-caches 999G || exit $?");
         commands.Add("sync || exit $?");
 

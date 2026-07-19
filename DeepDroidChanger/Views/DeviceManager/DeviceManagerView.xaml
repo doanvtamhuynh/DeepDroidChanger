@@ -535,9 +535,11 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
-                            <Button Grid.Row="0"
+                            <Button x:Name="RandomDeviceButton"
+                                    Grid.Row="0"
                                     Grid.Column="0"
                                     Command="{Binding RandomDeviceCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -556,7 +558,28 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="0"
+                            <Button x:Name="ChangeWithoutWipeButton"
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    Command="{Binding ChangeWithoutWipeCommand}"
+                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="CellphoneText"
+                                                             Width="16"
+                                                             Height="16"
+                                                             VerticalAlignment="Center"
+                                                             Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{DynamicResource DeviceManager_ActionChangeWithoutWipe}"
+                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                </Grid>
+                            </Button>
+                            <Button x:Name="ChangeDeviceButton"
+                                    Grid.Row="0"
                                     Grid.Column="1"
                                     Command="{Binding ChangeDeviceCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -575,7 +598,27 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="2"
+                            <Button x:Name="WipeWithoutChangeButton"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Command="{Binding WipeWithoutChangeCommand}"
+                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="DeleteSweep"
+                                                             Width="16"
+                                                             Height="16"
+                                                             VerticalAlignment="Center"
+                                                             Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{DynamicResource DeviceManager_ActionWipeWithoutChange}"
+                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                </Grid>
+                            </Button>
+                            <Button Grid.Row="3"
                                     Grid.Column="0"
                                     Command="{Binding RandomAndChangeDeviceCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -594,7 +637,8 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="1"
+                            <Button x:Name="RandomSimButton"
+                                    Grid.Row="2"
                                     Grid.Column="0"
                                     Command="{Binding RandomSimCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -613,7 +657,8 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="1"
+                            <Button x:Name="ChangeSimButton"
+                                    Grid.Row="2"
                                     Grid.Column="1"
                                     Command="{Binding ChangeSimCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -632,7 +677,7 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="3"
+                            <Button Grid.Row="4"
                                     Grid.Column="0"
                                     Command="{Binding ChangeLocationCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -651,7 +696,7 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="3"
+                            <Button Grid.Row="4"
                                     Grid.Column="1"
                                     Command="{Binding ChangeTimezoneCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -670,7 +715,7 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="5"
+                            <Button Grid.Row="6"
                                     Grid.Column="0"
                                     Command="{Binding UpdateIntegrityCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -689,7 +734,7 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="2"
+                            <Button Grid.Row="3"
                                     Grid.Column="1"
                                     Command="{Binding InstallApkCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -708,7 +753,7 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="4"
+                            <Button Grid.Row="5"
                                     Grid.Column="0"
                                     Command="{Binding FakeProxyCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
@@ -727,7 +772,7 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="4"
+                            <Button Grid.Row="5"
                                     Grid.Column="1"
                                     Command="{Binding StopFakeProxyCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">

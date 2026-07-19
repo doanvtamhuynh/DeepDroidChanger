@@ -32,6 +32,12 @@ public static class DeviceLogResourceKeys
     public const string ChangeDeviceVerifying = "Log_ChangeDeviceVerifying";
     public const string ChangeDeviceSuccess = "Log_ChangeDeviceSuccess";
     public const string ChangeDeviceFailed = "Log_ChangeDeviceFailed";
+    public const string ChangeWithoutWipe = "Log_ChangeWithoutWipe";
+    public const string ChangeWithoutWipeSuccess = "Log_ChangeWithoutWipeSuccess";
+    public const string ChangeWithoutWipeFailed = "Log_ChangeWithoutWipeFailed";
+    public const string WipeWithoutChange = "Log_WipeWithoutChange";
+    public const string WipeWithoutChangeSuccess = "Log_WipeWithoutChangeSuccess";
+    public const string WipeWithoutChangeFailed = "Log_WipeWithoutChangeFailed";
     public const string AdvancedChangeConfigSaved = "Log_AdvancedChangeConfigSaved";
     public const string AdvancedChangeConfigFailed = "Log_AdvancedChangeConfigFailed";
     public const string RandomAndChangeDevice = "Log_RandomAndChangeDevice";
@@ -39,6 +45,8 @@ public static class DeviceLogResourceKeys
     public const string RandomSimSuccess = "Log_RandomSimSuccess";
     public const string RandomSimFailed = "Log_RandomSimFailed";
     public const string ChangeSim = "Log_ChangeSim";
+    public const string ChangeSimSuccess = "Log_ChangeSimSuccess";
+    public const string ChangeSimFailed = "Log_ChangeSimFailed";
     public const string ResolvingByIp = "Log_ResolvingByIp";
     public const string ApplyingLocation = "Log_ApplyingLocation";
     public const string ChangeLocationSuccess = "Log_ChangeLocationSuccess";

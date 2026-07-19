@@ -23,6 +23,113 @@ public sealed class DeviceChangeService : IDeviceChangeService
         _logger = logger;
     }
 
+    public async Task ChangeSimAsync(
+        string serial,
+        SimProfile profile,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ValidateSimProfile(profile);
+        await ExecuteWithDeviceLockAsync(serial, async () =>
+        {
+            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
+            await SetPropertiesAsync(serial, CreateSimProperties(profile), cancellationToken).ConfigureAwait(false);
+            await RunRequiredShellAsync(
+                    serial,
+                    DeviceChangeConstants.SyncCommand,
+                    "sync changed SIM information",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await RebootAndWaitAsync(serial, progress: null, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Changed SIM information and rebooted device {Serial}.", serial);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task ChangeWithoutWipeAsync(
+        string serial,
+        DeviceInfoApiDevice profile,
+        bool changeSim,
+        DeviceChangeOptions options,
+        IProgress<DeviceChangeStage>? progress,
+        CancellationToken cancellationToken)
+    {
+        Validate(serial, profile, options);
+        await ExecuteWithDeviceLockAsync(serial, async () =>
+        {
+            progress?.Report(DeviceChangeStage.Preparing);
+            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
+
+            string originalAndroidId = await _adb
+                .GetSettingAsync(
+                    serial,
+                    DeviceChangeConstants.SecureSettingsNamespace,
+                    DeviceChangeConstants.AndroidIdSetting,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            bool changeAndroidId = options.UseDefaultMode || options.ChangeAndroidId;
+            string targetAndroidId = changeAndroidId ? profile.AndroidId : string.Empty;
+            bool changeMacAddress = options.UseDefaultMode || options.ChangeMacAddress;
+            if (changeMacAddress)
+                await _adb.SetWifiAsync(serial, false, cancellationToken).ConfigureAwait(false);
+
+            progress?.Report(DeviceChangeStage.ApplyingProfile);
+            await ApplyProfileAsync(
+                    serial,
+                    profile,
+                    targetAndroidId,
+                    changeAndroidId,
+                    changeSim,
+                    changeMacAddress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
+            progress?.Report(DeviceChangeStage.Verifying);
+            await VerifyAndroidIdAsync(
+                    serial,
+                    originalAndroidId,
+                    targetAndroidId,
+                    changeAndroidId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            progress?.Report(DeviceChangeStage.Completed);
+            _logger.LogInformation(
+                "Changed device identity without cleaning data on {Serial}. Default mode: {DefaultMode}; Android ID changed: {AndroidIdChanged}; SIM changed: {SimChanged}; MAC changed: {MacChanged}.",
+                serial,
+                options.UseDefaultMode,
+                changeAndroidId,
+                changeSim,
+                changeMacAddress);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task WipeWithoutChangeAsync(
+        string serial,
+        DeviceChangeOptions options,
+        IProgress<DeviceChangeStage>? progress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(options);
+        await ExecuteWithDeviceLockAsync(serial, async () =>
+        {
+            progress?.Report(DeviceChangeStage.Preparing);
+            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
+            progress?.Report(DeviceChangeStage.ClearingData);
+            await _cleanupService
+                .CleanPreservingSsaidAsync(serial, options, cancellationToken)
+                .ConfigureAwait(false);
+            await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
+            progress?.Report(DeviceChangeStage.Completed);
+            _logger.LogWarning(
+                "Wiped device data without changing identity on {Serial} while preserving SSAID. Default mode: {DefaultMode}; package cleanup: {PackageCleanup}; rm -rf package cleanup requested: {UseRmRfForPackageCleanup}.",
+                serial,
+                options.UseDefaultMode,
+                DeviceChangeOptionsHelper.HasPackageCleanup(options),
+                options.UseRmRfForPackageCleanup);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task ChangeAsync(
         string serial,
         DeviceInfoApiDevice profile,
@@ -32,10 +139,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
         CancellationToken cancellationToken)
     {
         Validate(serial, profile, options);
-        SemaphoreSlim deviceLock = _deviceLocks.GetOrAdd(serial, _ => new SemaphoreSlim(1, 1));
-        await deviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
+        await ExecuteWithDeviceLockAsync(serial, async () =>
         {
             progress?.Report(DeviceChangeStage.Preparing);
             await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
@@ -67,11 +171,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            progress?.Report(DeviceChangeStage.Rebooting);
-            await _adb.RebootAsync(serial, cancellationToken).ConfigureAwait(false);
-
-            progress?.Report(DeviceChangeStage.WaitingForDevice);
-            await WaitForBootCompletedAsync(serial, cancellationToken).ConfigureAwait(false);
+            await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
 
             progress?.Report(DeviceChangeStage.Verifying);
             await VerifyAndroidIdAsync(
@@ -90,11 +190,36 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 changeAndroidId,
                 DeviceChangeOptionsHelper.HasPackageCleanup(options),
                 options.UseRmRfForPackageCleanup);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ExecuteWithDeviceLockAsync(
+        string serial,
+        Func<Task> operation,
+        CancellationToken cancellationToken)
+    {
+        SemaphoreSlim deviceLock = _deviceLocks.GetOrAdd(serial, _ => new SemaphoreSlim(1, 1));
+        await deviceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await operation().ConfigureAwait(false);
         }
         finally
         {
             deviceLock.Release();
         }
+    }
+
+    private async Task RebootAndWaitAsync(
+        string serial,
+        IProgress<DeviceChangeStage>? progress,
+        CancellationToken cancellationToken)
+    {
+        progress?.Report(DeviceChangeStage.Rebooting);
+        await _adb.RebootAsync(serial, cancellationToken).ConfigureAwait(false);
+        progress?.Report(DeviceChangeStage.WaitingForDevice);
+        await WaitForBootCompletedAsync(serial, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EnsureRootAsync(string serial, CancellationToken cancellationToken)
@@ -272,17 +397,48 @@ public sealed class DeviceChangeService : IDeviceChangeService
         DeviceInfoApiDevice profile,
         bool changeSim)
     {
+        return CreateSimProperties(
+            changeSim,
+            changeSim ? profile.Iccid : string.Empty,
+            changeSim ? profile.Imsi : string.Empty,
+            changeSim ? profile.SimPhoneNumber : string.Empty,
+            changeSim ? profile.SimOperatorName : string.Empty,
+            changeSim ? profile.SimOperatorCountry : string.Empty,
+            changeSim ? profile.SimOperatorNumeric : string.Empty);
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> CreateSimProperties(SimProfile profile)
+    {
+        return CreateSimProperties(
+            true,
+            profile.Iccid,
+            profile.Imsi,
+            profile.PhoneNumber,
+            profile.OperatorName,
+            profile.OperatorCountry,
+            profile.OperatorNumeric);
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> CreateSimProperties(
+        bool enabled,
+        string iccid,
+        string imsi,
+        string phoneNumber,
+        string operatorName,
+        string operatorCountry,
+        string operatorNumeric)
+    {
         return
         [
             Pair(
                 DeviceSpoofPropertyConstants.SimEnabled,
-                changeSim ? DeviceChangeConstants.EnabledValue : DeviceChangeConstants.DisabledValue),
-            Pair(DeviceSpoofPropertyConstants.SimIccid, changeSim ? profile.Iccid : string.Empty),
-            Pair(DeviceSpoofPropertyConstants.SimImsi, changeSim ? profile.Imsi : string.Empty),
-            Pair(DeviceSpoofPropertyConstants.SimPhoneNumber, changeSim ? profile.SimPhoneNumber : string.Empty),
-            Pair(DeviceSpoofPropertyConstants.SimOperatorName, changeSim ? profile.SimOperatorName : string.Empty),
-            Pair(DeviceSpoofPropertyConstants.SimOperatorCountry, changeSim ? profile.SimOperatorCountry : string.Empty),
-            Pair(DeviceSpoofPropertyConstants.SimOperatorNumeric, changeSim ? profile.SimOperatorNumeric : string.Empty),
+                enabled ? DeviceChangeConstants.EnabledValue : DeviceChangeConstants.DisabledValue),
+            Pair(DeviceSpoofPropertyConstants.SimIccid, iccid),
+            Pair(DeviceSpoofPropertyConstants.SimImsi, imsi),
+            Pair(DeviceSpoofPropertyConstants.SimPhoneNumber, phoneNumber),
+            Pair(DeviceSpoofPropertyConstants.SimOperatorName, operatorName),
+            Pair(DeviceSpoofPropertyConstants.SimOperatorCountry, operatorCountry),
+            Pair(DeviceSpoofPropertyConstants.SimOperatorNumeric, operatorNumeric),
             Pair(DeviceSpoofPropertyConstants.Sim2Enabled, DeviceChangeConstants.DisabledValue),
             Pair(DeviceSpoofPropertyConstants.Sim2Iccid, string.Empty),
             Pair(DeviceSpoofPropertyConstants.Sim2Imsi, string.Empty),
@@ -381,6 +537,18 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 && string.IsNullOrWhiteSpace(profile.AndroidId)))
         {
             throw new InvalidOperationException("The generated device profile is incomplete.");
+        }
+    }
+
+    private static void ValidateSimProfile(SimProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        if (string.IsNullOrWhiteSpace(profile.Iccid)
+            || string.IsNullOrWhiteSpace(profile.Imsi)
+            || string.IsNullOrWhiteSpace(profile.OperatorNumeric)
+            || string.IsNullOrWhiteSpace(profile.OperatorCountry))
+        {
+            throw new InvalidOperationException("The generated SIM profile is incomplete.");
         }
     }
 

@@ -12,6 +12,111 @@ public sealed class DeviceChangeServiceTests
     private const string CurrentAndroidId = "33537c391caed62e";
 
     [TestMethod]
+    public async Task ChangeSimAsync_WritesOnlySimPropertiesAndRebootsWithoutCleanup()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+        var profile = new SimProfile
+        {
+            Iccid = "8984041234567890123",
+            Imsi = "452041234567890",
+            PhoneNumber = "+84901234567",
+            OperatorName = "Viettel",
+            OperatorCountry = "vn",
+            OperatorNumeric = "45204"
+        };
+
+        await service.ChangeSimAsync("SERIAL", profile, CancellationToken.None);
+
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.SimEnabled,
+            "1",
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.SimIccid,
+            profile.Iccid,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.SimOperatorNumeric,
+            profile.OperatorNumeric,
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.ProductModel,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceiveWithAnyArgs().SetWifiAsync(default!, default, default);
+        await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
+        await cleanup.DidNotReceiveWithAnyArgs().CleanPreservingSsaidAsync(default!, default!, default);
+        await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeWithoutWipeAsync_AppliesIdentityWithoutCallingCleanup()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+        DeviceInfoApiDevice profile = CreateProfile();
+        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
+            .Returns(CurrentAndroidId, profile.AndroidId);
+
+        await service.ChangeWithoutWipeAsync(
+            "SERIAL",
+            profile,
+            true,
+            new DeviceChangeOptions { UseDefaultMode = true },
+            null,
+            CancellationToken.None);
+
+        await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
+        await cleanup.DidNotReceiveWithAnyArgs().CleanPreservingSsaidAsync(default!, default!, default);
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.ProductModel,
+            profile.Model!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.SimIccid,
+            profile.Iccid,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task WipeWithoutChangeAsync_CleansWithRequestedOptionsWithoutWritingIdentity()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = false,
+            ClearAllPackages = false,
+            ClearSelectedPackages = true,
+            SelectedPackages = ["com.example.app"],
+            ClearGoogleAccounts = false
+        };
+
+        await service.WipeWithoutChangeAsync("SERIAL", options, null, CancellationToken.None);
+
+        await cleanup.Received(1).CleanPreservingSsaidAsync(
+            "SERIAL",
+            options,
+            Arg.Any<CancellationToken>());
+        await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
+        await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
+        await adb.DidNotReceiveWithAnyArgs().PutSettingAsync(default!, default!, default!, default!, default);
+        await adb.DidNotReceiveWithAnyArgs().DeleteSettingAsync(default!, default!, default!, default);
+        await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
     public async Task ChangeAsync_DefaultMode_ClearsDataAndAppliesFullGeneratedProfile()
     {
         IAdbCommandService adb = CreateRootedAdb();

@@ -101,11 +101,35 @@ public sealed class DeviceDataCleanupServiceTests
         Assert.DoesNotContain("rm -rf", script, StringComparison.Ordinal);
         Assert.Contains("/data/system_ce /data/system_de", script, StringComparison.Ordinal);
         Assert.Contains("/data/system/*.db*", script, StringComparison.Ordinal);
+        Assert.Contains(DeviceDataCleanupService.SsaidFilePattern, script, StringComparison.Ordinal);
         Assert.Contains("case \"$target\" in /data/system/package*)", script, StringComparison.Ordinal);
         AssertCleanupFinalization(script);
         await packages.Received(1).GetInstalledPackagesAsync(
             "SERIAL",
             Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task CleanPreservingSsaidAsync_DefaultMode_ExcludesOnlySsaidFilePattern()
+    {
+        IDevicePackageService packages = Substitute.For<IDevicePackageService>();
+        packages.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns([]);
+        IAdbCommandService adb = CreateSuccessfulAdb();
+        var service = CreateService(packages, adb);
+
+        await service.CleanPreservingSsaidAsync(
+            "SERIAL",
+            new DeviceChangeOptions { UseDefaultMode = true },
+            CancellationToken.None);
+
+        string script = GetOnlyCleanupScript(adb);
+        Assert.DoesNotContain(DeviceDataCleanupService.SsaidFilePattern, script, StringComparison.Ordinal);
+        foreach (string pattern in DeviceDataCleanupService.ResidualFilePatterns
+                     .Where(pattern => pattern != DeviceDataCleanupService.SsaidFilePattern))
+        {
+            Assert.Contains(pattern, script, StringComparison.Ordinal);
+        }
     }
 
     [TestMethod]
@@ -364,7 +388,7 @@ public sealed class DeviceDataCleanupServiceTests
         Assert.Contains("/data/misc_ce", DeviceDataCleanupService.ResidualDirectoryPatterns);
         Assert.Contains("/data/misc_de", DeviceDataCleanupService.ResidualDirectoryPatterns);
         Assert.Contains(
-            "/data/system/users/*/settings_ssaid.xml*",
+            DeviceDataCleanupService.SsaidFilePattern,
             DeviceDataCleanupService.ResidualFilePatterns);
         Assert.IsFalse(DeviceDataCleanupService.ResidualDirectoryPatterns.Any(
             target => target.EndsWith("/*", StringComparison.Ordinal)));
