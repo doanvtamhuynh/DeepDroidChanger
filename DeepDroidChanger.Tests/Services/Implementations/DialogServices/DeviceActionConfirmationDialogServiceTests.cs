@@ -1,3 +1,4 @@
+using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using NSubstitute;
 
@@ -7,18 +8,18 @@ namespace DeepDroidChanger.Tests.Services.Implementations.DialogServices;
 public sealed class DeviceActionConfirmationDialogServiceTests
 {
     [TestMethod]
-    public async Task ConfirmActions_ShowLocalizedWarningsWithDeviceIdentity()
+    public async Task ConfirmActions_ShowShortLocalizedMessagesWithDeviceIdentityInCaption()
     {
         IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
-        confirmationDialog.ShowWarningConfirmationAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        confirmationDialog.ShowConfirmationAsync(
+                Arg.Any<ConfirmationDialogOptions>(), Arg.Any<CancellationToken>())
             .Returns(true);
         ILocalizationService localization = Substitute.For<ILocalizationService>();
         localization.GetString(Arg.Any<string>()).Returns(callInfo =>
         {
             string key = callInfo.Arg<string>();
-            return key.EndsWith("Message", StringComparison.Ordinal)
-                ? $"{key}: {{0}}/{{1}}"
+            return key.EndsWith("Caption", StringComparison.Ordinal)
+                ? $"{key}: {{0}} - {{1}}"
                 : key;
         });
         var service = new DeviceActionConfirmationDialogService(confirmationDialog, localization);
@@ -33,17 +34,26 @@ public sealed class DeviceActionConfirmationDialogServiceTests
         Assert.IsTrue(changeWithoutWipe);
         Assert.IsTrue(wipeWithoutChange);
         Assert.IsTrue(changeSim);
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            "DeviceManager_ConfirmChangeWithoutWipeMessage: Phone/SERIAL",
-            "DeviceManager_ConfirmChangeWithoutWipeTitle",
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "DeviceManager_ConfirmChangeWithoutWipeCaption: Phone - SERIAL"
+                && options.Message == "DeviceManager_ConfirmChangeWithoutWipeMessage"
+                && options.WarningMessage == "DeviceManager_ConfirmChangeWithoutWipeWarning"
+                && options.Icon == ConfirmationDialogIcon.ChangeDevice),
             Arg.Any<CancellationToken>());
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            "DeviceManager_ConfirmWipeWithoutChangeMessage: Phone/SERIAL",
-            "DeviceManager_ConfirmWipeWithoutChangeTitle",
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "DeviceManager_ConfirmWipeWithoutChangeCaption: Phone - SERIAL"
+                && options.Message == "DeviceManager_ConfirmWipeWithoutChangeMessage"
+                && options.WarningMessage == "DeviceManager_ConfirmWipeWithoutChangeWarning"
+                && options.Icon == ConfirmationDialogIcon.Wipe),
             Arg.Any<CancellationToken>());
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            "DeviceManager_ConfirmChangeSimMessage: Phone/SERIAL",
-            "DeviceManager_ConfirmChangeSimTitle",
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "DeviceManager_ConfirmChangeSimCaption: Phone - SERIAL"
+                && options.Message == "DeviceManager_ConfirmChangeSimMessage"
+                && options.WarningMessage == "DeviceManager_ConfirmChangeSimWarning"
+                && options.Icon == ConfirmationDialogIcon.Sim),
             Arg.Any<CancellationToken>());
     }
 }

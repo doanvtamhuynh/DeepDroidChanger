@@ -1,9 +1,10 @@
+using DeepDroidChanger.Models;
+
 namespace DeepDroidChanger.Services;
 
 public interface IConfirmationDialogService
 {
-    Task<bool> ShowWarningConfirmationAsync(
-        string message,
-        string caption,
-        CancellationToken cancellationToken);
+    Task<bool> ShowConfirmationAsync(
+        ConfirmationDialogOptions options,
+        CancellationToken cancellationToken = default);
 }

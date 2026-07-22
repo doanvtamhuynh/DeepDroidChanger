@@ -1,3 +1,4 @@
+using DeepDroidChanger.Models;
 using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.Services;
@@ -26,15 +27,18 @@ public sealed class DeleteDeviceConfirmationDialogService : IDeleteDeviceConfirm
         cancellationToken.ThrowIfCancellationRequested();
         _logger.LogDebug("Opening Delete Device confirmation dialog for device {Serial}.", deviceSerial);
 
-        string message = string.Join(
-            Environment.NewLine + Environment.NewLine,
-            _localizationService.GetString("DeleteDeviceConfirmation_Title"),
-            string.Concat(deviceName, Environment.NewLine, deviceSerial),
-            _localizationService.GetString("DeleteDeviceConfirmation_Message"));
         bool confirmed = await _confirmationDialogService
-            .ShowWarningConfirmationAsync(
-                message,
-                _localizationService.GetString("DeleteDeviceConfirmation_WindowTitle"),
+            .ShowConfirmationAsync(
+                new ConfirmationDialogOptions
+                {
+                    Caption = string.Format(
+                        _localizationService.GetString("DeleteDeviceConfirmation_Caption"),
+                        deviceName,
+                        deviceSerial),
+                    Message = _localizationService.GetString("DeleteDeviceConfirmation_Message"),
+                    WarningMessage = _localizationService.GetString("DeleteDeviceConfirmation_Warning"),
+                    Icon = ConfirmationDialogIcon.Delete
+                },
                 cancellationToken)
             .ConfigureAwait(true);
 

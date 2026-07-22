@@ -1,4 +1,6 @@
+using DeepDroidChanger.Models;
 using DeepDroidChanger.ViewModels;
+using MaterialDesignThemes.Wpf;
 
 namespace DeepDroidChanger.Tests.ViewModels.Dialogs;
 
@@ -6,14 +8,42 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs;
 public sealed class ConfirmationDialogViewModelTests
 {
     [TestMethod]
-    public void Initialize_SetsCaptionAndMessage()
+    public void Initialize_SetsCaptionAndMessageAndWarning()
     {
         var viewModel = new ConfirmationDialogViewModel();
 
-        viewModel.Initialize("Confirm action", "Continue with this action?");
+        viewModel.Initialize(
+            "Confirm Change Device: Phone - SERIAL",
+            "Change device information.",
+            "This action will change device information.",
+            "Yes",
+            "No",
+            ConfirmationDialogIcon.ChangeDevice);
 
-        Assert.AreEqual("Confirm action", viewModel.Caption);
-        Assert.AreEqual("Continue with this action?", viewModel.Message);
+        Assert.AreEqual("Confirm Change Device: Phone - SERIAL", viewModel.Caption);
+        Assert.AreEqual("Change device information.", viewModel.Message);
+        Assert.AreEqual("This action will change device information.", viewModel.WarningMessage);
+        Assert.IsTrue(viewModel.HasWarning);
+        Assert.AreEqual("Yes", viewModel.ConfirmButtonText);
+        Assert.AreEqual("No", viewModel.CancelButtonText);
+        Assert.AreEqual(PackIconKind.CellphoneCog, viewModel.IconKind);
+    }
+
+    [TestMethod]
+    [DataRow(ConfirmationDialogIcon.Question, PackIconKind.HelpCircleOutline)]
+    [DataRow(ConfirmationDialogIcon.ChangeDevice, PackIconKind.CellphoneCog)]
+    [DataRow(ConfirmationDialogIcon.Wipe, PackIconKind.DeleteSweep)]
+    [DataRow(ConfirmationDialogIcon.Sim, PackIconKind.SimCard)]
+    [DataRow(ConfirmationDialogIcon.Delete, PackIconKind.Delete)]
+    public void Initialize_MapsActionToExpectedIcon(
+        ConfirmationDialogIcon icon,
+        PackIconKind expectedIconKind)
+    {
+        var viewModel = new ConfirmationDialogViewModel();
+
+        viewModel.Initialize("Caption", "Message", "Warning", "Yes", "No", icon);
+
+        Assert.AreEqual(expectedIconKind, viewModel.IconKind);
     }
 
     [TestMethod]

@@ -2,6 +2,9 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
+    <sys:String x:Key="ConfirmationDialog_DefaultCaption">Xác nhận</sys:String>
+    <sys:String x:Key="ConfirmationDialog_DefaultWarningPrefix">Cảnh báo:</sys:String>
+    <sys:String x:Key="ConfirmationDialog_DefaultWarning">Nếu tiếp tục, dữ liệu hiện tại sẽ bị thay đổi và không thể hoàn tác.</sys:String>
     <sys:String x:Key="ConfirmationDialog_NoButton">Không</sys:String>
     <sys:String x:Key="ConfirmationDialog_YesButton">Có</sys:String>
 </ResourceDictionary>

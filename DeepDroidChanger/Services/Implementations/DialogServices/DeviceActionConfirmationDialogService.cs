@@ -1,3 +1,5 @@
+using DeepDroidChanger.Models;
+
 namespace DeepDroidChanger.Services;
 
 public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirmationDialogService
@@ -19,8 +21,10 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         CancellationToken cancellationToken)
     {
         return ShowConfirmationAsync(
-            "DeviceManager_ConfirmChangeWithoutWipeTitle",
+            "DeviceManager_ConfirmChangeWithoutWipeCaption",
             "DeviceManager_ConfirmChangeWithoutWipeMessage",
+            "DeviceManager_ConfirmChangeWithoutWipeWarning",
+            ConfirmationDialogIcon.ChangeDevice,
             deviceName,
             deviceSerial,
             cancellationToken);
@@ -32,8 +36,10 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         CancellationToken cancellationToken)
     {
         return ShowConfirmationAsync(
-            "DeviceManager_ConfirmWipeWithoutChangeTitle",
+            "DeviceManager_ConfirmWipeWithoutChangeCaption",
             "DeviceManager_ConfirmWipeWithoutChangeMessage",
+            "DeviceManager_ConfirmWipeWithoutChangeWarning",
+            ConfirmationDialogIcon.Wipe,
             deviceName,
             deviceSerial,
             cancellationToken);
@@ -45,29 +51,37 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         CancellationToken cancellationToken)
     {
         return ShowConfirmationAsync(
-            "DeviceManager_ConfirmChangeSimTitle",
+            "DeviceManager_ConfirmChangeSimCaption",
             "DeviceManager_ConfirmChangeSimMessage",
+            "DeviceManager_ConfirmChangeSimWarning",
+            ConfirmationDialogIcon.Sim,
             deviceName,
             deviceSerial,
             cancellationToken);
     }
 
     private async Task<bool> ShowConfirmationAsync(
-        string titleKey,
+        string captionKey,
         string messageKey,
+        string warningKey,
+        ConfirmationDialogIcon icon,
         string deviceName,
         string deviceSerial,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        string message = string.Format(
-            _localizationService.GetString(messageKey),
-            deviceName,
-            deviceSerial);
         bool confirmed = await _confirmationDialogService
-            .ShowWarningConfirmationAsync(
-                message,
-                _localizationService.GetString(titleKey),
+            .ShowConfirmationAsync(
+                new ConfirmationDialogOptions
+                {
+                    Caption = string.Format(
+                        _localizationService.GetString(captionKey),
+                        deviceName,
+                        deviceSerial),
+                    Message = _localizationService.GetString(messageKey),
+                    WarningMessage = _localizationService.GetString(warningKey),
+                    Icon = icon
+                },
                 cancellationToken)
             .ConfigureAwait(true);
         cancellationToken.ThrowIfCancellationRequested();

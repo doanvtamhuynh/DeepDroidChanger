@@ -1,19 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
-    <sys:String x:Key="ChangeDeviceConfirmation_WindowTitle">Xác nhận đổi thiết bị</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_Title">Áp dụng danh tính mới cho thiết bị này?</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_DefaultProfileNotice">Đổi và Wipe mặc định sẽ áp dụng profile được tạo nhưng giữ nguyên Android ID.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_AdvancedProfileNotice">Tùy chọn profile nâng cao: {0}.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_RegenerateAndroidId">Android ID sẽ được tạo lại bằng cách xóa secure setting hiện tại</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_PreserveAndroidId">Android ID sẽ được giữ nguyên</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ChangeMac">sẽ đổi MAC Wi-Fi/Bluetooth</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_DeepPackageWipe">Chế độ xóa sâu sẽ chạy "rm -rf" trên tám đường dẫn dữ liệu ứng dụng và hồ sơ ART sau "pm clear"</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_NoPackageCleanup">Không xóa dữ liệu package.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ClearAllPackages">Sẽ xóa dữ liệu của tất cả package đã cài</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ClearSelectedPackages">Sẽ xóa dữ liệu của {0} package được chọn</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ClearGooglePackages">Sẽ xóa dữ liệu package Google</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ClearGoogleAccounts">Sẽ xóa dữ liệu package, tài khoản Google và trạng thái người dùng CE/DE đã mã hóa</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_GoogleDataPreserved">Dữ liệu package và tài khoản Google được giữ nguyên.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_GoogleDataMayBeCleared">Dữ liệu Google có thể bị xóa theo policy đã chọn. Dữ liệu đã xóa không thể khôi phục nếu không có backup.</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_Caption">Xác nhận đổi thiết bị: {0} - {1}</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_Message">Chức năng này áp dụng thông tin thiết bị đã tạo và các tùy chọn xóa đã chọn.</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_Warning">Hành động này sẽ thay đổi thông tin thiết bị và có thể xóa dữ liệu.</sys:String>
 </ResourceDictionary>

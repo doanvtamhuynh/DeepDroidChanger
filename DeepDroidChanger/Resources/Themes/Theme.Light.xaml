@@ -32,6 +32,8 @@
     <Color x:Key="Color.DeviceViewerBody">#CBD5E1</Color>
     <Color x:Key="Color.DeviceViewerScreen">#111827</Color>
     <Color x:Key="Color.DeviceViewerGlyph">#F8FAFC</Color>
+    <Color x:Key="Color.BadgeInfoBackground">#EFF6FF</Color>
+    <Color x:Key="Color.BadgeInfoForeground">#2563EB</Color>
 
     <!-- Brushes -->
     <SolidColorBrush x:Key="Brush.WindowBackground" Color="{StaticResource Color.WindowBackground}"/>
@@ -64,5 +66,7 @@
     <SolidColorBrush x:Key="Brush.DeviceViewerBody" Color="{StaticResource Color.DeviceViewerBody}"/>
     <SolidColorBrush x:Key="Brush.DeviceViewerScreen" Color="{StaticResource Color.DeviceViewerScreen}"/>
     <SolidColorBrush x:Key="Brush.DeviceViewerGlyph" Color="{StaticResource Color.DeviceViewerGlyph}"/>
+    <SolidColorBrush x:Key="Brush.BadgeInfoBackground" Color="{StaticResource Color.BadgeInfoBackground}"/>
+    <SolidColorBrush x:Key="Brush.BadgeInfoForeground" Color="{StaticResource Color.BadgeInfoForeground}"/>
 
 </ResourceDictionary>

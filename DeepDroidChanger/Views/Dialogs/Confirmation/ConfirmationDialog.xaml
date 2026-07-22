@@ -3,71 +3,143 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{Binding Caption}"
-        Width="520"
-        MinWidth="440"
+        Width="{StaticResource Metric.ConfirmationDialog.Width}"
+        MinWidth="{StaticResource Metric.ConfirmationDialog.MinWidth}"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource Brush.WindowBackground}"
-        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{StaticResource Metric.FontFamily}">
-    <Grid Margin="{StaticResource Spacing.PageMargin}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Style="{StaticResource CardBorderStyle}"
-                Padding="{StaticResource Spacing.CardPadding}">
-            <Grid>
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource Brush.Surface}"
+            BorderBrush="{DynamicResource Brush.Border}"
+            BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
+            CornerRadius="{StaticResource Radius.Large}"
+            Margin="{StaticResource Spacing.ConfirmationDialog.FrameMargin}"
+            MouseLeftButtonDown="OnCardMouseLeftButtonDown">
+        <Border.Effect>
+            <DropShadowEffect Color="{DynamicResource Color.Overlay}"
+                              BlurRadius="{StaticResource Metric.Elevation.DialogBlurRadius}"
+                              ShadowDepth="{StaticResource Metric.Elevation.DialogShadowDepth}"
+                              Opacity="{StaticResource Metric.Elevation.DialogShadowOpacity}"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0"
+                  Margin="{StaticResource Spacing.ConfirmationDialog.BodyPadding}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="16"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <materialDesign:PackIcon x:Name="WarningIcon"
-                                         Kind="Alert"
-                                         Width="32"
-                                         Height="32"
-                                         VerticalAlignment="Top"
-                                         Foreground="{DynamicResource Brush.Warning}"/>
-                <TextBlock x:Name="ConfirmationMessage"
-                           Grid.Column="2"
-                           Text="{Binding Message}"
-                           Style="{StaticResource AppLabelTextStyle}"
-                           TextWrapping="Wrap"
-                           MaxWidth="420"/>
+                <Border Grid.Column="0"
+                        Width="{StaticResource Metric.ConfirmationDialog.IconSize}"
+                        Height="{StaticResource Metric.ConfirmationDialog.IconSize}"
+                        CornerRadius="{StaticResource Radius.Circle}"
+                        Background="{DynamicResource Brush.BadgeInfoBackground}"
+                        VerticalAlignment="Top"
+                        Margin="{StaticResource Spacing.ConfirmationDialog.IconMargin}">
+                    <materialDesign:PackIcon x:Name="ActionIcon"
+                                             Kind="{Binding IconKind}"
+                                             Width="{StaticResource Metric.ConfirmationDialog.IconGlyphSize}"
+                                             Height="{StaticResource Metric.ConfirmationDialog.IconGlyphSize}"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             Foreground="{DynamicResource Brush.BadgeInfoForeground}"/>
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                    <TextBlock x:Name="TitleText"
+                               Text="{Binding Caption}"
+                               FontSize="{StaticResource Metric.FontSize.Title}"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource Brush.TextPrimary}"
+                               TextWrapping="Wrap"
+                               Margin="{StaticResource Spacing.ConfirmationDialog.TitleMargin}"/>
+
+                    <TextBlock x:Name="ConfirmationMessage"
+                               Text="{Binding Message}"
+                               FontSize="{StaticResource Metric.FontSize.Body}"
+                               Foreground="{DynamicResource Brush.TextSecondary}"
+                               TextWrapping="Wrap"
+                               Margin="{StaticResource Spacing.ConfirmationDialog.MessageMargin}"/>
+
+                    <Grid Visibility="{Binding HasWarning, Converter={StaticResource BooleanToVisibilityConverter}}"
+                          Margin="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <materialDesign:PackIcon x:Name="WarningIcon"
+                                                 Kind="Alert"
+                                                 Width="{StaticResource Metric.FontSize.SectionTitle}"
+                                                 Height="{StaticResource Metric.FontSize.SectionTitle}"
+                                                 VerticalAlignment="Top"
+                                                 Margin="{StaticResource Spacing.ConfirmationDialog.WarningIconMargin}"
+                                                 Foreground="{DynamicResource Brush.Warning}"/>
+
+                        <TextBlock Grid.Column="1"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource Metric.FontSize.Small}"
+                                   Foreground="{DynamicResource Brush.Warning}">
+                            <Run Text="{DynamicResource ConfirmationDialog_DefaultWarningPrefix}" FontWeight="Bold"/>
+                            <Run Text=" "/>
+                            <Run Text="{Binding WarningMessage}"/>
+                        </TextBlock>
+                    </Grid>
+                </StackPanel>
+
+                <Button x:Name="CloseButton"
+                        Grid.Column="2"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right"
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource ConfirmationDialogCloseButtonStyle}">
+                    <materialDesign:PackIcon Kind="Close"
+                                             Width="{StaticResource Metric.ConfirmationDialog.CloseGlyphSize}"
+                                             Height="{StaticResource Metric.ConfirmationDialog.CloseGlyphSize}"
+                                             Foreground="{DynamicResource Brush.AccentForeground}"/>
+                </Button>
             </Grid>
-        </Border>
 
-        <Grid Grid.Row="1"
-              Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+            <Border Grid.Row="1"
+                    BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="{StaticResource Metric.ConfirmationDialog.FooterBorderThickness}"/>
 
-            <Button x:Name="NoButton"
-                    Grid.Column="1"
-                    MinWidth="88"
-                    Margin="0,0,8,0"
-                    Command="{Binding CancelCommand}"
-                    Content="{DynamicResource ConfirmationDialog_NoButton}"
-                    Style="{StaticResource FlatButtonStyle}"
-                    IsCancel="True"
-                    IsDefault="True"/>
-            <Button x:Name="YesButton"
-                    Grid.Column="2"
-                    MinWidth="88"
-                    Command="{Binding ConfirmCommand}"
-                    Style="{StaticResource PrimaryButtonStyle}">
-                <TextBlock x:Name="YesButtonText"
-                           Text="{DynamicResource ConfirmationDialog_YesButton}"
-                           Foreground="{DynamicResource Brush.AccentForeground}"/>
-            </Button>
+            <Border Grid.Row="2"
+                    Padding="{StaticResource Spacing.ConfirmationDialog.FooterPadding}">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="NoButton"
+                            MinWidth="{StaticResource Metric.ConfirmationDialog.ButtonWidth}"
+                            Margin="{StaticResource Spacing.ConfirmationDialog.ButtonGap}"
+                            Command="{Binding CancelCommand}"
+                            Content="{Binding CancelButtonText}"
+                            IsCancel="True"
+                            IsDefault="True"/>
+                    <Button x:Name="YesButton"
+                            MinWidth="{StaticResource Metric.ConfirmationDialog.ButtonWidth}"
+                            Command="{Binding ConfirmCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}">
+                        <TextBlock x:Name="YesButtonText"
+                                   Text="{Binding ConfirmButtonText}"
+                                   Foreground="{DynamicResource Brush.AccentForeground}"/>
+                    </Button>
+                </StackPanel>
+            </Border>
         </Grid>
-    </Grid>
+    </Border>
 </Window>

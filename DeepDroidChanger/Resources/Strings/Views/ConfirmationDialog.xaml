@@ -2,6 +2,9 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
+    <sys:String x:Key="ConfirmationDialog_DefaultCaption">Confirmation</sys:String>
+    <sys:String x:Key="ConfirmationDialog_DefaultWarningPrefix">Warning:</sys:String>
+    <sys:String x:Key="ConfirmationDialog_DefaultWarning">If you continue, current data will be changed and cannot be undone.</sys:String>
     <sys:String x:Key="ConfirmationDialog_NoButton">No</sys:String>
     <sys:String x:Key="ConfirmationDialog_YesButton">Yes</sys:String>
 </ResourceDictionary>

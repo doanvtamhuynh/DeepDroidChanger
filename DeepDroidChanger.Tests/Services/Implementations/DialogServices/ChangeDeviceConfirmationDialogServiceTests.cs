@@ -9,55 +9,37 @@ namespace DeepDroidChanger.Tests.Services.Implementations.DialogServices;
 public sealed class ChangeDeviceConfirmationDialogServiceTests
 {
     [TestMethod]
-    public async Task ShowChangeDeviceConfirmationAsync_DefaultMode_ShowsWarningMessageAndReturnsSelection()
+    public async Task ShowChangeDeviceConfirmationAsync_DefaultMode_ShowsShortMessageWithIdentityInCaption()
     {
-        IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
-        confirmationDialog.ShowWarningConfirmationAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(true);
-        ILocalizationService localization = CreateLocalizationService();
+        IConfirmationDialogService confirmationDialog = CreateConfirmationDialog(true);
         var service = new ChangeDeviceConfirmationDialogService(
             confirmationDialog,
-            localization,
+            CreateLocalizationService(),
             NullLogger<ChangeDeviceConfirmationDialogService>.Instance);
 
         bool confirmed = await service.ShowChangeDeviceConfirmationAsync(
             "Phone",
             "SERIAL",
-            new DeviceChangeOptions
-            {
-                UseDefaultMode = true,
-                ChangeAndroidId = true
-            },
+            new DeviceChangeOptions { UseDefaultMode = true },
             CancellationToken.None);
 
         Assert.IsTrue(confirmed);
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            Arg.Is<string>(message =>
-                message.Contains("ChangeDeviceConfirmation_Title", StringComparison.Ordinal)
-                && message.Contains("Phone", StringComparison.Ordinal)
-                && message.Contains("SERIAL", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_DefaultProfileNotice", StringComparison.Ordinal)
-                && !message.Contains("ChangeDeviceConfirmation_RegenerateAndroidId", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_ClearAllPackages", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_ClearGoogleAccounts", StringComparison.Ordinal)
-                && !message.Contains("ChangeDeviceConfirmation_DeepPackageWipe", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_GoogleDataMayBeCleared", StringComparison.Ordinal)),
-            "ChangeDeviceConfirmation_WindowTitle",
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "Confirm Change Device: Phone - SERIAL"
+                && options.Message == "ChangeDeviceConfirmation_Message"
+                && options.WarningMessage == "ChangeDeviceConfirmation_Warning"
+                && options.Icon == ConfirmationDialogIcon.ChangeDevice),
             Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
-    public async Task ShowChangeDeviceConfirmationAsync_AdvancedMode_ShowsAutomaticCleanupDetails()
+    public async Task ShowChangeDeviceConfirmationAsync_AdvancedMode_DoesNotExposeCleanupDetails()
     {
-        IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
-        confirmationDialog.ShowWarningConfirmationAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(false);
-        ILocalizationService localization = CreateLocalizationService();
+        IConfirmationDialogService confirmationDialog = CreateConfirmationDialog(false);
         var service = new ChangeDeviceConfirmationDialogService(
             confirmationDialog,
-            localization,
+            CreateLocalizationService(),
             NullLogger<ChangeDeviceConfirmationDialogService>.Instance);
 
         bool confirmed = await service.ShowChangeDeviceConfirmationAsync(
@@ -68,72 +50,38 @@ public sealed class ChangeDeviceConfirmationDialogServiceTests
                 UseDefaultMode = false,
                 ChangeAndroidId = true,
                 ChangeMacAddress = true,
-                ClearAllPackages = false,
                 ClearSelectedPackages = true,
                 SelectedPackages = ["com.example.app"],
-                ClearGoogleAccounts = false,
                 UseRmRfForPackageCleanup = true
             },
             CancellationToken.None);
 
         Assert.IsFalse(confirmed);
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            Arg.Is<string>(message =>
-                message.Contains("ChangeDeviceConfirmation_RegenerateAndroidId", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_ChangeMac", StringComparison.Ordinal)
-                && message.Contains("selected 1", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_DeepPackageWipe", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_GoogleDataPreserved", StringComparison.Ordinal)),
-            "ChangeDeviceConfirmation_WindowTitle",
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "Confirm Change Device: Phone - SERIAL"
+                && options.Message == "ChangeDeviceConfirmation_Message"
+                && options.WarningMessage == "ChangeDeviceConfirmation_Warning"
+                && options.Icon == ConfirmationDialogIcon.ChangeDevice),
             Arg.Any<CancellationToken>());
     }
 
-    [TestMethod]
-    public async Task ShowChangeDeviceConfirmationAsync_AdvancedAndroidIdDisabled_ShowsPreservedState()
+    private static IConfirmationDialogService CreateConfirmationDialog(bool result)
     {
         IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
-        confirmationDialog.ShowWarningConfirmationAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(true);
-        var service = new ChangeDeviceConfirmationDialogService(
-            confirmationDialog,
-            CreateLocalizationService(),
-            NullLogger<ChangeDeviceConfirmationDialogService>.Instance);
-
-        await service.ShowChangeDeviceConfirmationAsync(
-            "Phone",
-            "SERIAL",
-            new DeviceChangeOptions
-            {
-                UseDefaultMode = false,
-                ChangeAndroidId = false,
-                ChangeMacAddress = false,
-                ClearAllPackages = false,
-                ClearGoogleAccounts = false
-            },
-            CancellationToken.None);
-
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            Arg.Is<string>(message =>
-                message.Contains("ChangeDeviceConfirmation_PreserveAndroidId", StringComparison.Ordinal)
-                && !message.Contains("ChangeDeviceConfirmation_RegenerateAndroidId", StringComparison.Ordinal)),
-            "ChangeDeviceConfirmation_WindowTitle",
-            Arg.Any<CancellationToken>());
+        confirmationDialog.ShowConfirmationAsync(
+                Arg.Any<ConfirmationDialogOptions>(), Arg.Any<CancellationToken>())
+            .Returns(result);
+        return confirmationDialog;
     }
 
     private static ILocalizationService CreateLocalizationService()
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
         localization.GetString(Arg.Any<string>()).Returns(callInfo =>
-        {
-            string key = callInfo.Arg<string>();
-            return key switch
-            {
-                "ChangeDeviceConfirmation_AdvancedProfileNotice" => "advanced {0}",
-                "ChangeDeviceConfirmation_ClearSelectedPackages" => "selected {0}",
-                _ => key
-            };
-        });
+            callInfo.Arg<string>() == "ChangeDeviceConfirmation_Caption"
+                ? "Confirm Change Device: {0} - {1}"
+                : callInfo.Arg<string>());
         return localization;
     }
 }

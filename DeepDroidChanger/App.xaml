@@ -12,6 +12,7 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml" />
                 <ResourceDictionary Source="Resources/Themes/Controls.xaml" />
                 <ResourceDictionary Source="Resources/Strings/Strings.xaml" />
+                <ResourceDictionary Source="Resources/Themes/ConfirmationDialog.xaml" />
                 <ResourceDictionary Source="Resources/Themes/MainWindow.xaml" />
                 <ResourceDictionary Source="Resources/Themes/DeviceManager.xaml" />
                 <ResourceDictionary Source="Resources/Themes/AdvancedChangeConfig.xaml" />

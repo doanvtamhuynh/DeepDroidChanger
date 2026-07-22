@@ -74,6 +74,7 @@ public sealed partial class ThemeResourceTests
             "Theme.Light.xaml",
             "Theme.Dark.xaml",
             "Controls.xaml",
+            "ConfirmationDialog.xaml",
             "MainWindow.xaml",
             "DeviceManager.xaml",
             "AdvancedChangeConfig.xaml",

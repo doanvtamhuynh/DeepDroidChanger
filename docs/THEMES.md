@@ -65,6 +65,10 @@ Status
   Brush.DangerPressed
   Brush.Overlay            modal backdrop overlay
 
+Confirmation dialog
+  Brush.BadgeInfoBackground question-mark/action badge surface
+  Brush.BadgeInfoForeground question-mark/action badge glyph
+
 Device viewer
   Brush.DeviceViewerStream stream canvas background
   Brush.DeviceViewerBody   device frame/body
@@ -73,11 +77,13 @@ Device viewer
 
 Light mode reference values: WindowBackground #F6F8FB, Surface
 #FFFFFF, TextPrimary #172033, TextSecondary #526176, Border #CBD5E1,
-Accent #2563EB, Success #15803D, Warning #B45309, Danger #DC2626.
+Accent #2563EB, Success #15803D, Warning #B45309, Danger #DC2626,
+BadgeInfoBackground #EFF6FF, BadgeInfoForeground #2563EB.
 
 Dark mode reference values: WindowBackground #0F172A, Surface
 #172033, TextPrimary #F8FAFC, TextSecondary #CBD5E1, Border #3B4A60,
-Accent #3B82F6, Success #4ADE80, Warning #FBBF24, Danger #F87171.
+Accent #3B82F6, Success #4ADE80, Warning #FBBF24, Danger #F87171,
+BadgeInfoBackground #1B2A4A, BadgeInfoForeground #3B82F6.
 
 Do not invent a new color outside this palette without updating both
 Theme.Light.xaml and Theme.Dark.xaml together, so every new color has
@@ -119,6 +125,7 @@ Named text styles (Resources/Themes/Controls.xaml):
   Metric.Animation.HoverDuration          0:0:0.17
   Metric.Animation.PressDuration          0:0:0.08
   Metric.Animation.EaseOut                CubicEase/EaseOut
+  Metric.ConfirmationDialog.*             dialog-specific dimensions
   Spacing.ControlPadding     12,8
   Spacing.InputPadding       12,7
   Spacing.ItemPadding        12,9
@@ -126,6 +133,7 @@ Named text styles (Resources/Themes/Controls.xaml):
   Spacing.CardPadding        16
   Spacing.CardPadding.Compact 12,10
   Spacing.ButtonPadding      16,8
+  Spacing.ConfirmationDialog.* dialog-specific layout spacing
 
   Radius.Small    6    small controls, tags
   Radius.Medium   8    buttons, inputs, default

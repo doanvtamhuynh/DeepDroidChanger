@@ -229,26 +229,34 @@ public sealed class UiSurfaceSmokeTests
     {
         ConfirmationDialog dialog = provider.GetRequiredService<ConfirmationDialog>();
         ConfirmationDialogViewModel viewModel = provider.GetRequiredService<ConfirmationDialogViewModel>();
-        viewModel.Initialize("Confirmation title", "Confirmation message");
+        viewModel.Initialize("Phone - SERIAL", "Confirmation message", "Warning message", "Yes", "No");
         dialog.DataContext = viewModel;
         MeasureSurface(dialog);
 
         var icon = Assert.IsInstanceOfType<MaterialDesignThemes.Wpf.PackIcon>(
             dialog.FindName("WarningIcon"));
+        var actionIcon = Assert.IsInstanceOfType<MaterialDesignThemes.Wpf.PackIcon>(
+            dialog.FindName("ActionIcon"));
+        var closeButton = Assert.IsInstanceOfType<Button>(dialog.FindName("CloseButton"));
+        var closeIcon = Assert.IsInstanceOfType<MaterialDesignThemes.Wpf.PackIcon>(closeButton.Content);
         var message = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("ConfirmationMessage"));
         var noButton = Assert.IsInstanceOfType<Button>(dialog.FindName("NoButton"));
         var yesButton = Assert.IsInstanceOfType<Button>(dialog.FindName("YesButton"));
         var yesButtonText = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("YesButtonText"));
         object accentForeground = Application.Current.FindResource("Brush.AccentForeground");
 
-        Assert.AreEqual(520d, dialog.Width);
+        Assert.AreEqual(560d, dialog.Width);
         Assert.AreEqual(SizeToContent.Height, dialog.SizeToContent);
         Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.Alert, icon.Kind);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.HelpCircleOutline, actionIcon.Kind);
+        Assert.AreSame(Application.Current.FindResource("Brush.Danger"), closeButton.Background);
+        Assert.AreSame(Application.Current.FindResource("Brush.AccentForeground"), closeButton.Foreground);
+        Assert.AreSame(Application.Current.FindResource("Brush.AccentForeground"), closeIcon.Foreground);
         Assert.AreSame(Application.Current.FindResource("Brush.Warning"), icon.Foreground);
         Assert.AreEqual(TextWrapping.Wrap, message.TextWrapping);
         Assert.IsTrue(noButton.IsCancel);
         Assert.IsTrue(noButton.IsDefault);
-        Assert.AreSame(Application.Current.FindResource("FlatButtonStyle"), noButton.Style);
+        Assert.AreSame(Application.Current.FindResource(typeof(Button)), noButton.Style);
         Assert.AreSame(Application.Current.FindResource("PrimaryButtonStyle"), yesButton.Style);
         Assert.AreSame(accentForeground, yesButton.Foreground);
         Assert.AreSame(accentForeground, yesButtonText.Foreground);

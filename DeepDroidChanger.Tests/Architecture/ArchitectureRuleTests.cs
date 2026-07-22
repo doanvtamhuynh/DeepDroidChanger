@@ -280,11 +280,21 @@ public sealed class ArchitectureRuleTests
 
         string dialogSource = File.ReadAllText(requiredPaths[0]);
         Assert.Contains("Kind=\"Alert\"", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("Kind=\"{Binding IconKind}\"", dialogSource, StringComparison.Ordinal);
         Assert.Contains("Brush.Warning", dialogSource, StringComparison.Ordinal);
-        Assert.Contains("ConfirmationDialog_NoButton", dialogSource, StringComparison.Ordinal);
-        Assert.Contains("ConfirmationDialog_YesButton", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{Binding CancelButtonText}\"", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ConfirmButtonText}\"", dialogSource, StringComparison.Ordinal);
         Assert.Contains("IsCancel=\"True\"", dialogSource, StringComparison.Ordinal);
         Assert.Contains("IsDefault=\"True\"", dialogSource, StringComparison.Ordinal);
+
+        string stringSource = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Resources",
+            "Strings",
+            "Views",
+            "ConfirmationDialog.xaml"));
+        Assert.Contains("ConfirmationDialog_NoButton", stringSource, StringComparison.Ordinal);
+        Assert.Contains("ConfirmationDialog_YesButton", stringSource, StringComparison.Ordinal);
 
         string[] sourceFiles = Directory.GetFiles(projectRoot, "*.cs", SearchOption.AllDirectories);
         string nativeMessageBoxUsages = string.Join(

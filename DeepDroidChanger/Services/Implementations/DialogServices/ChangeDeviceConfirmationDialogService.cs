@@ -29,79 +29,22 @@ public sealed class ChangeDeviceConfirmationDialogService : IChangeDeviceConfirm
         cancellationToken.ThrowIfCancellationRequested();
         _logger.LogDebug("Opening Change Device confirmation dialog for device {Serial}.", deviceSerial);
 
-        string message = string.Join(
-            Environment.NewLine + Environment.NewLine,
-            _localizationService.GetString("ChangeDeviceConfirmation_Title"),
-            string.Concat(deviceName, Environment.NewLine, deviceSerial),
-            CreateProfileNotice(options),
-            CreateCleanNotice(options),
-            _localizationService.GetString(
-                options.UseDefaultMode || options.ClearAllPackages || options.ClearGoogleAccounts
-                    ? "ChangeDeviceConfirmation_GoogleDataMayBeCleared"
-                    : "ChangeDeviceConfirmation_GoogleDataPreserved"));
-
         bool confirmed = await _confirmationDialogService
-            .ShowWarningConfirmationAsync(
-                message,
-                _localizationService.GetString("ChangeDeviceConfirmation_WindowTitle"),
+            .ShowConfirmationAsync(
+                new ConfirmationDialogOptions
+                {
+                    Caption = string.Format(
+                        _localizationService.GetString("ChangeDeviceConfirmation_Caption"),
+                        deviceName,
+                        deviceSerial),
+                    Message = _localizationService.GetString("ChangeDeviceConfirmation_Message"),
+                    WarningMessage = _localizationService.GetString("ChangeDeviceConfirmation_Warning"),
+                    Icon = ConfirmationDialogIcon.ChangeDevice
+                },
                 cancellationToken)
             .ConfigureAwait(true);
         cancellationToken.ThrowIfCancellationRequested();
         _logger.LogDebug("Change Device confirmation dialog closed. Confirmed: {Confirmed}.", confirmed);
         return confirmed;
-    }
-
-    private string CreateCleanNotice(DeviceChangeOptions options)
-    {
-        if (options.UseDefaultMode)
-        {
-            return string.Join(
-                "; ",
-                _localizationService.GetString("ChangeDeviceConfirmation_ClearAllPackages"),
-                _localizationService.GetString("ChangeDeviceConfirmation_ClearGoogleAccounts"));
-        }
-
-        var operations = new List<string>();
-        if (options.ClearAllPackages)
-            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_ClearAllPackages"));
-        else if (options.ClearSelectedPackages)
-        {
-            operations.Add(string.Format(
-                _localizationService.GetString("ChangeDeviceConfirmation_ClearSelectedPackages"),
-                options.SelectedPackages?.Count ?? 0));
-        }
-
-        if (!options.ClearAllPackages && options.ClearGooglePackages)
-            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_ClearGooglePackages"));
-
-        if (!options.ClearAllPackages && options.ClearGoogleAccounts)
-            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_ClearGoogleAccounts"));
-
-        if (options.UseRmRfForPackageCleanup && operations.Count > 0)
-            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_DeepPackageWipe"));
-
-        return operations.Count == 0
-            ? _localizationService.GetString("ChangeDeviceConfirmation_NoPackageCleanup")
-            : string.Join("; ", operations);
-    }
-
-    private string CreateProfileNotice(DeviceChangeOptions options)
-    {
-        if (options.UseDefaultMode)
-            return _localizationService.GetString("ChangeDeviceConfirmation_DefaultProfileNotice");
-
-        var operations = new List<string>
-        {
-            _localizationService.GetString(
-                options.ChangeAndroidId
-                    ? "ChangeDeviceConfirmation_RegenerateAndroidId"
-                    : "ChangeDeviceConfirmation_PreserveAndroidId")
-        };
-        if (options.ChangeMacAddress)
-            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_ChangeMac"));
-
-        return string.Format(
-            _localizationService.GetString("ChangeDeviceConfirmation_AdvancedProfileNotice"),
-            string.Join("; ", operations));
     }
 }

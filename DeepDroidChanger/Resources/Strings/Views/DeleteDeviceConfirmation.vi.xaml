@@ -2,7 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <sys:String x:Key="DeleteDeviceConfirmation_WindowTitle">Xóa thiết bị</sys:String>
-    <sys:String x:Key="DeleteDeviceConfirmation_Title">Xóa thiết bị đã lưu?</sys:String>
-    <sys:String x:Key="DeleteDeviceConfirmation_Message">Thao tác này chỉ xóa thiết bị khỏi dữ liệu đã lưu của ứng dụng.</sys:String>
+    <sys:String x:Key="DeleteDeviceConfirmation_Caption">Xác nhận xóa thiết bị: {0} - {1}</sys:String>
+    <sys:String x:Key="DeleteDeviceConfirmation_Message">Chức năng này xóa thiết bị khỏi danh sách đã lưu của ứng dụng.</sys:String>
+    <sys:String x:Key="DeleteDeviceConfirmation_Warning">Hành động này sẽ xóa cấu hình thiết bị đã lưu.</sys:String>
 </ResourceDictionary>

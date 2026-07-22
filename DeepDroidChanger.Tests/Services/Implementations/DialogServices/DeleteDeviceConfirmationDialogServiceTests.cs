@@ -1,3 +1,4 @@
+using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -8,14 +9,17 @@ namespace DeepDroidChanger.Tests.Services.Implementations.DialogServices;
 public sealed class DeleteDeviceConfirmationDialogServiceTests
 {
     [TestMethod]
-    public async Task ShowDeleteDeviceConfirmationAsync_ShowsSavedDataWarningAndReturnsSelection()
+    public async Task ShowDeleteDeviceConfirmationAsync_ShowsShortMessageWithIdentityInCaption()
     {
         IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
-        confirmationDialog.ShowWarningConfirmationAsync(
-                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        confirmationDialog.ShowConfirmationAsync(
+                Arg.Any<ConfirmationDialogOptions>(), Arg.Any<CancellationToken>())
             .Returns(true);
         ILocalizationService localization = Substitute.For<ILocalizationService>();
-        localization.GetString(Arg.Any<string>()).Returns(callInfo => callInfo.Arg<string>());
+        localization.GetString(Arg.Any<string>()).Returns(callInfo =>
+            callInfo.Arg<string>() == "DeleteDeviceConfirmation_Caption"
+                ? "Confirm Delete Device: {0} - {1}"
+                : callInfo.Arg<string>());
         var service = new DeleteDeviceConfirmationDialogService(
             confirmationDialog,
             localization,
@@ -27,13 +31,12 @@ public sealed class DeleteDeviceConfirmationDialogServiceTests
             CancellationToken.None);
 
         Assert.IsTrue(confirmed);
-        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
-            Arg.Is<string>(message =>
-                message.Contains("DeleteDeviceConfirmation_Title", StringComparison.Ordinal)
-                && message.Contains("Offline phone", StringComparison.Ordinal)
-                && message.Contains("SERIAL", StringComparison.Ordinal)
-                && message.Contains("DeleteDeviceConfirmation_Message", StringComparison.Ordinal)),
-            "DeleteDeviceConfirmation_WindowTitle",
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "Confirm Delete Device: Offline phone - SERIAL"
+                && options.Message == "DeleteDeviceConfirmation_Message"
+                && options.WarningMessage == "DeleteDeviceConfirmation_Warning"
+                && options.Icon == ConfirmationDialogIcon.Delete),
             Arg.Any<CancellationToken>());
     }
 }
