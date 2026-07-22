@@ -56,7 +56,7 @@ internal static class AdbCleanupCommandBuilder
 
     internal static string CreatePackageCleanupCommand(
         IEnumerable<string> packageNames,
-        bool useRmRf)
+        bool useDeepPackageWipe)
     {
         string[] packages = packageNames
             .Select(NormalizePackageName)
@@ -70,8 +70,10 @@ internal static class AdbCleanupCommandBuilder
         script.Append("for package in ")
             .AppendJoin(' ', packages)
             .AppendLine("; do")
-            .AppendLine("  am force-stop \"$package\" || exit $?");
-        if (useRmRf)
+            .AppendLine("  am force-stop \"$package\" || exit $?")
+            .AppendLine("  pm clear \"$package\" >/dev/null || exit $?");
+
+        if (useDeepPackageWipe)
         {
             string paths = string.Join(
                 ' ',
@@ -80,10 +82,6 @@ internal static class AdbCleanupCommandBuilder
             script.Append("  rm -rf ")
                 .Append(paths)
                 .AppendLine(" || exit $?");
-        }
-        else
-        {
-            script.AppendLine("  pm clear \"$package\" >/dev/null || exit $?");
         }
 
         return script.Append("done").ToString();

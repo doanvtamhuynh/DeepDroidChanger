@@ -73,7 +73,7 @@ public sealed class DeviceDataCleanupServiceTests
     }
 
     [TestMethod]
-    public async Task CleanAsync_DefaultMode_BatchesPackagesAccountAndResidualCleanupWithoutRmRf()
+    public async Task CleanAsync_DefaultMode_UsesPackageManagerWithoutDeepWipe()
     {
         IDevicePackageService packages = Substitute.For<IDevicePackageService>();
         packages.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
@@ -86,8 +86,8 @@ public sealed class DeviceDataCleanupServiceTests
             new DeviceChangeOptions
             {
                 UseDefaultMode = true,
-                ClearAllPackages = true,
-                UseRmRfForPackageCleanup = true
+                UseRmRfForPackageCleanup = true,
+                ClearAllPackages = true
             },
             CancellationToken.None);
 
@@ -130,6 +130,22 @@ public sealed class DeviceDataCleanupServiceTests
         {
             Assert.Contains(pattern, script, StringComparison.Ordinal);
         }
+    }
+
+    [TestMethod]
+    public async Task DeleteSsaidAsync_RemovesOnlySsaidFileAndSyncs()
+    {
+        IDevicePackageService packages = Substitute.For<IDevicePackageService>();
+        IAdbCommandService adb = CreateSuccessfulAdb();
+        var service = CreateService(packages, adb);
+
+        await service.DeleteSsaidAsync("SERIAL", CancellationToken.None);
+
+        string script = GetOnlyCleanupScript(adb);
+        Assert.AreEqual(
+            $"rm -f {DeviceDataCleanupService.SsaidFilePattern} || exit $?\nsync || exit $?",
+            script);
+        await packages.DidNotReceiveWithAnyArgs().GetInstalledPackagesAsync(default!, default);
     }
 
     [TestMethod]
@@ -197,10 +213,11 @@ public sealed class DeviceDataCleanupServiceTests
         Assert.Contains("com.android.vending", script, StringComparison.Ordinal);
         Assert.Contains("com.google.android.youtube", script, StringComparison.Ordinal);
         Assert.DoesNotContain("com.example.missing", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("rm -rf", script, StringComparison.Ordinal);
     }
 
     [TestMethod]
-    public async Task CleanAsync_RmRfOption_BatchesAllPackagesAndEightPathsInSameScript()
+    public async Task CleanAsync_DeepWipe_BatchesPackageManagerAndEightRmRfPathsInSameScript()
     {
         IDevicePackageService packages = Substitute.For<IDevicePackageService>();
         packages.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
@@ -234,7 +251,7 @@ public sealed class DeviceDataCleanupServiceTests
             script,
             StringComparison.Ordinal);
         Assert.Contains("rm -rf", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("pm clear", script, StringComparison.Ordinal);
+        Assert.Contains("pm clear", script, StringComparison.Ordinal);
         Assert.DoesNotContain("for package in com.android.shell", script, StringComparison.Ordinal);
         foreach (string pathTemplate in AdbCleanupCommandBuilder.RmRfPackagePathTemplates)
         {
@@ -277,7 +294,7 @@ public sealed class DeviceDataCleanupServiceTests
     {
         string script = DeviceDataCleanupService.CreateCleanupScript(
             ["com.example.app"],
-            useRmRfForPackageCleanup: false,
+            useDeepPackageWipe: false,
             clearGoogleAccounts: true,
             useDefaultMode: true);
 
@@ -304,17 +321,24 @@ public sealed class DeviceDataCleanupServiceTests
     {
         string command = AdbCleanupCommandBuilder.CreatePackageCleanupCommand(
             ["com.example.two", "com.example.one", "com.example.two"],
-            useRmRf: false);
+            useDeepPackageWipe: false);
 
         Assert.StartsWith(
             "for package in com.example.one com.example.two; do",
             command,
             StringComparison.Ordinal);
         Assert.AreEqual(1, CountOccurrences(command, "pm clear"));
+        Assert.AreEqual(0, CountOccurrences(command, "rm -rf"));
+
+        string deepCommand = AdbCleanupCommandBuilder.CreatePackageCleanupCommand(
+            ["com.example.one"],
+            useDeepPackageWipe: true);
+        Assert.AreEqual(1, CountOccurrences(deepCommand, "pm clear"));
+        Assert.AreEqual(1, CountOccurrences(deepCommand, "rm -rf"));
         Assert.ThrowsExactly<ArgumentException>(() =>
             AdbCleanupCommandBuilder.CreatePackageCleanupCommand(
                 ["com.example.app; reboot"],
-                useRmRf: false));
+                useDeepPackageWipe: false));
     }
 
     [TestMethod]
@@ -338,7 +362,7 @@ public sealed class DeviceDataCleanupServiceTests
     {
         string script = DeviceDataCleanupService.CreateCleanupScript(
             [],
-            useRmRfForPackageCleanup: false,
+            useDeepPackageWipe: false,
             clearGoogleAccounts: false,
             useDefaultMode: false);
 

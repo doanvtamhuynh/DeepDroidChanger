@@ -202,6 +202,19 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         return CleanAsync(serial, options, preserveSsaid: true, cancellationToken);
     }
 
+    public async Task DeleteSsaidAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        string script = string.Join(
+            '\n',
+            AdbCleanupCommandBuilder.CreateRemoveFilesCommand([SsaidFilePattern]),
+            "sync || exit $?");
+        await RunRequiredScriptAsync(serial, script, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Deleted stored SSAID data on {Serial} so Android can regenerate it.", serial);
+    }
+
     private async Task CleanAsync(
         string serial,
         DeviceChangeOptions options,
@@ -220,11 +233,11 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
                 clearGoogleAccounts,
                 cancellationToken)
             .ConfigureAwait(false);
-        bool useRmRfForPackageCleanup = !options.UseDefaultMode
+        bool useDeepPackageWipe = !options.UseDefaultMode
             && options.UseRmRfForPackageCleanup;
         string cleanupScript = CreateCleanupScript(
             packagesToClear,
-            useRmRfForPackageCleanup,
+            useDeepPackageWipe,
             clearGoogleAccounts,
             options.UseDefaultMode,
             preserveSsaid);
@@ -235,9 +248,10 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             : ResidualFilePatterns.Length;
 
         _logger.LogWarning(
-            "Cleared device data on {Serial}. Package stores: {PackageCount}; clear all packages: {ClearAllPackages}; clear Google accounts and CE/DE state: {ClearGoogleAccounts}; preserve SSAID: {PreserveSsaid}; residual directory patterns: {DirectoryPatternCount}; residual file patterns: {FilePatternCount}.",
+            "Cleared device data on {Serial}. Package stores: {PackageCount}; deep package wipe: {UseDeepPackageWipe}; clear all packages: {ClearAllPackages}; clear Google accounts and CE/DE state: {ClearGoogleAccounts}; preserve SSAID: {PreserveSsaid}; residual directory patterns: {DirectoryPatternCount}; residual file patterns: {FilePatternCount}.",
             serial,
             packagesToClear.Count,
+            useDeepPackageWipe,
             clearAllPackages,
             clearGoogleAccounts,
             preserveSsaid,
@@ -253,7 +267,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
 
     internal static string CreateCleanupScript(
         IReadOnlyCollection<string> packagesToClear,
-        bool useRmRfForPackageCleanup,
+        bool useDeepPackageWipe,
         bool clearGoogleAccounts,
         bool useDefaultMode,
         bool preserveSsaid = false)
@@ -264,7 +278,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             "cmd activity force-stop-all >/dev/null 2>&1 || true",
             AdbCleanupCommandBuilder.CreatePackageCleanupCommand(
                 packagesToClear,
-                useRmRfForPackageCleanup)
+                useDeepPackageWipe)
         ];
 
         if (clearGoogleAccounts)
