@@ -47,6 +47,12 @@
     <sys:String x:Key="DeviceManager_ActionRandomAndChangeDevice">Random &amp; Change Device</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomSim">Random SIM</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeSim">Change SIM</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeWithoutWipeTitle">Confirm Change Without Wipe</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeWithoutWipeMessage">Change the device identity for "{0}" ({1}) without wiping app data?</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmWipeWithoutChangeTitle">Confirm Wipe Without Change</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmWipeWithoutChangeMessage">Wipe old device data for "{0}" ({1}) without changing the current identity? Deleted data cannot be recovered without a backup.</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeSimTitle">Confirm Change SIM</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeSimMessage">Apply the generated SIM information to "{0}" ({1})?</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeLocation">Change Location</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeTimezone">Change Timezone</sys:String>
     <sys:String x:Key="DeviceManager_ActionUpdateIntegrity">Update Integrity</sys:String>

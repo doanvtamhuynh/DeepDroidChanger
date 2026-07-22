@@ -47,6 +47,12 @@
     <sys:String x:Key="DeviceManager_ActionRandomAndChangeDevice">Tạo ngẫu nhiên và đổi thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomSim">Tạo SIM ngẫu nhiên</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeSim">Đổi SIM</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeWithoutWipeTitle">Xác nhận đổi thông tin không xóa dữ liệu</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeWithoutWipeMessage">Đổi danh tính thiết bị cho "{0}" ({1}) mà không xóa dữ liệu ứng dụng?</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmWipeWithoutChangeTitle">Xác nhận xóa dữ liệu không đổi thông tin</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmWipeWithoutChangeMessage">Xóa dữ liệu thiết bị cũ trên "{0}" ({1}) mà không đổi danh tính hiện tại? Dữ liệu đã xóa không thể khôi phục nếu không có bản sao lưu.</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeSimTitle">Xác nhận đổi SIM</sys:String>
+    <sys:String x:Key="DeviceManager_ConfirmChangeSimMessage">Áp dụng thông tin SIM đã tạo cho "{0}" ({1})?</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeLocation">Đổi vị trí</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeTimezone">Đổi múi giờ</sys:String>
     <sys:String x:Key="DeviceManager_ActionUpdateIntegrity">Cập nhật Integrity</sys:String>

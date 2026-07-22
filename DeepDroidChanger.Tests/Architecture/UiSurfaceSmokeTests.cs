@@ -50,6 +50,7 @@ public sealed class UiSurfaceSmokeTests
                         MeasureDialog<AddDevicesDialog, AddDevicesViewModel>(provider);
                         MeasureDialog<DeleteDeviceConfirmationDialog, DeleteDeviceConfirmationViewModel>(provider);
                         MeasureDialog<ChangeDeviceConfirmationDialog, ChangeDeviceConfirmationViewModel>(provider);
+                        VerifyConfirmationDialog(provider);
                         MeasureDialog<AdvancedChangeConfigDialog, AdvancedChangeConfigViewModel>(provider);
                         VerifyAdvancedChangeConfigDialog(provider);
                         MeasureDialog<RandomDeviceInfoDialog, RandomDeviceInfoViewModel>(provider);
@@ -203,6 +204,37 @@ public sealed class UiSurfaceSmokeTests
         Assert.IsFalse(selectiveWipeGroup.IsEnabled);
         Assert.AreEqual(0.48d, selectiveWipeGroup.Opacity);
         Assert.AreEqual(0.48d, packagePanel.Opacity);
+    }
+
+    private static void VerifyConfirmationDialog(IServiceProvider provider)
+    {
+        ConfirmationDialog dialog = provider.GetRequiredService<ConfirmationDialog>();
+        ConfirmationDialogViewModel viewModel = provider.GetRequiredService<ConfirmationDialogViewModel>();
+        viewModel.Initialize("Confirmation title", "Confirmation message");
+        dialog.DataContext = viewModel;
+        MeasureSurface(dialog);
+
+        var icon = Assert.IsInstanceOfType<MaterialDesignThemes.Wpf.PackIcon>(
+            dialog.FindName("WarningIcon"));
+        var message = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("ConfirmationMessage"));
+        var noButton = Assert.IsInstanceOfType<Button>(dialog.FindName("NoButton"));
+        var yesButton = Assert.IsInstanceOfType<Button>(dialog.FindName("YesButton"));
+        var yesButtonText = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("YesButtonText"));
+        object accentForeground = Application.Current.FindResource("Brush.AccentForeground");
+
+        Assert.AreEqual(520d, dialog.Width);
+        Assert.AreEqual(SizeToContent.Height, dialog.SizeToContent);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.Alert, icon.Kind);
+        Assert.AreSame(Application.Current.FindResource("Brush.Warning"), icon.Foreground);
+        Assert.AreEqual(TextWrapping.Wrap, message.TextWrapping);
+        Assert.IsTrue(noButton.IsCancel);
+        Assert.IsTrue(noButton.IsDefault);
+        Assert.AreSame(Application.Current.FindResource("FlatButtonStyle"), noButton.Style);
+        Assert.AreSame(Application.Current.FindResource("PrimaryButtonStyle"), yesButton.Style);
+        Assert.AreSame(accentForeground, yesButton.Foreground);
+        Assert.AreSame(accentForeground, yesButtonText.Foreground);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(noButton.Content?.ToString()));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(yesButtonText.Text));
     }
 
     private static void VerifyInteractiveStyles()

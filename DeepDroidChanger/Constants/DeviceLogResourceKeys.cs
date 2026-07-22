@@ -22,6 +22,7 @@ public static class DeviceLogResourceKeys
     public const string RandomDeviceSuccess = "Log_RandomDeviceSuccess";
     public const string RandomDeviceFailed = "Log_RandomDeviceFailed";
     public const string RandomDeviceLoginRequired = "Log_RandomDeviceLoginRequired";
+    public const string RandomDeviceRequired = "Log_RandomDeviceRequired";
     public const string DeviceMustBeOnline = "Log_DeviceMustBeOnline";
     public const string ChangeDevice = "Log_ChangeDevice";
     public const string ChangeDeviceCanceled = "Log_ChangeDeviceCanceled";
@@ -33,9 +34,11 @@ public static class DeviceLogResourceKeys
     public const string ChangeDeviceSuccess = "Log_ChangeDeviceSuccess";
     public const string ChangeDeviceFailed = "Log_ChangeDeviceFailed";
     public const string ChangeWithoutWipe = "Log_ChangeWithoutWipe";
+    public const string ChangeWithoutWipeCanceled = "Log_ChangeWithoutWipeCanceled";
     public const string ChangeWithoutWipeSuccess = "Log_ChangeWithoutWipeSuccess";
     public const string ChangeWithoutWipeFailed = "Log_ChangeWithoutWipeFailed";
     public const string WipeWithoutChange = "Log_WipeWithoutChange";
+    public const string WipeWithoutChangeCanceled = "Log_WipeWithoutChangeCanceled";
     public const string WipeWithoutChangeSuccess = "Log_WipeWithoutChangeSuccess";
     public const string WipeWithoutChangeFailed = "Log_WipeWithoutChangeFailed";
     public const string AdvancedChangeConfigSaved = "Log_AdvancedChangeConfigSaved";
@@ -44,7 +47,9 @@ public static class DeviceLogResourceKeys
     public const string RandomSim = "Log_RandomSim";
     public const string RandomSimSuccess = "Log_RandomSimSuccess";
     public const string RandomSimFailed = "Log_RandomSimFailed";
+    public const string RandomSimRequired = "Log_RandomSimRequired";
     public const string ChangeSim = "Log_ChangeSim";
+    public const string ChangeSimCanceled = "Log_ChangeSimCanceled";
     public const string ChangeSimSuccess = "Log_ChangeSimSuccess";
     public const string ChangeSimFailed = "Log_ChangeSimFailed";
     public const string ResolvingByIp = "Log_ResolvingByIp";

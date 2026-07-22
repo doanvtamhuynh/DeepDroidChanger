@@ -153,8 +153,10 @@ public sealed partial class App : Application
         services.AddTransient<ILoginDialogService, LoginDialogService>();
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();
         services.AddTransient<IChangeTimezoneDialogService, ChangeTimezoneDialogService>();
+        services.AddTransient<IConfirmationDialogService, ConfirmationDialogService>();
         services.AddTransient<IDeleteDeviceConfirmationDialogService, DeleteDeviceConfirmationDialogService>();
         services.AddTransient<IChangeDeviceConfirmationDialogService, ChangeDeviceConfirmationDialogService>();
+        services.AddTransient<IDeviceActionConfirmationDialogService, DeviceActionConfirmationDialogService>();
         services.AddTransient<IAdvancedChangeConfigDialogService, AdvancedChangeConfigDialogService>();
         services.AddTransient<IRandomDeviceInfoDialogService, RandomDeviceInfoDialogService>();
         services.AddTransient<IDeviceViewerDialogService, DeviceViewerDialogService>();
@@ -172,6 +174,7 @@ public sealed partial class App : Application
         services.AddTransient<AddDevicesViewModel>();
         services.AddTransient<ChangeLocationViewModel>();
         services.AddTransient<ChangeTimezoneViewModel>();
+        services.AddTransient<ConfirmationDialogViewModel>();
         services.AddTransient<DeleteDeviceConfirmationViewModel>();
         services.AddTransient<ChangeDeviceConfirmationViewModel>();
         services.AddTransient<AdvancedChangeConfigViewModel>();
@@ -185,6 +188,7 @@ public sealed partial class App : Application
         services.AddTransient<AddDevicesDialog>();
         services.AddTransient<ChangeLocationDialog>();
         services.AddTransient<ChangeTimezoneDialog>();
+        services.AddTransient<ConfirmationDialog>();
         services.AddTransient<DeleteDeviceConfirmationDialog>();
         services.AddTransient<ChangeDeviceConfirmationDialog>();
         services.AddTransient<AdvancedChangeConfigDialog>();

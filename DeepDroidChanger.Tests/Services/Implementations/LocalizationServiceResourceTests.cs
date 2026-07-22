@@ -163,6 +163,28 @@ public sealed class LocalizationServiceResourceTests
         }
     }
 
+    [TestMethod]
+    public void DeviceManagerDictionaries_ExposeClearDeviceInfoFieldLabels()
+    {
+        string stringsDirectory = Path.Combine(
+            GetSolutionRoot(),
+            "DeepDroidChanger",
+            "Resources",
+            "Strings",
+            "Views");
+        IReadOnlyDictionary<string, string> english = LoadResources(
+            [Path.Combine(stringsDirectory, "DeviceManager.xaml")]);
+        IReadOnlyDictionary<string, string> vietnamese = LoadResources(
+            [Path.Combine(stringsDirectory, "DeviceManager.vi.xaml")]);
+
+        Assert.AreEqual("Hardware", english["DeviceManager_FieldHardware"]);
+        Assert.AreEqual("Fingerprint", english["DeviceManager_FieldFingerprint"]);
+        Assert.AreEqual("Wi-Fi MAC", english["DeviceManager_FieldMac"]);
+        Assert.AreEqual("Phần cứng", vietnamese["DeviceManager_FieldHardware"]);
+        Assert.AreEqual("Fingerprint", vietnamese["DeviceManager_FieldFingerprint"]);
+        Assert.AreEqual("Wi-Fi MAC", vietnamese["DeviceManager_FieldMac"]);
+    }
+
     private static IReadOnlyDictionary<string, string> LoadResources(IEnumerable<string> paths)
     {
         XNamespace xaml = "http://schemas.microsoft.com/winfx/2006/xaml";

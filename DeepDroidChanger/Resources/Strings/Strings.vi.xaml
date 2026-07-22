@@ -14,6 +14,7 @@
         <ResourceDictionary Source="Views/DeviceViewer.vi.xaml" />
         <ResourceDictionary Source="Views/DeleteDeviceConfirmation.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeDeviceConfirmation.vi.xaml" />
+        <ResourceDictionary Source="Views/ConfirmationDialog.vi.xaml" />
         <ResourceDictionary Source="Views/AdvancedChangeConfig.vi.xaml" />
         <ResourceDictionary Source="Views/RandomDeviceInfo.vi.xaml" />
         <ResourceDictionary Source="Views/Login.vi.xaml" />
