@@ -34,7 +34,6 @@ public static class DeviceSpoofPropertyConstants
     public const string ClientIdBase = Prefix + "clientidbase";
     public const string Baseband = Prefix + "gsm.version.baseband";
     public const string SerialNumber = Prefix + "serial_number";
-    public const string AndroidId = Prefix + "android.id";
     public const string DeviceName = Prefix + "device.name";
     public const string VbmetaDigest = Prefix + "vbmeta.digest";
     public const string Imei0 = Prefix + "imei0";

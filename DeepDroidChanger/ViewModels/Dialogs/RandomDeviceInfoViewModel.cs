@@ -52,7 +52,6 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
             Field("OsVersion", device.Release),
             Field("Sdk", device.Sdk),
             Field("Serial", device.Serial),
-            Field("AndroidId", device.AndroidId),
             Field("Imsi", device.Imsi),
             Field("Iccid", device.Iccid),
             Field("PhoneNumber", device.SimPhoneNumber),
@@ -106,7 +105,6 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
         _device.Release = values["OsVersion"];
         _device.Sdk = values["Sdk"];
         _device.Serial = values["Serial"];
-        _device.AndroidId = values["AndroidId"];
         _device.Imsi = values["Imsi"];
         _device.Iccid = values["Iccid"];
         _device.SimPhoneNumber = values["PhoneNumber"];

@@ -67,7 +67,6 @@ namespace DeepDroidChanger.Models
         public string Release { get; set; } = string.Empty;
         public string Sdk { get; set; } = string.Empty;
         public string Serial { get; set; } = string.Empty;
-        public string AndroidId { get; set; } = string.Empty;
         public string Imsi { get; set; } = string.Empty;
         public string Iccid { get; set; } = string.Empty;
         public string SimPhoneNumber { get; set; } = string.Empty;

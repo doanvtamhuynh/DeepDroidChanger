@@ -3,12 +3,12 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="ChangeDeviceConfirmation_WindowTitle">Xác nhận đổi thiết bị</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_Title">Áp dụng danh tính mới cho thiết bị này?</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_DefaultProfileNotice">Đổi và Wipe mặc định sẽ áp dụng toàn bộ profile được tạo, bao gồm Android ID và địa chỉ MAC Wi-Fi/Bluetooth.</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_DefaultProfileNotice">Đổi và Wipe mặc định sẽ áp dụng profile được tạo nhưng giữ nguyên Android ID.</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_AdvancedProfileNotice">Tùy chọn profile nâng cao: {0}.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ChangeAndroidId">sẽ đổi Android ID</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_DeleteAndroidId">sẽ xóa Android ID đã lưu</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_RegenerateAndroidId">Android ID sẽ được tạo lại bằng cách xóa secure setting hiện tại</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_PreserveAndroidId">Android ID sẽ được giữ nguyên</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_ChangeMac">sẽ đổi MAC Wi-Fi/Bluetooth</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_RmRfPackageCleanup">sẽ buộc dừng rồi dùng "rm -rf" để xóa thư mục dữ liệu gói tại tám đường dẫn hệ thống tệp</sys:String>
+    <sys:String x:Key="ChangeDeviceConfirmation_DeepPackageWipe">Chế độ xóa sâu sẽ chạy "rm -rf" trên tám đường dẫn dữ liệu ứng dụng và hồ sơ ART sau "pm clear"</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_NoPackageCleanup">Không xóa dữ liệu package.</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_ClearAllPackages">Sẽ xóa dữ liệu của tất cả package đã cài</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_ClearSelectedPackages">Sẽ xóa dữ liệu của {0} package được chọn</sys:String>

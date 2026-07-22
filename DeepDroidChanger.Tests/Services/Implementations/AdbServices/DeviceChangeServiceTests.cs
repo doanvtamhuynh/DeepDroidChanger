@@ -10,6 +10,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
 public sealed class DeviceChangeServiceTests
 {
     private const string CurrentAndroidId = "33537c391caed62e";
+    private const string RegeneratedAndroidId = "94ab6d2e18f047c3";
 
     [TestMethod]
     public async Task ChangeSimAsync_WritesOnlySimPropertiesAndRebootsWithoutCleanup()
@@ -52,29 +53,33 @@ public sealed class DeviceChangeServiceTests
         await adb.DidNotReceiveWithAnyArgs().SetWifiAsync(default!, default, default);
         await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
         await cleanup.DidNotReceiveWithAnyArgs().CleanPreservingSsaidAsync(default!, default!, default);
+        await cleanup.DidNotReceiveWithAnyArgs().DeleteSsaidAsync(default!, default);
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
-    public async Task ChangeWithoutWipeAsync_AppliesIdentityWithoutCallingCleanup()
+    public async Task ChangeWithoutWipeAsync_DefaultMode_DeletesSsaidWithoutChangingAndroidId()
     {
         IAdbCommandService adb = CreateRootedAdb();
         IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
         DeviceChangeService service = CreateService(adb, cleanup);
         DeviceInfoApiDevice profile = CreateProfile();
-        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
-            .Returns(CurrentAndroidId, profile.AndroidId);
 
         await service.ChangeWithoutWipeAsync(
             "SERIAL",
             profile,
             true,
-            new DeviceChangeOptions { UseDefaultMode = true },
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = true,
+                ChangeAndroidId = true
+            },
             null,
             CancellationToken.None);
 
         await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
         await cleanup.DidNotReceiveWithAnyArgs().CleanPreservingSsaidAsync(default!, default!, default);
+        await cleanup.Received(1).DeleteSsaidAsync("SERIAL", Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
             DeviceSpoofPropertyConstants.ProductModel,
@@ -85,7 +90,101 @@ public sealed class DeviceChangeServiceTests
             DeviceSpoofPropertyConstants.SimIccid,
             profile.Iccid,
             Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().PutSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().GetSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeWithoutWipeAsync_AdvancedAndroidIdEnabled_DeletesSettingAfterSsaidAndVerifiesNewId()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
+            .Returns(CurrentAndroidId, RegeneratedAndroidId);
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+
+        await service.ChangeWithoutWipeAsync(
+            "SERIAL",
+            CreateProfile(),
+            true,
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeAndroidId = true
+            },
+            null,
+            CancellationToken.None);
+
+        await adb.Received(1).DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        await adb.Received(2).GetSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
+            cleanup.DeleteSsaidAsync("SERIAL", Arg.Any<CancellationToken>());
+            adb.DeleteSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
+            adb.SetPropertyAsync(
+                "SERIAL",
+                DeviceSpoofPropertyConstants.ProductModel,
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>());
+            adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+            adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
+        });
+    }
+
+    [TestMethod]
+    public async Task ChangeWithoutWipeAsync_AdvancedAndroidIdDisabled_DeletesSsaidWithoutChangingAndroidId()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+
+        await service.ChangeWithoutWipeAsync(
+            "SERIAL",
+            CreateProfile(),
+            true,
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeAndroidId = false
+            },
+            null,
+            CancellationToken.None);
+
+        await cleanup.Received(1).DeleteSsaidAsync("SERIAL", Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().GetSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -97,6 +196,7 @@ public sealed class DeviceChangeServiceTests
         var options = new DeviceChangeOptions
         {
             UseDefaultMode = false,
+            ChangeAndroidId = true,
             ClearAllPackages = false,
             ClearSelectedPackages = true,
             SelectedPackages = ["com.example.app"],
@@ -110,6 +210,7 @@ public sealed class DeviceChangeServiceTests
             options,
             Arg.Any<CancellationToken>());
         await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
+        await cleanup.DidNotReceiveWithAnyArgs().DeleteSsaidAsync(default!, default);
         await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
         await adb.DidNotReceiveWithAnyArgs().PutSettingAsync(default!, default!, default!, default!, default);
         await adb.DidNotReceiveWithAnyArgs().DeleteSettingAsync(default!, default!, default!, default);
@@ -123,9 +224,11 @@ public sealed class DeviceChangeServiceTests
         IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
         DeviceChangeService service = CreateService(adb, cleanup);
         DeviceInfoApiDevice profile = CreateProfile();
-        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
-            .Returns(CurrentAndroidId, profile.AndroidId);
-        var options = new DeviceChangeOptions { UseDefaultMode = true };
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = true,
+            ChangeAndroidId = true
+        };
 
         await service.ChangeAsync("SERIAL", profile, true, options, null, CancellationToken.None);
 
@@ -149,16 +252,16 @@ public sealed class DeviceChangeServiceTests
             DeviceSpoofPropertyConstants.Bootloader,
             profile.Bootloader!,
             Arg.Any<CancellationToken>());
-        await adb.Received(1).SetPropertyAsync(
-            "SERIAL",
-            DeviceSpoofPropertyConstants.AndroidId,
-            profile.AndroidId,
-            Arg.Any<CancellationToken>());
-        await adb.Received(1).PutSettingAsync(
+        await adb.DidNotReceive().PutSettingAsync(
             "SERIAL",
             "secure",
             "android_id",
-            profile.AndroidId,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
@@ -186,7 +289,7 @@ public sealed class DeviceChangeServiceTests
                 Arg.Any<CancellationToken>());
         });
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
-        await adb.Received(2).GetSettingAsync(
+        await adb.DidNotReceive().GetSettingAsync(
             "SERIAL",
             "secure",
             "android_id",
@@ -199,7 +302,7 @@ public sealed class DeviceChangeServiceTests
         IAdbCommandService adb = CreateRootedAdb();
         DeviceInfoApiDevice profile = CreateProfile();
         adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
-            .Returns(CurrentAndroidId, profile.AndroidId);
+            .Returns(CurrentAndroidId, "9999888877776666");
         DeviceChangeService service = CreateService(adb);
 
         await service.ChangeAsync(
@@ -464,13 +567,14 @@ public sealed class DeviceChangeServiceTests
     }
 
     [TestMethod]
-    public async Task ChangeAsync_AdvancedAndroidIdEnabled_WritesAndVerifiesGeneratedAndroidId()
+    public async Task ChangeAsync_AdvancedAndroidIdEnabled_DeletesSettingAfterCleanupAndVerifiesNewId()
     {
         IAdbCommandService adb = CreateRootedAdb();
         DeviceInfoApiDevice profile = CreateProfile();
         adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
-            .Returns(CurrentAndroidId, profile.AndroidId);
-        DeviceChangeService service = CreateService(adb);
+            .Returns(CurrentAndroidId, RegeneratedAndroidId);
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
 
         await service.ChangeAsync(
             "SERIAL",
@@ -479,60 +583,16 @@ public sealed class DeviceChangeServiceTests
             new DeviceChangeOptions
             {
                 UseDefaultMode = false,
-                ClearAllPackages = false,
                 ChangeAndroidId = true,
-                ClearGoogleAccounts = false
-            },
-            null,
-            CancellationToken.None);
-
-        await adb.Received(1).SetPropertyAsync(
-            "SERIAL",
-            DeviceSpoofPropertyConstants.AndroidId,
-            profile.AndroidId,
-            Arg.Any<CancellationToken>());
-        await adb.Received(1).PutSettingAsync(
-            "SERIAL",
-            "secure",
-            "android_id",
-            profile.AndroidId,
-            Arg.Any<CancellationToken>());
-        await adb.DidNotReceive().DeleteSettingAsync(
-            "SERIAL",
-            "secure",
-            "android_id",
-            Arg.Any<CancellationToken>());
-    }
-
-    [TestMethod]
-    public async Task ChangeAsync_AdvancedAndroidIdDisabled_DeletesStoredAndroidIdAndClearsSpoofProperty()
-    {
-        IAdbCommandService adb = CreateRootedAdb();
-        DeviceChangeService service = CreateService(adb);
-
-        await service.ChangeAsync(
-            "SERIAL",
-            CreateProfile(),
-            true,
-            new DeviceChangeOptions
-            {
-                UseDefaultMode = false,
                 ClearAllPackages = false,
-                ChangeAndroidId = false,
                 ClearGoogleAccounts = false
             },
             null,
             CancellationToken.None);
 
-        await adb.Received(1).SetPropertyAsync(
+        await cleanup.Received(1).CleanAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.AndroidId,
-            string.Empty,
-            Arg.Any<CancellationToken>());
-        await adb.Received(1).DeleteSettingAsync(
-            "SERIAL",
-            "secure",
-            "android_id",
+            Arg.Any<DeviceChangeOptions>(),
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().PutSettingAsync(
             "SERIAL",
@@ -540,6 +600,154 @@ public sealed class DeviceChangeServiceTests
             "android_id",
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
+        await adb.Received(1).DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        await adb.Received(2).GetSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
+            cleanup.CleanAsync("SERIAL", Arg.Any<DeviceChangeOptions>(), Arg.Any<CancellationToken>());
+            adb.DeleteSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
+            adb.SetPropertyAsync(
+                "SERIAL",
+                DeviceSpoofPropertyConstants.ProductModel,
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>());
+            adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+            adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
+        });
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_AdvancedAndroidIdDisabled_CleansSsaidWithoutReadingOrDeletingSetting()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = false,
+            ChangeAndroidId = false,
+            ClearAllPackages = false,
+            ClearGoogleAccounts = false
+        };
+
+        await service.ChangeAsync(
+            "SERIAL",
+            CreateProfile(),
+            true,
+            options,
+            null,
+            CancellationToken.None);
+
+        await cleanup.Received(1).CleanAsync("SERIAL", options, Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().GetSettingAsync(
+            "SERIAL",
+            "secure",
+            "android_id",
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_UnchangedAndroidIdAfterCleanup_Throws()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
+            .Returns(CurrentAndroidId, CurrentAndroidId);
+        DeviceChangeService service = CreateService(adb);
+
+        InvalidOperationException exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            service.ChangeAsync(
+                "SERIAL",
+                CreateProfile(),
+                true,
+                new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true,
+                    ClearAllPackages = false,
+                    ClearGoogleAccounts = false
+                },
+                null,
+                CancellationToken.None));
+
+        Assert.Contains("Android ID was not regenerated", exception.Message, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_MissingRegeneratedAndroidId_Throws()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
+            .Returns(CurrentAndroidId, "null");
+        DeviceChangeService service = CreateService(adb);
+
+        InvalidOperationException exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            service.ChangeAsync(
+                "SERIAL",
+                CreateProfile(),
+                true,
+                new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true,
+                    ClearAllPackages = false,
+                    ClearGoogleAccounts = false
+                },
+                null,
+                CancellationToken.None));
+
+        Assert.Contains("Android ID was not regenerated", exception.Message, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_DeleteAndroidIdFailure_StopsBeforeApplyingProfileOrRebooting()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        var failure = new InvalidOperationException("delete setting failed");
+        adb.DeleteSettingAsync(
+                "SERIAL",
+                "secure",
+                "android_id",
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(failure));
+        IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
+        DeviceChangeService service = CreateService(adb, cleanup);
+
+        InvalidOperationException exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            service.ChangeAsync(
+                "SERIAL",
+                CreateProfile(),
+                true,
+                new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true,
+                    ClearAllPackages = false,
+                    ClearGoogleAccounts = false
+                },
+                null,
+                CancellationToken.None));
+
+        Assert.AreSame(failure, exception);
+        await cleanup.Received(1).CleanAsync(
+            "SERIAL",
+            Arg.Any<DeviceChangeOptions>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
+        await adb.DidNotReceiveWithAnyArgs().RebootAsync(default!, default);
     }
 
     private static IAdbCommandService CreateRootedAdb()
@@ -554,8 +762,6 @@ public sealed class DeviceChangeServiceTests
                 "getprop sys.boot_completed" => new CommandResult(0, "1", string.Empty),
                 _ => new CommandResult(0, string.Empty, string.Empty)
             });
-        adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>())
-            .Returns(CurrentAndroidId, "null");
         return adb;
     }
 
@@ -583,7 +789,6 @@ public sealed class DeviceChangeServiceTests
             BuildDateUtc = "1780531200",
             Bootloader = "test",
             Serial = "NEW-SERIAL",
-            AndroidId = "0123456789abcdef",
             Imei = "123456789012345",
             Imei1 = "123456789012352",
             Iccid = "8984041234567890123",

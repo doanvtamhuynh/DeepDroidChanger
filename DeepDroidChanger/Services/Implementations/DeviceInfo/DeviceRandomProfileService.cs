@@ -160,7 +160,6 @@ namespace DeepDroidChanger.Services
                 device.Imei1 = GenerateDistinctImei(imeiBrand, device.Imei![..8], device.Imei);
             }
 
-            device.AndroidId = _randomService.GetRandomHexString(16)[..16];
             device.Serial = _randomService.GetRandomHexString(16)[.._randomService.RandomInRange(8, 13)];
             device.WifiMacAddress = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
             device.BluetoothMacAddress = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
@@ -371,7 +370,6 @@ namespace DeepDroidChanger.Services
                 (nameof(device.Baseband), device.Baseband),
                 (nameof(device.SecurityPatch), device.SecurityPatch),
                 (nameof(device.Serial), device.Serial),
-                (nameof(device.AndroidId), device.AndroidId),
                 (nameof(device.WifiMacAddress), device.WifiMacAddress),
                 (nameof(device.BluetoothMacAddress), device.BluetoothMacAddress),
                 (nameof(device.SettingDeviceName), device.SettingDeviceName),

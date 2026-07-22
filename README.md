@@ -27,7 +27,7 @@ DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đ
 ### Random Device và SIM
 
 - Lấy profile ngẫu nhiên từ Device Info API theo Brand, Android version, Country và Carrier.
-- Chuẩn hóa identity gồm fingerprint/build, serial, Android ID, IMEI, IMSI, ICCID, số điện thoại, Wi-Fi/Bluetooth MAC và thông tin SIM.
+- Chuẩn hóa identity gồm fingerprint/build, serial, IMEI, IMSI, ICCID, số điện thoại, Wi-Fi/Bluetooth MAC và thông tin SIM.
 - Dữ liệu cục bộ dùng cho việc tạo profile nằm trong `Assets/Data` và được nhúng vào assembly khi build: carrier, timezone, TAC IMEI, MAC vendor, tên và word list.
 - **Random Device** và **Random SIM** chỉ cập nhật form. Dữ liệu chỉ được ghi lên điện thoại khi chạy **Change Device**.
 
@@ -40,18 +40,18 @@ Flow hiện tại:
 1. Kiểm tra thiết bị online và profile hợp lệ.
 2. Hiển thị dialog xác nhận với đúng cấu hình Default/Advanced hiện tại.
 3. Khởi động lại `adbd` ở quyền root, chờ thiết bị và xác minh `id -u = 0`.
-4. Tắt Wi-Fi và đọc Android ID hiện tại để đối chiếu sau khi thay đổi.
+4. Tắt Wi-Fi; chỉ đọc Android ID hiện tại khi Advanced bật **Change Android ID**.
 5. `SetPropertyAsync` chỉ bật bypass theo phạm vi một lệnh khi property bắt đầu bằng `ro.`, rồi luôn tắt bypass ngay sau `setprop`.
-6. Xóa data cũ theo policy đã chọn.
-7. Áp dụng build/device/SIM/MAC/Android ID và Android settings từ profile.
+6. Xóa data cũ theo policy đã chọn, luôn gồm `settings_ssaid.xml`; chỉ chạy `settings delete secure android_id` khi Advanced bật **Change Android ID**.
+7. Áp dụng build/device/SIM/MAC và Android settings từ profile; không ghi Android ID thủ công.
 8. Đồng bộ dữ liệu, reboot và chờ `sys.boot_completed = 1`.
-9. Đọc lại Android ID để xác minh kết quả; lỗi ở bước bắt buộc sẽ không được báo thành công giả.
+9. Khi đổi Android ID được chọn, đọc lại ID sau reboot và xác minh giá trị mới tồn tại, khác giá trị cũ; lỗi ở bước bắt buộc sẽ không được báo thành công giả.
 
 Mỗi serial có lock riêng để tránh hai Change Device chạy đồng thời trên cùng thiết bị.
 
 #### Chế độ Default
 
-- Áp dụng toàn bộ profile mới, gồm Android ID, MAC Wi-Fi/Bluetooth và SIM.
+- Áp dụng profile mới, gồm MAC Wi-Fi/Bluetooth và SIM, nhưng giữ nguyên Android ID.
 - Lấy danh sách package đã cài rồi xóa data bằng `pm clear`; giữ nguyên APK.
 - Xóa dữ liệu các package Google/account liên quan.
 - Xóa file account và nội dung file dưới `/data/system_ce` và `/data/system_de`, nhưng giữ lại cây thư mục để Android có thể tái sử dụng đúng path/permission.
@@ -59,10 +59,12 @@ Mỗi serial có lock riêng để tránh hai Change Device chạy đồng thờ
 
 #### Chế độ Advanced
 
-- Chọn có đổi Android ID, MAC và SIM hay không.
+- Chọn có đổi Android ID, MAC và SIM hay không. Android ID chỉ được tạo lại khi bật **Change Android ID**.
 - Chọn xóa toàn bộ package, package Google hoặc danh sách package cụ thể.
 - Chọn riêng việc xóa account Google và CE/DE state.
-- Mặc định vẫn dùng `pm clear`. Tùy chọn `rm -rf` chỉ áp dụng cho data của package được chọn và xóa tám path package/data/ART profile đã định nghĩa trong service.
+- Package được chọn luôn được xử lý bằng `pm clear`. Khi bật **Dùng chế độ xóa sâu cho package**, cleanup chạy thêm `rm -rf` trên tám path app-data/ART profile.
+
+**Change without Wipe** không chạy full cleanup package/account/residual. Action này vẫn xóa `settings_ssaid.xml`; chỉ xóa secure Android ID và xác minh ID mới khi option Advanced được chọn. **Random Change & Wipe** dùng cùng option như **Change Device**.
 
 Ở cả Default và Advanced, cleanup residual vẫn chạy: ứng dụng dùng `find ... -not -type d -delete` để xóa file bên trong các vùng log/cache/state nhưng giữ lại directory root. Cách này giải quyết trường hợp một số thư mục hệ thống không được tạo lại đúng khi xóa cả path. `/data/misc/bluetooth` và `/data/misc/bluedroid` vẫn nằm trong danh sách cleanup (xóa nội dung nhưng giữ root); package registry, `/data/app`, kho `/data/property/persistent_properties` và dữ liệu Wi-Fi APEX được bảo vệ khỏi danh sách cleanup.
 

@@ -25,7 +25,7 @@ public sealed class RandomDeviceInfoViewModelTests
         viewModel.Initialize(profile);
 
         Assert.AreEqual(typeof(DeviceInfoApiDevice).GetProperties().Length, viewModel.Fields.Count);
-        Assert.HasCount(44, viewModel.Fields);
+        Assert.HasCount(43, viewModel.Fields);
         Assert.AreEqual("RandomDeviceInfo_FieldModel", viewModel.Fields[0].Label);
         Assert.AreEqual("Pixel 9", viewModel.Fields[0].Value);
         Assert.AreEqual("15", viewModel.Fields.Single(field => field.Label == "RandomDeviceInfo_FieldOsVersion").Value);
@@ -75,7 +75,6 @@ public sealed class RandomDeviceInfoViewModelTests
             [nameof(DeviceInfoApiDevice.Release)] = "OsVersion",
             [nameof(DeviceInfoApiDevice.Sdk)] = "Sdk",
             [nameof(DeviceInfoApiDevice.Serial)] = "Serial",
-            [nameof(DeviceInfoApiDevice.AndroidId)] = "AndroidId",
             [nameof(DeviceInfoApiDevice.Imsi)] = "Imsi",
             [nameof(DeviceInfoApiDevice.Iccid)] = "Iccid",
             [nameof(DeviceInfoApiDevice.SimPhoneNumber)] = "PhoneNumber",

@@ -78,7 +78,7 @@ public sealed class ChangeDeviceConfirmationDialogService : IChangeDeviceConfirm
             operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_ClearGoogleAccounts"));
 
         if (options.UseRmRfForPackageCleanup && operations.Count > 0)
-            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_RmRfPackageCleanup"));
+            operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_DeepPackageWipe"));
 
         return operations.Count == 0
             ? _localizationService.GetString("ChangeDeviceConfirmation_NoPackageCleanup")
@@ -94,8 +94,8 @@ public sealed class ChangeDeviceConfirmationDialogService : IChangeDeviceConfirm
         {
             _localizationService.GetString(
                 options.ChangeAndroidId
-                    ? "ChangeDeviceConfirmation_ChangeAndroidId"
-                    : "ChangeDeviceConfirmation_DeleteAndroidId")
+                    ? "ChangeDeviceConfirmation_RegenerateAndroidId"
+                    : "ChangeDeviceConfirmation_PreserveAndroidId")
         };
         if (options.ChangeMacAddress)
             operations.Add(_localizationService.GetString("ChangeDeviceConfirmation_ChangeMac"));

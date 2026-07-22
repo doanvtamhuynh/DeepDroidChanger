@@ -24,7 +24,11 @@ public sealed class ChangeDeviceConfirmationDialogServiceTests
         bool confirmed = await service.ShowChangeDeviceConfirmationAsync(
             "Phone",
             "SERIAL",
-            new DeviceChangeOptions { UseDefaultMode = true },
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = true,
+                ChangeAndroidId = true
+            },
             CancellationToken.None);
 
         Assert.IsTrue(confirmed);
@@ -34,15 +38,17 @@ public sealed class ChangeDeviceConfirmationDialogServiceTests
                 && message.Contains("Phone", StringComparison.Ordinal)
                 && message.Contains("SERIAL", StringComparison.Ordinal)
                 && message.Contains("ChangeDeviceConfirmation_DefaultProfileNotice", StringComparison.Ordinal)
+                && !message.Contains("ChangeDeviceConfirmation_RegenerateAndroidId", StringComparison.Ordinal)
                 && message.Contains("ChangeDeviceConfirmation_ClearAllPackages", StringComparison.Ordinal)
                 && message.Contains("ChangeDeviceConfirmation_ClearGoogleAccounts", StringComparison.Ordinal)
+                && !message.Contains("ChangeDeviceConfirmation_DeepPackageWipe", StringComparison.Ordinal)
                 && message.Contains("ChangeDeviceConfirmation_GoogleDataMayBeCleared", StringComparison.Ordinal)),
             "ChangeDeviceConfirmation_WindowTitle",
             Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
-    public async Task ShowChangeDeviceConfirmationAsync_AdvancedRmRfMode_PreservesDetailedWarning()
+    public async Task ShowChangeDeviceConfirmationAsync_AdvancedMode_ShowsAutomaticCleanupDetails()
     {
         IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
         confirmationDialog.ShowWarningConfirmationAsync(
@@ -60,7 +66,7 @@ public sealed class ChangeDeviceConfirmationDialogServiceTests
             new DeviceChangeOptions
             {
                 UseDefaultMode = false,
-                ChangeAndroidId = false,
+                ChangeAndroidId = true,
                 ChangeMacAddress = true,
                 ClearAllPackages = false,
                 ClearSelectedPackages = true,
@@ -73,11 +79,44 @@ public sealed class ChangeDeviceConfirmationDialogServiceTests
         Assert.IsFalse(confirmed);
         await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
             Arg.Is<string>(message =>
-                message.Contains("ChangeDeviceConfirmation_DeleteAndroidId", StringComparison.Ordinal)
+                message.Contains("ChangeDeviceConfirmation_RegenerateAndroidId", StringComparison.Ordinal)
                 && message.Contains("ChangeDeviceConfirmation_ChangeMac", StringComparison.Ordinal)
                 && message.Contains("selected 1", StringComparison.Ordinal)
-                && message.Contains("ChangeDeviceConfirmation_RmRfPackageCleanup", StringComparison.Ordinal)
+                && message.Contains("ChangeDeviceConfirmation_DeepPackageWipe", StringComparison.Ordinal)
                 && message.Contains("ChangeDeviceConfirmation_GoogleDataPreserved", StringComparison.Ordinal)),
+            "ChangeDeviceConfirmation_WindowTitle",
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ShowChangeDeviceConfirmationAsync_AdvancedAndroidIdDisabled_ShowsPreservedState()
+    {
+        IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
+        confirmationDialog.ShowWarningConfirmationAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        var service = new ChangeDeviceConfirmationDialogService(
+            confirmationDialog,
+            CreateLocalizationService(),
+            NullLogger<ChangeDeviceConfirmationDialogService>.Instance);
+
+        await service.ShowChangeDeviceConfirmationAsync(
+            "Phone",
+            "SERIAL",
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeAndroidId = false,
+                ChangeMacAddress = false,
+                ClearAllPackages = false,
+                ClearGoogleAccounts = false
+            },
+            CancellationToken.None);
+
+        await confirmationDialog.Received(1).ShowWarningConfirmationAsync(
+            Arg.Is<string>(message =>
+                message.Contains("ChangeDeviceConfirmation_PreserveAndroidId", StringComparison.Ordinal)
+                && !message.Contains("ChangeDeviceConfirmation_RegenerateAndroidId", StringComparison.Ordinal)),
             "ChangeDeviceConfirmation_WindowTitle",
             Arg.Any<CancellationToken>());
     }
