@@ -5,6 +5,4 @@
     <sys:String x:Key="DeleteDeviceConfirmation_WindowTitle">Delete Device</sys:String>
     <sys:String x:Key="DeleteDeviceConfirmation_Title">Delete saved device?</sys:String>
     <sys:String x:Key="DeleteDeviceConfirmation_Message">This removes the device from saved app data only.</sys:String>
-    <sys:String x:Key="DeleteDeviceConfirmation_CancelButton">Cancel</sys:String>
-    <sys:String x:Key="DeleteDeviceConfirmation_DeleteButton">Delete</sys:String>
 </ResourceDictionary>

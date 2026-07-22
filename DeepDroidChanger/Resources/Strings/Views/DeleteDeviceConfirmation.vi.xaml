@@ -5,6 +5,4 @@
     <sys:String x:Key="DeleteDeviceConfirmation_WindowTitle">Xóa thiết bị</sys:String>
     <sys:String x:Key="DeleteDeviceConfirmation_Title">Xóa thiết bị đã lưu?</sys:String>
     <sys:String x:Key="DeleteDeviceConfirmation_Message">Thao tác này chỉ xóa thiết bị khỏi dữ liệu đã lưu của ứng dụng.</sys:String>
-    <sys:String x:Key="DeleteDeviceConfirmation_CancelButton">Hủy</sys:String>
-    <sys:String x:Key="DeleteDeviceConfirmation_DeleteButton">Xóa</sys:String>
 </ResourceDictionary>

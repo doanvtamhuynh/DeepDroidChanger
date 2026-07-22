@@ -23,7 +23,6 @@
                 <ResourceDictionary Source="Resources/Themes/UpdateIntegrity.xaml" />
                 <ResourceDictionary Source="Resources/Themes/InstallPackage.xaml" />
                 <ResourceDictionary Source="Resources/Themes/DeviceViewer.xaml" />
-                <ResourceDictionary Source="Resources/Themes/DeleteDeviceConfirmation.xaml" />
                 <ResourceDictionary Source="Resources/Themes/RandomDeviceInfo.xaml" />
                 <ResourceDictionary Source="Resources/Themes/Login.xaml" />
             </ResourceDictionary.MergedDictionaries>

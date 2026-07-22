@@ -16,6 +16,4 @@
     <sys:String x:Key="ChangeDeviceConfirmation_ClearGoogleAccounts">Google package data, accounts, and encrypted CE/DE user state will be cleared</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_GoogleDataPreserved">Google package data and accounts are preserved.</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_GoogleDataMayBeCleared">Google data may be removed by the selected cleanup policy. Cleared data cannot be recovered without a backup.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_CancelButton">Cancel</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ConfirmButton">Change &amp; Wipe Device</sys:String>
 </ResourceDictionary>

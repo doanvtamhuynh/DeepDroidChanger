@@ -48,8 +48,6 @@ public sealed class UiSurfaceSmokeTests
                         MeasureSurface(provider.GetRequiredService<SettingsView>());
                         MeasureDialog<LoginDialog, LoginViewModel>(provider);
                         MeasureDialog<AddDevicesDialog, AddDevicesViewModel>(provider);
-                        MeasureDialog<DeleteDeviceConfirmationDialog, DeleteDeviceConfirmationViewModel>(provider);
-                        MeasureDialog<ChangeDeviceConfirmationDialog, ChangeDeviceConfirmationViewModel>(provider);
                         VerifyConfirmationDialog(provider);
                         MeasureDialog<AdvancedChangeConfigDialog, AdvancedChangeConfigViewModel>(provider);
                         VerifyAdvancedChangeConfigDialog(provider);

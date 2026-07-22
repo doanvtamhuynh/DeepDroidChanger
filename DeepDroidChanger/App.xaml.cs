@@ -175,8 +175,6 @@ public sealed partial class App : Application
         services.AddTransient<ChangeLocationViewModel>();
         services.AddTransient<ChangeTimezoneViewModel>();
         services.AddTransient<ConfirmationDialogViewModel>();
-        services.AddTransient<DeleteDeviceConfirmationViewModel>();
-        services.AddTransient<ChangeDeviceConfirmationViewModel>();
         services.AddTransient<AdvancedChangeConfigViewModel>();
         services.AddTransient<RandomDeviceInfoViewModel>();
         services.AddTransient<DeviceViewerViewModel>();
@@ -189,8 +187,6 @@ public sealed partial class App : Application
         services.AddTransient<ChangeLocationDialog>();
         services.AddTransient<ChangeTimezoneDialog>();
         services.AddTransient<ConfirmationDialog>();
-        services.AddTransient<DeleteDeviceConfirmationDialog>();
-        services.AddTransient<ChangeDeviceConfirmationDialog>();
         services.AddTransient<AdvancedChangeConfigDialog>();
         services.AddTransient<RandomDeviceInfoDialog>();
         services.AddTransient<DeviceViewerDialog>();

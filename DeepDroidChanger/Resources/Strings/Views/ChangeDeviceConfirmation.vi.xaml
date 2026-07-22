@@ -16,6 +16,4 @@
     <sys:String x:Key="ChangeDeviceConfirmation_ClearGoogleAccounts">Sẽ xóa dữ liệu package, tài khoản Google và trạng thái người dùng CE/DE đã mã hóa</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_GoogleDataPreserved">Dữ liệu package và tài khoản Google được giữ nguyên.</sys:String>
     <sys:String x:Key="ChangeDeviceConfirmation_GoogleDataMayBeCleared">Dữ liệu Google có thể bị xóa theo policy đã chọn. Dữ liệu đã xóa không thể khôi phục nếu không có backup.</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_CancelButton">Hủy</sys:String>
-    <sys:String x:Key="ChangeDeviceConfirmation_ConfirmButton">Đổi &amp; Xóa dữ liệu thiết bị</sys:String>
 </ResourceDictionary>

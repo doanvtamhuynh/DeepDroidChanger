@@ -250,6 +250,49 @@ public sealed class ArchitectureRuleTests
         Assert.IsEmpty(xamlAssets);
     }
 
+    [TestMethod]
+    public void ConfirmationServices_UseSharedThemedDialogWithoutNativeMessageBox()
+    {
+        string projectRoot = GetProjectRoot();
+        string[] requiredPaths =
+        [
+            Path.Combine(projectRoot, "Views", "Dialogs", "Confirmation", "ConfirmationDialog.xaml"),
+            Path.Combine(projectRoot, "Views", "Dialogs", "Confirmation", "ConfirmationDialog.xaml.cs"),
+            Path.Combine(projectRoot, "ViewModels", "Dialogs", "ConfirmationDialogViewModel.cs"),
+            Path.Combine(projectRoot, "Services", "Interfaces", "DialogServices", "IConfirmationDialogService.cs"),
+            Path.Combine(projectRoot, "Services", "Implementations", "DialogServices", "ConfirmationDialogService.cs")
+        ];
+        Assert.IsTrue(requiredPaths.All(File.Exists));
+
+        string[] obsoletePaths =
+        [
+            Path.Combine(projectRoot, "Views", "Dialogs", "ChangeDeviceConfirmation", "ChangeDeviceConfirmationDialog.xaml"),
+            Path.Combine(projectRoot, "Views", "Dialogs", "ChangeDeviceConfirmation", "ChangeDeviceConfirmationDialog.xaml.cs"),
+            Path.Combine(projectRoot, "Views", "Dialogs", "DeleteDeviceConfirmation", "DeleteDeviceConfirmationDialog.xaml"),
+            Path.Combine(projectRoot, "Views", "Dialogs", "DeleteDeviceConfirmation", "DeleteDeviceConfirmationDialog.xaml.cs"),
+            Path.Combine(projectRoot, "ViewModels", "Dialogs", "ChangeDeviceConfirmationViewModel.cs"),
+            Path.Combine(projectRoot, "ViewModels", "Dialogs", "DeleteDeviceConfirmationViewModel.cs"),
+            Path.Combine(projectRoot, "Resources", "Themes", "DeleteDeviceConfirmation.xaml"),
+            Path.Combine(projectRoot, "Services", "Interfaces", "DialogServices", "IMessageBoxService.cs"),
+            Path.Combine(projectRoot, "Services", "Implementations", "DialogServices", "MessageBoxService.cs")
+        ];
+        Assert.IsTrue(obsoletePaths.All(path => !File.Exists(path)));
+
+        string dialogSource = File.ReadAllText(requiredPaths[0]);
+        Assert.Contains("Kind=\"Alert\"", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("Brush.Warning", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("ConfirmationDialog_NoButton", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("ConfirmationDialog_YesButton", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("IsCancel=\"True\"", dialogSource, StringComparison.Ordinal);
+        Assert.Contains("IsDefault=\"True\"", dialogSource, StringComparison.Ordinal);
+
+        string[] sourceFiles = Directory.GetFiles(projectRoot, "*.cs", SearchOption.AllDirectories);
+        string nativeMessageBoxUsages = string.Join(
+            Environment.NewLine,
+            sourceFiles.Select(File.ReadAllText).Where(source => source.Contains("MessageBox.Show", StringComparison.Ordinal)));
+        Assert.IsEmpty(nativeMessageBoxUsages);
+    }
+
     private static string GetProjectRoot()
     {
         return Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
