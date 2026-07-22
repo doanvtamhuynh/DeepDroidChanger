@@ -44,7 +44,7 @@
     <sys:String x:Key="DeviceManager_ActionChangeWithoutWipe">Đổi thông tin không xóa dữ liệu</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeDevice">Đổi &amp; Xóa dữ liệu thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_ActionWipeWithoutChange">Xóa dữ liệu không đổi thông tin</sys:String>
-    <sys:String x:Key="DeviceManager_ActionRandomAndChangeDevice">Tạo ngẫu nhiên và đổi thiết bị</sys:String>
+    <sys:String x:Key="DeviceManager_ActionRandomChangeAndWipe">Random, Change &amp; Wipe</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomSim">Tạo SIM ngẫu nhiên</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeSim">Đổi SIM</sys:String>
     <sys:String x:Key="DeviceManager_ConfirmChangeWithoutWipeTitle">Xác nhận đổi thông tin không xóa dữ liệu</sys:String>

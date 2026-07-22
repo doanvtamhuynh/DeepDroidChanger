@@ -44,7 +44,7 @@
     <sys:String x:Key="DeviceManager_ActionChangeWithoutWipe">Change Without Wipe</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeDevice">Change &amp; Wipe Device</sys:String>
     <sys:String x:Key="DeviceManager_ActionWipeWithoutChange">Wipe Without Change</sys:String>
-    <sys:String x:Key="DeviceManager_ActionRandomAndChangeDevice">Random &amp; Change Device</sys:String>
+    <sys:String x:Key="DeviceManager_ActionRandomChangeAndWipe">Random, Change &amp; Wipe</sys:String>
     <sys:String x:Key="DeviceManager_ActionRandomSim">Random SIM</sys:String>
     <sys:String x:Key="DeviceManager_ActionChangeSim">Change SIM</sys:String>
     <sys:String x:Key="DeviceManager_ConfirmChangeWithoutWipeTitle">Confirm Change Without Wipe</sys:String>

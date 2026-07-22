@@ -42,7 +42,7 @@
     <sys:String x:Key="Log_WipeWithoutChangeFailed">Xóa dữ liệu không đổi thông tin thiết bị thất bại</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigSaved">Đã lưu cấu hình đổi thiết bị nâng cao</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigFailed">Tải hoặc lưu cấu hình đổi thiết bị nâng cao thất bại</sys:String>
-    <sys:String x:Key="Log_RandomAndChangeDevice">Tạo ngẫu nhiên và đổi thiết bị hiện chưa được triển khai.</sys:String>
+    <sys:String x:Key="Log_RandomAndChangeDevice">Đang thực hiện Random, Change &amp; Wipe...</sys:String>
     <sys:String x:Key="Log_RandomSim">Đang tạo thông tin SIM ngẫu nhiên...</sys:String>
     <sys:String x:Key="Log_RandomSimSuccess">Đã tạo thông tin SIM ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomSimFailed">Tạo thông tin SIM ngẫu nhiên thất bại</sys:String>

@@ -652,7 +652,7 @@
                                                              VerticalAlignment="Center"
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource DeviceManager_ActionRandomAndChangeDevice}"
+                                               Text="{DynamicResource DeviceManager_ActionRandomChangeAndWipe}"
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>

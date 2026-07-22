@@ -1612,6 +1612,127 @@ public sealed class DeviceManagerViewModelLifecycleTests
         viewModel.Dispose();
     }
 
+    [TestMethod]
+    public async Task RandomAndChangeDeviceCommand_DeviceOffline_SetsDeviceMustBeOnlineLog()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Offline)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        viewModel.SelectedDevice = viewModel.Devices[0];
+        await viewModel.RandomAndChangeDeviceCommand.ExecuteAsync(null);
+
+        await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
+        await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
+        Assert.AreEqual(DeviceLogResourceKeys.Ready, viewModel.Devices[0].Process);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RandomAndChangeDeviceCommand_DeviceOnline_CreatesProfileAndExecutesChangeAsync()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var randomProfile = new DeviceInfoApiDevice
+        {
+            Brand = "google",
+            Model = "Pixel 8",
+            Name = "shiba",
+            Fingerprint = "google/shiba/shiba:14/UD1A.230803.041/10808077:user/release-keys",
+            AndroidId = "1234567890abcdef"
+        };
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, randomProfile));
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        viewModel.SelectedDevice = viewModel.Devices[0];
+        await viewModel.RandomAndChangeDeviceCommand.ExecuteAsync(null);
+
+        await randomDevice.Received(1).CreateRandomProfileAsync(
+            Arg.Any<RandomDeviceRequest>(),
+            Arg.Any<CancellationToken>());
+        await deviceChange.Received(1).ChangeAsync(
+            "A",
+            Arg.Is<DeviceInfoApiDevice>(p => p.Model == "Pixel 8" && p.Brand == "google"),
+            Arg.Any<bool>(),
+            Arg.Any<DeviceChangeOptions>(),
+            Arg.Any<IProgress<DeviceChangeStage>>(),
+            Arg.Any<CancellationToken>());
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RandomAndChangeDeviceCommand_RandomFailed_DoesNotExecuteChangeAsync()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(RandomDeviceStatus.Failed, null));
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        viewModel.SelectedDevice = viewModel.Devices[0];
+        await viewModel.RandomAndChangeDeviceCommand.ExecuteAsync(null);
+
+        await randomDevice.Received(1).CreateRandomProfileAsync(
+            Arg.Any<RandomDeviceRequest>(),
+            Arg.Any<CancellationToken>());
+        await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
     private static Dictionary<string, bool> GetGuardedActionStates(DeviceManagerViewModel viewModel)
     {
         return new Dictionary<string, bool>

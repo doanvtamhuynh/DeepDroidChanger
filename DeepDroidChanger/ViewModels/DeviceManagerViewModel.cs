@@ -557,16 +557,7 @@ namespace DeepDroidChanger.ViewModels
                 randomProfileLockTaken = true;
                 SetDeviceLog(device, DeviceLogResourceKeys.RandomDevice);
                 var randomResult = await _randomDeviceService
-                    .CreateRandomProfileAsync(
-                        new RandomDeviceRequest
-                        {
-                            SelectedBrand = SelectedBrand,
-                            SelectedAndroidVersion = SelectedAndroidVersion,
-                            UseIntegritySecurityPatch = UseIntegritySecurityPatch,
-                            Country = SelectedCountry,
-                            Carrier = SelectedCarrier
-                        },
-                        cancellationToken)
+                    .CreateRandomProfileAsync(CreateCurrentRandomDeviceRequest(), cancellationToken)
                     .ConfigureAwait(true);
 
                 if (randomResult.Status == RandomDeviceStatus.LoginRequired)
@@ -851,8 +842,86 @@ namespace DeepDroidChanger.ViewModels
             if (device == null)
                 return;
 
-            await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomAndChangeDevice, cancellationToken).ConfigureAwait(true);
-            SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            var randomProfileLockTaken = false;
+            DeviceInfoApiDevice? profile;
+            try
+            {
+                await _randomProfileLock.WaitAsync(cancellationToken).ConfigureAwait(true);
+                randomProfileLockTaken = true;
+                SetDeviceLog(device, DeviceLogResourceKeys.RandomDevice);
+                var randomResult = await _randomDeviceService
+                    .CreateRandomProfileAsync(CreateCurrentRandomDeviceRequest(), cancellationToken)
+                    .ConfigureAwait(true);
+
+                if (randomResult.Status == RandomDeviceStatus.LoginRequired)
+                {
+                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceLoginRequired, cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    return;
+                }
+
+                if (randomResult.Status == RandomDeviceStatus.Failed || randomResult.Profile == null)
+                {
+                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    return;
+                }
+
+                profile = randomResult.Profile;
+                ApplyRandomDeviceInfo(profile);
+            }
+            catch (OperationCanceledException)
+            {
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                return;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Unexpected failure while randomizing device info.");
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                return;
+            }
+            finally
+            {
+                if (randomProfileLockTaken)
+                    _randomProfileLock.Release();
+            }
+
+            SetDeviceLog(device, DeviceLogResourceKeys.ChangeDevice);
+
+            try
+            {
+                DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+                CopyFormValuesToProfile(profile);
+                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
+                    device,
+                    DeviceLogResourceKeys.ChangeDevice,
+                    DeviceLogResourceKeys.ChangeDeviceSuccess);
+                await _deviceChangeService
+                    .ChangeAsync(
+                        device.Serial,
+                        profile,
+                        IsChangeSimEnabled,
+                        changeOptions,
+                        progress,
+                        cancellationToken)
+                    .ConfigureAwait(true);
+
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceSuccess, cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to change device {Serial}.", device.Serial);
+                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceFailed, CancellationToken.None).ConfigureAwait(true);
+            }
+            finally
+            {
+                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
         }
 
         [RelayCommand]
@@ -2306,6 +2375,18 @@ namespace DeepDroidChanger.ViewModels
             profile.SimOperatorName = DeviceInfo.Operator.Trim();
             profile.SimPhoneNumber = DeviceInfo.PhoneNumber.Trim();
             profile.WifiMacAddress = DeviceInfo.Mac.Trim();
+        }
+
+        private RandomDeviceRequest CreateCurrentRandomDeviceRequest()
+        {
+            return new RandomDeviceRequest
+            {
+                SelectedBrand = SelectedBrand,
+                SelectedAndroidVersion = SelectedAndroidVersion,
+                UseIntegritySecurityPatch = UseIntegritySecurityPatch,
+                Country = SelectedCountry,
+                Carrier = SelectedCarrier
+            };
         }
 
         private DeviceChangeOptions CreateCurrentChangeOptions()

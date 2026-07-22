@@ -42,7 +42,7 @@
     <sys:String x:Key="Log_WipeWithoutChangeFailed">Failed to wipe device data without changing device information</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigSaved">Advanced Change Device configuration saved</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigFailed">Failed to load or save advanced Change Device configuration</sys:String>
-    <sys:String x:Key="Log_RandomAndChangeDevice">Random &amp; Change Device is not implemented yet.</sys:String>
+    <sys:String x:Key="Log_RandomAndChangeDevice">Performing Random, Change &amp; Wipe...</sys:String>
     <sys:String x:Key="Log_RandomSim">Generating random SIM information...</sys:String>
     <sys:String x:Key="Log_RandomSimSuccess">Random SIM information generated</sys:String>
     <sys:String x:Key="Log_RandomSimFailed">Failed to generate random SIM information</sys:String>
