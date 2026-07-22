@@ -836,7 +836,7 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand]
-        private async Task RandomAndChangeDeviceAsync(CancellationToken cancellationToken)
+        private async Task RandomChangeAndWipeDeviceAsync(CancellationToken cancellationToken)
         {
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)

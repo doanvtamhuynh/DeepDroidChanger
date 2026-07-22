@@ -43,7 +43,7 @@ public static class DeviceLogResourceKeys
     public const string WipeWithoutChangeFailed = "Log_WipeWithoutChangeFailed";
     public const string AdvancedChangeConfigSaved = "Log_AdvancedChangeConfigSaved";
     public const string AdvancedChangeConfigFailed = "Log_AdvancedChangeConfigFailed";
-    public const string RandomAndChangeDevice = "Log_RandomAndChangeDevice";
+    public const string RandomChangeAndWipeDevice = "Log_RandomAndChangeDevice";
     public const string RandomSim = "Log_RandomSim";
     public const string RandomSimSuccess = "Log_RandomSimSuccess";
     public const string RandomSimFailed = "Log_RandomSimFailed";

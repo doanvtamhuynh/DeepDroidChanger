@@ -1613,7 +1613,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task RandomAndChangeDeviceCommand_DeviceOffline_SetsDeviceMustBeOnlineLog()
+    public async Task RandomChangeAndWipeDeviceCommand_DeviceOffline_SetsDeviceMustBeOnlineLog()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -1636,7 +1636,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await viewModel.InitializeAsync(CancellationToken.None);
 
         viewModel.SelectedDevice = viewModel.Devices[0];
-        await viewModel.RandomAndChangeDeviceCommand.ExecuteAsync(null);
+        await viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
 
         await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
@@ -1646,7 +1646,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task RandomAndChangeDeviceCommand_DeviceOnline_CreatesProfileAndExecutesChangeAsync()
+    public async Task RandomChangeAndWipeDeviceCommand_DeviceOnline_CreatesProfileAndExecutesChangeAsync()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -1679,7 +1679,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await viewModel.InitializeAsync(CancellationToken.None);
 
         viewModel.SelectedDevice = viewModel.Devices[0];
-        await viewModel.RandomAndChangeDeviceCommand.ExecuteAsync(null);
+        await viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
 
         await randomDevice.Received(1).CreateRandomProfileAsync(
             Arg.Any<RandomDeviceRequest>(),
@@ -1697,7 +1697,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task RandomAndChangeDeviceCommand_RandomFailed_DoesNotExecuteChangeAsync()
+    public async Task RandomChangeAndWipeDeviceCommand_RandomFailed_DoesNotExecuteChangeAsync()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -1722,7 +1722,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await viewModel.InitializeAsync(CancellationToken.None);
 
         viewModel.SelectedDevice = viewModel.Devices[0];
-        await viewModel.RandomAndChangeDeviceCommand.ExecuteAsync(null);
+        await viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
 
         await randomDevice.Received(1).CreateRandomProfileAsync(
             Arg.Any<RandomDeviceRequest>(),
@@ -1741,7 +1741,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             [nameof(DeviceManagerViewModel.ChangeWithoutWipeCommand)] = viewModel.ChangeWithoutWipeCommand.CanExecute(null),
             [nameof(DeviceManagerViewModel.WipeWithoutChangeCommand)] = viewModel.WipeWithoutChangeCommand.CanExecute(null),
             [nameof(DeviceManagerViewModel.OpenAdvancedChangeConfigCommand)] = viewModel.OpenAdvancedChangeConfigCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.RandomAndChangeDeviceCommand)] = viewModel.RandomAndChangeDeviceCommand.CanExecute(null),
+            [nameof(DeviceManagerViewModel.RandomChangeAndWipeDeviceCommand)] = viewModel.RandomChangeAndWipeDeviceCommand.CanExecute(null),
             [nameof(DeviceManagerViewModel.ChangeSimCommand)] = viewModel.ChangeSimCommand.CanExecute(null),
             [nameof(DeviceManagerViewModel.ChangeLocationCommand)] = viewModel.ChangeLocationCommand.CanExecute(null),
             [nameof(DeviceManagerViewModel.ChangeTimezoneCommand)] = viewModel.ChangeTimezoneCommand.CanExecute(null),

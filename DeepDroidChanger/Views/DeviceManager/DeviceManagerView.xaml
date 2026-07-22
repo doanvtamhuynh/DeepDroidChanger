@@ -639,7 +639,7 @@
                             </Button>
                             <Button Grid.Row="3"
                                     Grid.Column="0"
-                                    Command="{Binding RandomAndChangeDeviceCommand}"
+                                    Command="{Binding RandomChangeAndWipeDeviceCommand}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
