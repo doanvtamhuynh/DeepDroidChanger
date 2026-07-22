@@ -13,7 +13,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations;
 public sealed class SettingsServiceTests
 {
     [TestMethod]
-    public async Task LoadAsync_MissingFile_WritesDefaultChangeDeviceConfiguration()
+    public async Task LoadAsync_MissingFile_WritesDefaultSettings()
     {
         using var fixture = new TestTempDirectory();
         string path = Path.Combine(fixture.Path, "settings.json");
@@ -23,61 +23,48 @@ public sealed class SettingsServiceTests
 
         AppSettings settings = await service.LoadAsync(CancellationToken.None);
 
-        Assert.IsTrue(settings.ChangeOptions.UseDefaultMode);
-        Assert.IsTrue(settings.ChangeOptions.ChangeMacAddress);
-        Assert.IsTrue(settings.ChangeOptions.ClearAllPackages);
-        Assert.IsTrue(settings.ChangeOptions.ClearGoogleAccounts);
+        Assert.AreEqual(LanguageConstants.English, settings.Language);
+        Assert.AreEqual(ThemeConstants.Dark, settings.Theme);
+        Assert.IsFalse(settings.SidebarCollapsed);
+        Assert.AreEqual("Settings/devices.json", settings.DeviceDataFilePath);
+        Assert.AreEqual(string.Empty, settings.SelectedDeviceSerial);
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        JsonElement options = document.RootElement.GetProperty("ChangeOptions");
-        Assert.IsTrue(options.GetProperty("UseDefaultMode").GetBoolean());
-        Assert.IsTrue(options.GetProperty("ChangeMacAddress").GetBoolean());
-        Assert.IsTrue(options.GetProperty("ClearAllPackages").GetBoolean());
-        Assert.IsTrue(options.GetProperty("ClearGoogleAccounts").GetBoolean());
+        Assert.AreEqual(ThemeConstants.Dark, document.RootElement.GetProperty("Theme").GetString());
+        Assert.AreEqual(LanguageConstants.English, document.RootElement.GetProperty("Language").GetString());
     }
 
     [TestMethod]
-    public async Task SaveLoadAsync_PreservesGlobalChangeOptionsAndNormalizesPackages()
+    public async Task SaveLoadAsync_PreservesAppSettingsProperties()
     {
         using var fixture = new TestTempDirectory();
         string path = Path.Combine(fixture.Path, "settings.json");
         IThemeService themes = Substitute.For<IThemeService>();
-        themes.NormalizeTheme(Arg.Any<string>()).Returns(ThemeConstants.Dark);
+        themes.NormalizeTheme("light").Returns("light");
         var service = new SettingsService(path, themes, NullLogger<SettingsService>.Instance);
         var settings = new AppSettings
         {
-            ChangeOptions = new DeviceChangeOptions
-            {
-                UseDefaultMode = false,
-                ChangeMacAddress = false,
-                ClearAllPackages = false,
-                ClearSelectedPackages = true,
-                ClearGoogleAccounts = false,
-                SelectedPackages = [" com.example.two ", "com.example.one", "com.example.one"]
-            }
+            Language = LanguageConstants.Vietnamese,
+            Theme = "light",
+            SidebarCollapsed = true,
+            SelectedDeviceSerial = "DEVICE_123"
         };
 
         await service.SaveAsync(settings, CancellationToken.None);
         using (JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path)))
         {
-            JsonElement options = document.RootElement.GetProperty("ChangeOptions");
-            Assert.IsFalse(options.GetProperty("UseDefaultMode").GetBoolean());
-            Assert.IsFalse(options.GetProperty("ChangeMacAddress").GetBoolean());
-            Assert.IsFalse(options.GetProperty("ClearAllPackages").GetBoolean());
-            Assert.IsTrue(options.GetProperty("ClearSelectedPackages").GetBoolean());
-            Assert.IsFalse(options.GetProperty("ClearGoogleAccounts").GetBoolean());
+            Assert.AreEqual("light", document.RootElement.GetProperty("Theme").GetString());
+            Assert.AreEqual(LanguageConstants.Vietnamese, document.RootElement.GetProperty("Language").GetString());
+            Assert.IsTrue(document.RootElement.GetProperty("SidebarCollapsed").GetBoolean());
+            Assert.AreEqual("DEVICE_123", document.RootElement.GetProperty("SelectedDeviceSerial").GetString());
         }
 
         AppSettings loaded = await service.LoadAsync(CancellationToken.None);
 
-        Assert.IsFalse(loaded.ChangeOptions.UseDefaultMode);
-        Assert.IsFalse(loaded.ChangeOptions.ChangeMacAddress);
-        Assert.IsFalse(loaded.ChangeOptions.ClearAllPackages);
-        Assert.IsTrue(loaded.ChangeOptions.ClearSelectedPackages);
-        Assert.IsFalse(loaded.ChangeOptions.ClearGoogleAccounts);
-        CollectionAssert.AreEqual(
-            new[] { "com.example.one", "com.example.two" },
-            loaded.ChangeOptions.SelectedPackages);
+        Assert.AreEqual(LanguageConstants.Vietnamese, loaded.Language);
+        Assert.AreEqual("light", loaded.Theme);
+        Assert.IsTrue(loaded.SidebarCollapsed);
+        Assert.AreEqual("DEVICE_123", loaded.SelectedDeviceSerial);
     }
 
     [TestMethod]

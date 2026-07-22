@@ -203,6 +203,5 @@ public sealed partial class App : Application
         target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
         target.DeviceDataFilePath = source.DeviceDataFilePath;
         target.SelectedDeviceSerial = source.SelectedDeviceSerial;
-        target.ChangeOptions = source.ChangeOptions;
     }
 }

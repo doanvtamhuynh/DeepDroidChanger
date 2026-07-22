@@ -138,7 +138,6 @@ namespace DeepDroidChanger.Services
 
             settings.DeviceDataFilePath ??= "Settings/devices.json";
             settings.SelectedDeviceSerial ??= string.Empty;
-            settings.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(settings.ChangeOptions);
         }
     }
 }
