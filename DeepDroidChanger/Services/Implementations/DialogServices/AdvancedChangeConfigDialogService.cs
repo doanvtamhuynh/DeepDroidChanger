@@ -20,9 +20,10 @@ public sealed class AdvancedChangeConfigDialogService : IAdvancedChangeConfigDia
         _logger = logger;
     }
 
-    public Task<DeviceChangeOptions?> ShowAdvancedChangeConfigAsync(
+    public Task<AdvancedChangeConfigDialogResult?> ShowAdvancedChangeConfigAsync(
         string deviceSerial,
         DeviceChangeOptions currentOptions,
+        bool useIntegritySecurityPatch,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -31,18 +32,18 @@ public sealed class AdvancedChangeConfigDialogService : IAdvancedChangeConfigDia
         using var scope = _scopeFactory.CreateScope();
         AdvancedChangeConfigViewModel viewModel =
             scope.ServiceProvider.GetRequiredService<AdvancedChangeConfigViewModel>();
-        viewModel.Initialize(deviceSerial, currentOptions);
+        viewModel.Initialize(deviceSerial, currentOptions, useIntegritySecurityPatch);
 
         AdvancedChangeConfigDialog window =
             scope.ServiceProvider.GetRequiredService<AdvancedChangeConfigDialog>();
         window.Owner = Application.Current?.MainWindow;
         window.DataContext = viewModel;
 
-        DeviceChangeOptions? result = null;
-        viewModel.CloseRequested += (_, options) =>
+        AdvancedChangeConfigDialogResult? result = null;
+        viewModel.CloseRequested += (_, dialogResult) =>
         {
-            result = options;
-            window.DialogResult = options != null;
+            result = dialogResult;
+            window.DialogResult = dialogResult != null;
         };
 
         window.ShowDialog();

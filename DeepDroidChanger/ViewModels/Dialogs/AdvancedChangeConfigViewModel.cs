@@ -23,6 +23,9 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
     private bool _changeMacAddress = true;
 
     [ObservableProperty]
+    private bool _useIntegritySecurityPatch = true;
+
+    [ObservableProperty]
     private bool _useRmRfForPackageCleanup;
 
     [ObservableProperty]
@@ -87,11 +90,12 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
 
     public bool IsPackageSelectionActive => !ClearAllPackages && ClearSelectedPackages;
 
-    public event EventHandler<DeviceChangeOptions?>? CloseRequested;
+    public event EventHandler<AdvancedChangeConfigDialogResult?>? CloseRequested;
 
     public void Initialize(
         string deviceSerial,
-        DeviceChangeOptions options)
+        DeviceChangeOptions options,
+        bool useIntegritySecurityPatch = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(deviceSerial);
         ArgumentNullException.ThrowIfNull(options);
@@ -99,6 +103,7 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         _deviceSerial = deviceSerial;
         ChangeAndroidId = options.ChangeAndroidId;
         ChangeMacAddress = options.ChangeMacAddress;
+        UseIntegritySecurityPatch = useIntegritySecurityPatch;
         UseRmRfForPackageCleanup = options.UseRmRfForPackageCleanup;
         ClearAllPackages = options.ClearAllPackages;
         ClearSelectedPackages = options.ClearSelectedPackages;
@@ -249,7 +254,7 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private void Confirm()
     {
-        CloseRequested?.Invoke(this, new DeviceChangeOptions
+        var options = new DeviceChangeOptions
         {
             UseDefaultMode = false,
             ChangeAndroidId = ChangeAndroidId,
@@ -260,7 +265,8 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
             ClearGooglePackages = ClearGooglePackages,
             ClearGoogleAccounts = ClearGoogleAccounts,
             SelectedPackages = DeviceChangeOptionsHelper.NormalizePackageNames(SelectedPackages)
-        });
+        };
+        CloseRequested?.Invoke(this, new AdvancedChangeConfigDialogResult(options, UseIntegritySecurityPatch));
     }
 
     private bool CanConfirm()

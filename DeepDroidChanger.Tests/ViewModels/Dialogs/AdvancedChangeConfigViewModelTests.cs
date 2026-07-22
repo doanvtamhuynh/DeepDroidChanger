@@ -20,7 +20,9 @@ public sealed class AdvancedChangeConfigViewModelTests
         viewModel.Initialize("SERIAL", new DeviceChangeOptions());
 
         Assert.IsFalse(viewModel.IsPackageSelectionActive);
+        Assert.IsFalse(viewModel.ChangeAndroidId);
         Assert.IsTrue(viewModel.ChangeMacAddress);
+        Assert.IsFalse(viewModel.UseRmRfForPackageCleanup);
         Assert.IsTrue(viewModel.ClearAllPackages);
         Assert.IsTrue(viewModel.ClearGoogleAccounts);
         Assert.IsFalse(viewModel.ClearGooglePackages);
@@ -157,8 +159,10 @@ public sealed class AdvancedChangeConfigViewModelTests
         Assert.IsFalse(viewModel.IsPackageSelectionActive);
     }
 
+    [DataRow(false)]
+    [DataRow(true)]
     [TestMethod]
-    public void Confirm_ReturnsSeparatedChangeAndWipeOptions()
+    public void Confirm_ReturnsSeparatedChangeWipeAndIntegrityOptions(bool useIntegritySecurityPatch)
     {
         AdvancedChangeConfigViewModel viewModel = CreateViewModel(Substitute.For<IDevicePackageService>());
         viewModel.Initialize(
@@ -173,20 +177,23 @@ public sealed class AdvancedChangeConfigViewModelTests
                 ClearGooglePackages = true,
                 ClearGoogleAccounts = true,
                 SelectedPackages = ["com.example.app"]
-            });
-        DeviceChangeOptions? result = null;
-        viewModel.CloseRequested += (_, options) => result = options;
+            },
+            useIntegritySecurityPatch);
+        AdvancedChangeConfigDialogResult? result = null;
+        viewModel.CloseRequested += (_, dialogResult) => result = dialogResult;
 
         viewModel.ConfirmCommand.Execute(null);
 
         Assert.IsNotNull(result);
-        Assert.IsFalse(result.UseDefaultMode);
-        Assert.IsTrue(result.ChangeAndroidId);
-        Assert.IsFalse(result.ChangeMacAddress);
-        Assert.IsTrue(result.UseRmRfForPackageCleanup);
-        Assert.IsTrue(result.ClearGooglePackages);
-        Assert.IsTrue(result.ClearGoogleAccounts);
-        CollectionAssert.AreEqual(new[] { "com.example.app" }, result.SelectedPackages);
+        Assert.AreEqual(useIntegritySecurityPatch, result.UseIntegritySecurityPatch);
+        DeviceChangeOptions options = result.Options;
+        Assert.IsFalse(options.UseDefaultMode);
+        Assert.IsTrue(options.ChangeAndroidId);
+        Assert.IsFalse(options.ChangeMacAddress);
+        Assert.IsTrue(options.UseRmRfForPackageCleanup);
+        Assert.IsTrue(options.ClearGooglePackages);
+        Assert.IsTrue(options.ClearGoogleAccounts);
+        CollectionAssert.AreEqual(new[] { "com.example.app" }, options.SelectedPackages);
     }
 
     private static AdvancedChangeConfigViewModel CreateViewModel(

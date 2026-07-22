@@ -69,8 +69,7 @@ namespace DeepDroidChanger.ViewModels
         private bool _isUpdatingCarrierOptions;
         [ObservableProperty]
         private bool _isChangeSimEnabled = true;
-        [ObservableProperty]
-        private bool _useIntegritySecurityPatch;
+        private bool _useIntegritySecurityPatch = true;
         [ObservableProperty]
         private bool _useDefaultChangeMode = true;
         private bool _isLoadingDevices;
@@ -304,12 +303,6 @@ namespace DeepDroidChanger.ViewModels
         }
 
         partial void OnIsChangeSimEnabledChanged(bool value)
-        {
-            if (!_isApplyingDeviceConfig)
-                QueueSelectedDeviceProfileSave();
-        }
-
-        partial void OnUseIntegritySecurityPatchChanged(bool value)
         {
             if (!_isApplyingDeviceConfig)
                 QueueSelectedDeviceProfileSave();
@@ -795,20 +788,22 @@ namespace DeepDroidChanger.ViewModels
             SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
             try
             {
-                DeviceChangeOptions? result = await _advancedChangeConfigDialogService
+                AdvancedChangeConfigDialogResult? result = await _advancedChangeConfigDialogService
                     .ShowAdvancedChangeConfigAsync(
                         device.Serial,
                         DeviceChangeOptionsHelper.CreateNormalizedCopy(
                             _deviceChangeOptions,
                             useDefaultMode: false),
+                        _useIntegritySecurityPatch,
                         cancellationToken)
                     .ConfigureAwait(true);
                 if (result == null)
                     return;
 
                 _deviceChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
-                    result,
+                    result.Options,
                     useDefaultMode: false);
+                _useIntegritySecurityPatch = result.UseIntegritySecurityPatch;
                 UseDefaultChangeMode = false;
                 QueueSelectedDeviceProfileSave();
                 await ShowDeviceLogAsync(
@@ -1900,7 +1895,7 @@ namespace DeepDroidChanger.ViewModels
                 SelectedBrand = FindOption(Brands, storedDevice?.Brand) ?? DeviceProfileOptions.Random;
                 UpdateAndroidVersionOptions(SelectedBrand, storedDevice?.AndroidVersion);
                 IsChangeSimEnabled = storedDevice?.ChangeSimEnabled ?? true;
-                UseIntegritySecurityPatch = storedDevice?.UseIntegritySecurityPatch ?? false;
+                _useIntegritySecurityPatch = storedDevice?.UseIntegritySecurityPatch ?? true;
                 _deviceChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
                     storedDevice?.ChangeOptions ?? new DeviceChangeOptions());
                 UseDefaultChangeMode = _deviceChangeOptions.UseDefaultMode;
@@ -2030,7 +2025,7 @@ namespace DeepDroidChanger.ViewModels
                 Brand = SelectedBrand ?? string.Empty,
                 AndroidVersion = SelectedAndroidVersion ?? string.Empty,
                 ChangeSimEnabled = IsChangeSimEnabled,
-                UseIntegritySecurityPatch = UseIntegritySecurityPatch,
+                UseIntegritySecurityPatch = _useIntegritySecurityPatch,
                 CountryIso = SelectedCountry?.CountryIso ?? string.Empty,
                 CountryName = SelectedCountry?.CountryName ?? string.Empty,
                 Carrier = SelectedCarrier?.CarrierName ?? string.Empty,
@@ -2383,7 +2378,7 @@ namespace DeepDroidChanger.ViewModels
             {
                 SelectedBrand = SelectedBrand,
                 SelectedAndroidVersion = SelectedAndroidVersion,
-                UseIntegritySecurityPatch = UseIntegritySecurityPatch,
+                UseIntegritySecurityPatch = UseDefaultChangeMode || _useIntegritySecurityPatch,
                 Country = SelectedCountry,
                 Carrier = SelectedCarrier
             };

@@ -44,21 +44,18 @@
             <StackPanel>
                 <TextBlock Text="{DynamicResource AdvancedChangeConfig_ChangeSectionTitle}"
                            Style="{StaticResource SubtitleTextStyle}"/>
-                <TextBlock Text="{DynamicResource AdvancedChangeConfig_ChangeSectionDescription}"
-                           Style="{StaticResource SecondaryTextStyle}"/>
                 <UniformGrid Columns="3"
                              Rows="1"
-                             Margin="0,12,0,0">
+                             Margin="0,8,0,0">
                     <CheckBox x:Name="ChangeAndroidIdCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeAndroidId}"
                               IsChecked="{Binding ChangeAndroidId, Mode=TwoWay}"/>
                     <CheckBox x:Name="ChangeMacAddressCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeMac}"
                               IsChecked="{Binding ChangeMacAddress, Mode=TwoWay}"/>
-                    <CheckBox x:Name="UseRmRfForPackageCleanupCheckBox"
-                              Content="{DynamicResource AdvancedChangeConfig_UseRmRfForPackageCleanup}"
-                              ToolTip="{DynamicResource AdvancedChangeConfig_UseRmRfForPackageCleanupDescription}"
-                              IsChecked="{Binding UseRmRfForPackageCleanup, Mode=TwoWay}"/>
+                    <CheckBox x:Name="UseIntegritySecurityPatchCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_UseIntegritySecurityPatch}"
+                              IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"/>
                 </UniformGrid>
             </StackPanel>
         </Border>
@@ -69,46 +66,51 @@
             <StackPanel>
                 <TextBlock Text="{DynamicResource AdvancedChangeConfig_WipeSectionTitle}"
                            Style="{StaticResource SubtitleTextStyle}"/>
-                <TextBlock Text="{DynamicResource AdvancedChangeConfig_WipeSectionDescription}"
-                           Style="{StaticResource SecondaryTextStyle}"/>
-                <Grid Margin="0,12,0,0">
+                <CheckBox x:Name="UseDeepPackageWipeCheckBox"
+                          Content="{DynamicResource AdvancedChangeConfig_UseDeepPackageWipe}"
+                          ToolTip="{DynamicResource AdvancedChangeConfig_UseDeepPackageWipeDescription}"
+                          IsChecked="{Binding UseRmRfForPackageCleanup, Mode=TwoWay}"
+                          Margin="0,8,0,0"/>
+                <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="16"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                    <GroupBox x:Name="PrimaryWipeOptionsGroup"
+                    <CheckBox x:Name="ClearAllPackagesCheckBox"
+                              Grid.Row="0"
                               Grid.Column="0"
-                              Header="{DynamicResource AdvancedChangeConfig_PrimaryWipeOptions}">
-                        <StackPanel>
-                            <CheckBox x:Name="ClearAllPackagesCheckBox"
-                                      Content="{DynamicResource AdvancedChangeConfig_ClearAllPackages}"
-                                      IsChecked="{Binding ClearAllPackages, Mode=TwoWay}"
-                                      Margin="0,6,0,0"/>
-                            <CheckBox x:Name="ClearGoogleAccountsCheckBox"
-                                      Content="{DynamicResource AdvancedChangeConfig_ClearGoogleAccounts}"
-                                      IsChecked="{Binding ClearGoogleAccounts, Mode=TwoWay}"
-                                      Margin="0,8,0,0"/>
-                        </StackPanel>
-                    </GroupBox>
+                              Content="{DynamicResource AdvancedChangeConfig_ClearAllPackages}"
+                              IsChecked="{Binding ClearAllPackages, Mode=TwoWay}"
+                              Margin="0,4,0,4"/>
 
-                    <GroupBox x:Name="SelectiveWipeOptionsGroup"
+                    <CheckBox x:Name="ClearGooglePackagesCheckBox"
+                              Grid.Row="0"
                               Grid.Column="2"
-                              Header="{DynamicResource AdvancedChangeConfig_SelectiveWipeOptions}"
-                              Style="{StaticResource AdvancedChangeConfigSelectiveGroupStyle}"
-                              IsEnabled="{Binding IsSelectiveWipeEnabled}">
-                        <StackPanel>
-                            <CheckBox x:Name="ClearGooglePackagesCheckBox"
-                                      Content="{DynamicResource AdvancedChangeConfig_ClearGooglePackages}"
-                                      IsChecked="{Binding ClearGooglePackages, Mode=TwoWay}"
-                                      Margin="0,6,0,0"/>
-                            <CheckBox x:Name="ClearSelectedPackagesCheckBox"
-                                      Content="{DynamicResource AdvancedChangeConfig_ClearSelectedPackages}"
-                                      IsChecked="{Binding ClearSelectedPackages, Mode=TwoWay}"
-                                      Margin="0,8,0,0"/>
-                        </StackPanel>
-                    </GroupBox>
+                              Content="{DynamicResource AdvancedChangeConfig_ClearGooglePackages}"
+                              IsChecked="{Binding ClearGooglePackages, Mode=TwoWay}"
+                              IsEnabled="{Binding IsSelectiveWipeEnabled}"
+                              Margin="0,4,0,4"/>
+
+                    <CheckBox x:Name="ClearGoogleAccountsCheckBox"
+                              Grid.Row="1"
+                              Grid.Column="0"
+                              Content="{DynamicResource AdvancedChangeConfig_ClearGoogleAccounts}"
+                              IsChecked="{Binding ClearGoogleAccounts, Mode=TwoWay}"
+                              Margin="0,4,0,4"/>
+
+                    <CheckBox x:Name="ClearSelectedPackagesCheckBox"
+                              Grid.Row="1"
+                              Grid.Column="2"
+                              Content="{DynamicResource AdvancedChangeConfig_ClearSelectedPackages}"
+                              IsChecked="{Binding ClearSelectedPackages, Mode=TwoWay}"
+                              IsEnabled="{Binding IsSelectiveWipeEnabled}"
+                              Margin="0,4,0,4"/>
                 </Grid>
             </StackPanel>
         </Border>
@@ -190,23 +192,27 @@
                     <StackPanel Grid.Column="1"
                                 VerticalAlignment="Center"
                                 Margin="12,0">
-                        <Button Command="{Binding AddSelectedPackageCommand}"
-                                Style="{StaticResource FlatButtonStyle}"
+                        <Button x:Name="AddSelectedPackageButton"
+                                Command="{Binding AddSelectedPackageCommand}"
+                                Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
                                 ToolTip="{DynamicResource AdvancedChangeConfig_AddSelectedPackage}">
                             <materialDesign:PackIcon Kind="ChevronRight"/>
                         </Button>
-                        <Button Command="{Binding RemoveSelectedPackageCommand}"
-                                Style="{StaticResource FlatButtonStyle}"
+                        <Button x:Name="RemoveSelectedPackageButton"
+                                Command="{Binding RemoveSelectedPackageCommand}"
+                                Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
                                 ToolTip="{DynamicResource AdvancedChangeConfig_RemoveSelectedPackage}">
                             <materialDesign:PackIcon Kind="ChevronLeft"/>
                         </Button>
-                        <Button Command="{Binding AddAllPackagesCommand}"
-                                Style="{StaticResource FlatButtonStyle}"
+                        <Button x:Name="AddAllPackagesButton"
+                                Command="{Binding AddAllPackagesCommand}"
+                                Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
                                 ToolTip="{DynamicResource AdvancedChangeConfig_AddAllPackages}">
                             <materialDesign:PackIcon Kind="ChevronDoubleRight"/>
                         </Button>
-                        <Button Command="{Binding RemoveAllPackagesCommand}"
-                                Style="{StaticResource FlatButtonStyle}"
+                        <Button x:Name="RemoveAllPackagesButton"
+                                Command="{Binding RemoveAllPackagesCommand}"
+                                Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
                                 ToolTip="{DynamicResource AdvancedChangeConfig_RemoveAllPackages}">
                             <materialDesign:PackIcon Kind="ChevronDoubleLeft"/>
                         </Button>

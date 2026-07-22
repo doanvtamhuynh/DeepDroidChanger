@@ -8,7 +8,7 @@ namespace DeepDroidChanger.Services
 {
     public sealed class DeviceStoreService : IDeviceStoreService
     {
-        private const int CurrentDocumentVersion = 4;
+        private const int CurrentDocumentVersion = 5;
         private const string SettingsDirectoryName = "Settings";
         private const string DevicesFileName = "devices.json";
 

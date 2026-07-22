@@ -4,8 +4,9 @@ namespace DeepDroidChanger.Services;
 
 public interface IAdvancedChangeConfigDialogService
 {
-    Task<DeviceChangeOptions?> ShowAdvancedChangeConfigAsync(
+    Task<AdvancedChangeConfigDialogResult?> ShowAdvancedChangeConfigAsync(
         string deviceSerial,
         DeviceChangeOptions currentOptions,
+        bool useIntegritySecurityPatch,
         CancellationToken cancellationToken);
 }

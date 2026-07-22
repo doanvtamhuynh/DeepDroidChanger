@@ -68,8 +68,8 @@ namespace DeepDroidChanger.Tests.Services.Implementations
                 ChangeOptions = new DeviceChangeOptions
                 {
                     UseDefaultMode = false,
-                    ClearAllPackages = false,
                     ChangeAndroidId = true,
+                    ClearAllPackages = false,
                     ClearSelectedPackages = true,
                     ChangeMacAddress = false,
                     UseRmRfForPackageCleanup = true,
@@ -96,9 +96,9 @@ namespace DeepDroidChanger.Tests.Services.Implementations
             Assert.AreEqual("452", config.CarrierMcc);
             Assert.AreEqual("04", config.CarrierMnc);
             Assert.IsFalse(config.ChangeOptions.UseDefaultMode);
+            Assert.IsTrue(config.ChangeOptions.ChangeAndroidId);
             Assert.IsTrue(config.ChangeOptions.ClearSelectedPackages);
             Assert.IsFalse(config.ChangeOptions.ChangeMacAddress);
-            Assert.IsTrue(config.ChangeOptions.ChangeAndroidId);
             Assert.IsTrue(config.ChangeOptions.UseRmRfForPackageCleanup);
             Assert.IsTrue(config.ChangeOptions.ClearGooglePackages);
             Assert.IsTrue(config.ChangeOptions.ClearGoogleAccounts);

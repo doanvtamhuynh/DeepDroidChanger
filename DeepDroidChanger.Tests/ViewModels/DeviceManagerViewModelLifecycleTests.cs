@@ -261,7 +261,6 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 ChangeOptions = new DeviceChangeOptions
                 {
                     UseDefaultMode = false,
-                    ChangeAndroidId = true,
                     ClearAllPackages = false,
                     ClearSelectedPackages = true,
                     SelectedPackages = ["com.example.app"]
@@ -287,7 +286,6 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.AreEqual("Samsung", viewModel.SelectedBrand);
         Assert.AreEqual("Android 15", viewModel.SelectedAndroidVersion);
         Assert.IsFalse(viewModel.IsChangeSimEnabled);
-        Assert.IsTrue(viewModel.UseIntegritySecurityPatch);
         Assert.IsFalse(viewModel.UseDefaultChangeMode);
         Assert.AreEqual("Vietnam (VN)", viewModel.SelectedCountry?.DisplayName);
         Assert.AreEqual("Viettel (MCC 452 / MNC 04)", viewModel.SelectedCarrier?.DisplayName);
@@ -325,7 +323,6 @@ public sealed class DeviceManagerViewModelLifecycleTests
 
         viewModel.SelectedBrand = "Samsung";
         viewModel.IsChangeSimEnabled = false;
-        viewModel.UseIntegritySecurityPatch = true;
         viewModel.UseDefaultChangeMode = false;
         viewModel.SelectedDevice = viewModel.Devices[1];
         viewModel.SelectedBrand = "Google";
@@ -346,7 +343,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Arg.Is<DeviceProfileConfig>(profile =>
                 profile.Brand == "Google"
                 && profile.ChangeSimEnabled
-                && !profile.UseIntegritySecurityPatch
+                && profile.UseIntegritySecurityPatch
                 && profile.ChangeOptions.UseDefaultMode),
             Arg.Any<CancellationToken>());
         viewModel.Dispose();
@@ -363,7 +360,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 Name = "Phone",
                 Type = "Phone",
                 Brand = "Samsung",
-                UseIntegritySecurityPatch = true
+                UseIntegritySecurityPatch = false
             }
         ];
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
@@ -575,7 +572,18 @@ public sealed class DeviceManagerViewModelLifecycleTests
     {
         StoredDeviceConfig[] storedDevices =
         [
-            new() { Serial = "A", Name = "Phone", Type = "Phone", ChangeSimEnabled = false }
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                ChangeSimEnabled = false,
+                ChangeOptions = new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true
+                }
+            }
         ];
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
@@ -591,8 +599,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Code = "e3q",
             Name = "e3qxxx",
             Fingerprint = "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
-            Serial = "NEW-SERIAL",
-            AndroidId = "0123456789abcdef"
+            Serial = "NEW-SERIAL"
         };
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, profile));
@@ -625,7 +632,9 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
             "Phone",
             "A",
-            Arg.Is<DeviceChangeOptions>(options => options.UseDefaultMode),
+            Arg.Is<DeviceChangeOptions>(options =>
+                !options.UseDefaultMode
+                && options.ChangeAndroidId),
             Arg.Any<CancellationToken>());
         await deviceChange.Received(1).ChangeAsync(
             "A",
@@ -633,8 +642,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
             false,
             Arg.Is<DeviceChangeOptions>(options =>
                 ReferenceEquals(options, confirmedOptions)
-                && options.UseDefaultMode
-                && !options.ChangeAndroidId
+                && !options.UseDefaultMode
+                && options.ChangeAndroidId
                 && options.ChangeMacAddress
                 && options.ClearAllPackages
                 && options.ClearGoogleAccounts),
@@ -649,7 +658,18 @@ public sealed class DeviceManagerViewModelLifecycleTests
     {
         StoredDeviceConfig[] storedDevices =
         [
-            new() { Serial = "A", Name = "Phone", Type = "Phone", ChangeSimEnabled = false }
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                ChangeSimEnabled = false,
+                ChangeOptions = new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true
+                }
+            }
         ];
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
@@ -663,8 +683,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Model = "SM-S928B",
             Name = "e3qxxx",
             Fingerprint = "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
-            Serial = "NEW-SERIAL",
-            AndroidId = "0123456789abcdef"
+            Serial = "NEW-SERIAL"
         };
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
@@ -696,7 +715,9 @@ public sealed class DeviceManagerViewModelLifecycleTests
             "A",
             profile,
             false,
-            Arg.Is<DeviceChangeOptions>(options => options.UseDefaultMode),
+            Arg.Is<DeviceChangeOptions>(options =>
+                !options.UseDefaultMode
+                && options.ChangeAndroidId),
             Arg.Any<IProgress<DeviceChangeStage>>(),
             Arg.Any<CancellationToken>());
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
@@ -718,6 +739,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 ChangeOptions = new DeviceChangeOptions
                 {
                     UseDefaultMode = false,
+                    ChangeAndroidId = true,
                     ClearAllPackages = false,
                     ClearSelectedPackages = true,
                     SelectedPackages = ["com.example.app"],
@@ -752,6 +774,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             "A",
             Arg.Is<DeviceChangeOptions>(options =>
                 !options.UseDefaultMode
+                && options.ChangeAndroidId
                 && !options.ClearAllPackages
                 && options.ClearSelectedPackages
                 && !options.ClearGoogleAccounts
@@ -954,6 +977,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 Serial = "A",
                 Name = "Phone",
                 Type = "Phone",
+                UseIntegritySecurityPatch = false,
                 ChangeOptions = new DeviceChangeOptions
                 {
                     UseDefaultMode = false,
@@ -972,18 +996,22 @@ public sealed class DeviceManagerViewModelLifecycleTests
         dialog.ShowAdvancedChangeConfigAsync(
                 "A",
                 Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new DeviceChangeOptions
-            {
-                UseDefaultMode = false,
-                ClearAllPackages = false,
-                ClearSelectedPackages = true,
-                SelectedPackages = ["com.example.app"],
-                ChangeMacAddress = false,
-                ChangeAndroidId = true,
-                ClearGooglePackages = true,
-                ClearGoogleAccounts = true
-            });
+            .Returns(new AdvancedChangeConfigDialogResult(
+                new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true,
+                    ClearAllPackages = false,
+                    ClearSelectedPackages = true,
+                    SelectedPackages = ["com.example.app"],
+                    ChangeMacAddress = false,
+                    UseRmRfForPackageCleanup = true,
+                    ClearGooglePackages = true,
+                    ClearGoogleAccounts = true
+                },
+                false));
         IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
         var viewModel = CreateViewModel(
             deviceList,
@@ -1002,6 +1030,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await dialog.Received(1).ShowAdvancedChangeConfigAsync(
             "A",
             Arg.Is<DeviceChangeOptions>(options => !options.UseDefaultMode),
+            Arg.Is<bool>(useIntegritySecurityPatch => !useIntegritySecurityPatch),
             Arg.Any<CancellationToken>());
         await viewModel.DeactivateAsync();
         await deviceConfig.Received(1).SaveDeviceProfileAsync(
@@ -1009,9 +1038,10 @@ public sealed class DeviceManagerViewModelLifecycleTests
             "A",
             Arg.Is<DeviceProfileConfig>(profile =>
                 !profile.ChangeOptions.UseDefaultMode
+                && profile.ChangeOptions.ChangeAndroidId
+                && !profile.UseIntegritySecurityPatch
                 && profile.ChangeOptions.ClearSelectedPackages
                 && !profile.ChangeOptions.ChangeMacAddress
-                && profile.ChangeOptions.ChangeAndroidId
                 && profile.ChangeOptions.ClearGooglePackages
                 && profile.ChangeOptions.ClearGoogleAccounts
                 && profile.ChangeOptions.SelectedPackages.SequenceEqual(new[] { "com.example.app" })),
@@ -1650,7 +1680,17 @@ public sealed class DeviceManagerViewModelLifecycleTests
     {
         StoredDeviceConfig[] storedDevices =
         [
-            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                ChangeOptions = new DeviceChangeOptions
+                {
+                    UseDefaultMode = false,
+                    ChangeAndroidId = true
+                }
+            }
         ];
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
@@ -1663,8 +1703,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Brand = "google",
             Model = "Pixel 8",
             Name = "shiba",
-            Fingerprint = "google/shiba/shiba:14/UD1A.230803.041/10808077:user/release-keys",
-            AndroidId = "1234567890abcdef"
+            Fingerprint = "google/shiba/shiba:14/UD1A.230803.041/10808077:user/release-keys"
         };
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
@@ -1688,7 +1727,9 @@ public sealed class DeviceManagerViewModelLifecycleTests
             "A",
             Arg.Is<DeviceInfoApiDevice>(p => p.Model == "Pixel 8" && p.Brand == "google"),
             Arg.Any<bool>(),
-            Arg.Any<DeviceChangeOptions>(),
+            Arg.Is<DeviceChangeOptions>(options =>
+                !options.UseDefaultMode
+                && options.ChangeAndroidId),
             Arg.Any<IProgress<DeviceChangeStage>>(),
             Arg.Any<CancellationToken>());
 

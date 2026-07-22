@@ -11,18 +11,6 @@
         <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
     </Style>
 
-    <Style x:Key="AdvancedChangeConfigSelectiveGroupStyle"
-           TargetType="GroupBox"
-           BasedOn="{StaticResource {x:Type GroupBox}}">
-        <Style.Triggers>
-            <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
-                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                <Setter Property="Opacity" Value="0.48"/>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
     <Style x:Key="AdvancedChangeConfigPackagePanelStyle"
            TargetType="Border"
            BasedOn="{StaticResource CardBorderStyle}">
@@ -32,6 +20,18 @@
                 <Setter Property="Opacity" Value="0.48"/>
             </Trigger>
         </Style.Triggers>
+    </Style>
+
+    <Style x:Key="AdvancedChangeConfigTransferButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource FlatButtonStyle}">
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="LayoutTransform">
+            <Setter.Value>
+                <ScaleTransform ScaleX="0.7" ScaleY="0.7"/>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="AdvancedChangeConfigPrimaryButtonStyle"

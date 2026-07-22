@@ -57,7 +57,7 @@ public sealed class DeviceStoreServiceTests
 
         Assert.HasCount(1, devices);
         Assert.IsTrue(devices[0].ChangeSimEnabled);
-        Assert.IsFalse(devices[0].UseIntegritySecurityPatch);
+        Assert.IsTrue(devices[0].UseIntegritySecurityPatch);
         Assert.AreEqual(string.Empty, devices[0].Brand);
         Assert.AreEqual(string.Empty, devices[0].AndroidVersion);
         Assert.AreEqual(string.Empty, devices[0].Timezone);
@@ -120,8 +120,8 @@ public sealed class DeviceStoreServiceTests
             ChangeOptions = new DeviceChangeOptions
             {
                 UseDefaultMode = false,
-                ClearAllPackages = false,
                 ChangeAndroidId = true,
+                ClearAllPackages = false,
                 ClearSelectedPackages = true,
                 ChangeMacAddress = false,
                 UseRmRfForPackageCleanup = true,
@@ -162,9 +162,9 @@ public sealed class DeviceStoreServiceTests
         Assert.IsFalse(restored.ChangeSimEnabled);
         Assert.IsTrue(restored.UseIntegritySecurityPatch);
         Assert.IsFalse(restored.ChangeOptions.UseDefaultMode);
+        Assert.IsTrue(restored.ChangeOptions.ChangeAndroidId);
         Assert.IsTrue(restored.ChangeOptions.ClearSelectedPackages);
         Assert.IsFalse(restored.ChangeOptions.ChangeMacAddress);
-        Assert.IsTrue(restored.ChangeOptions.ChangeAndroidId);
         Assert.IsTrue(restored.ChangeOptions.UseRmRfForPackageCleanup);
         Assert.IsTrue(restored.ChangeOptions.ClearGooglePackages);
         Assert.IsTrue(restored.ChangeOptions.ClearGoogleAccounts);
@@ -191,6 +191,22 @@ public sealed class DeviceStoreServiceTests
     }
 
     [TestMethod]
+    public async Task SaveAndLoadAsync_ExplicitDisabledIntegrityPatch_PreservesFalse()
+    {
+        using var fixture = new TestTempDirectory();
+        string path = Path.Combine(fixture.Path, "devices.json");
+        var service = new DeviceStoreService(path, NullLogger<DeviceStoreService>.Instance);
+
+        await service.SaveAsync(
+            [new StoredDeviceConfig { Serial = "SERIAL", UseIntegritySecurityPatch = false }],
+            CancellationToken.None);
+        IReadOnlyList<StoredDeviceConfig> loaded = await service.LoadAsync(CancellationToken.None);
+
+        Assert.HasCount(1, loaded);
+        Assert.IsFalse(loaded[0].UseIntegritySecurityPatch);
+    }
+
+    [TestMethod]
     public async Task LoadAsync_LegacyRandomDeviceValues_AreRemovedFromPersistedJson()
     {
         using var fixture = new TestTempDirectory();
@@ -206,11 +222,53 @@ public sealed class DeviceStoreServiceTests
         Assert.HasCount(1, loaded);
         Assert.AreEqual(string.Empty, loaded[0].Brand);
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        Assert.AreEqual(4, document.RootElement.GetProperty("version").GetInt32());
+        Assert.AreEqual(5, document.RootElement.GetProperty("version").GetInt32());
         JsonElement savedDevice = document.RootElement.GetProperty("devices")[0];
         Assert.AreEqual(string.Empty, savedDevice.GetProperty("brand").GetString());
         Assert.IsFalse(savedDevice.TryGetProperty("deviceInfoModel", out _));
         Assert.IsFalse(savedDevice.TryGetProperty("deviceInfoImei", out _));
+    }
+
+    [TestMethod]
+    public async Task LoadAsync_Version4Document_PreservesAndroidIdAndDeepWipeOptions()
+    {
+        using var fixture = new TestTempDirectory();
+        string path = Path.Combine(fixture.Path, "devices.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":4,\"devices\":[{\"serial\":\"SERIAL\",\"changeOptions\":{"
+            + "\"useDefaultMode\":false,\"changeAndroidId\":true,"
+            + "\"useRmRfForPackageCleanup\":true,\"clearAllPackages\":false}}]}");
+        var service = new DeviceStoreService(path, NullLogger<DeviceStoreService>.Instance);
+
+        IReadOnlyList<StoredDeviceConfig> loaded = await service.LoadAsync(CancellationToken.None);
+
+        Assert.HasCount(1, loaded);
+        Assert.IsTrue(loaded[0].ChangeOptions.ChangeAndroidId);
+        Assert.IsTrue(loaded[0].ChangeOptions.UseRmRfForPackageCleanup);
+        using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        Assert.AreEqual(5, document.RootElement.GetProperty("version").GetInt32());
+        JsonElement options = document.RootElement
+            .GetProperty("devices")[0]
+            .GetProperty("changeOptions");
+        Assert.IsTrue(options.GetProperty("changeAndroidId").GetBoolean());
+        Assert.IsTrue(options.GetProperty("useRmRfForPackageCleanup").GetBoolean());
+    }
+
+    [TestMethod]
+    public async Task LoadAsync_DocumentWithoutChangeAndroidId_DefaultsOptionToFalse()
+    {
+        using var fixture = new TestTempDirectory();
+        string path = Path.Combine(fixture.Path, "devices.json");
+        await File.WriteAllTextAsync(
+            path,
+            "{\"version\":5,\"devices\":[{\"serial\":\"SERIAL\",\"changeOptions\":{\"useDefaultMode\":false}}]}");
+        var service = new DeviceStoreService(path, NullLogger<DeviceStoreService>.Instance);
+
+        IReadOnlyList<StoredDeviceConfig> loaded = await service.LoadAsync(CancellationToken.None);
+
+        Assert.HasCount(1, loaded);
+        Assert.IsFalse(loaded[0].ChangeOptions.ChangeAndroidId);
     }
 
     [TestMethod]
