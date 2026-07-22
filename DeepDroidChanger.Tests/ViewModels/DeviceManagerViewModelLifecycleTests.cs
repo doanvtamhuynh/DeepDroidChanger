@@ -378,6 +378,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
         var generatedProfile = new DeviceInfoApiDevice
         {
             Name = "Generated device",
+            Hardware = "qcom",
+            Fingerprint = "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
             Model = "SM-S928B",
             Brand = "samsung",
             Release = "15",
@@ -422,6 +424,10 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await viewModel.DeactivateAsync();
 
         Assert.AreEqual("Edited device", viewModel.DeviceInfo.Name);
+        Assert.AreEqual("qcom", viewModel.DeviceInfo.Hardware);
+        Assert.AreEqual(
+            "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
+            viewModel.DeviceInfo.Fingerprint);
         Assert.AreEqual("Edited model", viewModel.DeviceInfo.Model);
         Assert.AreEqual("edited brand", viewModel.DeviceInfo.Brand);
         Assert.AreEqual("Android 14", viewModel.DeviceInfo.AndroidVersion);
@@ -437,6 +443,98 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await randomDeviceInfoDialog.Received(1).ShowRandomDeviceInfoAsync(
             generatedProfile,
             Arg.Any<CancellationToken>());
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task DeviceInfoFormEdits_AutomaticallyUpdatePreparedRandomProfile()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var generatedProfile = new DeviceInfoApiDevice
+        {
+            Name = "Generated device",
+            Hardware = "generated-hardware",
+            Fingerprint = "generated/fingerprint",
+            Model = "Generated model",
+            Brand = "generated-brand",
+            Release = "15",
+            Product = "preserved-product",
+            Serial = "GENERATED-SERIAL",
+            Imei = "123456789012345",
+            Iccid = "8984041234567890123",
+            Imsi = "452041234567890",
+            SimOperatorName = "Generated operator",
+            SimOperatorNumeric = "45204",
+            SimOperatorCountry = "vn",
+            SimPhoneNumber = "+84901234567",
+            WifiMacAddress = "00:11:22:33:44:55"
+        };
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, generatedProfile));
+        DeviceInfoApiDevice? dialogProfile = null;
+        IRandomDeviceInfoDialogService randomDeviceInfoDialog = Substitute.For<IRandomDeviceInfoDialogService>();
+        randomDeviceInfoDialog.ShowRandomDeviceInfoAsync(
+                Arg.Any<DeviceInfoApiDevice>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                dialogProfile = callInfo.ArgAt<DeviceInfoApiDevice>(0);
+                return false;
+            });
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            randomDeviceInfoDialog: randomDeviceInfoDialog);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+
+        viewModel.DeviceInfo.Name = "Edited device";
+        viewModel.DeviceInfo.Hardware = "edited-hardware";
+        viewModel.DeviceInfo.Fingerprint = "edited/fingerprint";
+        viewModel.DeviceInfo.Model = "Edited model";
+        viewModel.DeviceInfo.Brand = "edited-brand";
+        viewModel.DeviceInfo.AndroidVersion = "Android 14";
+        viewModel.DeviceInfo.Serial = "EDITED-SERIAL";
+        viewModel.DeviceInfo.Imei = "543210987654321";
+        viewModel.DeviceInfo.Iccid = "8984049876543210987";
+        viewModel.DeviceInfo.Imsi = "452049876543210";
+        viewModel.DeviceInfo.Operator = "Edited operator";
+        viewModel.DeviceInfo.PhoneNumber = "+84987654321";
+        viewModel.DeviceInfo.Mac = "aa:bb:cc:dd:ee:ff";
+
+        await viewModel.ViewRandomDeviceInfoCommand.ExecuteAsync(null);
+
+        Assert.IsNotNull(dialogProfile);
+        Assert.AreEqual("Edited device", dialogProfile.Name);
+        Assert.AreEqual("edited-hardware", dialogProfile.Hardware);
+        Assert.AreEqual("edited/fingerprint", dialogProfile.Fingerprint);
+        Assert.AreEqual("Edited model", dialogProfile.Model);
+        Assert.AreEqual("edited-brand", dialogProfile.Brand);
+        Assert.AreEqual("14", dialogProfile.Release);
+        Assert.AreEqual("preserved-product", dialogProfile.Product);
+        Assert.AreEqual("EDITED-SERIAL", dialogProfile.Serial);
+        Assert.AreEqual("543210987654321", dialogProfile.Imei);
+        Assert.AreEqual("8984049876543210987", dialogProfile.Iccid);
+        Assert.AreEqual("452049876543210", dialogProfile.Imsi);
+        Assert.AreEqual("Edited operator", dialogProfile.SimOperatorName);
+        Assert.AreEqual("45204", dialogProfile.SimOperatorNumeric);
+        Assert.AreEqual("vn", dialogProfile.SimOperatorCountry);
+        Assert.AreEqual("+84987654321", dialogProfile.SimPhoneNumber);
+        Assert.AreEqual("aa:bb:cc:dd:ee:ff", dialogProfile.WifiMacAddress);
+        await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
 

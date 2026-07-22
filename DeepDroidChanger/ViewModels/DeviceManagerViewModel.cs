@@ -64,6 +64,7 @@ namespace DeepDroidChanger.ViewModels
         private bool _isRefreshingRows;
         private bool _isSynchronizingSelection;
         private bool _isApplyingDeviceConfig;
+        private bool _isSynchronizingDeviceInfo;
         private bool _isUpdatingCarrierOptions;
         [ObservableProperty]
         private bool _isChangeSimEnabled = true;
@@ -154,6 +155,7 @@ namespace DeepDroidChanger.ViewModels
             Carriers = new ObservableCollection<CarrierOption>();
             AndroidVersions = new ObservableCollection<string>();
             DeviceInfo = CreateDefaultDeviceInfo();
+            DeviceInfo.PropertyChanged += OnDeviceInfoPropertyChanged;
 
             Brands = DeviceProfileOptions.Brands;
             UpdateAndroidVersionOptions(DeviceProfileOptions.Random, null);
@@ -332,6 +334,7 @@ namespace DeepDroidChanger.ViewModels
             foreach (var device in _allDeviceRows)
                 device.PropertyChanged -= OnDeviceRowPropertyChanged;
 
+            DeviceInfo.PropertyChanged -= OnDeviceInfoPropertyChanged;
             _pollCancellation?.Dispose();
             _pollCancellation = null;
         }
@@ -2132,31 +2135,39 @@ namespace DeepDroidChanger.ViewModels
             ChangeDeviceCommand.NotifyCanExecuteChanged();
             ChangeWithoutWipeCommand.NotifyCanExecuteChanged();
             ChangeSimCommand.NotifyCanExecuteChanged();
-            DeviceInfo.Name = GetFirstValue(randomDevice.Name, randomDevice.Board, randomDevice.Code);
-            DeviceInfo.Model = randomDevice.Model ?? string.Empty;
-            DeviceInfo.Brand = GetFirstValue(randomDevice.Brand, randomDevice.Manufacturer);
-            DeviceInfo.AndroidVersion = GetAndroidVersionDisplay(randomDevice.Release, randomDevice.Sdk);
-            DeviceInfo.Serial = randomDevice.Serial;
-            DeviceInfo.Imei = randomDevice.Imei ?? string.Empty;
-            DeviceInfo.Iccid = randomDevice.Iccid;
-            DeviceInfo.Imsi = randomDevice.Imsi;
-            DeviceInfo.Operator = string.IsNullOrWhiteSpace(randomDevice.SimOperatorName)
-                ? randomDevice.SimOperatorNumeric
-                : randomDevice.SimOperatorName;
-            DeviceInfo.PhoneNumber = randomDevice.SimPhoneNumber;
-            DeviceInfo.Mac = randomDevice.WifiMacAddress;
+            SynchronizeDeviceInfo(() =>
+            {
+                DeviceInfo.Name = GetFirstValue(randomDevice.Name, randomDevice.Board, randomDevice.Code);
+                DeviceInfo.Hardware = randomDevice.Hardware ?? string.Empty;
+                DeviceInfo.Fingerprint = randomDevice.Fingerprint ?? string.Empty;
+                DeviceInfo.Model = randomDevice.Model ?? string.Empty;
+                DeviceInfo.Brand = GetFirstValue(randomDevice.Brand, randomDevice.Manufacturer);
+                DeviceInfo.AndroidVersion = GetAndroidVersionDisplay(randomDevice.Release, randomDevice.Sdk);
+                DeviceInfo.Serial = randomDevice.Serial;
+                DeviceInfo.Imei = randomDevice.Imei ?? string.Empty;
+                DeviceInfo.Iccid = randomDevice.Iccid;
+                DeviceInfo.Imsi = randomDevice.Imsi;
+                DeviceInfo.Operator = string.IsNullOrWhiteSpace(randomDevice.SimOperatorName)
+                    ? randomDevice.SimOperatorNumeric
+                    : randomDevice.SimOperatorName;
+                DeviceInfo.PhoneNumber = randomDevice.SimPhoneNumber;
+                DeviceInfo.Mac = randomDevice.WifiMacAddress;
+            });
         }
 
         private void ApplyRandomSimInfo(SimProfile simProfile)
         {
             _lastRandomSimProfile = simProfile;
             ChangeSimCommand.NotifyCanExecuteChanged();
-            DeviceInfo.Iccid = simProfile.Iccid;
-            DeviceInfo.Imsi = simProfile.Imsi;
-            DeviceInfo.Operator = string.IsNullOrWhiteSpace(simProfile.OperatorName)
-                ? simProfile.OperatorNumeric
-                : simProfile.OperatorName;
-            DeviceInfo.PhoneNumber = simProfile.PhoneNumber;
+            SynchronizeDeviceInfo(() =>
+            {
+                DeviceInfo.Iccid = simProfile.Iccid;
+                DeviceInfo.Imsi = simProfile.Imsi;
+                DeviceInfo.Operator = string.IsNullOrWhiteSpace(simProfile.OperatorName)
+                    ? simProfile.OperatorNumeric
+                    : simProfile.OperatorName;
+                DeviceInfo.PhoneNumber = simProfile.PhoneNumber;
+            });
 
             if (_lastRandomDeviceInfo == null)
                 return;
@@ -2167,6 +2178,27 @@ namespace DeepDroidChanger.ViewModels
             _lastRandomDeviceInfo.SimOperatorNumeric = simProfile.OperatorNumeric;
             _lastRandomDeviceInfo.SimOperatorCountry = simProfile.OperatorCountry;
             _lastRandomDeviceInfo.SimOperatorName = simProfile.OperatorName;
+        }
+
+        private void SynchronizeDeviceInfo(Action update)
+        {
+            _isSynchronizingDeviceInfo = true;
+            try
+            {
+                update();
+            }
+            finally
+            {
+                _isSynchronizingDeviceInfo = false;
+            }
+        }
+
+        private void OnDeviceInfoPropertyChanged(object? _, PropertyChangedEventArgs __)
+        {
+            if (_isSynchronizingDeviceInfo || _lastRandomDeviceInfo == null)
+                return;
+
+            CopyFormValuesToProfile(_lastRandomDeviceInfo);
         }
 
         private SimProfile CreateEditedSimProfile(SimProfile profile)
@@ -2229,6 +2261,8 @@ namespace DeepDroidChanger.ViewModels
             return new DeviceInfoFormViewModel
             {
                 Name = string.Empty,
+                Hardware = string.Empty,
+                Fingerprint = string.Empty,
                 Model = string.Empty,
                 Brand = string.Empty,
                 AndroidVersion = string.Empty,
@@ -2247,6 +2281,8 @@ namespace DeepDroidChanger.ViewModels
         private void CopyFormValuesToProfile(DeviceInfoApiDevice profile)
         {
             profile.Name = DeviceInfo.Name.Trim();
+            profile.Hardware = DeviceInfo.Hardware.Trim();
+            profile.Fingerprint = DeviceInfo.Fingerprint.Trim();
             profile.Model = DeviceInfo.Model.Trim();
             profile.Brand = DeviceInfo.Brand.Trim();
             profile.Release = DeviceInfo.AndroidVersion

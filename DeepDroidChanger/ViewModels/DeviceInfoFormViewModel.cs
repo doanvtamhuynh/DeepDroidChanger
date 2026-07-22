@@ -8,6 +8,12 @@ public sealed partial class DeviceInfoFormViewModel : ObservableObject
     private string _name = string.Empty;
 
     [ObservableProperty]
+    private string _hardware = string.Empty;
+
+    [ObservableProperty]
+    private string _fingerprint = string.Empty;
+
+    [ObservableProperty]
     private string _model = string.Empty;
 
     [ObservableProperty]

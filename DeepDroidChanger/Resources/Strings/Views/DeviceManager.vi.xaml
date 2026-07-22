@@ -22,6 +22,8 @@
     <sys:String x:Key="DeviceManager_DeviceConfigHeader">Cấu hình thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_ActionSingleHeader">Thao tác một thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_FieldName">Tên</sys:String>
+    <sys:String x:Key="DeviceManager_FieldHardware">Phần cứng</sys:String>
+    <sys:String x:Key="DeviceManager_FieldFingerprint">Fingerprint</sys:String>
     <sys:String x:Key="DeviceManager_FieldModel">Model</sys:String>
     <sys:String x:Key="DeviceManager_FieldSerial">Serial</sys:String>
     <sys:String x:Key="DeviceManager_FieldImei">IMEI</sys:String>
@@ -29,7 +31,7 @@
     <sys:String x:Key="DeviceManager_FieldImsi">IMSI</sys:String>
     <sys:String x:Key="DeviceManager_FieldOperator">Nhà mạng</sys:String>
     <sys:String x:Key="DeviceManager_FieldPhoneNumber">Số điện thoại</sys:String>
-    <sys:String x:Key="DeviceManager_FieldMac">MAC</sys:String>
+    <sys:String x:Key="DeviceManager_FieldMac">Wi-Fi MAC</sys:String>
     <sys:String x:Key="DeviceManager_FieldBrand">Hãng</sys:String>
     <sys:String x:Key="DeviceManager_FieldOsVersion">Phiên bản OS</sys:String>
     <sys:String x:Key="DeviceManager_FieldCountry">Quốc gia</sys:String>

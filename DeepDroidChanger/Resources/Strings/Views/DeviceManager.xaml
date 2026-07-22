@@ -22,6 +22,8 @@
     <sys:String x:Key="DeviceManager_DeviceConfigHeader">Device Configuration</sys:String>
     <sys:String x:Key="DeviceManager_ActionSingleHeader">Single Device Actions</sys:String>
     <sys:String x:Key="DeviceManager_FieldName">Name</sys:String>
+    <sys:String x:Key="DeviceManager_FieldHardware">Hardware</sys:String>
+    <sys:String x:Key="DeviceManager_FieldFingerprint">Fingerprint</sys:String>
     <sys:String x:Key="DeviceManager_FieldModel">Model</sys:String>
     <sys:String x:Key="DeviceManager_FieldSerial">Serial</sys:String>
     <sys:String x:Key="DeviceManager_FieldImei">IMEI</sys:String>
@@ -29,7 +31,7 @@
     <sys:String x:Key="DeviceManager_FieldImsi">IMSI</sys:String>
     <sys:String x:Key="DeviceManager_FieldOperator">Operator</sys:String>
     <sys:String x:Key="DeviceManager_FieldPhoneNumber">Phone Number</sys:String>
-    <sys:String x:Key="DeviceManager_FieldMac">MAC</sys:String>
+    <sys:String x:Key="DeviceManager_FieldMac">Wi-Fi MAC</sys:String>
     <sys:String x:Key="DeviceManager_FieldBrand">Brand</sys:String>
     <sys:String x:Key="DeviceManager_FieldOsVersion">OS Version</sys:String>
     <sys:String x:Key="DeviceManager_FieldCountry">Country</sys:String>

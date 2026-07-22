@@ -335,15 +335,28 @@ public sealed class UiSurfaceSmokeTests
         Assert.IsFalse(viewAllDeviceInfoButton.IsEnabled);
         Assert.AreSame(Application.Current.FindResource("DeviceActionButtonStyle"), viewAllDeviceInfoButton.Style.BasedOn);
         AssertGridPosition(deviceManagerView, "DeviceInfoNameTextBox", 0, 1);
-        AssertGridPosition(deviceManagerView, "DeviceInfoOperatorTextBox", 0, 3);
-        AssertGridPosition(deviceManagerView, "DeviceInfoBrandTextBox", 1, 1);
-        AssertGridPosition(deviceManagerView, "DeviceInfoPhoneNumberTextBox", 1, 3);
-        AssertGridPosition(deviceManagerView, "DeviceInfoAndroidVersionTextBox", 2, 1);
-        AssertGridPosition(deviceManagerView, "DeviceInfoIccidTextBox", 2, 3);
-        AssertGridPosition(deviceManagerView, "DeviceInfoSerialTextBox", 3, 1);
-        AssertGridPosition(deviceManagerView, "DeviceInfoImsiTextBox", 3, 3);
-        AssertGridPosition(deviceManagerView, "DeviceInfoImeiTextBox", 4, 1);
-        AssertGridPosition(deviceManagerView, "DeviceInfoMacTextBox", 4, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoImeiTextBox", 0, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoHardwareTextBox", 1, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoOperatorTextBox", 1, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoFingerprintTextBox", 2, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoPhoneNumberTextBox", 2, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoAndroidVersionTextBox", 3, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoIccidTextBox", 3, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoBrandTextBox", 4, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoImsiTextBox", 4, 3);
+        AssertGridPosition(deviceManagerView, "DeviceInfoSerialTextBox", 5, 1);
+        AssertGridPosition(deviceManagerView, "DeviceInfoMacTextBox", 5, 3);
+        var deviceInfoNameTextBox = Assert.IsInstanceOfType<TextBox>(
+            deviceManagerView.FindName("DeviceInfoNameTextBox"));
+        var deviceInfoFingerprintTextBox = Assert.IsInstanceOfType<TextBox>(
+            deviceManagerView.FindName("DeviceInfoFingerprintTextBox"));
+        var deviceInfoFormGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(
+            deviceInfoNameTextBox.Parent);
+        Assert.HasCount(6, deviceInfoFormGrid.RowDefinitions);
+        Assert.AreSame(deviceInfoNameTextBox.Style, deviceInfoFingerprintTextBox.Style);
+        Assert.AreEqual(TextWrapping.NoWrap, deviceInfoFingerprintTextBox.TextWrapping);
+        Assert.IsFalse(deviceInfoFingerprintTextBox.AcceptsReturn);
+        Assert.IsTrue(double.IsNaN(deviceInfoFingerprintTextBox.Width));
         var deviceConfigGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceConfigFormGrid"));
         Assert.HasCount(8, deviceConfigGrid.RowDefinitions);
         var integrityPatchCheckBox = Assert.IsInstanceOfType<CheckBox>(
