@@ -116,6 +116,7 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceStoreService, DeviceStoreService>();
         services.AddSingleton<ICarrierDataService, CarrierDataService>();
         services.AddSingleton<ITimezoneDataService, TimezoneDataService>();
+        services.AddSingleton<ILocationDataService, LocationDataService>();
         services.AddSingleton<IAccountStoreService, AccountStoreService>();
 
         services.AddSingleton<IAccountAuthenticationService, AccountAuthenticationService>();
