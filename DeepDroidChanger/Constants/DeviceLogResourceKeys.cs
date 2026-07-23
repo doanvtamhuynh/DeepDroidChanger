@@ -24,6 +24,7 @@ public static class DeviceLogResourceKeys
     public const string RandomDeviceLoginRequired = "Log_RandomDeviceLoginRequired";
     public const string RandomDeviceRequired = "Log_RandomDeviceRequired";
     public const string DeviceMustBeOnline = "Log_DeviceMustBeOnline";
+    public const string ActionAlreadyInProgress = "Log_ActionAlreadyInProgress";
     public const string ChangeDevice = "Log_ChangeDevice";
     public const string ChangeDeviceCanceled = "Log_ChangeDeviceCanceled";
     public const string ChangeDevicePreparing = "Log_ChangeDevicePreparing";

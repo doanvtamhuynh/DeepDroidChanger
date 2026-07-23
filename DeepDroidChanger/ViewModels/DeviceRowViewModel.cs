@@ -10,6 +10,7 @@ public sealed class DeviceRowViewModel : ObservableObject
     private string _type;
     private string _status;
     private string _process;
+    private bool _isActionBusy;
 
     public DeviceRowViewModel(
         int index,
@@ -67,4 +68,16 @@ public sealed class DeviceRowViewModel : ObservableObject
         get => _process;
         set => SetProperty(ref _process, value);
     }
+
+    public bool IsActionBusy
+    {
+        get => _isActionBusy;
+        set
+        {
+            if (SetProperty(ref _isActionBusy, value))
+                OnPropertyChanged(nameof(CanEdit));
+        }
+    }
+
+    public bool CanEdit => !IsActionBusy;
 }
