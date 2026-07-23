@@ -1563,29 +1563,6 @@ namespace DeepDroidChanger.ViewModels
                     .ApplyAsync(device.Serial, dialogResult, cancellationToken)
                     .ConfigureAwait(true);
 
-                if (!string.IsNullOrWhiteSpace(workflowResult.AppliedLatitude)
-                    && !string.IsNullOrWhiteSpace(workflowResult.AppliedLongitude))
-                {
-                    await SaveLocationConfigAsync(
-                            device.Serial,
-                            ChangeLocationMode.DeviceIp,
-                            workflowResult.AppliedLatitude,
-                            workflowResult.AppliedLongitude,
-                            cancellationToken)
-                        .ConfigureAwait(true);
-                }
-
-                if (!string.IsNullOrWhiteSpace(workflowResult.AppliedTimezone))
-                {
-                    await SaveTimezoneConfigAsync(
-                            device.Serial,
-                            ChangeTimezoneMode.DeviceIp,
-                            workflowResult.AppliedTimezone,
-                            cancellationToken)
-                        .ConfigureAwait(true);
-
-                }
-
                 if (workflowResult.LocationUpdateFailed)
                 {
                     await ShowDeviceLogAsync(

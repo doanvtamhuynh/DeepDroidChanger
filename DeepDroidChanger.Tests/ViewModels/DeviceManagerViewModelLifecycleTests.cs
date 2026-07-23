@@ -2014,6 +2014,80 @@ public sealed class DeviceManagerViewModelLifecycleTests
         return string.Join(", ", actionStates.Select(pair => $"{pair.Key}={pair.Value}"));
     }
 
+    [TestMethod]
+    public async Task FakeProxyCommand_ExecutesProxyWorkflow_DoesNotUpdateLocationOrTimezoneConfig()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new()
+            {
+                Serial = "A",
+                Name = "Phone",
+                Type = "Phone",
+                LocationMode = nameof(ChangeLocationMode.Config),
+                LocationLatitude = "1.23",
+                LocationLongitude = "4.56",
+                TimezoneMode = nameof(ChangeTimezoneMode.Data),
+                Timezone = "America/New_York"
+            }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        IFakeProxyDialogService fakeProxyDialog = Substitute.For<IFakeProxyDialogService>();
+        var fakeProxyResult = new FakeProxyDialogResult(
+            "127.0.0.1",
+            8080,
+            "user",
+            "pass",
+            "SOCKS5",
+            proxyChangeLocationByIp: true,
+            proxyChangeTimezoneByIp: true);
+        fakeProxyDialog.ShowFakeProxyDialogAsync("A", "Phone", Arg.Any<CancellationToken>())
+            .Returns(fakeProxyResult);
+
+        IProxyWorkflowService proxyWorkflowService = Substitute.For<IProxyWorkflowService>();
+        var workflowResult = new ProxyWorkflowResult(
+            locationUpdateFailed: false,
+            timezoneUpdateFailed: false,
+            appliedLatitude: "10.0",
+            appliedLongitude: "106.0",
+            appliedTimezone: "Asia/Ho_Chi_Minh");
+        proxyWorkflowService.ApplyAsync("A", fakeProxyResult, Arg.Any<CancellationToken>())
+            .Returns(workflowResult);
+
+        IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
+
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceConfig: deviceConfig,
+            fakeProxyDialog: fakeProxyDialog,
+            proxyWorkflowService: proxyWorkflowService);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        viewModel.SelectedDevice = viewModel.Devices[0];
+        await viewModel.FakeProxyCommand.ExecuteAsync(null);
+
+        await proxyWorkflowService.Received(1).ApplyAsync("A", fakeProxyResult, Arg.Any<CancellationToken>());
+        await deviceConfig.DidNotReceiveWithAnyArgs().SaveLocationConfigAsync(
+            default!, default!, default!, default!, default!, default!);
+        await deviceConfig.DidNotReceiveWithAnyArgs().SaveLocationConfigAsync(
+            default!, default!, default!, default!, default!, default!, default!, default!);
+        await deviceConfig.DidNotReceiveWithAnyArgs().SaveTimezoneConfigAsync(
+            default!, default!, default!, default!, default!);
+
+        Assert.AreEqual(nameof(ChangeLocationMode.Config), storedDevices[0].LocationMode);
+        Assert.AreEqual("1.23", storedDevices[0].LocationLatitude);
+        Assert.AreEqual("4.56", storedDevices[0].LocationLongitude);
+        Assert.AreEqual(nameof(ChangeTimezoneMode.Data), storedDevices[0].TimezoneMode);
+        Assert.AreEqual("America/New_York", storedDevices[0].Timezone);
+    }
+
     private static DeviceManagerViewModel CreateViewModel(
         IDeviceListService deviceList,
         ICarrierDataService carriers,
@@ -2028,6 +2102,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
         IDeviceChangeService? deviceChange = null,
         IDeviceActionGuardService? deviceActionGuard = null,
+        IFakeProxyDialogService? fakeProxyDialog = null,
+        IProxyWorkflowService? proxyWorkflowService = null,
         AppSettings? settings = null)
     {
         return new DeviceManagerViewModel(
@@ -2037,9 +2113,9 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Substitute.For<IDeviceTimezoneService>(),
             Substitute.For<IChangeLocationDialogService>(),
             Substitute.For<IDeviceLocationService>(),
-            Substitute.For<IFakeProxyDialogService>(),
+            fakeProxyDialog ?? Substitute.For<IFakeProxyDialogService>(),
             Substitute.For<IProxyService>(),
-            Substitute.For<IProxyWorkflowService>(),
+            proxyWorkflowService ?? Substitute.For<IProxyWorkflowService>(),
             Substitute.For<IUpdateIntegrityDialogService>(),
             Substitute.For<IDeviceIntegrityService>(),
             Substitute.For<IInstallPackageDialogService>(),
