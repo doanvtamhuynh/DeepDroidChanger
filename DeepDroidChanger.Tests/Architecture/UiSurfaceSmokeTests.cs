@@ -502,9 +502,14 @@ public sealed class UiSurfaceSmokeTests
         ChangeTimezoneDialog timezoneDialog = provider.GetRequiredService<ChangeTimezoneDialog>();
         AssertTemplateText(
             timezoneDialog,
+            "CountryComboBox",
+            new CountryOption("VN", "Vietnam"),
+            "Vietnam (VN)");
+        AssertTemplateText(
+            timezoneDialog,
             "TimezoneComboBox",
-            new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "UTC +07:00", "Vietnam — Asia/Ho_Chi_Minh (UTC +07:00)"),
-            "Vietnam — Asia/Ho_Chi_Minh (UTC +07:00)");
+            new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "UTC +07:00"),
+            "Asia/Ho_Chi_Minh (UTC +07:00)");
     }
 
     private static void AssertGridPosition(

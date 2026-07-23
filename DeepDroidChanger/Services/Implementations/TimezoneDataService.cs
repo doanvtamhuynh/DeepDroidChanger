@@ -7,7 +7,7 @@ namespace DeepDroidChanger.Services
 {
     public sealed class TimezoneDataService : ITimezoneDataService
     {
-        private const string TimezonesResourcePath = "Assets/Data/timezones.json";
+        private const string TimezonesResourcePath = "Assets/Data/location-timezones.json";
         private const string CountryCodePropertyName = "country_code";
         private const string CountryNamePropertyName = "country_name";
         private const string TimezonePropertyName = "timezone";
@@ -52,8 +52,7 @@ namespace DeepDroidChanger.Services
                         countryCode,
                         countryName,
                         timezone,
-                        gmtOffset,
-                        $"{countryName} — {timezone} ({gmtOffset})"));
+                        gmtOffset));
                 }
 
                 return options

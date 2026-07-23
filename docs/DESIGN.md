@@ -96,7 +96,7 @@ DeepDroidChanger/ (solution root)
       Images/
       Icons/
       Fonts/
-      Data/       carriers.json, timezones.json (embedded in app assembly)
+      Data/       carriers.json, location-timezones.json (embedded in app assembly)
       Tools/
         platform-tools/   adb.exe, fastboot.exe (Copy to Output)
         viewscreen/       scrcpy.exe and runtime dependencies (Copy to Output)

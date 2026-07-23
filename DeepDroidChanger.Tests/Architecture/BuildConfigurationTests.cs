@@ -53,7 +53,7 @@ public sealed class BuildConfigurationTests
             "DeepDroidChanger.Assets.Data.imei_tacs.json",
             "DeepDroidChanger.Assets.Data.mac_vendors.json",
             "DeepDroidChanger.Assets.Data.names.txt",
-            "DeepDroidChanger.Assets.Data.timezones.json",
+            "DeepDroidChanger.Assets.Data.location-timezones.json",
         ];
         string[] actualResourceNames = typeof(AssetDataReader).Assembly.GetManifestResourceNames();
         string configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent?.Name

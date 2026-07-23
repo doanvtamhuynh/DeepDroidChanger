@@ -4,9 +4,9 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{DynamicResource ChangeTimezone_WindowTitle}"
         Width="620"
-        Height="520"
+        Height="540"
         MinWidth="520"
-        MinHeight="440"
+        MinHeight="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource Brush.WindowBackground}"
@@ -54,49 +54,80 @@
                 </Grid.RowDefinitions>
 
                 <RadioButton Grid.Row="0"
-                             Content="{DynamicResource ChangeTimezone_ModeData}"
                              IsChecked="{Binding IsDataMode, Mode=TwoWay}"
-                             Style="{StaticResource ChangeTimezoneModeRadioStyle}"/>
+                             Style="{StaticResource ChangeTimezoneModeRadioStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="ClockOutline"
+                                                 Width="18" Height="18"
+                                                 Margin="0,0,8,0"
+                                                 VerticalAlignment="Center"
+                                                 Foreground="{DynamicResource Brush.Accent}"/>
+                        <TextBlock Text="{DynamicResource ChangeTimezone_ModeData}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
 
                 <RadioButton Grid.Row="1"
-                             Content="{DynamicResource ChangeTimezone_ModeDeviceIp}"
                              IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
-                             Style="{StaticResource ChangeTimezoneModeRadioStyle}"/>
+                             Style="{StaticResource ChangeTimezoneModeRadioStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="Web"
+                                                 Width="18" Height="18"
+                                                 Margin="0,0,8,0"
+                                                 VerticalAlignment="Center"
+                                                 Foreground="{DynamicResource Brush.Accent}"/>
+                        <TextBlock Text="{DynamicResource ChangeTimezone_ModeDeviceIp}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
             </Grid>
         </GroupBox>
 
         <!-- TIMEZONE SELECTOR -->
-        <Grid Grid.Row="2"
-              Style="{StaticResource ChangeTimezoneSelectorGridStyle}">
+        <Grid Grid.Row="2" Style="{StaticResource ChangeTimezoneSelectorGridStyle}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Search -->
+            <!-- Search Box -->
             <TextBox Grid.Row="0"
                      Text="{Binding TimezoneSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      Style="{StaticResource ChangeTimezoneSearchTextBoxStyle}"
                      materialDesign:HintAssist.Hint="{DynamicResource ChangeTimezone_SearchHint}"
                      IsEnabled="{Binding IsDataMode}"/>
 
-            <!-- Timezone ComboBox -->
-            <ComboBox x:Name="TimezoneComboBox"
+            <!-- Country ComboBox (Dropbox 1) -->
+            <ComboBox x:Name="CountryComboBox"
                       Grid.Row="1"
-                      ItemsSource="{Binding FilteredTimezones}"
-                      SelectedItem="{Binding SelectedTimezone, Mode=TwoWay}"
-                      IsDropDownOpen="{Binding IsTimezoneDropDownOpen, Mode=TwoWay}"
+                      ItemsSource="{Binding FilteredCountries}"
+                      SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
+                      IsDropDownOpen="{Binding IsCountryDropDownOpen, Mode=TwoWay}"
                       Style="{StaticResource ChangeTimezoneComboBoxStyle}"
                       IsEnabled="{Binding IsDataMode}"
-                      MaxDropDownHeight="280">
+                      MaxDropDownHeight="220">
                 <ComboBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding DisplayText}"/>
+                        <TextBlock Text="{Binding CountryDisplayText}"/>
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
 
+            <!-- Timezone ComboBox (Dropbox 2) -->
+            <ComboBox x:Name="TimezoneComboBox"
+                      Grid.Row="2"
+                      ItemsSource="{Binding CountryTimezones}"
+                      SelectedItem="{Binding SelectedTimezone, Mode=TwoWay}"
+                      Style="{StaticResource ChangeTimezoneComboBoxStyle}"
+                      IsEnabled="{Binding IsDataMode}"
+                      MaxDropDownHeight="220">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding TimezoneDisplayText}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
         </Grid>
 
         <!-- LOADING -->

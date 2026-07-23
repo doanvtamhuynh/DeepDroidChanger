@@ -19,6 +19,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly object _configSaveLock = new();
         private Task _pendingConfigSave = Task.CompletedTask;
         private bool _isInitializing;
+        private bool _isUpdatingCountryFromTimezone;
 
         [ObservableProperty]
         private string _deviceSerial = string.Empty;
@@ -39,13 +40,16 @@ namespace DeepDroidChanger.ViewModels
         private bool _isDeviceIpMode;
 
         [ObservableProperty]
+        private CountryOption? _selectedCountry;
+
+        [ObservableProperty]
         private TimezoneOption? _selectedTimezone;
 
         [ObservableProperty]
         private string _timezoneSearchText = string.Empty;
 
         [ObservableProperty]
-        private bool _isTimezoneDropDownOpen;
+        private bool _isCountryDropDownOpen;
 
         [ObservableProperty]
         private bool _isLoading = true;
@@ -66,7 +70,9 @@ namespace DeepDroidChanger.ViewModels
             _logger = logger;
 
             AllTimezones = new ObservableCollection<TimezoneOption>();
-            FilteredTimezones = new ObservableCollection<TimezoneOption>();
+            Countries = new ObservableCollection<CountryOption>();
+            FilteredCountries = new ObservableCollection<CountryOption>();
+            CountryTimezones = new ObservableCollection<TimezoneOption>();
 
             DeviceDataFilePath = _appSettings.DeviceDataFilePath;
         }
@@ -74,7 +80,9 @@ namespace DeepDroidChanger.ViewModels
         public event EventHandler<bool>? CloseRequested;
 
         public ObservableCollection<TimezoneOption> AllTimezones { get; }
-        public ObservableCollection<TimezoneOption> FilteredTimezones { get; }
+        public ObservableCollection<CountryOption> Countries { get; }
+        public ObservableCollection<CountryOption> FilteredCountries { get; }
+        public ObservableCollection<TimezoneOption> CountryTimezones { get; }
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -96,39 +104,70 @@ namespace DeepDroidChanger.ViewModels
             if (value)
             {
                 IsDataMode = false;
-                IsTimezoneDropDownOpen = false;
+                IsCountryDropDownOpen = false;
             }
 
             SaveCommand.NotifyCanExecuteChanged();
             QueueConfigSave();
         }
 
-        partial void OnDeviceSerialChanged(string value)
-        {
-            UpdateDeviceInfoText();
-        }
+        partial void OnDeviceSerialChanged(string value) => UpdateDeviceInfoText();
 
         partial void OnDeviceNameChanged(string value) => UpdateDeviceInfoText();
+
+        partial void OnDeviceDataFilePathChanged(string value) => QueueConfigSave();
 
         private void UpdateDeviceInfoText()
         {
             DeviceInfoText = DeviceInfoTextHelper.Create(_localizationService, DeviceName, DeviceSerial);
         }
 
+        partial void OnSelectedCountryChanged(CountryOption? value)
+        {
+            if (_isUpdatingCountryFromTimezone)
+                return;
+
+            PopulateCountryTimezones(value);
+        }
+
         partial void OnSelectedTimezoneChanged(TimezoneOption? value)
         {
+            if (_isUpdatingCountryFromTimezone)
+                return;
+
+            _isUpdatingCountryFromTimezone = true;
+            try
+            {
+                if (value != null && (SelectedCountry == null || !string.Equals(SelectedCountry.CountryName, value.CountryName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    var matchingCountry = FilteredCountries.FirstOrDefault(c => string.Equals(c.CountryName, value.CountryName, StringComparison.OrdinalIgnoreCase))
+                                         ?? Countries.FirstOrDefault(c => string.Equals(c.CountryName, value.CountryName, StringComparison.OrdinalIgnoreCase));
+                    if (matchingCountry != null)
+                    {
+                        SelectedCountry = matchingCountry;
+                    }
+                }
+            }
+            finally
+            {
+                _isUpdatingCountryFromTimezone = false;
+            }
+
             SaveCommand.NotifyCanExecuteChanged();
             QueueConfigSave();
         }
 
-        partial void OnDeviceDataFilePathChanged(string value) => QueueConfigSave();
-
         partial void OnTimezoneSearchTextChanged(string value)
         {
-            ApplyFilter(value);
-
-            if (IsDataMode && !string.IsNullOrEmpty(value) && FilteredTimezones.Count > 0)
-                IsTimezoneDropDownOpen = true;
+            ApplyCountryFilter(value, updateSelection: false);
+            if (IsDataMode)
+            {
+                bool shouldBeOpen = !string.IsNullOrWhiteSpace(value) && FilteredCountries.Count > 0;
+                if (IsCountryDropDownOpen != shouldBeOpen)
+                {
+                    IsCountryDropDownOpen = shouldBeOpen;
+                }
+            }
         }
 
         public ChangeTimezoneDialogResult? BuildResult()
@@ -287,7 +326,8 @@ namespace DeepDroidChanger.ViewModels
                 foreach (var tz in timezones)
                     AllTimezones.Add(tz);
 
-                ApplyFilter(TimezoneSearchText);
+                PopulateCountries();
+                ApplyCountryFilter(TimezoneSearchText);
                 RestoreLastTimezone();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -304,40 +344,95 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
+        private void PopulateCountries()
+        {
+            Countries.Clear();
+
+            var distinctCountries = AllTimezones
+                .GroupBy(tz => tz.CountryName, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new CountryOption(group.First().CountryCode, group.Key))
+                .OrderBy(c => c.CountryName, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var country in distinctCountries)
+                Countries.Add(country);
+        }
+
+        private void PopulateCountryTimezones(CountryOption? country)
+        {
+            CountryTimezones.Clear();
+            if (country == null)
+            {
+                SelectedTimezone = null;
+                return;
+            }
+
+            var timezones = AllTimezones
+                .Where(tz => string.Equals(tz.CountryName, country.CountryName, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(tz => tz.Timezone, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var tz in timezones)
+                CountryTimezones.Add(tz);
+
+            // Keep current selection if it already belongs to this country
+            if (SelectedTimezone != null && CountryTimezones.Any(tz => string.Equals(tz.Timezone, SelectedTimezone.Timezone, StringComparison.OrdinalIgnoreCase)))
+            {
+                SelectedTimezone = CountryTimezones.First(tz => string.Equals(tz.Timezone, SelectedTimezone.Timezone, StringComparison.OrdinalIgnoreCase));
+                return;
+            }
+
+            // Keep restored selection if it belongs to this country
+            if (!string.IsNullOrWhiteSpace(_lastTimezone))
+            {
+                var restoredMatch = CountryTimezones.FirstOrDefault(tz => string.Equals(tz.Timezone, _lastTimezone, StringComparison.OrdinalIgnoreCase));
+                if (restoredMatch != null)
+                {
+                    SelectedTimezone = restoredMatch;
+                    return;
+                }
+            }
+
+            SelectedTimezone = CountryTimezones.FirstOrDefault();
+        }
+
         private void RestoreLastTimezone()
         {
             var match = string.IsNullOrWhiteSpace(_lastTimezone)
                 ? null
                 : AllTimezones.FirstOrDefault(tz => string.Equals(tz.Timezone, _lastTimezone, StringComparison.OrdinalIgnoreCase));
 
-            if (match == null)
+            if (match != null)
             {
-                match = AllTimezones.FirstOrDefault(tz => string.Equals(tz.Timezone, "America/New_York", StringComparison.OrdinalIgnoreCase));
+                SelectedCountry = Countries.FirstOrDefault(c => string.Equals(c.CountryName, match.CountryName, StringComparison.OrdinalIgnoreCase));
+                SelectedTimezone = CountryTimezones.FirstOrDefault(tz => string.Equals(tz.Timezone, match.Timezone, StringComparison.OrdinalIgnoreCase))
+                                   ?? CountryTimezones.FirstOrDefault();
             }
-
-            SelectedTimezone = match ?? FilteredTimezones.FirstOrDefault();
+            else
+            {
+                SelectedCountry = Countries.FirstOrDefault();
+            }
         }
 
-        private void ApplyFilter(string? searchText)
+        private void ApplyCountryFilter(string? searchText, bool updateSelection = true)
         {
-            FilteredTimezones.Clear();
-
+            FilteredCountries.Clear();
             var query = searchText?.Trim() ?? string.Empty;
 
-            foreach (var tz in AllTimezones)
+            foreach (var country in Countries)
             {
                 if (query.Length == 0
-                    || tz.DisplayText.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || tz.Timezone.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || tz.CountryName.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || tz.CountryCode.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    || country.CountryDisplayText.Contains(query, StringComparison.OrdinalIgnoreCase))
                 {
-                    FilteredTimezones.Add(tz);
+                    FilteredCountries.Add(country);
                 }
             }
 
-            if (SelectedTimezone != null && !FilteredTimezones.Contains(SelectedTimezone))
-                SelectedTimezone = FilteredTimezones.FirstOrDefault();
+            if (updateSelection)
+            {
+                if (SelectedCountry == null || !FilteredCountries.Any(c => string.Equals(c.CountryName, SelectedCountry.CountryName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    SelectedCountry = FilteredCountries.FirstOrDefault();
+                }
+            }
         }
 
         private readonly record struct TimezoneConfigSnapshot(

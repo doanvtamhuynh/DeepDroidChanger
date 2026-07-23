@@ -6,14 +6,15 @@ namespace DeepDroidChanger.Models
             string countryCode,
             string countryName,
             string timezone,
-            string gmtOffset,
-            string displayText)
+            string gmtOffset)
         {
             CountryCode = countryCode;
             CountryName = countryName;
             Timezone = timezone;
             GmtOffset = gmtOffset;
-            DisplayText = displayText;
+            TimezoneDisplayText = string.IsNullOrEmpty(gmtOffset)
+                ? timezone
+                : $"{timezone} ({gmtOffset})";
         }
 
         public string CountryCode { get; }
@@ -21,6 +22,6 @@ namespace DeepDroidChanger.Models
         public string Timezone { get; }
         public string GmtOffset { get; }
 
-        public string DisplayText { get; }
+        public string TimezoneDisplayText { get; }
     }
 }

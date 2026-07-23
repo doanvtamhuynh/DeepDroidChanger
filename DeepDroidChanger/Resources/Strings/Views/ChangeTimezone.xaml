@@ -6,6 +6,9 @@
     <sys:String x:Key="ChangeTimezone_ModeGroupHeader">Change Mode</sys:String>
     <sys:String x:Key="ChangeTimezone_ModeData">Use timezone data</sys:String>
     <sys:String x:Key="ChangeTimezone_ModeDeviceIp">Use device IP</sys:String>
+    <sys:String x:Key="ChangeTimezone_CountryLabel">Country</sys:String>
+    <sys:String x:Key="ChangeTimezone_CountrySearchHint">Search country...</sys:String>
+    <sys:String x:Key="ChangeTimezone_TimezoneLabel">Timezone</sys:String>
     <sys:String x:Key="ChangeTimezone_SearchHint">Search timezone...</sys:String>
     <sys:String x:Key="ChangeTimezone_SaveButton">Apply</sys:String>
 </ResourceDictionary>

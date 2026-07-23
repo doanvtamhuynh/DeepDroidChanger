@@ -41,19 +41,24 @@
 </Style>
 
 <!-- MODE RADIO BUTTON -->
-<Style x:Key="ChangeTimezoneModeRadioStyle" TargetType="RadioButton">
-    <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
-    <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
-    <Setter Property="FontWeight" Value="SemiBold"/>
-    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+<Style x:Key="ChangeTimezoneModeRadioStyle" TargetType="RadioButton"
+       BasedOn="{StaticResource CardRadioButtonStyle}">
     <Setter Property="Margin" Value="0,4"/>
-    <Setter Property="VerticalContentAlignment" Value="Center"/>
-    <Setter Property="Cursor" Value="Hand"/>
 </Style>
 
 <!-- SELECTOR GRID -->
 <Style x:Key="ChangeTimezoneSelectorGridStyle" TargetType="Grid">
     <Setter Property="Margin" Value="0,0,0,8"/>
+</Style>
+
+<!-- INPUT LABEL -->
+<Style x:Key="ChangeTimezoneInputLabelStyle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+    <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+    <Setter Property="Margin" Value="0,4,0,4"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
 </Style>
 
 <!-- SEARCH TEXT BOX -->

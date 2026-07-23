@@ -14,7 +14,7 @@ public sealed class TimezoneDataServiceTests
         IReadOnlyList<Models.TimezoneOption> timezones =
             await service.GetTimezonesAsync(CancellationToken.None);
 
-        Assert.HasCount(418, timezones);
+        Assert.HasCount(416, timezones);
         Assert.IsTrue(timezones.Any(option => option.Timezone == "Asia/Ho_Chi_Minh"));
     }
 }

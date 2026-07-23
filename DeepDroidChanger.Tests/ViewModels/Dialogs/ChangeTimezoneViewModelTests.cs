@@ -35,7 +35,7 @@ public sealed class ChangeTimezoneViewModelTests
         ITimezoneDataService timezones = Substitute.For<ITimezoneDataService>();
         ISettingsService settingsService = Substitute.For<ISettingsService>();
         var appSettings = new AppSettings();
-        var option = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00", "Vietnam — Asia/Ho_Chi_Minh (+07:00)");
+        var option = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
         timezones.GetTimezonesAsync(Arg.Any<CancellationToken>()).Returns([option]);
         var viewModel = CreateViewModel(store, timezones, settingsService, appSettings);
         await viewModel.InitializeAsync(CancellationToken.None);
@@ -60,8 +60,8 @@ public sealed class ChangeTimezoneViewModelTests
             Timezone = "Asia/Ho_Chi_Minh",
         });
         ITimezoneDataService timezones = Substitute.For<ITimezoneDataService>();
-        var vietnam = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00", "Vietnam — Asia/Ho_Chi_Minh (+07:00)");
-        var unitedStates = new TimezoneOption("US", "United States", "America/New_York", "-05:00", "United States — America/New_York (-05:00)");
+        var vietnam = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
+        var unitedStates = new TimezoneOption("US", "United States", "America/New_York", "-05:00");
         timezones.GetTimezonesAsync(Arg.Any<CancellationToken>()).Returns([vietnam, unitedStates]);
         var viewModel = CreateViewModel(store, timezones);
 
@@ -69,8 +69,29 @@ public sealed class ChangeTimezoneViewModelTests
         viewModel.TimezoneSearchText = "Vietnam";
 
         Assert.AreSame(vietnam, viewModel.SelectedTimezone);
-        Assert.HasCount(1, viewModel.FilteredTimezones);
-        Assert.AreSame(vietnam, viewModel.FilteredTimezones[0]);
+        Assert.HasCount(1, viewModel.FilteredCountries);
+        Assert.AreEqual("Vietnam", viewModel.FilteredCountries[0].CountryName);
+    }
+
+    [TestMethod]
+    public async Task SelectingUnitedStates_PopulatesOnlyUsTimezonesAndDefaultsToNewYork()
+    {
+        IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(new StoredDeviceConfig { Serial = "ABC" });
+        ITimezoneDataService timezones = Substitute.For<ITimezoneDataService>();
+        var vietnam = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
+        var usNewYork = new TimezoneOption("US", "United States", "America/New_York", "-04:00");
+        var usHonolulu = new TimezoneOption("US", "United States", "Pacific/Honolulu", "-10:00");
+        timezones.GetTimezonesAsync(Arg.Any<CancellationToken>()).Returns([vietnam, usHonolulu, usNewYork]);
+
+        var viewModel = CreateViewModel(store, timezones);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        var usCountry = viewModel.Countries.First(c => c.CountryCode == "US");
+        viewModel.SelectedCountry = usCountry;
+
+        Assert.HasCount(2, viewModel.CountryTimezones);
+        Assert.IsTrue(viewModel.CountryTimezones.All(tz => tz.CountryCode == "US"));
+        Assert.AreEqual("America/New_York", viewModel.SelectedTimezone?.Timezone);
     }
 
     private static ChangeTimezoneViewModel CreateViewModel(

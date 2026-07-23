@@ -15,7 +15,7 @@ public sealed class AssetDataReaderTests
             "Assets/Data/imei_tacs.json",
             "Assets/Data/mac_vendors.json",
             "Assets/Data/names.txt",
-            "Assets/Data/timezones.json",
+            "Assets/Data/location-timezones.json",
         ];
 
         foreach (string resourcePath in resourcePaths)

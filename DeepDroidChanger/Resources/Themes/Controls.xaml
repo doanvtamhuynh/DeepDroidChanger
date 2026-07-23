@@ -478,6 +478,81 @@
         </Setter>
     </Style>
 
+    <!-- Card / SelectBox RadioButton Style -->
+    <Style x:Key="CardRadioButtonStyle" TargetType="{x:Type RadioButton}">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type RadioButton}">
+                    <Border x:Name="CardBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{StaticResource Radius.Medium}"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <Grid Width="20" Height="20" VerticalAlignment="Center">
+                                <Ellipse x:Name="OuterCircle"
+                                         Fill="Transparent"
+                                         Stroke="{DynamicResource Brush.BorderStrong}"
+                                         StrokeThickness="1.5"/>
+                                <Ellipse x:Name="InnerCircle"
+                                         Width="10"
+                                         Height="10"
+                                         Fill="{DynamicResource Brush.Accent}"
+                                         Visibility="Collapsed"/>
+                            </Grid>
+
+                            <ContentPresenter Grid.Column="1"
+                                              Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              RecognizesAccessKey="True"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CardBorder" Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                            <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                            <Setter TargetName="OuterCircle" Property="Stroke" Value="{DynamicResource Brush.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CardBorder" Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+                            <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                            <Setter TargetName="CardBorder" Property="BorderThickness" Value="1.5"/>
+                            <Setter TargetName="OuterCircle" Property="Stroke" Value="{DynamicResource Brush.Accent}"/>
+                            <Setter TargetName="OuterCircle" Property="StrokeThickness" Value="2"/>
+                            <Setter TargetName="InnerCircle" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                            <Setter TargetName="CardBorder" Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ListBox / ListView -->
     <Style TargetType="{x:Type ListBox}">
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
