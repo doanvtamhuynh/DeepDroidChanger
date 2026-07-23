@@ -1513,7 +1513,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task RandomSim_WhileRandomDeviceIsRunning_WaitsAndWinsInInvocationOrder()
+    public async Task RandomSim_WhileRandomDeviceIsRunning_IsDisabledUntilActionCompletes()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -1552,7 +1552,12 @@ public sealed class DeviceManagerViewModelLifecycleTests
 
         Task randomDeviceTask = viewModel.RandomDeviceCommand.ExecuteAsync(null);
         await randomDeviceStarted.Task;
-        Task randomSimTask = viewModel.RandomSimCommand.ExecuteAsync(null);
+
+        Assert.IsFalse(viewModel.CanInteractWithSelectedDevice);
+        Assert.IsTrue(viewModel.SelectedDevice!.IsActionBusy);
+        Assert.IsFalse(viewModel.SelectedDevice.CanEdit);
+        Assert.IsFalse(viewModel.RandomSimCommand.CanExecute(null));
+        await viewModel.RandomSimCommand.ExecuteAsync(null);
         simProfileService.DidNotReceiveWithAnyArgs().CreateRandomProfile(default, default);
 
         randomDeviceCompletion.SetResult(new RandomDeviceResult(
@@ -1565,7 +1570,13 @@ public sealed class DeviceManagerViewModelLifecycleTests
                 SimPhoneNumber = "device-phone",
                 SimOperatorName = "Device operator"
             }));
-        await Task.WhenAll(randomDeviceTask, randomSimTask);
+        await randomDeviceTask;
+
+        Assert.IsTrue(viewModel.CanInteractWithSelectedDevice);
+        Assert.IsFalse(viewModel.SelectedDevice.IsActionBusy);
+        Assert.IsTrue(viewModel.SelectedDevice.CanEdit);
+        Assert.IsTrue(viewModel.RandomSimCommand.CanExecute(null));
+        await viewModel.RandomSimCommand.ExecuteAsync(null);
 
         simProfileService.Received(1).CreateRandomProfile(
             Arg.Any<CarrierCountryOption?>(),
@@ -1574,6 +1585,108 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.AreEqual("sim-iccid", viewModel.DeviceInfo.Iccid);
         Assert.AreEqual("sim-phone", viewModel.DeviceInfo.PhoneNumber);
         Assert.AreEqual("SIM operator", viewModel.DeviceInfo.Operator);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task DeviceActionGuard_BlocksOnlyBusySerialAndKeepsRandomInfoIsolatedPerDevice()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new()
+            {
+                Serial = "A",
+                Name = "Phone A",
+                Type = "Phone",
+                ChangeOptions = new DeviceChangeOptions { UseDefaultMode = false }
+            },
+            new()
+            {
+                Serial = "B",
+                Name = "Phone B",
+                Type = "Phone",
+                ChangeOptions = new DeviceChangeOptions { UseDefaultMode = false }
+            }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var firstRandomStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstRandomCompletion = new TaskCompletionSource<RandomDeviceResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invocationCount = 0;
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                if (Interlocked.Increment(ref invocationCount) == 1)
+                {
+                    firstRandomStarted.TrySetResult();
+                    return firstRandomCompletion.Task;
+                }
+
+                return Task.FromResult(new RandomDeviceResult(
+                    RandomDeviceStatus.Created,
+                    new DeviceInfoApiDevice { Model = "Profile B" }));
+            });
+        var viewModel = CreateViewModel(deviceList, carriers, randomDevice: randomDevice);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        viewModel.SelectedDevice = deviceA;
+        Task deviceAAction = viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await firstRandomStarted.Task;
+
+        Assert.IsTrue(deviceA.IsActionBusy);
+        Assert.IsFalse(deviceA.CanEdit);
+        Assert.IsFalse(viewModel.CanInteractWithSelectedDevice);
+        Assert.IsFalse(viewModel.RandomDeviceCommand.CanExecute(null));
+        Assert.IsFalse(viewModel.RandomSimCommand.CanExecute(null));
+        Dictionary<string, bool> busyDeviceActionStates = GetGuardedActionStates(viewModel);
+        Assert.IsTrue(
+            busyDeviceActionStates.All(pair => !pair.Value),
+            CreateActionStateMessage(busyDeviceActionStates));
+        Dictionary<string, bool> busyContextMenuStates = GetContextMenuActionStates(viewModel);
+        Assert.IsTrue(
+            busyContextMenuStates.All(pair => !pair.Value),
+            CreateActionStateMessage(busyContextMenuStates));
+
+        viewModel.SelectedDevice = deviceB;
+
+        Assert.IsFalse(deviceB.IsActionBusy);
+        Assert.IsTrue(deviceB.CanEdit);
+        Assert.IsTrue(viewModel.CanInteractWithSelectedDevice);
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        Dictionary<string, bool> otherDeviceActionStates = GetGuardedActionStates(viewModel);
+        Assert.IsTrue(
+            otherDeviceActionStates.All(pair => pair.Value),
+            CreateActionStateMessage(otherDeviceActionStates));
+
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        Assert.AreEqual("Profile B", viewModel.DeviceInfo.Model);
+
+        firstRandomCompletion.SetResult(new RandomDeviceResult(
+            RandomDeviceStatus.Created,
+            new DeviceInfoApiDevice { Model = "Profile A" }));
+        await deviceAAction;
+
+        Assert.AreEqual("Profile B", viewModel.DeviceInfo.Model);
+        Assert.IsFalse(deviceA.IsActionBusy);
+        Assert.IsTrue(deviceA.CanEdit);
+
+        viewModel.SelectedDevice = deviceA;
+        Assert.AreEqual("Profile A", viewModel.DeviceInfo.Model);
+        Assert.IsTrue(viewModel.CanInteractWithSelectedDevice);
+
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
@@ -1914,6 +2027,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IDeviceActionConfirmationDialogService? deviceActionConfirmationDialog = null,
         IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
         IDeviceChangeService? deviceChange = null,
+        IDeviceActionGuardService? deviceActionGuard = null,
         AppSettings? settings = null)
     {
         return new DeviceManagerViewModel(
@@ -1940,6 +2054,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             deviceConfig ?? Substitute.For<IDeviceConfigService>(),
             randomDevice ?? Substitute.For<IRandomDeviceService>(),
             simProfileService ?? Substitute.For<ISimProfileService>(),
+            deviceActionGuard ?? new DeviceActionGuardService(),
             Substitute.For<IDeviceActionService>(),
             deviceChange ?? Substitute.For<IDeviceChangeService>(),
             CreateLocalizationService(),

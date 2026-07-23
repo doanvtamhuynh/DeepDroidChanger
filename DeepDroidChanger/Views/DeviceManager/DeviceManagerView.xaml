@@ -124,6 +124,7 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     IsEnabled="{Binding CanEdit}"
                                      Style="{StaticResource InlineDataGridTextBoxStyle}"
                                      materialDesign:HintAssist.Hint="{DynamicResource Shared_DeviceNameHint}"/>
                         </DataTemplate>
@@ -141,6 +142,7 @@
                         <DataTemplate>
                             <ComboBox ItemsSource="{Binding DataContext.TypeOptions, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                       SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEnabled="{Binding CanEdit}"
                                       Style="{StaticResource InlineDataGridComboBoxStyle}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
@@ -198,6 +200,7 @@
                               HorizontalScrollBarVisibility="Disabled">
                     <Grid x:Name="DeviceProfilePanelContentGrid"
                           Margin="{StaticResource DeviceProfilePanelContentMargin}"
+                          IsEnabled="{Binding CanInteractWithSelectedDevice}"
                           MinHeight="260">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2.2*"/>

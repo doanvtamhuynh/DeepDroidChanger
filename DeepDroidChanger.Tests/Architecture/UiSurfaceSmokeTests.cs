@@ -381,6 +381,11 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreEqual(ScrollBarVisibility.Disabled, deviceProfilePanelScrollViewer.HorizontalScrollBarVisibility);
         var deviceProfilePanelContentGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceProfilePanelContentGrid"));
         Assert.AreEqual(new Thickness(0d, 10d, 16d, 0d), deviceProfilePanelContentGrid.Margin);
+        System.Windows.Data.Binding? interactionBinding = System.Windows.Data.BindingOperations.GetBinding(
+            deviceProfilePanelContentGrid,
+            UIElement.IsEnabledProperty);
+        Assert.IsNotNull(interactionBinding);
+        Assert.AreEqual(nameof(DeviceManagerViewModel.CanInteractWithSelectedDevice), interactionBinding.Path.Path);
         var deviceActionGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceActionGrid"));
         Assert.IsFalse(deviceActionGrid.Parent is ScrollViewer);
         Assert.HasCount(7, deviceActionGrid.RowDefinitions);
