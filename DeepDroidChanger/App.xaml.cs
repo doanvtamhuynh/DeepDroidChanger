@@ -145,6 +145,7 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceSelectionService, DeviceSelectionService>();
         services.AddSingleton<IDeviceConfigService, DeviceConfigService>();
         services.AddSingleton<IRandomDeviceService, RandomDeviceService>();
+        services.AddSingleton<IDeviceActionGuardService, DeviceActionGuardService>();
         services.AddSingleton<IDeviceActionService, DeviceActionService>();
         services.AddSingleton<IProxyWorkflowService, ProxyWorkflowService>();
         services.AddSingleton<IDeviceViewerCoordinatorService, DeviceViewerCoordinatorService>();

@@ -36,6 +36,7 @@ public sealed class DependencyInjectionTests
         AssertLifetime<ISettingsService>(services, ServiceLifetime.Singleton);
         AssertLifetime<IDeviceSessionService>(services, ServiceLifetime.Singleton);
         AssertLifetime<IAdbCommandService>(services, ServiceLifetime.Singleton);
+        AssertLifetime<IDeviceActionGuardService>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainViewModel>(services, ServiceLifetime.Singleton);
         AssertLifetime<DeviceManagerViewModel>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainWindow>(services, ServiceLifetime.Singleton);
