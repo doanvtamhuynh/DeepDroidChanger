@@ -23,6 +23,8 @@ namespace DeepDroidChanger.Models
         public string LocationMode { get; set; } = string.Empty;
         public string LocationLatitude { get; set; } = string.Empty;
         public string LocationLongitude { get; set; } = string.Empty;
+        public string LocationCountryCode { get; set; } = string.Empty;
+        public string LocationCityName { get; set; } = string.Empty;
         public string TimezoneMode { get; set; } = string.Empty;
         public string Timezone { get; set; } = string.Empty;
         public string ProxyFullString { get; set; } = string.Empty;

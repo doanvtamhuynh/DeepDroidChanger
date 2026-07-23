@@ -142,6 +142,8 @@ public sealed class DeviceStoreServiceTests
             LocationMode = nameof(ChangeLocationMode.Config),
             LocationLatitude = "38.9072",
             LocationLongitude = "-77.0369",
+            LocationCountryCode = "US",
+            LocationCityName = "Washington D.C.",
             TimezoneMode = nameof(ChangeTimezoneMode.Data),
             Timezone = "America/New_York",
             ProxyFullString = "proxy.example:1080:user:password",
@@ -182,6 +184,8 @@ public sealed class DeviceStoreServiceTests
         Assert.AreEqual(nameof(ChangeLocationMode.Config), restored.LocationMode);
         Assert.AreEqual("38.9072", restored.LocationLatitude);
         Assert.AreEqual("-77.0369", restored.LocationLongitude);
+        Assert.AreEqual("US", restored.LocationCountryCode);
+        Assert.AreEqual("Washington D.C.", restored.LocationCityName);
         Assert.AreEqual(nameof(ChangeTimezoneMode.Data), restored.TimezoneMode);
         Assert.AreEqual("America/New_York", restored.Timezone);
         Assert.AreEqual("proxy.example:1080:user:password", restored.ProxyFullString);

@@ -254,6 +254,8 @@ namespace DeepDroidChanger.Services
                     LocationMode = NormalizeValue(device.LocationMode),
                     LocationLatitude = NormalizeValue(device.LocationLatitude),
                     LocationLongitude = NormalizeValue(device.LocationLongitude),
+                    LocationCountryCode = NormalizeValue(device.LocationCountryCode),
+                    LocationCityName = NormalizeValue(device.LocationCityName),
                     TimezoneMode = NormalizeValue(device.TimezoneMode),
                     Timezone = NormalizeValue(device.Timezone),
                     ProxyFullString = NormalizeValue(device.ProxyFullString),
@@ -270,6 +272,5 @@ namespace DeepDroidChanger.Services
         {
             return value?.Trim() ?? string.Empty;
         }
-
     }
 }
