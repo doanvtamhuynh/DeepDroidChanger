@@ -5,6 +5,9 @@
     <system:String x:Key="ChangeLocation_ModeGroupHeader">Chế độ</system:String>
     <system:String x:Key="ChangeLocation_ModeConfig">Cấu hình thủ công</system:String>
     <system:String x:Key="ChangeLocation_ModeDeviceIp">Dùng IP thiết bị</system:String>
+    <system:String x:Key="ChangeLocation_CountryLabel">Quốc gia</system:String>
+    <system:String x:Key="ChangeLocation_CountrySearchHint">Tìm kiếm quốc gia...</system:String>
+    <system:String x:Key="ChangeLocation_LocationLabel">Vị trí / Thành phố</system:String>
     <system:String x:Key="ChangeLocation_LatitudeLabel">Vĩ độ (Latitude)</system:String>
     <system:String x:Key="ChangeLocation_LatitudeHint">Từ -90 đến 90, ví dụ: 21.0285</system:String>
     <system:String x:Key="ChangeLocation_LongitudeLabel">Kinh độ (Longitude)</system:String>

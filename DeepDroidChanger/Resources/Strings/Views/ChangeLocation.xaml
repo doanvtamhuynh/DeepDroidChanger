@@ -5,6 +5,9 @@
     <system:String x:Key="ChangeLocation_ModeGroupHeader">Change Mode</system:String>
     <system:String x:Key="ChangeLocation_ModeConfig">Manual coordinates</system:String>
     <system:String x:Key="ChangeLocation_ModeDeviceIp">Device IP</system:String>
+    <system:String x:Key="ChangeLocation_CountryLabel">Country</system:String>
+    <system:String x:Key="ChangeLocation_CountrySearchHint">Search country...</system:String>
+    <system:String x:Key="ChangeLocation_LocationLabel">Location / City</system:String>
     <system:String x:Key="ChangeLocation_LatitudeLabel">Latitude</system:String>
     <system:String x:Key="ChangeLocation_LatitudeHint">Range: -90 to 90, e.g., 21.0285</system:String>
     <system:String x:Key="ChangeLocation_LongitudeLabel">Longitude</system:String>

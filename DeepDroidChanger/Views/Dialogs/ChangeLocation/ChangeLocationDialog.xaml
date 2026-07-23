@@ -3,21 +3,27 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{DynamicResource ChangeLocation_WindowTitle}"
-        Width="620"
-        Height="440"
+        Width="640"
+        Height="660"
         MinWidth="520"
-        MinHeight="380"
+        MinHeight="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource Brush.WindowBackground}"
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{StaticResource Metric.FontFamily}">
 
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
     <Grid Style="{StaticResource ChangeLocationRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -49,19 +55,86 @@
                 </Grid.RowDefinitions>
 
                 <RadioButton Grid.Row="0"
-                             Content="{DynamicResource ChangeLocation_ModeConfig}"
                              IsChecked="{Binding IsConfigMode, Mode=TwoWay}"
-                             Style="{StaticResource ChangeLocationModeRadioStyle}"/>
+                             Style="{StaticResource ChangeLocationModeRadioStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="SquareEditOutline"
+                                                 Width="18" Height="18"
+                                                 Margin="0,0,8,0"
+                                                 VerticalAlignment="Center"
+                                                 Foreground="{DynamicResource Brush.Accent}"/>
+                        <TextBlock Text="{DynamicResource ChangeLocation_ModeConfig}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
 
                 <RadioButton Grid.Row="1"
-                             Content="{DynamicResource ChangeLocation_ModeDeviceIp}"
                              IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
-                             Style="{StaticResource ChangeLocationModeRadioStyle}"/>
+                             Style="{StaticResource ChangeLocationModeRadioStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="Web"
+                                                 Width="18" Height="18"
+                                                 Margin="0,0,8,0"
+                                                 VerticalAlignment="Center"
+                                                 Foreground="{DynamicResource Brush.Accent}"/>
+                        <TextBlock Text="{DynamicResource ChangeLocation_ModeDeviceIp}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
             </Grid>
         </GroupBox>
 
-        <!-- CONFIG INPUTS -->
-        <Grid Grid.Row="2"
+        <!-- DATA LOCATION SELECTOR (BELOW RADIO BOX & ABOVE LAT/LON) -->
+        <Grid Grid.Row="2" Style="{StaticResource ChangeLocationSelectorGridStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Search Box -->
+            <TextBox Grid.Row="0"
+                     Text="{Binding LocationSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource ChangeLocationSearchTextBoxStyle}"
+                     materialDesign:HintAssist.Hint="{DynamicResource ChangeLocation_CountrySearchHint}"
+                     IsEnabled="{Binding IsConfigMode}"/>
+
+            <!-- Country ComboBox -->
+            <ComboBox x:Name="CountryComboBox"
+                      Grid.Row="1"
+                      ItemsSource="{Binding FilteredCountries}"
+                      SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
+                      IsDropDownOpen="{Binding IsCountryDropDownOpen, Mode=TwoWay}"
+                      DropDownClosed="CountryComboBox_DropDownClosed"
+                      Style="{StaticResource ChangeLocationComboBoxStyle}"
+                      IsEnabled="{Binding IsConfigMode}"
+                      MaxDropDownHeight="220">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding CountryDisplayText}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <!-- Location ComboBox -->
+            <ComboBox x:Name="LocationComboBox"
+                      Grid.Row="2"
+                      ItemsSource="{Binding CountryLocations}"
+                      SelectedItem="{Binding SelectedLocation, Mode=TwoWay}"
+                      DropDownClosed="LocationComboBox_DropDownClosed"
+                      Style="{StaticResource ChangeLocationComboBoxStyle}"
+                      IsEnabled="{Binding IsConfigMode}"
+                      MaxDropDownHeight="220">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding LocationDisplayText}"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+        </Grid>
+
+        <!-- CONFIG INPUTS (LATITUDE / LONGITUDE) -->
+        <Grid Grid.Row="3"
               Style="{StaticResource ChangeLocationSelectorGridStyle}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -97,16 +170,21 @@
                        Style="{StaticResource ChangeLocationHintTextStyle}"/>
         </Grid>
 
+        <!-- LOADING -->
+        <ProgressBar Grid.Row="4"
+                     IsIndeterminate="True"
+                     Style="{StaticResource ChangeLocationProgressBarStyle}"
+                     Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
         <!-- ACTION BUTTONS -->
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="5"
               Style="{StaticResource ChangeLocationActionGridStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="2"
+            <Button Grid.Column="1"
                     Command="{Binding SaveCommand}"
                     Style="{StaticResource ChangeLocationSaveButtonStyle}">
                 <Grid>

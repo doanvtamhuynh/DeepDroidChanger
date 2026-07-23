@@ -41,14 +41,9 @@
 </Style>
 
 <!-- MODE RADIO BUTTON -->
-<Style x:Key="ChangeLocationModeRadioStyle" TargetType="RadioButton">
-    <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
-    <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
-    <Setter Property="FontWeight" Value="SemiBold"/>
-    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+<Style x:Key="ChangeLocationModeRadioStyle" TargetType="RadioButton"
+       BasedOn="{StaticResource CardRadioButtonStyle}">
     <Setter Property="Margin" Value="0,4"/>
-    <Setter Property="VerticalContentAlignment" Value="Center"/>
-    <Setter Property="Cursor" Value="Hand"/>
 </Style>
 
 <!-- SELECTOR GRID -->
@@ -64,6 +59,82 @@
     <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
     <Setter Property="Margin" Value="0,4,0,4"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
+</Style>
+
+<!-- SEARCH TEXT BOX -->
+<Style x:Key="ChangeLocationSearchTextBoxStyle" TargetType="TextBox">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource Brush.Accent}"/>
+    <Setter Property="SelectionBrush" Value="{DynamicResource Brush.SurfaceSelected}"/>
+    <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+    <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+    <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+    <Setter Property="Padding" Value="10,0"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Margin" Value="0,0,0,8"/>
+    <Setter Property="materialDesign:HintAssist.Foreground"
+            Value="{DynamicResource Brush.TextDisabled}"/>
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="TextBox">
+                <Border x:Name="SearchBorder"
+                        Background="{DynamicResource Brush.Surface}"
+                        BorderBrush="{DynamicResource Brush.Border}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource Radius.Medium}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <materialDesign:PackIcon Kind="Magnify"
+                                                 Width="16" Height="16"
+                                                 Margin="10,0,4,0"
+                                                 VerticalAlignment="Center"
+                                                 Foreground="{DynamicResource Brush.TextSecondary}"/>
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Grid.Column="1"
+                                      Focusable="False"
+                                      Margin="4,0,10,0"
+                                      VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsFocused" Value="True">
+                        <Setter TargetName="SearchBorder" Property="BorderBrush"
+                                Value="{DynamicResource Brush.Accent}"/>
+                        <Setter TargetName="SearchBorder" Property="Background"
+                                Value="{DynamicResource Brush.SurfaceSelected}"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter TargetName="SearchBorder" Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                        <Setter TargetName="SearchBorder" Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+
+<!-- COMBOBOX STYLE -->
+<Style x:Key="ChangeLocationComboBoxStyle"
+       TargetType="ComboBox"
+       BasedOn="{StaticResource FlatComboBoxStyle}">
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="Margin" Value="0,0,0,8"/>
+    <Setter Property="ItemContainerStyle">
+        <Setter.Value>
+            <Style TargetType="ComboBoxItem"
+                   BasedOn="{StaticResource FlatComboBoxItemStyle}">
+                <Setter Property="Padding" Value="10,6"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            </Style>
+        </Setter.Value>
+    </Setter>
 </Style>
 
 <!-- HINT TEXT -->
@@ -84,11 +155,18 @@
     <Setter Property="materialDesign:HintAssist.Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
 </Style>
 
+<!-- PROGRESS BAR -->
+<Style x:Key="ChangeLocationProgressBarStyle" TargetType="ProgressBar"
+       BasedOn="{StaticResource MaterialDesignLinearProgressBar}">
+    <Setter Property="Height" Value="3"/>
+    <Setter Property="Margin" Value="0,4,0,4"/>
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+</Style>
+
 <!-- ACTION GRID -->
 <Style x:Key="ChangeLocationActionGridStyle" TargetType="Grid">
     <Setter Property="Margin" Value="0,8,0,0"/>
 </Style>
-
 
 <!-- SAVE BUTTON -->
 <Style x:Key="ChangeLocationSaveButtonStyle" TargetType="Button"
