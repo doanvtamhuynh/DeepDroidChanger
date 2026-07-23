@@ -94,6 +94,32 @@
         <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}, Path=IsSelected}"
+                         Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}, Path=IsEnabled}"
+                         Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBox}, Path=IsEnabled}"
+                         Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=CheckBox}, Path=IsEnabled}"
+                         Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=RadioButton}, Path=IsEnabled}"
+                         Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ButtonBase}, Path=IsEnabled}"
+                         Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="TitleTextStyle" TargetType="{x:Type TextBlock}">
@@ -359,7 +385,8 @@
                 <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
             </Trigger>
             <Trigger Property="IsSelected" Value="True">
-                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
                 <Setter Property="FontWeight" Value="Bold"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
