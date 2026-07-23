@@ -114,4 +114,42 @@ public sealed class DeviceLocationServiceTests
         Assert.AreEqual("10.5000", latitude);
         Assert.AreEqual("106.2500", longitude);
     }
+
+    [TestMethod]
+    public async Task ResolveLocationByDeviceIpAsync_ResolvesCountryAndCityFromDataService()
+    {
+        IIpGeolocationService geolocation = Substitute.For<IIpGeolocationService>();
+        geolocation.GetDeviceIpGeolocationAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new IpGeolocationInfo
+            {
+                Success = true,
+                CountryCode = "VN",
+                Latitude = 10.75,
+                Longitude = 106.666,
+                Timezone = "Asia/Ho_Chi_Minh"
+            });
+
+        ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+        var locations = new List<LocationOption>
+        {
+            new LocationOption("VN", "Vietnam", "Ho Chi Minh City", "Asia/Ho_Chi_Minh", "UTC +07:00", 10.75, 106.666)
+        };
+        locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<LocationOption>>(locations));
+
+        IRandomService random = Substitute.For<IRandomService>();
+        random.RandomInRange(0, 1000).Returns(0);
+
+        var service = new DeviceLocationService(
+            Substitute.For<IAdbCommandService>(),
+            geolocation,
+            locationDataService,
+            random,
+            NullLogger<DeviceLocationService>.Instance);
+
+        DeviceLocationResult result = await service.ResolveLocationByDeviceIpAsync("SERIAL", CancellationToken.None);
+
+        Assert.AreEqual("VN", result.CountryCode);
+        Assert.AreEqual("Ho Chi Minh City", result.CityName);
+    }
 }

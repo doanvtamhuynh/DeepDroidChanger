@@ -1200,15 +1200,17 @@ namespace DeepDroidChanger.ViewModels
                     dialogResult.Mode == ChangeLocationMode.DeviceIp
                         ? DeviceLogResourceKeys.ResolvingByIp
                         : DeviceLogResourceKeys.ApplyingLocation);
-                (string appliedLatitude, string appliedLongitude) = await _deviceLocationService
+                DeviceLocationResult locationResult = await _deviceLocationService
                     .ApplyAsync(device.Serial, dialogResult, cancellationToken)
                     .ConfigureAwait(true);
 
                 await SaveLocationConfigAsync(
                         device.Serial,
                         dialogResult.Mode,
-                        appliedLatitude,
-                        appliedLongitude,
+                        locationResult.Latitude,
+                        locationResult.Longitude,
+                        locationResult.CountryCode,
+                        locationResult.CityName,
                         cancellationToken)
                     .ConfigureAwait(true);
 
@@ -1327,11 +1329,30 @@ namespace DeepDroidChanger.ViewModels
                 ApplyRandomDeviceInfo(device.Serial, profile);
         }
 
+        private Task SaveLocationConfigAsync(
+            string serial,
+            ChangeLocationMode mode,
+            string latitude,
+            string longitude,
+            CancellationToken cancellationToken)
+        {
+            return SaveLocationConfigAsync(
+                serial,
+                mode,
+                latitude,
+                longitude,
+                countryCode: string.Empty,
+                cityName: string.Empty,
+                cancellationToken);
+        }
+
         private async Task SaveLocationConfigAsync(
             string serial,
             ChangeLocationMode mode,
             string latitude,
             string longitude,
+            string countryCode,
+            string cityName,
             CancellationToken cancellationToken)
         {
             await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
@@ -1344,6 +1365,8 @@ namespace DeepDroidChanger.ViewModels
                         mode,
                         latitude,
                         longitude,
+                        countryCode,
+                        cityName,
                         cancellationToken)
                     .ConfigureAwait(true);
             }

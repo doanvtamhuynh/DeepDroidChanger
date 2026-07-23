@@ -14,7 +14,7 @@ public sealed class ProxyWorkflowServiceTests
         IProxyService proxy = Substitute.For<IProxyService>();
         IDeviceLocationService location = Substitute.For<IDeviceLocationService>();
         location.ResolveLocationByDeviceIpAsync("SERIAL", Arg.Any<CancellationToken>())
-            .Returns<Task<(string Latitude, string Longitude)>>(_ => throw new InvalidOperationException("location failed"));
+            .Returns<Task<DeviceLocationResult>>(_ => throw new InvalidOperationException("location failed"));
         IDeviceTimezoneService timezone = Substitute.For<IDeviceTimezoneService>();
         timezone.ResolveTimezoneByDeviceIpAsync("SERIAL", Arg.Any<CancellationToken>())
             .Returns("Asia/Ho_Chi_Minh");

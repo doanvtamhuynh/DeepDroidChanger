@@ -17,6 +17,7 @@ namespace DeepDroidChanger.Services
 
         private readonly IAdbCommandService _adbCommandService;
         private readonly IIpGeolocationService _adbIpGeolocationService;
+        private readonly ILocationDataService? _locationDataService;
         private readonly IRandomService _randomService;
         private readonly ILogger<DeviceLocationService> _logger;
 
@@ -25,9 +26,20 @@ namespace DeepDroidChanger.Services
             IIpGeolocationService adbIpGeolocationService,
             IRandomService randomService,
             ILogger<DeviceLocationService> logger)
+            : this(adbCommandService, adbIpGeolocationService, null, randomService, logger)
+        {
+        }
+
+        public DeviceLocationService(
+            IAdbCommandService adbCommandService,
+            IIpGeolocationService adbIpGeolocationService,
+            ILocationDataService? locationDataService,
+            IRandomService randomService,
+            ILogger<DeviceLocationService> logger)
         {
             _adbCommandService = adbCommandService;
             _adbIpGeolocationService = adbIpGeolocationService;
+            _locationDataService = locationDataService;
             _randomService = randomService;
             _logger = logger;
         }
@@ -49,7 +61,7 @@ namespace DeepDroidChanger.Services
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Prop_Longitude, safeLon, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<(string Latitude, string Longitude)> ResolveLocationByDeviceIpAsync(string serial, CancellationToken cancellationToken)
+        public async Task<DeviceLocationResult> ResolveLocationByDeviceIpAsync(string serial, CancellationToken cancellationToken)
         {
             var geoInfo = await _adbIpGeolocationService.GetDeviceIpGeolocationAsync(serial, cancellationToken).ConfigureAwait(false);
 
@@ -59,10 +71,47 @@ namespace DeepDroidChanger.Services
             var randomizedLat = RandomizeCoordinate(geoInfo.Latitude, MinLatitude, MaxLatitude);
             var randomizedLon = RandomizeCoordinate(geoInfo.Longitude, MinLongitude, MaxLongitude);
 
-            return (randomizedLat, randomizedLon);
+            string countryCode = geoInfo.CountryCode;
+            string cityName = string.Empty;
+
+            if (_locationDataService != null)
+            {
+                try
+                {
+                    var locations = await _locationDataService.GetLocationsAsync(cancellationToken).ConfigureAwait(false);
+                    if (locations.Count > 0)
+                    {
+                        LocationOption? match = null;
+                        if (!string.IsNullOrWhiteSpace(geoInfo.CountryCode))
+                        {
+                            match = locations.FirstOrDefault(loc =>
+                                string.Equals(loc.CountryCode, geoInfo.CountryCode, StringComparison.OrdinalIgnoreCase));
+                        }
+
+                        if (match == null)
+                        {
+                            match = locations
+                                .OrderBy(loc => Math.Pow(loc.Latitude - geoInfo.Latitude, 2) + Math.Pow(loc.Longitude - geoInfo.Longitude, 2))
+                                .FirstOrDefault();
+                        }
+
+                        if (match != null)
+                        {
+                            countryCode = match.CountryCode;
+                            cityName = match.CityName;
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(exception, "Failed to resolve city name for IP geolocation.");
+                }
+            }
+
+            return new DeviceLocationResult(randomizedLat, randomizedLon, countryCode, cityName);
         }
 
-        public async Task<(string Latitude, string Longitude)> ApplyAsync(
+        public async Task<DeviceLocationResult> ApplyAsync(
             string serial,
             ChangeLocationDialogResult result,
             CancellationToken cancellationToken)
@@ -71,10 +120,10 @@ namespace DeepDroidChanger.Services
 
             if (result.Mode == ChangeLocationMode.DeviceIp)
             {
-                (string latitude, string longitude) =
+                DeviceLocationResult locationResult =
                     await ResolveLocationByDeviceIpAsync(serial, cancellationToken).ConfigureAwait(false);
-                await ApplyLocationAsync(serial, latitude, longitude, cancellationToken).ConfigureAwait(false);
-                return (latitude, longitude);
+                await ApplyLocationAsync(serial, locationResult.Latitude, locationResult.Longitude, cancellationToken).ConfigureAwait(false);
+                return locationResult;
             }
 
             await ApplyLocationAsync(
@@ -83,9 +132,11 @@ namespace DeepDroidChanger.Services
                     result.Longitude,
                     cancellationToken)
                 .ConfigureAwait(false);
-            return (
-                double.Parse(result.Latitude, CultureInfo.InvariantCulture).ToString("F4", CultureInfo.InvariantCulture),
-                double.Parse(result.Longitude, CultureInfo.InvariantCulture).ToString("F4", CultureInfo.InvariantCulture));
+
+            string safeLat = double.Parse(result.Latitude, CultureInfo.InvariantCulture).ToString("F4", CultureInfo.InvariantCulture);
+            string safeLon = double.Parse(result.Longitude, CultureInfo.InvariantCulture).ToString("F4", CultureInfo.InvariantCulture);
+
+            return new DeviceLocationResult(safeLat, safeLon);
         }
 
         private static bool IsValidResolvedCoordinate(double latitude, double longitude, string countryCode)

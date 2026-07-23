@@ -42,4 +42,14 @@ public interface IDeviceConfigService
         string latitude,
         string longitude,
         CancellationToken cancellationToken);
+
+    Task<bool> SaveLocationConfigAsync(
+        IList<StoredDeviceConfig> storedDevices,
+        string serial,
+        ChangeLocationMode mode,
+        string latitude,
+        string longitude,
+        string countryCode,
+        string cityName,
+        CancellationToken cancellationToken);
 }

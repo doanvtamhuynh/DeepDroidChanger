@@ -123,12 +123,33 @@ namespace DeepDroidChanger.Services
             return updated;
         }
 
+        public Task<bool> SaveLocationConfigAsync(
+            IList<StoredDeviceConfig> storedDevices,
+            string serial,
+            ChangeLocationMode mode,
+            string latitude,
+            string longitude,
+            CancellationToken cancellationToken)
+        {
+            return SaveLocationConfigAsync(
+                storedDevices,
+                serial,
+                mode,
+                latitude,
+                longitude,
+                countryCode: string.Empty,
+                cityName: string.Empty,
+                cancellationToken);
+        }
+
         public async Task<bool> SaveLocationConfigAsync(
             IList<StoredDeviceConfig> storedDevices,
             string serial,
             ChangeLocationMode mode,
             string latitude,
             string longitude,
+            string countryCode,
+            string cityName,
             CancellationToken cancellationToken)
         {
             var storedDevice = storedDevices.FirstOrDefault(device => DeviceRowFactory.SerialEquals(device.Serial, serial));
@@ -140,6 +161,12 @@ namespace DeepDroidChanger.Services
                 device.LocationMode = mode.ToString();
                 device.LocationLatitude = Normalize(latitude);
                 device.LocationLongitude = Normalize(longitude);
+
+                if (!string.IsNullOrWhiteSpace(countryCode))
+                    device.LocationCountryCode = Normalize(countryCode);
+
+                if (!string.IsNullOrWhiteSpace(cityName))
+                    device.LocationCityName = Normalize(cityName);
             }
 
             bool updated = await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken).ConfigureAwait(false);
