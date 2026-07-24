@@ -149,7 +149,8 @@
 
             <TextBlock Grid.Row="0" Grid.Column="0"
                        Text="{DynamicResource ChangeLocation_LatitudeLabel}"
-                       Style="{StaticResource ChangeLocationInputLabelStyle}"/>
+                       Style="{StaticResource ChangeLocationInputLabelStyle}"
+                       IsEnabled="{Binding IsConfigMode}"/>
             <TextBox Grid.Row="1" Grid.Column="0"
                      Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      Style="{StaticResource ChangeLocationTextBoxStyle}"
@@ -160,7 +161,8 @@
 
             <TextBlock Grid.Row="0" Grid.Column="2"
                        Text="{DynamicResource ChangeLocation_LongitudeLabel}"
-                       Style="{StaticResource ChangeLocationInputLabelStyle}"/>
+                       Style="{StaticResource ChangeLocationInputLabelStyle}"
+                       IsEnabled="{Binding IsConfigMode}"/>
             <TextBox Grid.Row="1" Grid.Column="2"
                      Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      Style="{StaticResource ChangeLocationTextBoxStyle}"
