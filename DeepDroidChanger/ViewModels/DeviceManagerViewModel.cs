@@ -449,6 +449,7 @@ namespace DeepDroidChanger.ViewModels
             DeleteDeviceCommand.NotifyCanExecuteChanged();
             RebootDeviceCommand.NotifyCanExecuteChanged();
             ViewDeviceInfoCommand.NotifyCanExecuteChanged();
+            CopySerialCommand.NotifyCanExecuteChanged();
             RandomDeviceCommand.NotifyCanExecuteChanged();
             ChangeDeviceCommand.NotifyCanExecuteChanged();
             ChangeWithoutWipeCommand.NotifyCanExecuteChanged();
@@ -609,6 +610,39 @@ namespace DeepDroidChanger.ViewModels
                 _logger.LogError(exception, "Failed to reboot device {Serial}.", device.Serial);
                 await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RebootDeviceFailed, CancellationToken.None).ConfigureAwait(true);
                 SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction))]
+        private async Task CopySerialAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
+        {
+            DeviceRowViewModel? targetDevice = device ?? SelectedDevice;
+            if (targetDevice == null || string.IsNullOrWhiteSpace(targetDevice.Serial))
+                return;
+
+            bool success = false;
+            await RunOnUiContextAsync(() =>
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(targetDevice.Serial);
+                    success = true;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to copy serial for device {Serial}.", targetDevice.Serial);
+                }
+            }).ConfigureAwait(true);
+
+            if (success)
+            {
+                await ShowDeviceLogAsync(targetDevice, DeviceLogResourceKeys.CopySerialSuccess, cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
+            }
+            else
+            {
+                await ShowDeviceLogAsync(targetDevice, DeviceLogResourceKeys.CopySerialFailed, CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
             }
         }
 

@@ -127,4 +127,6 @@ public static class DeviceLogResourceKeys
     public const string ActionShellCommand = "Log_ActionShellCommand";
     public const string ProxyLocationByIpFailed = "Log_ProxyLocationByIpFailed";
     public const string ProxyTimezoneByIpFailed = "Log_ProxyTimezoneByIpFailed";
+    public const string CopySerialSuccess = "Log_CopySerialSuccess";
+    public const string CopySerialFailed = "Log_CopySerialFailed";
 }

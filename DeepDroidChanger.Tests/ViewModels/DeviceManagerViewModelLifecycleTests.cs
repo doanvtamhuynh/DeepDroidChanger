@@ -2088,6 +2088,32 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.AreEqual("America/New_York", storedDevices[0].Timezone);
     }
 
+    [TestMethod]
+    public async Task CopySerial_CanExecuteAndExecutesWithoutThrowing()
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL_12345", Name = "TestDevice", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, []));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        var viewModel = CreateViewModel(deviceList, carriers);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsNotNull(viewModel.CopySerialCommand);
+        Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(viewModel.Devices[0]));
+
+        await viewModel.CopySerialCommand.ExecuteAsync(viewModel.Devices[0]);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
     private static DeviceManagerViewModel CreateViewModel(
         IDeviceListService deviceList,
         ICarrierDataService carriers,

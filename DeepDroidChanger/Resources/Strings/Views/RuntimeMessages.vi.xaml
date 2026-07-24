@@ -126,4 +126,6 @@
     <sys:String x:Key="Log_ActionShellCommand">ADB Shell</sys:String>
     <sys:String x:Key="Log_ProxyLocationByIpFailed">Đã áp dụng proxy, nhưng đổi vị trí theo IP thất bại. Vui lòng tự đổi vị trí.</sys:String>
     <sys:String x:Key="Log_ProxyTimezoneByIpFailed">Đã áp dụng proxy, nhưng đổi múi giờ theo IP thất bại. Vui lòng tự đổi múi giờ.</sys:String>
+    <sys:String x:Key="Log_CopySerialSuccess">Đã sao chép serial vào bộ nhớ tạm</sys:String>
+    <sys:String x:Key="Log_CopySerialFailed">Không thể sao chép serial</sys:String>
 </ResourceDictionary>

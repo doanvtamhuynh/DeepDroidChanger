@@ -64,9 +64,10 @@
     <sys:String x:Key="DeviceManager_ActionViewDevice">View Device</sys:String>
     <sys:String x:Key="DeviceManager_ActionViewAllDeviceInfo">View All Info</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuDeleteDevice">Delete Device</sys:String>
-    <sys:String x:Key="DeviceManager_RowMenuDeleteShortcut">Del</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuRebootDevice">Reboot Device</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuDeviceInfo">Device Info</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuFactoryReset">Factory Reset</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuCopySerial">Copy Serial</sys:String>
     <sys:String x:Key="DeviceManager_FlashRomPlaceholder">Flash ROM is not implemented.</sys:String>
 
     <!-- Filter Strings -->

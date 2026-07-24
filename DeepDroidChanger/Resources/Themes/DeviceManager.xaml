@@ -87,6 +87,25 @@
                         </MenuItem.Header>
                     </MenuItem>
 
+                    <MenuItem Command="{Binding PlacementTarget.Tag.CopySerialCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                        <MenuItem.Header>
+                            <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="ContentCopy"
+                                                         Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{DynamicResource DeviceManager_RowMenuCopySerial}"
+                                           Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                            </Grid>
+                        </MenuItem.Header>
+                    </MenuItem>
+
                     <MenuItem Command="{Binding PlacementTarget.Tag.RebootDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                               Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
@@ -106,11 +125,29 @@
                         </MenuItem.Header>
                     </MenuItem>
 
+                    <MenuItem Command="{Binding PlacementTarget.Tag.FactoryResetCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                        <MenuItem.Header>
+                            <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="Restore"
+                                                         Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{DynamicResource DeviceManager_RowMenuFactoryReset}"
+                                           Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                            </Grid>
+                        </MenuItem.Header>
+                    </MenuItem>
+
                     <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
 
                     <MenuItem Command="{Binding PlacementTarget.Tag.DeleteDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                              InputGestureText="{DynamicResource DeviceManager_RowMenuDeleteShortcut}"
                               Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
                         <MenuItem.Header>
                             <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">

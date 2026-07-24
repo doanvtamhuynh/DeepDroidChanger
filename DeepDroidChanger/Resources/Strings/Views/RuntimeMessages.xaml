@@ -126,4 +126,6 @@
     <sys:String x:Key="Log_ActionShellCommand">ADB Shell</sys:String>
     <sys:String x:Key="Log_ProxyLocationByIpFailed">Proxy applied, but location by IP failed. Please change location manually.</sys:String>
     <sys:String x:Key="Log_ProxyTimezoneByIpFailed">Proxy applied, but timezone by IP failed. Please change timezone manually.</sys:String>
+    <sys:String x:Key="Log_CopySerialSuccess">Serial copied to clipboard</sys:String>
+    <sys:String x:Key="Log_CopySerialFailed">Failed to copy serial</sys:String>
 </ResourceDictionary>
