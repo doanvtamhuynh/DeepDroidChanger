@@ -768,12 +768,20 @@ public sealed class DeviceChangeServiceTests
     private static DeviceChangeService CreateService(
         IAdbCommandService adb,
         IDeviceDataCleanupService? cleanupService = null,
-        IDeviceIntegrityService? integrityService = null)
+        IDeviceIntegrityService? integrityService = null,
+        IDeviceLocationService? locationService = null,
+        IDeviceTimezoneService? timezoneService = null,
+        ILocationDataService? locationDataService = null,
+        IRandomService? randomService = null)
     {
         return new DeviceChangeService(
             adb,
             cleanupService ?? Substitute.For<IDeviceDataCleanupService>(),
             integrityService ?? Substitute.For<IDeviceIntegrityService>(),
+            locationService,
+            timezoneService,
+            locationDataService,
+            randomService,
             NullLogger<DeviceChangeService>.Instance);
     }
 
@@ -840,5 +848,111 @@ public sealed class DeviceChangeServiceTests
         await service.ChangeAsync("SERIAL", CreateProfile(), changeSim: true, options, progress: null, CancellationToken.None);
 
         await integrityService.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default!, default);
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_AppliesLocationAndTimezone_WhenInAdvancedModeWithLocationAndTimezoneChecked()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
+        IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
+        ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+
+        var testLocations = new List<LocationOption>
+        {
+            new LocationOption("vn", "Viet Nam", "Hanoi", "Asia/Ho_Chi_Minh", "UTC+7", 21.0300, 105.8690)
+        };
+        locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<LocationOption>>(testLocations));
+
+        DeviceChangeService service = CreateService(
+            adb,
+            locationService: locationService,
+            timezoneService: timezoneService,
+            locationDataService: locationDataService);
+
+        DeviceInfoApiDevice profile = CreateProfile();
+        profile.SimOperatorCountry = "vn";
+
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = false,
+            ChangeLocation = true,
+            ChangeTimezone = true
+        };
+
+        await service.ChangeAsync("SERIAL", profile, changeSim: true, options, progress: null, CancellationToken.None);
+
+        await locationService.Received(1).ApplyLocationAsync("SERIAL", "21.0300", "105.8690", Arg.Any<CancellationToken>());
+        await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "Asia/Ho_Chi_Minh", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_SkipsLocationAndTimezone_WhenInDefaultMode()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
+        IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
+        ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+
+        DeviceChangeService service = CreateService(
+            adb,
+            locationService: locationService,
+            timezoneService: timezoneService,
+            locationDataService: locationDataService);
+
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = true,
+            ChangeLocation = true,
+            ChangeTimezone = true
+        };
+
+        await service.ChangeAsync("SERIAL", CreateProfile(), changeSim: true, options, progress: null, CancellationToken.None);
+
+        await locationDataService.DidNotReceiveWithAnyArgs().GetLocationsAsync(Arg.Any<CancellationToken>());
+        await locationService.DidNotReceiveWithAnyArgs().ApplyLocationAsync(default!, default!, default!, default);
+        await timezoneService.DidNotReceiveWithAnyArgs().ApplyTimezoneAsync(default!, default!, default);
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_RandomlySelectsLocationAndTimezone_FromCountryLocations()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
+        IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
+        ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+        IRandomService randomService = Substitute.For<IRandomService>();
+
+        var testLocations = new List<LocationOption>
+        {
+            new LocationOption("us", "United States", "New York", "America/New_York", "UTC-5", 40.7128, -74.0060),
+            new LocationOption("us", "United States", "Los Angeles", "America/Los_Angeles", "UTC-8", 34.0522, -118.2437)
+        };
+        locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<LocationOption>>(testLocations));
+
+        randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocations[1]);
+        randomService.PickRandom(Arg.Any<IReadOnlyList<string>>()).Returns("America/Los_Angeles");
+
+        DeviceChangeService service = CreateService(
+            adb,
+            locationService: locationService,
+            timezoneService: timezoneService,
+            locationDataService: locationDataService,
+            randomService: randomService);
+
+        DeviceInfoApiDevice profile = CreateProfile();
+        profile.SimOperatorCountry = "us";
+
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = false,
+            ChangeLocation = true,
+            ChangeTimezone = true
+        };
+
+        await service.ChangeAsync("SERIAL", profile, changeSim: true, options, progress: null, CancellationToken.None);
+
+        await locationService.Received(1).ApplyLocationAsync("SERIAL", "34.0522", "-118.2437", Arg.Any<CancellationToken>());
+        await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "America/Los_Angeles", Arg.Any<CancellationToken>());
     }
 }

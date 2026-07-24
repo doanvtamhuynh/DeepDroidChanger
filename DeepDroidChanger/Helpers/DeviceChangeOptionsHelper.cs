@@ -15,6 +15,8 @@ public static class DeviceChangeOptionsHelper
             ChangeAndroidId = source.ChangeAndroidId,
             ChangeMacAddress = source.ChangeMacAddress,
             UpdateIntegrity = source.UpdateIntegrity,
+            ChangeTimezone = source.ChangeTimezone,
+            ChangeLocation = source.ChangeLocation,
             UseRmRfForPackageCleanup = source.UseRmRfForPackageCleanup,
             ClearAllPackages = source.ClearAllPackages,
             ClearSelectedPackages = source.ClearSelectedPackages,

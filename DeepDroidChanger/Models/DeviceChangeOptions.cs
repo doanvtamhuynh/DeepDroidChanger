@@ -6,6 +6,8 @@ public sealed class DeviceChangeOptions
     public bool ChangeAndroidId { get; set; }
     public bool ChangeMacAddress { get; set; } = true;
     public bool UpdateIntegrity { get; set; }
+    public bool ChangeTimezone { get; set; }
+    public bool ChangeLocation { get; set; }
     public bool UseRmRfForPackageCleanup { get; set; }
     public bool ClearAllPackages { get; set; } = true;
     public bool ClearSelectedPackages { get; set; }

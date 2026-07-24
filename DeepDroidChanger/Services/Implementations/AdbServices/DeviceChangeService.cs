@@ -12,6 +12,10 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private readonly IAdbCommandService _adb;
     private readonly IDeviceDataCleanupService _cleanupService;
     private readonly IDeviceIntegrityService _integrityService;
+    private readonly IDeviceLocationService? _locationService;
+    private readonly IDeviceTimezoneService? _timezoneService;
+    private readonly ILocationDataService? _locationDataService;
+    private readonly IRandomService? _randomService;
     private readonly ILogger<DeviceChangeService> _logger;
 
     public DeviceChangeService(
@@ -19,10 +23,27 @@ public sealed class DeviceChangeService : IDeviceChangeService
         IDeviceDataCleanupService cleanupService,
         IDeviceIntegrityService integrityService,
         ILogger<DeviceChangeService> logger)
+        : this(adb, cleanupService, integrityService, null, null, null, null, logger)
+    {
+    }
+
+    public DeviceChangeService(
+        IAdbCommandService adb,
+        IDeviceDataCleanupService cleanupService,
+        IDeviceIntegrityService integrityService,
+        IDeviceLocationService? locationService,
+        IDeviceTimezoneService? timezoneService,
+        ILocationDataService? locationDataService,
+        IRandomService? randomService,
+        ILogger<DeviceChangeService> logger)
     {
         _adb = adb;
         _cleanupService = cleanupService;
         _integrityService = integrityService;
+        _locationService = locationService;
+        _timezoneService = timezoneService;
+        _locationDataService = locationDataService;
+        _randomService = randomService;
         _logger = logger;
     }
 
@@ -75,6 +96,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             bool updateIntegrity = ShouldUpdateIntegrity(options);
+            bool changeLocation = ShouldChangeLocation(options);
+            bool changeTimezone = ShouldChangeTimezone(options);
             progress?.Report(DeviceChangeStage.ApplyingProfile);
             await ApplyProfileAsync(
                     serial,
@@ -82,6 +105,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     changeSim,
                     changeMacAddress,
                     updateIntegrity,
+                    changeLocation,
+                    changeTimezone,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -160,6 +185,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             bool updateIntegrity = ShouldUpdateIntegrity(options);
+            bool changeLocation = ShouldChangeLocation(options);
+            bool changeTimezone = ShouldChangeTimezone(options);
             progress?.Report(DeviceChangeStage.ApplyingProfile);
             await ApplyProfileAsync(
                     serial,
@@ -167,6 +194,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     changeSim,
                     changeMacAddress,
                     updateIntegrity,
+                    changeLocation,
+                    changeTimezone,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -250,6 +279,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
         bool changeSim,
         bool changeMacAddress,
         bool updateIntegrity,
+        bool changeLocation,
+        bool changeTimezone,
         CancellationToken cancellationToken)
     {
         if (updateIntegrity)
@@ -265,6 +296,14 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     cancellationToken)
                 .ConfigureAwait(false);
         }
+
+        await ApplyLocationAndTimezoneAsync(
+                serial,
+                profile,
+                changeLocation,
+                changeTimezone,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         await SetPropertiesAsync(
                 serial,
@@ -462,6 +501,76 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private static bool ShouldUpdateIntegrity(DeviceChangeOptions options)
     {
         return !options.UseDefaultMode && options.UpdateIntegrity;
+    }
+
+    private static bool ShouldChangeLocation(DeviceChangeOptions options)
+    {
+        return !options.UseDefaultMode && options.ChangeLocation;
+    }
+
+    private static bool ShouldChangeTimezone(DeviceChangeOptions options)
+    {
+        return !options.UseDefaultMode && options.ChangeTimezone;
+    }
+
+    private async Task ApplyLocationAndTimezoneAsync(
+        string serial,
+        DeviceInfoApiDevice profile,
+        bool changeLocation,
+        bool changeTimezone,
+        CancellationToken cancellationToken)
+    {
+        if ((!changeLocation && !changeTimezone) || _locationDataService == null)
+            return;
+
+        try
+        {
+            var locations = await _locationDataService.GetLocationsAsync(cancellationToken).ConfigureAwait(false);
+            if (locations.Count == 0)
+                return;
+
+            string countryIso = profile.SimOperatorCountry;
+            IReadOnlyList<LocationOption> countryLocations = string.IsNullOrWhiteSpace(countryIso)
+                ? Array.Empty<LocationOption>()
+                : locations.Where(loc => string.Equals(loc.CountryCode, countryIso, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            var targetLocations = countryLocations.Count > 0 ? countryLocations : locations;
+            IRandomService random = _randomService ?? new RandomService();
+
+            if (changeLocation && _locationService != null)
+            {
+                LocationOption selectedLocation = random.PickRandom(targetLocations);
+                await _locationService.ApplyLocationAsync(
+                        serial,
+                        selectedLocation.LatitudeString,
+                        selectedLocation.LongitudeString,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (changeTimezone && _timezoneService != null)
+            {
+                var countryTimezones = targetLocations
+                    .Select(loc => loc.Timezone)
+                    .Where(tz => !string.IsNullOrWhiteSpace(tz))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                string selectedTimezone = countryTimezones.Count > 0
+                    ? random.PickRandom(countryTimezones)
+                    : random.PickRandom(targetLocations).Timezone;
+
+                await _timezoneService.ApplyTimezoneAsync(
+                        serial,
+                        selectedTimezone,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to apply location or timezone during change device for {Serial}.", serial);
+        }
     }
 
     private Task<string> ReadAndroidIdAsync(

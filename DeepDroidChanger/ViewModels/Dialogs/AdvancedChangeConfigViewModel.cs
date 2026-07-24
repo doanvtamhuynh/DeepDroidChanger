@@ -113,6 +113,8 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         ChangeAndroidId = options.ChangeAndroidId;
         ChangeMacAddress = options.ChangeMacAddress;
         UpdateIntegrity = options.UpdateIntegrity;
+        ChangeTimezone = options.ChangeTimezone;
+        ChangeLocation = options.ChangeLocation;
         UseIntegritySecurityPatch = useIntegritySecurityPatch;
         UseRmRfForPackageCleanup = options.UseRmRfForPackageCleanup;
         ClearAllPackages = options.ClearAllPackages;
@@ -270,6 +272,8 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
             ChangeAndroidId = ChangeAndroidId,
             ChangeMacAddress = ChangeMacAddress,
             UpdateIntegrity = UpdateIntegrity,
+            ChangeTimezone = ChangeTimezone,
+            ChangeLocation = ChangeLocation,
             UseRmRfForPackageCleanup = UseRmRfForPackageCleanup,
             ClearAllPackages = ClearAllPackages,
             ClearSelectedPackages = ClearSelectedPackages,
