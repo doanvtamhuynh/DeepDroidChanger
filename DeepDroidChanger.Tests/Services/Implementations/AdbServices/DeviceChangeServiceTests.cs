@@ -767,11 +767,13 @@ public sealed class DeviceChangeServiceTests
 
     private static DeviceChangeService CreateService(
         IAdbCommandService adb,
-        IDeviceDataCleanupService? cleanupService = null)
+        IDeviceDataCleanupService? cleanupService = null,
+        IDeviceIntegrityService? integrityService = null)
     {
         return new DeviceChangeService(
             adb,
             cleanupService ?? Substitute.For<IDeviceDataCleanupService>(),
+            integrityService ?? Substitute.For<IDeviceIntegrityService>(),
             NullLogger<DeviceChangeService>.Instance);
     }
 
@@ -801,5 +803,42 @@ public sealed class DeviceChangeServiceTests
             BluetoothMacAddress = "00:11:22:33:44:66",
             WifiBssid = "00:11:22:33:44:77"
         };
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_AppliesIntegrityUpdate_WhenInAdvancedModeWithUpdateIntegrityChecked()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceIntegrityService integrityService = Substitute.For<IDeviceIntegrityService>();
+        DeviceChangeService service = CreateService(adb, integrityService: integrityService);
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = false,
+            UpdateIntegrity = true
+        };
+
+        await service.ChangeAsync("SERIAL", CreateProfile(), changeSim: true, options, progress: null, CancellationToken.None);
+
+        await integrityService.Received(1).ApplyAsync(
+            "SERIAL",
+            Arg.Is<UpdateIntegrityDialogResult>(r => r.UpdateIntegrityFromServer && r.UpdateIntegrityEnabled && r.UpdateKeyboxEnabled),
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_SkipsIntegrityUpdate_WhenInDefaultMode()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceIntegrityService integrityService = Substitute.For<IDeviceIntegrityService>();
+        DeviceChangeService service = CreateService(adb, integrityService: integrityService);
+        var options = new DeviceChangeOptions
+        {
+            UseDefaultMode = true,
+            UpdateIntegrity = true
+        };
+
+        await service.ChangeAsync("SERIAL", CreateProfile(), changeSim: true, options, progress: null, CancellationToken.None);
+
+        await integrityService.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default!, default);
     }
 }

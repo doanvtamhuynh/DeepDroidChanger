@@ -45,17 +45,31 @@
                 <TextBlock Text="{DynamicResource AdvancedChangeConfig_ChangeSectionTitle}"
                            Style="{StaticResource SubtitleTextStyle}"/>
                 <UniformGrid Columns="3"
-                             Rows="1"
                              Margin="0,8,0,0">
                     <CheckBox x:Name="ChangeAndroidIdCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeAndroidId}"
-                              IsChecked="{Binding ChangeAndroidId, Mode=TwoWay}"/>
+                              IsChecked="{Binding ChangeAndroidId, Mode=TwoWay}"
+                              Margin="0,4"/>
                     <CheckBox x:Name="ChangeMacAddressCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeMac}"
-                              IsChecked="{Binding ChangeMacAddress, Mode=TwoWay}"/>
+                              IsChecked="{Binding ChangeMacAddress, Mode=TwoWay}"
+                              Margin="0,4"/>
                     <CheckBox x:Name="UseIntegritySecurityPatchCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_UseIntegritySecurityPatch}"
-                              IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"/>
+                              IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="UpdateIntegrityCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_UpdateIntegrity}"
+                              IsChecked="{Binding UpdateIntegrity, Mode=TwoWay}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ChangeTimezoneCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_ChangeTimezone}"
+                              IsChecked="{Binding ChangeTimezone, Mode=TwoWay}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ChangeLocationCheckBox"
+                              Content="{DynamicResource AdvancedChangeConfig_ChangeLocation}"
+                              IsChecked="{Binding ChangeLocation, Mode=TwoWay}"
+                              Margin="0,4"/>
                 </UniformGrid>
             </StackPanel>
         </Border>

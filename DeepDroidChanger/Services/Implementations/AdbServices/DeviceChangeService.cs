@@ -11,15 +11,18 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _deviceLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly IAdbCommandService _adb;
     private readonly IDeviceDataCleanupService _cleanupService;
+    private readonly IDeviceIntegrityService _integrityService;
     private readonly ILogger<DeviceChangeService> _logger;
 
     public DeviceChangeService(
         IAdbCommandService adb,
         IDeviceDataCleanupService cleanupService,
+        IDeviceIntegrityService integrityService,
         ILogger<DeviceChangeService> logger)
     {
         _adb = adb;
         _cleanupService = cleanupService;
+        _integrityService = integrityService;
         _logger = logger;
     }
 
@@ -71,12 +74,14 @@ public sealed class DeviceChangeService : IDeviceChangeService
             if (changeAndroidId)
                 await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
+            bool updateIntegrity = ShouldUpdateIntegrity(options);
             progress?.Report(DeviceChangeStage.ApplyingProfile);
             await ApplyProfileAsync(
                     serial,
                     profile,
                     changeSim,
                     changeMacAddress,
+                    updateIntegrity,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -154,12 +159,14 @@ public sealed class DeviceChangeService : IDeviceChangeService
             if (changeAndroidId)
                 await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
+            bool updateIntegrity = ShouldUpdateIntegrity(options);
             progress?.Report(DeviceChangeStage.ApplyingProfile);
             await ApplyProfileAsync(
                     serial,
                     profile,
                     changeSim,
                     changeMacAddress,
+                    updateIntegrity,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -242,8 +249,23 @@ public sealed class DeviceChangeService : IDeviceChangeService
         DeviceInfoApiDevice profile,
         bool changeSim,
         bool changeMacAddress,
+        bool updateIntegrity,
         CancellationToken cancellationToken)
     {
+        if (updateIntegrity)
+        {
+            await _integrityService.ApplyAsync(
+                    serial,
+                    new UpdateIntegrityDialogResult(
+                        updateIntegrityFromServer: true,
+                        updateIntegrityEnabled: true,
+                        updateKeyboxEnabled: true,
+                        updateIntegrityFile: string.Empty,
+                        updateKeyboxFile: string.Empty),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         await SetPropertiesAsync(
                 serial,
                 CreateIdentityProperties(profile, changeMacAddress),
@@ -435,6 +457,11 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private static bool ShouldChangeAndroidId(DeviceChangeOptions options)
     {
         return !options.UseDefaultMode && options.ChangeAndroidId;
+    }
+
+    private static bool ShouldUpdateIntegrity(DeviceChangeOptions options)
+    {
+        return !options.UseDefaultMode && options.UpdateIntegrity;
     }
 
     private Task<string> ReadAndroidIdAsync(

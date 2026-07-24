@@ -14,6 +14,7 @@ public static class DeviceChangeOptionsHelper
             UseDefaultMode = useDefaultMode ?? source.UseDefaultMode,
             ChangeAndroidId = source.ChangeAndroidId,
             ChangeMacAddress = source.ChangeMacAddress,
+            UpdateIntegrity = source.UpdateIntegrity,
             UseRmRfForPackageCleanup = source.UseRmRfForPackageCleanup,
             ClearAllPackages = source.ClearAllPackages,
             ClearSelectedPackages = source.ClearSelectedPackages,

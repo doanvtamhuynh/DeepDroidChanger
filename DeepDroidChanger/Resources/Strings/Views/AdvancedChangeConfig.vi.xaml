@@ -7,6 +7,9 @@
     <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Đổi Android ID</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Đổi MAC Wi-Fi/Bluetooth</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatch">Sử dụng bản vá bảo mật Integrity</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UpdateIntegrity">Cập nhật integrity</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeTimezone">Đổi timezone</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_ChangeLocation">Đổi location</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_WipeSectionTitle">Cấu hình Wipe</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipe">Dùng chế độ xóa sâu cho package</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipeDescription">Sau "pm clear", dùng "rm -rf" xóa tám đường dẫn dữ liệu ứng dụng và hồ sơ ART của package.</sys:String>
