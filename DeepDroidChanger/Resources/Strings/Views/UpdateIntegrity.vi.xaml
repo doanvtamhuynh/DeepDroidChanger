@@ -7,12 +7,12 @@
     <system:String x:Key="UpdateIntegrity_KeyboxFileTitle">Chọn tệp XML Keybox</system:String>
     <system:String x:Key="UpdateIntegrity_WindowTitle">Cập nhật Integrity</system:String>
     <system:String x:Key="UpdateIntegrity_SourceGroupHeader">Cấu hình nguồn</system:String>
-    <system:String x:Key="UpdateIntegrity_SourceServer">Dùng nguồn trực tuyến</system:String>
+    <system:String x:Key="UpdateIntegrity_SourceServer">Dùng Server</system:String>
     <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Tùy chọn mục tiêu</system:String>
     <system:String x:Key="UpdateIntegrity_TargetIntegrity">Integrity (PIF)</system:String>
     <system:String x:Key="UpdateIntegrity_TargetKeybox">Keybox</system:String>
-    <system:String x:Key="UpdateIntegrity_IntegrityFileLabel">Đường dẫn tệp PIF JSON</system:String>
-    <system:String x:Key="UpdateIntegrity_KeyboxFileLabel">Đường dẫn tệp Keybox XML</system:String>
+    <system:String x:Key="UpdateIntegrity_IntegrityFileLabel">Tệp PIF JSON</system:String>
+    <system:String x:Key="UpdateIntegrity_KeyboxFileLabel">Tệp Keybox XML</system:String>
     <system:String x:Key="UpdateIntegrity_BrowseButton">Chọn tệp...</system:String>
     <system:String x:Key="UpdateIntegrity_UpdateButton">Cập nhật</system:String>
 </ResourceDictionary>

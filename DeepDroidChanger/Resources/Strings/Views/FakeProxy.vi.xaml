@@ -2,14 +2,14 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="FakeProxy_WindowTitle">Fake Proxy</system:String>
-    <system:String x:Key="FakeProxy_HostLabel">Máy chủ (địa chỉ IP)</system:String>
-    <system:String x:Key="FakeProxy_PortLabel">Cổng</system:String>
-    <system:String x:Key="FakeProxy_UsernameLabel">Tài khoản (tùy chọn)</system:String>
-    <system:String x:Key="FakeProxy_PasswordLabel">Mật khẩu (tùy chọn)</system:String>
+    <system:String x:Key="FakeProxy_HostLabel">Host (IP)</system:String>
+    <system:String x:Key="FakeProxy_PortLabel">Port</system:String>
+    <system:String x:Key="FakeProxy_UsernameLabel">Username (tùy chọn)</system:String>
+    <system:String x:Key="FakeProxy_PasswordLabel">Password (tùy chọn)</system:String>
     <system:String x:Key="FakeProxy_TypeLabel">Loại proxy</system:String>
     <system:String x:Key="FakeProxy_SaveButton">Bắt đầu</system:String>
-    <system:String x:Key="FakeProxy_ChangeLocationByIpLabel">Thay đổi vị trí theo IP</system:String>
-    <system:String x:Key="FakeProxy_ChangeTimezoneByIpLabel">Thay đổi múi giờ theo IP</system:String>
-    <system:String x:Key="FakeProxy_OptionsGroupHeader">Tùy chọn (tự động thay đổi theo IP)</system:String>
+    <system:String x:Key="FakeProxy_ChangeLocationByIpLabel">Đổi Location theo IP</system:String>
+    <system:String x:Key="FakeProxy_ChangeTimezoneByIpLabel">Đổi Timezone theo IP</system:String>
+    <system:String x:Key="FakeProxy_OptionsGroupHeader">Tùy chọn theo IP</system:String>
     <system:String x:Key="FakeProxy_FullProxyLabel">Chuỗi proxy đầy đủ (ip:port:user:pass)</system:String>
 </ResourceDictionary>

@@ -2,13 +2,13 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <sys:String x:Key="ChangeTimezone_WindowTitle">Đổi múi giờ</sys:String>
-    <sys:String x:Key="ChangeTimezone_ModeGroupHeader">Chế độ thay đổi</sys:String>
-    <sys:String x:Key="ChangeTimezone_ModeData">Đổi múi giờ theo dữ liệu</sys:String>
-    <sys:String x:Key="ChangeTimezone_ModeDeviceIp">Đổi múi giờ theo IP thiết bị</sys:String>
+    <sys:String x:Key="ChangeTimezone_WindowTitle">Đổi Timezone</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeGroupHeader">Chế độ</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeData">Theo dữ liệu</sys:String>
+    <sys:String x:Key="ChangeTimezone_ModeDeviceIp">Theo IP thiết bị</sys:String>
     <sys:String x:Key="ChangeTimezone_CountryLabel">Quốc gia</sys:String>
-    <sys:String x:Key="ChangeTimezone_CountrySearchHint">Tìm kiếm quốc gia...</sys:String>
-    <sys:String x:Key="ChangeTimezone_TimezoneLabel">Múi giờ</sys:String>
-    <sys:String x:Key="ChangeTimezone_SearchHint">Tìm múi giờ...</sys:String>
+    <sys:String x:Key="ChangeTimezone_CountrySearchHint">Tìm quốc gia...</sys:String>
+    <sys:String x:Key="ChangeTimezone_TimezoneLabel">Timezone</sys:String>
+    <sys:String x:Key="ChangeTimezone_SearchHint">Tìm timezone...</sys:String>
     <sys:String x:Key="ChangeTimezone_SaveButton">Áp dụng</sys:String>
 </ResourceDictionary>
