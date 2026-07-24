@@ -7,7 +7,7 @@
     <system:String x:Key="UpdateIntegrity_KeyboxFileTitle">Select Keybox XML file</system:String>
     <system:String x:Key="UpdateIntegrity_WindowTitle">Update Integrity</system:String>
     <system:String x:Key="UpdateIntegrity_SourceGroupHeader">Source configuration</system:String>
-    <system:String x:Key="UpdateIntegrity_SourceServer">Use online source</system:String>
+    <system:String x:Key="UpdateIntegrity_SourceServer">Use data from server</system:String>
     <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Update targets</system:String>
     <system:String x:Key="UpdateIntegrity_TargetIntegrity">Integrity (PIF)</system:String>
     <system:String x:Key="UpdateIntegrity_TargetKeybox">Keybox</system:String>

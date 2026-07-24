@@ -7,7 +7,7 @@
     <system:String x:Key="UpdateIntegrity_KeyboxFileTitle">Chọn tệp XML Keybox</system:String>
     <system:String x:Key="UpdateIntegrity_WindowTitle">Cập nhật Integrity</system:String>
     <system:String x:Key="UpdateIntegrity_SourceGroupHeader">Cấu hình nguồn</system:String>
-    <system:String x:Key="UpdateIntegrity_SourceServer">Dùng Server</system:String>
+    <system:String x:Key="UpdateIntegrity_SourceServer">Dùng dữ liệu từ server</system:String>
     <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Tùy chọn mục tiêu</system:String>
     <system:String x:Key="UpdateIntegrity_TargetIntegrity">Integrity (PIF)</system:String>
     <system:String x:Key="UpdateIntegrity_TargetKeybox">Keybox</system:String>
