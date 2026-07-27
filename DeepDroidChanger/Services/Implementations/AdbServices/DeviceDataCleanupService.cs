@@ -45,7 +45,6 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         "/data/dalvik-cache",
         "/data/drm",
         "/data/incremental",
-        "/data/local",
         "/data/mediadrm",
         "/data/system/battery-history",
         "/data/system/battery-saver",
