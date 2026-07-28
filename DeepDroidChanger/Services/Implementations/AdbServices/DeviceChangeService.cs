@@ -89,7 +89,15 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 : null;
             bool changeMacAddress = options.UseDefaultMode || options.ChangeMacAddress;
             if (changeMacAddress)
+            {
                 await _adb.SetWifiAsync(serial, false, cancellationToken).ConfigureAwait(false);
+                await RunRequiredShellAsync(
+                        serial,
+                        DeviceChangeConstants.DisableBluetoothCommand,
+                        "disable Bluetooth before changing identity",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
             await _cleanupService.DeleteSsaidAsync(serial, cancellationToken).ConfigureAwait(false);
             if (changeAndroidId)
@@ -111,9 +119,14 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 .ConfigureAwait(false);
 
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
+            progress?.Report(DeviceChangeStage.Verifying);
+            await VerifyAppliedProfileAsync(
+                    serial,
+                    profile,
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (changeAndroidId)
             {
-                progress?.Report(DeviceChangeStage.Verifying);
                 await VerifyRegeneratedAndroidIdAsync(
                         serial,
                         originalAndroidId!,
@@ -149,6 +162,10 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 .CleanPreservingSsaidAsync(serial, options, cancellationToken)
                 .ConfigureAwait(false);
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
+            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
+            await _cleanupService
+                .CleanPostRebootAsync(serial, cancellationToken)
+                .ConfigureAwait(false);
             progress?.Report(DeviceChangeStage.Completed);
             _logger.LogWarning(
                 "Wiped device data without changing identity on {Serial} while preserving SSAID. Default mode: {DefaultMode}; package cleanup: {PackageCleanup}.",
@@ -178,11 +195,15 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 ? await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false)
                 : null;
             bool changeMacAddress = options.UseDefaultMode || options.ChangeMacAddress;
-
-            progress?.Report(DeviceChangeStage.ClearingData);
-            await _cleanupService.CleanAsync(serial, options, cancellationToken).ConfigureAwait(false);
-            if (changeAndroidId)
-                await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
+            if (changeMacAddress)
+            {
+                await RunRequiredShellAsync(
+                        serial,
+                        DeviceChangeConstants.DisableBluetoothCommand,
+                        "disable Bluetooth before changing identity",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
             bool updateIntegrity = ShouldUpdateIntegrity(options);
             bool changeLocation = ShouldChangeLocation(options);
@@ -199,11 +220,25 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
+            progress?.Report(DeviceChangeStage.ClearingData);
+            await _cleanupService.CleanAsync(serial, options, cancellationToken).ConfigureAwait(false);
+            if (changeAndroidId)
+                await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
+            await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
+            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
+            await _cleanupService
+                .CleanPostRebootAsync(serial, cancellationToken)
+                .ConfigureAwait(false);
+
+            progress?.Report(DeviceChangeStage.Verifying);
+            await VerifyAppliedProfileAsync(
+                    serial,
+                    profile,
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (changeAndroidId)
             {
-                progress?.Report(DeviceChangeStage.Verifying);
                 await VerifyRegeneratedAndroidIdAsync(
                         serial,
                         originalAndroidId!,
@@ -314,6 +349,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             .ConfigureAwait(false);
 
         string deviceName = FirstValue(profile.SettingDeviceName, profile.Name, profile.Model);
+        string bluetoothName = FirstValue(profile.SettingBluetoothName, deviceName);
         await _adb.PutSettingAsync(
                 serial,
                 DeviceChangeConstants.GlobalSettingsNamespace,
@@ -321,8 +357,34 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 deviceName,
                 cancellationToken)
             .ConfigureAwait(false);
+        await _adb.PutSettingAsync(
+                serial,
+                DeviceChangeConstants.SecureSettingsNamespace,
+                DeviceChangeConstants.BluetoothNameSetting,
+                bluetoothName,
+                cancellationToken)
+            .ConfigureAwait(false);
+        await _adb.PutSettingAsync(
+                serial,
+                DeviceChangeConstants.GlobalSettingsNamespace,
+                DeviceChangeConstants.WifiP2pDeviceNameSetting,
+                deviceName,
+                cancellationToken)
+            .ConfigureAwait(false);
         if (changeMacAddress)
         {
+            await _adb.DeleteSettingAsync(
+                    serial,
+                    DeviceChangeConstants.SecureSettingsNamespace,
+                    DeviceChangeConstants.BluetoothAddressSetting,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adb.DeleteSettingAsync(
+                    serial,
+                    DeviceChangeConstants.SecureSettingsNamespace,
+                    DeviceChangeConstants.BluetoothAddressValidSetting,
+                    cancellationToken)
+                .ConfigureAwait(false);
             await _adb.PutSettingAsync(
                     serial,
                     DeviceChangeConstants.GlobalSettingsNamespace,
@@ -608,6 +670,132 @@ public sealed class DeviceChangeService : IDeviceChangeService
         {
             throw new InvalidOperationException($"Android ID was not regenerated on device {serial}.");
         }
+    }
+
+    private async Task VerifyAppliedProfileAsync(
+        string serial,
+        DeviceInfoApiDevice expected,
+        CancellationToken cancellationToken)
+    {
+        var mismatches = new List<string>();
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.ProductBrand,
+            "ro.product.brand",
+            expected.Brand,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.ProductManufacturer,
+            "ro.product.manufacturer",
+            expected.Manufacturer,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.ProductModel,
+            "ro.product.model",
+            expected.Model,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.ProductDevice,
+            "ro.product.device",
+            expected.Code,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.ProductName,
+            "ro.product.name",
+            expected.Name,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.AndroidRelease,
+            "ro.build.version.release",
+            expected.Release,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.BuildFingerprint,
+            "ro.build.fingerprint",
+            expected.Fingerprint,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.BuildId,
+            "ro.build.id",
+            expected.BuildId,
+            mismatches);
+        await VerifyPropertyAsync(
+            DeviceSpoofPropertyConstants.SecurityPatch,
+            "ro.build.version.security_patch",
+            expected.SecurityPatch,
+            mismatches);
+
+        string expectedDeviceName = FirstValue(
+            expected.SettingDeviceName,
+            expected.Name,
+            expected.Model);
+        string actualDeviceName = await _adb.GetSettingAsync(
+                serial,
+                DeviceChangeConstants.GlobalSettingsNamespace,
+                DeviceChangeConstants.DeviceNameSetting,
+                cancellationToken)
+            .ConfigureAwait(false);
+        AddMismatch(
+            "global.device_name",
+            expectedDeviceName,
+            actualDeviceName,
+            mismatches);
+
+        string expectedBluetoothName = FirstValue(
+            expected.SettingBluetoothName,
+            expectedDeviceName);
+        string actualBluetoothName = await _adb.GetSettingAsync(
+                serial,
+                DeviceChangeConstants.SecureSettingsNamespace,
+                DeviceChangeConstants.BluetoothNameSetting,
+                cancellationToken)
+            .ConfigureAwait(false);
+        AddMismatch(
+            "secure.bluetooth_name",
+            expectedBluetoothName,
+            actualBluetoothName,
+            mismatches);
+
+        if (mismatches.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Device profile verification failed on {serial}: {string.Join(", ", mismatches)}.");
+        }
+
+        return;
+
+        async Task VerifyPropertyAsync(
+            string spoofProperty,
+            string runtimeProperty,
+            string? expectedValue,
+            List<string> mismatchList)
+        {
+            if (string.IsNullOrWhiteSpace(expectedValue))
+                return;
+
+            string actualValue = await _adb
+                .GetPropertyAsync(serial, runtimeProperty, cancellationToken)
+                .ConfigureAwait(false);
+            AddMismatch(spoofProperty, expectedValue, actualValue, mismatchList);
+        }
+    }
+
+    private static void AddMismatch(
+        string field,
+        string? expected,
+        string? actual,
+        List<string> mismatches)
+    {
+        if (string.IsNullOrWhiteSpace(expected))
+            return;
+        if (string.Equals(
+                expected.Trim(),
+                actual?.Trim(),
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        mismatches.Add(field);
     }
 
     private static bool HasExistingAndroidId(string androidId)

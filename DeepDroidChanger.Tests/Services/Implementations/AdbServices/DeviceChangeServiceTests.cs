@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
 
 [TestClass]
-public sealed class DeviceChangeServiceTests
+public sealed partial class DeviceChangeServiceTests
 {
     private const string CurrentAndroidId = "33537c391caed62e";
     private const string RegeneratedAndroidId = "94ab6d2e18f047c3";
@@ -53,6 +53,7 @@ public sealed class DeviceChangeServiceTests
         await adb.DidNotReceiveWithAnyArgs().SetWifiAsync(default!, default, default);
         await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
         await cleanup.DidNotReceiveWithAnyArgs().CleanPreservingSsaidAsync(default!, default!, default);
+        await cleanup.DidNotReceiveWithAnyArgs().CleanPostRebootAsync(default!, default);
         await cleanup.DidNotReceiveWithAnyArgs().DeleteSsaidAsync(default!, default);
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
     }
@@ -79,6 +80,7 @@ public sealed class DeviceChangeServiceTests
 
         await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
         await cleanup.DidNotReceiveWithAnyArgs().CleanPreservingSsaidAsync(default!, default!, default);
+        await cleanup.DidNotReceiveWithAnyArgs().CleanPostRebootAsync(default!, default);
         await cleanup.Received(1).DeleteSsaidAsync("SERIAL", Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
@@ -211,10 +213,23 @@ public sealed class DeviceChangeServiceTests
             Arg.Any<CancellationToken>());
         await cleanup.DidNotReceiveWithAnyArgs().CleanAsync(default!, default!, default);
         await cleanup.DidNotReceiveWithAnyArgs().DeleteSsaidAsync(default!, default);
+        await cleanup.Received(1).CleanPostRebootAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
         await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
         await adb.DidNotReceiveWithAnyArgs().PutSettingAsync(default!, default!, default!, default!, default);
         await adb.DidNotReceiveWithAnyArgs().DeleteSettingAsync(default!, default!, default!, default);
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            cleanup.CleanPreservingSsaidAsync("SERIAL", options, Arg.Any<CancellationToken>());
+            adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+            adb.RunAdbShellAsync(
+                "SERIAL",
+                DeviceChangeConstants.BootCompletedCommand,
+                Arg.Any<CancellationToken>());
+            cleanup.CleanPostRebootAsync("SERIAL", Arg.Any<CancellationToken>());
+        });
     }
 
     [TestMethod]
@@ -224,13 +239,14 @@ public sealed class DeviceChangeServiceTests
         IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
         DeviceChangeService service = CreateService(adb, cleanup);
         DeviceInfoApiDevice profile = CreateProfile();
+        IProgress<DeviceChangeStage> progress = Substitute.For<IProgress<DeviceChangeStage>>();
         var options = new DeviceChangeOptions
         {
             UseDefaultMode = true,
             ChangeAndroidId = true
         };
 
-        await service.ChangeAsync("SERIAL", profile, true, options, null, CancellationToken.None);
+        await service.ChangeAsync("SERIAL", profile, true, options, progress, CancellationToken.None);
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
@@ -279,21 +295,62 @@ public sealed class DeviceChangeServiceTests
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await cleanup.Received(1).CleanAsync("SERIAL", options, Arg.Any<CancellationToken>());
+        await cleanup.Received(1).CleanPostRebootAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
         Received.InOrder(() =>
         {
-            cleanup.CleanAsync("SERIAL", options, Arg.Any<CancellationToken>());
+            progress.Report(DeviceChangeStage.ApplyingProfile);
             adb.SetPropertyAsync(
                 "SERIAL",
                 DeviceSpoofPropertyConstants.ProductModel,
                 profile.Model!,
                 Arg.Any<CancellationToken>());
+            progress.Report(DeviceChangeStage.ClearingData);
+            cleanup.CleanAsync("SERIAL", options, Arg.Any<CancellationToken>());
         });
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+        Received.InOrder(() =>
+        {
+            cleanup.CleanAsync("SERIAL", options, Arg.Any<CancellationToken>());
+            adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
+            adb.RunAdbShellAsync(
+                "SERIAL",
+                DeviceChangeConstants.BootCompletedCommand,
+                Arg.Any<CancellationToken>());
+            cleanup.CleanPostRebootAsync("SERIAL", Arg.Any<CancellationToken>());
+        });
         await adb.DidNotReceive().GetSettingAsync(
             "SERIAL",
             "secure",
             "android_id",
             Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_ProfileStillContainsOldValueAfterReboot_ThrowsVerificationFailure()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        adb.GetPropertyAsync(
+                "SERIAL",
+                "ro.product.model",
+                Arg.Any<CancellationToken>())
+            .Returns("OLD-MODEL");
+        DeviceChangeService service = CreateService(adb);
+
+        InvalidOperationException exception =
+            await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+                service.ChangeAsync(
+                    "SERIAL",
+                    CreateProfile(),
+                    changeSim: true,
+                    new DeviceChangeOptions { UseDefaultMode = true },
+                    progress: null,
+                    CancellationToken.None));
+
+        StringAssert.Contains(exception.Message, "Device profile verification failed");
+        StringAssert.Contains(exception.Message, DeviceSpoofPropertyConstants.ProductModel);
+        await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -426,6 +483,38 @@ public sealed class DeviceChangeServiceTests
             "non_persistent_mac_randomization_force_enabled",
             "1",
             Arg.Any<CancellationToken>());
+        await adb.Received(1).PutSettingAsync(
+            "SERIAL",
+            "global",
+            "device_name",
+            profile.Name!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).PutSettingAsync(
+            "SERIAL",
+            "secure",
+            "bluetooth_name",
+            profile.Name!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).PutSettingAsync(
+            "SERIAL",
+            "global",
+            "wifi_p2p_device_name",
+            profile.Name!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "bluetooth_address",
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).DeleteSettingAsync(
+            "SERIAL",
+            "secure",
+            "bluetooth_addr_valid",
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).RunAdbShellAsync(
+            "SERIAL",
+            DeviceChangeConstants.DisableBluetoothCommand,
+            Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetWifiAsync("SERIAL", true, Arg.Any<CancellationToken>());
         Received.InOrder(() =>
         {
@@ -440,7 +529,7 @@ public sealed class DeviceChangeServiceTests
     }
 
     [TestMethod]
-    public async Task ChangeAsync_CleanupFailure_StopsWithoutTogglingBypassOrRebooting()
+    public async Task ChangeAsync_CleanupFailure_AppliesProfileButStopsBeforeRebooting()
     {
         IAdbCommandService adb = CreateRootedAdb();
         IDeviceDataCleanupService cleanup = Substitute.For<IDeviceDataCleanupService>();
@@ -466,6 +555,11 @@ public sealed class DeviceChangeServiceTests
                 null,
                 CancellationToken.None));
 
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.ProductModel,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
             DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
@@ -613,13 +707,13 @@ public sealed class DeviceChangeServiceTests
         Received.InOrder(() =>
         {
             adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
-            cleanup.CleanAsync("SERIAL", Arg.Any<DeviceChangeOptions>(), Arg.Any<CancellationToken>());
-            adb.DeleteSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
             adb.SetPropertyAsync(
                 "SERIAL",
                 DeviceSpoofPropertyConstants.ProductModel,
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>());
+            cleanup.CleanAsync("SERIAL", Arg.Any<DeviceChangeOptions>(), Arg.Any<CancellationToken>());
+            adb.DeleteSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
             adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
             adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
         });
@@ -713,7 +807,7 @@ public sealed class DeviceChangeServiceTests
     }
 
     [TestMethod]
-    public async Task ChangeAsync_DeleteAndroidIdFailure_StopsBeforeApplyingProfileOrRebooting()
+    public async Task ChangeAsync_DeleteAndroidIdFailure_StopsAfterProfileAndCleanupBeforeRebooting()
     {
         IAdbCommandService adb = CreateRootedAdb();
         var failure = new InvalidOperationException("delete setting failed");
@@ -746,7 +840,11 @@ public sealed class DeviceChangeServiceTests
             "SERIAL",
             Arg.Any<DeviceChangeOptions>(),
             Arg.Any<CancellationToken>());
-        await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            DeviceSpoofPropertyConstants.ProductModel,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
         await adb.DidNotReceiveWithAnyArgs().RebootAsync(default!, default);
     }
 
@@ -762,6 +860,29 @@ public sealed class DeviceChangeServiceTests
                 "getprop sys.boot_completed" => new CommandResult(0, "1", string.Empty),
                 _ => new CommandResult(0, string.Empty, string.Empty)
             });
+        adb.GetPropertyAsync("SERIAL", Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => callInfo.ArgAt<string>(1) switch
+            {
+                "ro.product.brand" => "samsung",
+                "ro.product.manufacturer" => "samsung",
+                "ro.product.model" => "SM-S928B",
+                "ro.product.device" => "e3q",
+                "ro.product.name" => "e3qxxx",
+                "ro.build.fingerprint" => "samsung/e3qxxx/e3q:15/AP3A/test:user/release-keys",
+                _ => string.Empty
+            });
+        adb.GetSettingAsync(
+                "SERIAL",
+                DeviceChangeConstants.GlobalSettingsNamespace,
+                DeviceChangeConstants.DeviceNameSetting,
+                Arg.Any<CancellationToken>())
+            .Returns("e3qxxx");
+        adb.GetSettingAsync(
+                "SERIAL",
+                DeviceChangeConstants.SecureSettingsNamespace,
+                DeviceChangeConstants.BluetoothNameSetting,
+                Arg.Any<CancellationToken>())
+            .Returns("e3qxxx");
         return adb;
     }
 

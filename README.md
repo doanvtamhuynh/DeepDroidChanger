@@ -40,35 +40,34 @@ Flow hiện tại:
 1. Kiểm tra thiết bị online và profile hợp lệ.
 2. Hiển thị dialog xác nhận với đúng cấu hình Default/Advanced hiện tại.
 3. Khởi động lại `adbd` ở quyền root, chờ thiết bị và xác minh `id -u = 0`.
-4. Tắt Wi-Fi; chỉ đọc Android ID hiện tại khi Advanced bật **Change Android ID**.
+4. Tắt Wi-Fi; tắt thêm Bluetooth khi đổi MAC; chỉ đọc Android ID hiện tại khi Advanced bật **Change Android ID**.
 5. `SetPropertyAsync` chỉ bật bypass theo phạm vi một lệnh khi property bắt đầu bằng `ro.`, rồi luôn tắt bypass ngay sau `setprop`.
-6. Xóa data cũ theo policy đã chọn, luôn gồm `settings_ssaid.xml`; chỉ chạy `settings delete secure android_id` khi Advanced bật **Change Android ID**.
-7. Áp dụng build/device/SIM/MAC và Android settings từ profile; không ghi Android ID thủ công.
+6. Áp dụng build/device/SIM/MAC và Android settings từ profile; không ghi Android ID thủ công.
+7. Xóa data cũ theo policy đã chọn, gồm shared identity và `settings_ssaid.xml`; chỉ chạy `settings delete secure android_id` khi Advanced bật **Change Android ID**.
 8. Đồng bộ dữ liệu, reboot và chờ `sys.boot_completed = 1`.
-9. Khi đổi Android ID được chọn, đọc lại ID sau reboot và xác minh giá trị mới tồn tại, khác giá trị cũ; lỗi ở bước bắt buộc sẽ không được báo thành công giả.
+9. Đọc lại các property/name đã đổi; khi đổi Android ID được chọn thì xác minh ID mới tồn tại và khác ID cũ. Lỗi ở bước bắt buộc sẽ không được báo thành công giả.
 
 Mỗi serial có lock riêng để tránh hai Change Device chạy đồng thời trên cùng thiết bị.
 
 #### Chế độ Default
 
 - Áp dụng profile mới, gồm MAC Wi-Fi/Bluetooth và SIM, nhưng giữ nguyên Android ID.
-- Lấy danh sách package đã cài rồi xóa data bằng `pm clear`; giữ nguyên APK.
-- Xóa dữ liệu các package Google/account liên quan.
-- Xóa file account và nội dung file dưới `/data/system_ce` và `/data/system_de`, nhưng giữ lại cây thư mục để Android có thể tái sử dụng đúng path/permission.
-- Xóa database hệ thống khớp `/data/system/*.db*`, trừ các file registry bắt đầu bằng `/data/system/package`.
+- Lấy danh sách package đã cài trên host rồi chạy riêng `force-stop` và `pm clear --user 0` cho từng package; giữ nguyên APK và bản update trong `/data/app`.
+- Xóa đúng các database account CE/DE, sync state và registered-service state; không xóa toàn bộ `/data/system_ce`, `/data/system_de` hoặc database hệ thống.
+- Giữ nguyên Wi-Fi APEX/legacy/CE/DE để không mất mạng đã lưu; reset Bluetooth, DHCP/network, radio/carrier/APN, usage/net/process/graphics stats, ANR, tombstone và SSAID.
 
 #### Chế độ Advanced
 
 - Chọn có đổi Android ID, MAC và SIM hay không. Android ID chỉ được tạo lại khi bật **Change Android ID**.
 - Chọn xóa toàn bộ package, package Google hoặc danh sách package cụ thể.
 - Chọn riêng việc xóa account Google và CE/DE state.
-- Package được chọn luôn được xử lý bằng `pm clear`. Khi bật **Dùng chế độ xóa sâu cho package**, cleanup chạy thêm `rm -rf` trên tám path app-data/ART profile.
+- Package được chọn luôn được xử lý bằng `pm clear --user 0`. Khi bật **Dùng chế độ xóa sâu cho package**, cleanup xóa file còn sót trong sáu path app-data/media/ART profile nhưng giữ nguyên cây thư mục, owner, mode và SELinux context.
 
-**Change without Wipe** không chạy full cleanup package/account/residual. Action này vẫn xóa `settings_ssaid.xml`; chỉ xóa secure Android ID và xác minh ID mới khi option Advanced được chọn. **Random Change & Wipe** dùng cùng option như **Change Device**.
+**Change without Wipe** không chạy cleanup package/account/shared identity. Action này vẫn xóa `settings_ssaid.xml`; chỉ xóa secure Android ID và xác minh ID mới khi option Advanced được chọn. **Wipe without Change** chỉ chạy package/account policy đã chọn, giữ SSAID và toàn bộ shared identity để không làm thay đổi profile. **Random Change & Wipe** dùng cùng option như **Change Device**.
 
-Ở cả Default và Advanced, cleanup residual vẫn chạy: ứng dụng dùng `find ... -not -type d -delete` để xóa file bên trong các vùng log/cache/state nhưng giữ lại directory root. Cách này giải quyết trường hợp một số thư mục hệ thống không được tạo lại đúng khi xóa cả path. `/data/misc/bluetooth` và `/data/misc/bluedroid` vẫn nằm trong danh sách cleanup (xóa nội dung nhưng giữ root); package registry, `/data/app`, kho `/data/property/persistent_properties` và dữ liệu Wi-Fi APEX được bảo vệ khỏi danh sách cleanup.
+Full Change áp dụng profile trước rồi mới cleanup. Sau reboot, ứng dụng đọc lại brand, manufacturer, model, device code, product name, release, fingerprint, build ID, security patch, device name và Bluetooth name; nếu còn giá trị cũ thì action báo lỗi thay vì Completed.
 
-Cleanup được hợp nhất thành một shell script và truyền thẳng qua standard input của `adb -s <serial> shell sh`; script không nằm trong Windows command line và không cần push tệp `.sh` lên thiết bị. Khi cần xóa package, tổng số ADB process của cleanup là một lần list package và một lần chạy script.
+Cleanup không ghép hàng trăm package/path vào một command dài. Tool chỉ xử lý Android user `0`, nên toàn bộ account/identity path dùng trực tiếp user `0` và không cần gọi `pm list users`; shell không còn loop `for target` hoặc wildcard ở directory segment. Chỉ một wildcard cuối tên file được phép để bắt SQLite sidecar/backup trong cùng directory. Mỗi `force-stop`, `pm clear`, file target hoặc directory target được gửi thành một lệnh `adb shell sh` riêng và được chờ tuần tự với timeout độc lập 60 giây. Output/exit code bị bỏ qua và command không được retry—cùng cách caller của AccountCreator bỏ qua kết quả `runCMD`; khi timeout, process hiện tại bị dừng và cleanup chuyển sang command kế tiếp. Cancellation của toàn workflow vẫn được propagate. Directory hệ thống chỉ bị xóa file con bằng `find ... -not -type d -delete`; các root nhạy cảm như `/data/app`, `/data/system*`, `/data/misc*`, `/data/vendor*`, `/data/apex`, `/data/property`, `/data/local/tmp` và bốn vùng dữ liệu Wi-Fi legacy/APEX/CE/DE bị guard bảo vệ khỏi xóa trực tiếp.
 
 ### Location và Timezone
 

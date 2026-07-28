@@ -48,6 +48,27 @@ public sealed class DevicePackageServiceTests
     }
 
     [TestMethod]
+    public async Task GetInstalledPackagesAsync_FiltersPackageNamesEndingWithUnderscore()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        adb.RunAdbShellAsync("SERIAL", "pm list packages", Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(
+                0,
+                """
+                package:com.android.bips.auto_generated_rro_product__
+                package:com.example.generated_
+                package:com.example.valid_name
+                """,
+                string.Empty));
+        var service = new DevicePackageService(adb);
+
+        IReadOnlyList<string> packages =
+            await service.GetInstalledPackagesAsync("SERIAL", CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "com.example.valid_name" }, packages.ToArray());
+    }
+
+    [TestMethod]
     public async Task GetInstalledPackagesAsync_AdbFailure_Throws()
     {
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();

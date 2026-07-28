@@ -14,6 +14,10 @@ public interface IDeviceDataCleanupService
         DeviceChangeOptions options,
         CancellationToken cancellationToken);
 
+    Task CleanPostRebootAsync(
+        string serial,
+        CancellationToken cancellationToken);
+
     Task DeleteSsaidAsync(
         string serial,
         CancellationToken cancellationToken);

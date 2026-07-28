@@ -49,8 +49,10 @@ public sealed class DevicePackageService : IDevicePackageService
     private static string ParsePackageName(string value)
     {
         const string prefix = "package:";
-        return value.StartsWith(prefix, StringComparison.Ordinal)
-            ? value[prefix.Length..].Trim()
-            : string.Empty;
+        if (!value.StartsWith(prefix, StringComparison.Ordinal))
+            return string.Empty;
+
+        string packageName = value[prefix.Length..].Trim();
+        return packageName.EndsWith('_') ? string.Empty : packageName;
     }
 }

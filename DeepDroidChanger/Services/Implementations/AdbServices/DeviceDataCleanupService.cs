@@ -1,3 +1,4 @@
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using Microsoft.Extensions.Logging;
@@ -6,140 +7,93 @@ namespace DeepDroidChanger.Services;
 
 public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
 {
-    internal const string SsaidFilePattern = "/data/system/users/*/settings_ssaid.xml*";
+    internal enum CleanupTargetKind
+    {
+        FilePattern,
+        DirectoryContents
+    }
+
+    internal readonly record struct CleanupTarget(
+        string Path,
+        CleanupTargetKind Kind);
+
+    internal static readonly TimeSpan CleanupCommandTimeout = TimeSpan.FromSeconds(60);
+
+    internal const string SsaidFilePattern = "/data/system/users/0/settings_ssaid.xml*";
+    internal const string DropBoxDirectoryPath = "/data/system/dropbox";
+
+    internal static readonly string[] DeepWipePackagePathTemplates =
+    [
+        "/data/user/0/{package}",
+        "/data/user_de/0/{package}",
+        "/data/media/0/Android/data/{package}",
+        "/data/media/0/Android/media/{package}",
+        "/data/misc/profiles/cur/0/{package}",
+        "/data/misc/profiles/ref/{package}"
+    ];
+
+    internal static readonly string[] IdentityDirectoryPaths =
+    [
+        "/data/misc/bluedroid",
+        "/data/misc/bluetooth",
+        "/data/misc/dhcp",
+        "/data/misc/net",
+        "/data/misc/network_watchlist",
+        "/data/misc/radio",
+        "/data/misc/carrierid",
+        "/data/misc/apns",
+        "/data/system/netstats",
+        "/data/system/procexitstore",
+        "/data/system/procstats",
+        "/data/system/graphicsstats",
+        "/data/system/usagestats",
+        "/data/system_ce/0/usagestats",
+        "/data/anr",
+        "/data/tombstones"
+    ];
+
+    internal static readonly string[] PreservedWifiDataRoots =
+    [
+        "/data/misc/wifi",
+        "/data/misc/apexdata/com.android.wifi",
+        "/data/misc_ce/0/apexdata/com.android.wifi",
+        "/data/misc_de/0/apexdata/com.android.wifi"
+    ];
+
+    internal static readonly CleanupTarget[] AccountCleanupTargets =
+    [
+        new("/data/system_ce/0/accounts_ce.db*", CleanupTargetKind.FilePattern),
+        new("/data/system_de/0/accounts_de.db*", CleanupTargetKind.FilePattern),
+        new("/data/system/users/0/accounts.db*", CleanupTargetKind.FilePattern),
+        new("/data/system/syncmanager.db*", CleanupTargetKind.FilePattern),
+        new("/data/system/sync", CleanupTargetKind.DirectoryContents),
+        new("/data/system/users/0/registered_services", CleanupTargetKind.DirectoryContents)
+    ];
 
     private static readonly HashSet<string> ProtectedPackages = new(StringComparer.Ordinal)
     {
-        "com.android.shell"
+        "android",
+        "com.android.shell",
+        "com.android.wifi"
     };
 
-    internal static readonly string[] ProtectedDirectoryPaths =
-    [
-        "/data/misc/apexdata/com.android.wifi"
-    ];
-
-    internal static readonly string[] AccountDirectoryPatterns =
-    [
-        "/data/system_ce",
-        "/data/system_de"
-    ];
-
-    internal static readonly string[] AccountFilePatterns =
-    [
-        "/data/system/users/*/accounts.db*",
-        "/data/system/sync/accounts.xml",
-        "/data/system/syncmanager.db*"
-    ];
-
-    internal static readonly string[] DefaultModeFilePatterns =
-    [
-        "/data/system/*.db*"
-    ];
-
-    internal static readonly string[] ResidualDirectoryPatterns =
-    [
-        "/data/anr",
-        "/data/tombstones",
-        "/data/backup",
-        "/data/cache",
-        "/data/dalvik-cache",
-        "/data/drm",
-        "/data/incremental",
-        "/data/mediadrm",
-        "/data/system/battery-history",
-        "/data/system/battery-saver",
-        "/data/system/battery-usage-stats",
-        "/data/system/blobstore",
-        "/data/system/appops",
-        "/data/system/device_config",
-        "/data/system/deviceidle",
-        "/data/system/dropbox",
-        "/data/system/graphicsstats",
-        "/data/system/ifw",
-        "/data/system/install_sessions*",
-        "/data/system/integrity_rules*",
-        "/data/system/integrity_staging*",
-        "/data/system/job",
-        "/data/system/netstats",
-        "/data/system/package_cache",
-        "/data/system/procexitstore",
-        "/data/system/procstats",
-        "/data/system/recoverablekeystore",
-        "/data/system/sensorservice",
-        "/data/system/slice",
-        "/data/system/stats-service",
-        "/data/system/storage",
-        "/data/system/sync",
-        "/data/system/syncmanager-log",
-        "/data/system/usagestats",
-        "/data/system/users/*/registered_services",
+    private static readonly HashSet<string> ProtectedRemovalRoots = new(StringComparer.Ordinal)
+    {
+        "/data",
         "/data/apex",
-        "/data/misc/apexdata/com.android.*",
-        "/data/misc/apexdata/com.google.*",
-        "/data/misc/apns",
-        "/data/misc/bluedroid",
-        "/data/misc/bluetooth",
-        "/data/misc/bootstat",
-        "/data/misc/carrierid",
-        "/data/misc/credstore",
-        "/data/misc/dhcp",
-        "/data/misc/ethernet",
-        "/data/misc/gatekeeper",
-        "/data/misc/keychain",
-        "/data/misc/keystore",
-        "/data/misc/installd",
-        "/data/misc/logd",
-        "/data/misc/media",
-        "/data/misc/net",
-        "/data/misc/network_watchlist",
-        "/data/misc/nfc",
-        "/data/misc/perfetto-traces",
-        "/data/misc/profiles",
-        "/data/misc/profman",
-        "/data/misc/radio",
-        "/data/misc/recovery",
-        "/data/misc/stats-active-metric",
-        "/data/misc/stats-data",
-        "/data/misc/stats-metadata",
-        "/data/misc/stats-service",
-        "/data/misc/trace",
-        "/data/misc/update_engine",
-        "/data/misc/update_engine_log",
-        "/data/misc/user",
-        "/data/misc/vpn",
+        "/data/app",
+        "/data/local/tmp",
+        "/data/misc",
         "/data/misc_ce",
         "/data/misc_de",
-        "/data/per_boot",
+        "/data/property",
+        "/data/system",
+        "/data/system_ce",
+        "/data/system_de",
         "/data/vendor",
         "/data/vendor_ce",
         "/data/vendor_de"
-    ];
-
-    internal static readonly string[] ResidualFilePatterns =
-    [
-        "/data/system/appops.xml*",
-        "/data/system/cachequota.xml*",
-        "/data/system/device_owner_2.xml*",
-        "/data/system/device_policies.xml*",
-        "/data/system/display-manager-state.xml*",
-        "/data/system/diskstats_cache.json*",
-        "/data/system/netpolicy.xml*",
-        "/data/system/notification-log*",
-        "/data/system/notification_policy.xml*",
-        "/data/system/overlays.xml*",
-        "/data/system/profiles.xml*",
-        "/data/system/recoverablekeystore.db*",
-        "/data/system/sensor_privacy.xml*",
-        "/data/system/shortcut_service.xml*",
-        "/data/system/users/*/app_idle_stats.xml*",
-        "/data/system/users/*/appwidgets.xml*",
-        "/data/system/users/*/package-restrictions.xml*",
-        "/data/system/users/*/runtime-permissions.xml*",
-        "/data/system/users/*/settings_config.xml*",
-        SsaidFilePattern,
-        "/data/system/users/*/wallpaper*",
-        "/data/system/watchlist*"
-    ];
+    };
 
     internal static readonly HashSet<string> GoogleDataPackages = new(StringComparer.Ordinal)
     {
@@ -190,7 +144,12 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         DeviceChangeOptions options,
         CancellationToken cancellationToken)
     {
-        return CleanAsync(serial, options, preserveSsaid: false, cancellationToken);
+        return CleanAsync(
+            serial,
+            options,
+            resetSharedIdentityState: true,
+            preserveSsaid: false,
+            cancellationToken);
     }
 
     public Task CleanPreservingSsaidAsync(
@@ -198,7 +157,26 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         DeviceChangeOptions options,
         CancellationToken cancellationToken)
     {
-        return CleanAsync(serial, options, preserveSsaid: true, cancellationToken);
+        return CleanAsync(
+            serial,
+            options,
+            resetSharedIdentityState: false,
+            preserveSsaid: true,
+            cancellationToken);
+    }
+
+    public async Task CleanPostRebootAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        string[] commands =
+        [
+            CreateDeleteDirectoryContentsCommand(DropBoxDirectoryPath),
+            DeviceChangeConstants.SyncCommand
+        ];
+        await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Deleted post-reboot DropBox files while preserving its directory on {Serial}.", serial);
     }
 
     public async Task DeleteSsaidAsync(
@@ -206,17 +184,127 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
-        string script = string.Join(
-            '\n',
-            AdbCleanupCommandBuilder.CreateRemoveFilesCommand([SsaidFilePattern]),
-            "sync || exit $?");
-        await RunRequiredScriptAsync(serial, script, cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Deleted stored SSAID data on {Serial} so Android can regenerate it.", serial);
+        string[] commands =
+        [
+            CreateRemoveFileCommand(SsaidFilePattern),
+            DeviceChangeConstants.SyncCommand
+        ];
+        await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Deleted stored SSAID files on {Serial} so Android can regenerate them.", serial);
+    }
+
+    internal static bool IsGooglePackage(string packageName)
+    {
+        return packageName.StartsWith("com.google.", StringComparison.Ordinal)
+            || GoogleDataPackages.Contains(packageName);
+    }
+
+    internal static string CreateRemoveFileCommand(string pattern)
+    {
+        ValidateDataPathPattern(pattern, allowWildcards: true);
+        if (IsProtectedRemovalPath(pattern))
+            throw new ArgumentException("Cleanup target is a protected data path.", nameof(pattern));
+
+        int wildcardIndex = pattern.IndexOfAny(['*', '?', '[', ']']);
+        if (wildcardIndex >= 0)
+        {
+            int fileNameStart = pattern.LastIndexOf('/') + 1;
+            bool hasOneTrailingAsterisk = wildcardIndex > fileNameStart
+                && pattern[wildcardIndex] == '*'
+                && wildcardIndex == pattern.Length - 1
+                && pattern.LastIndexOf('*') == wildcardIndex;
+            if (!hasOneTrailingAsterisk)
+            {
+                throw new ArgumentException(
+                    "File cleanup allows only one trailing filename wildcard.",
+                    nameof(pattern));
+            }
+        }
+
+        return $"rm -f {pattern}";
+    }
+
+    internal static string CreateDeleteDirectoryContentsCommand(string path)
+    {
+        ValidateDataPathPattern(path, allowWildcards: false);
+        if (IsProtectedRemovalPath(path))
+            throw new ArgumentException("Cleanup target is a protected data path.", nameof(path));
+
+        return $"find '{path}' -mindepth 1 -not -type d -delete";
+    }
+
+    internal static IReadOnlyList<string> CreatePackageCleanupCommands(
+        IEnumerable<string> packageNames,
+        bool useDeepPackageWipe)
+    {
+        string[] packages = packageNames
+            .Select(NormalizePackageName)
+            .Distinct(StringComparer.Ordinal)
+            .Where(packageName => !ProtectedPackages.Contains(packageName))
+            .OrderBy(packageName => packageName, StringComparer.Ordinal)
+            .ToArray();
+        var commands = new List<string>();
+        foreach (string packageName in packages)
+        {
+            commands.Add($"am force-stop \"{packageName}\" >/dev/null 2>&1");
+            commands.Add($"pm clear --user 0 \"{packageName}\" >/dev/null 2>&1");
+
+            if (!useDeepPackageWipe)
+                continue;
+
+            foreach (string pathTemplate in DeepWipePackagePathTemplates)
+            {
+                string path = pathTemplate.Replace(
+                    "{package}",
+                    packageName,
+                    StringComparison.Ordinal);
+                commands.Add(CreateDeleteDirectoryContentsCommand(path));
+            }
+        }
+
+        return commands;
+    }
+
+    internal static IReadOnlyList<string> CreateCleanupCommands(
+        IReadOnlyCollection<string> packagesToClear,
+        bool useDeepPackageWipe,
+        bool clearGoogleAccounts,
+        bool preserveSsaid = false,
+        bool clearAllPackages = false,
+        bool resetSharedIdentityState = true)
+    {
+        ArgumentNullException.ThrowIfNull(packagesToClear);
+
+        var commands = new List<string>();
+
+        if (clearAllPackages)
+            commands.Add("cmd activity force-stop-all >/dev/null 2>&1");
+
+        commands.AddRange(CreatePackageCleanupCommands(
+            packagesToClear,
+            useDeepPackageWipe));
+
+        if (clearGoogleAccounts)
+            AddAccountCleanupCommands(commands);
+
+        if (resetSharedIdentityState)
+            AddIdentityCleanupCommands(commands, preserveSsaid);
+
+        if (clearAllPackages)
+        {
+            commands.Add("pm reset-permissions");
+            commands.Add("cmd appops reset --user 0");
+            commands.Add("pm trim-caches 999G");
+        }
+
+        commands.Add(DeviceChangeConstants.SyncCommand);
+        return commands;
     }
 
     private async Task CleanAsync(
         string serial,
         DeviceChangeOptions options,
+        bool resetSharedIdentityState,
         bool preserveSsaid,
         CancellationToken cancellationToken)
     {
@@ -234,78 +322,55 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             .ConfigureAwait(false);
         bool useDeepPackageWipe = !options.UseDefaultMode
             && options.UseRmRfForPackageCleanup;
-        string cleanupScript = CreateCleanupScript(
+        IReadOnlyList<string> cleanupCommands = CreateCleanupCommands(
             packagesToClear,
             useDeepPackageWipe,
             clearGoogleAccounts,
-            options.UseDefaultMode,
-            preserveSsaid);
-        await RunRequiredScriptAsync(serial, cleanupScript, cancellationToken).ConfigureAwait(false);
-
-        int residualFilePatternCount = preserveSsaid
-            ? ResidualFilePatterns.Length - 1
-            : ResidualFilePatterns.Length;
+            preserveSsaid,
+            clearAllPackages,
+            resetSharedIdentityState);
+        await RunCleanupCommandsAsync(serial, cleanupCommands, cancellationToken).ConfigureAwait(false);
 
         _logger.LogWarning(
-            "Cleared device data on {Serial}. Package stores: {PackageCount}; deep package wipe: {UseDeepPackageWipe}; clear all packages: {ClearAllPackages}; clear Google accounts and CE/DE state: {ClearGoogleAccounts}; preserve SSAID: {PreserveSsaid}; residual directory patterns: {DirectoryPatternCount}; residual file patterns: {FilePatternCount}.",
+            "Cleared device data on {Serial}. Packages: {PackageCount}; deep package file cleanup: {DeepPackageFileCleanup}; clear all packages: {ClearAllPackages}; clear Google accounts: {ClearGoogleAccounts}; reset shared identity state: {ResetSharedIdentityState}; preserve SSAID: {PreserveSsaid}.",
             serial,
             packagesToClear.Count,
             useDeepPackageWipe,
             clearAllPackages,
             clearGoogleAccounts,
-            preserveSsaid,
-            ResidualDirectoryPatterns.Length,
-            residualFilePatternCount);
+            resetSharedIdentityState,
+            preserveSsaid);
     }
 
-    internal static bool IsGooglePackage(string packageName)
+    private static void AddAccountCleanupCommands(List<string> commands)
     {
-        return packageName.StartsWith("com.google.", StringComparison.Ordinal)
-            || GoogleDataPackages.Contains(packageName);
+        foreach (CleanupTarget target in AccountCleanupTargets)
+            AddCleanupTargetCommand(commands, target.Path, target.Kind);
     }
 
-    internal static string CreateCleanupScript(
-        IReadOnlyCollection<string> packagesToClear,
-        bool useDeepPackageWipe,
-        bool clearGoogleAccounts,
-        bool useDefaultMode,
-        bool preserveSsaid = false)
+    private static void AddIdentityCleanupCommands(
+        List<string> commands,
+        bool preserveSsaid)
     {
-        ArgumentNullException.ThrowIfNull(packagesToClear);
-        List<string> commands =
-        [
-            "cmd activity force-stop-all >/dev/null 2>&1 || true",
-            AdbCleanupCommandBuilder.CreatePackageCleanupCommand(
-                packagesToClear,
-                useDeepPackageWipe)
-        ];
+        foreach (string path in IdentityDirectoryPaths)
+            commands.Add(CreateDeleteDirectoryContentsCommand(path));
+        if (!preserveSsaid)
+            commands.Add(CreateRemoveFileCommand(SsaidFilePattern));
+    }
 
-        if (clearGoogleAccounts)
+    private static void AddCleanupTargetCommand(
+        List<string> commands,
+        string path,
+        CleanupTargetKind kind)
+    {
+        commands.Add(kind switch
         {
-            commands.Add(AdbCleanupCommandBuilder.CreatePreserveDirectoryCommand(
-                string.Join(' ', AccountDirectoryPatterns)));
-            commands.Add(AdbCleanupCommandBuilder.CreateRemoveFilesCommand(AccountFilePatterns));
-        }
-
-        if (useDefaultMode)
-        {
-            commands.Add(AdbCleanupCommandBuilder.CreateProtectedSystemFilesCommand(
-                string.Join(' ', DefaultModeFilePatterns)));
-        }
-
-        commands.Add(AdbCleanupCommandBuilder.CreatePreserveDirectoryCommand(
-            string.Join(' ', ResidualDirectoryPatterns),
-            ProtectedDirectoryPaths));
-        IEnumerable<string> residualFilePatterns = preserveSsaid
-            ? ResidualFilePatterns.Where(pattern => pattern != SsaidFilePattern)
-            : ResidualFilePatterns;
-        commands.Add(AdbCleanupCommandBuilder.CreateRemoveFilesCommand(residualFilePatterns));
-        commands.Add("pm trim-caches 999G || exit $?");
-        commands.Add("sync || exit $?");
-
-        return string.Join(
-            '\n',
-            commands.Where(command => !string.IsNullOrWhiteSpace(command)));
+            CleanupTargetKind.FilePattern =>
+                CreateRemoveFileCommand(path),
+            CleanupTargetKind.DirectoryContents =>
+                CreateDeleteDirectoryContentsCommand(path),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        });
     }
 
     private async Task<IReadOnlyList<string>> ResolvePackagesToClearAsync(
@@ -322,11 +387,11 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             .GetInstalledPackagesAsync(serial, cancellationToken)
             .ConfigureAwait(false);
         var installedSet = installedPackages.ToHashSet(StringComparer.Ordinal);
-        var packagesToClear = new HashSet<string>(StringComparer.Ordinal);
+        var packagesToClear = clearAllPackages
+            ? installedSet
+            : new HashSet<string>(StringComparer.Ordinal);
 
-        if (clearAllPackages)
-            packagesToClear.UnionWith(installedPackages);
-        else if (options.ClearSelectedPackages)
+        if (!clearAllPackages && options.ClearSelectedPackages)
             packagesToClear.UnionWith(options.SelectedPackages ?? []);
 
         if (!clearAllPackages && options.ClearGooglePackages)
@@ -335,7 +400,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             packagesToClear.UnionWith(installedPackages.Where(IsGooglePackage));
         }
 
-        if (clearGoogleAccounts)
+        if (!clearAllPackages && clearGoogleAccounts)
         {
             packagesToClear.UnionWith(GoogleDataPackages);
             packagesToClear.UnionWith(GoogleAccountPackages);
@@ -348,17 +413,61 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             .ToArray();
     }
 
-    private async Task RunRequiredScriptAsync(
+    private async Task RunCleanupCommandsAsync(
         string serial,
-        string script,
+        IReadOnlyList<string> commands,
         CancellationToken cancellationToken)
     {
-        CommandResult result = await _adb
-            .RunAdbShellScriptAsync(serial, script, cancellationToken)
-            .ConfigureAwait(false);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"Unable to execute the consolidated cleanup script on device {serial}.");
+        foreach (string command in commands)
+        {
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(CleanupCommandTimeout);
+            try
+            {
+                _ = await _adb
+                    .RunAdbShellScriptAsync(serial, command, timeoutSource.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Match AccountCreator's ignored "PROCESS TIMEOUT" result and continue.
+            }
+        }
     }
 
+    private static string NormalizePackageName(string packageName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageName);
+        string normalized = packageName.Trim();
+        if (!normalized.All(character => char.IsLetterOrDigit(character) || character is '.' or '_'))
+            throw new ArgumentException("Package name contains unsupported characters.", nameof(packageName));
+
+        return normalized;
+    }
+
+    private static bool IsProtectedRemovalPath(string path)
+    {
+        string normalized = path.TrimEnd('/');
+        return ProtectedRemovalRoots.Contains(normalized)
+            || PreservedWifiDataRoots.Any(root =>
+                string.Equals(normalized, root, StringComparison.Ordinal)
+                || normalized.StartsWith($"{root}/", StringComparison.Ordinal));
+    }
+
+    private static void ValidateDataPathPattern(string pattern, bool allowWildcards)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pattern);
+        if (!pattern.StartsWith("/data/", StringComparison.Ordinal))
+            throw new ArgumentException("Cleanup target must stay under /data.", nameof(pattern));
+        if (pattern.Any(char.IsWhiteSpace) || pattern.Contains('\'') || pattern.Contains('"'))
+            throw new ArgumentException("Only one safe path pattern is allowed.", nameof(pattern));
+        if (!allowWildcards && pattern.IndexOfAny(['*', '?', '[', ']']) >= 0)
+            throw new ArgumentException("Wildcards are not allowed for this cleanup command.", nameof(pattern));
+        if (!pattern.All(character =>
+                char.IsLetterOrDigit(character)
+                || character is '/' or '.' or '_' or '-' or '*' or '?' or '[' or ']'))
+        {
+            throw new ArgumentException("Cleanup target contains unsupported characters.", nameof(pattern));
+        }
+    }
 }
