@@ -9,9 +9,6 @@ namespace DeepDroidChanger.Services
 {
     public sealed class SettingsService : ISettingsService
     {
-        private const string SettingsDirectoryName = "Settings";
-        private const string SettingsFileName = "settings.json";
-
         private readonly SemaphoreSlim _fileLock = new(1, 1);
         private readonly IThemeService _themeService;
         private readonly ILogger<SettingsService> _logger;
@@ -25,7 +22,13 @@ namespace DeepDroidChanger.Services
         };
 
         public SettingsService(IThemeService themeService, ILogger<SettingsService> logger)
-            : this(Path.Combine(AppContext.BaseDirectory, SettingsDirectoryName, SettingsFileName), themeService, logger)
+            : this(
+                Path.Combine(
+                    AppContext.BaseDirectory,
+                    RuntimeDataPathConstants.AppSettingsDirectoryName,
+                    RuntimeDataPathConstants.AppSettingsFileName),
+                themeService,
+                logger)
         {
         }
 
@@ -136,7 +139,6 @@ namespace DeepDroidChanger.Services
             if (settings.DeviceTableColumnRatios.Count == 0)
                 settings.DeviceTableColumnRatios = new Dictionary<string, double>(DeviceTableColumnSettings.DefaultRatios);
 
-            settings.DeviceDataFilePath ??= "Settings/devices.json";
             settings.SelectedDeviceSerial ??= string.Empty;
         }
     }

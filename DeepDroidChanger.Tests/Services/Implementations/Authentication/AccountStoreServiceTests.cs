@@ -1,5 +1,6 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
+using DeepDroidChanger.Tests.Helpers;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
@@ -11,7 +12,9 @@ namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
         [TestMethod]
         public async Task SaveAsync_RememberAccount_ProtectsPasswordInJson()
         {
-            var service = CreateService();
+            using var fixture = new TestTempDirectory();
+            string accountPath = GetAccountFilePath(fixture.Path);
+            var service = CreateService(accountPath);
             var cancellationToken = CancellationToken.None;
             var loginRequest = new AccountLoginRequest
             {
@@ -21,9 +24,8 @@ namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
             };
 
             await service.SaveAsync(loginRequest, cancellationToken);
-            var rawJson = await File.ReadAllTextAsync(GetAccountFilePath(), cancellationToken);
+            var rawJson = await File.ReadAllTextAsync(accountPath, cancellationToken);
             var loadedLogin = await service.LoadSavedLoginAsync(cancellationToken);
-            await service.ClearAsync(cancellationToken);
 
             Assert.DoesNotContain(loginRequest.Password, rawJson, StringComparison.Ordinal);
             Assert.DoesNotContain("endpoint", rawJson, StringComparison.OrdinalIgnoreCase);
@@ -37,7 +39,9 @@ namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
         [TestMethod]
         public async Task SaveAsync_RememberDisabled_ClearsAccountFile()
         {
-            var service = CreateService();
+            using var fixture = new TestTempDirectory();
+            string accountPath = GetAccountFilePath(fixture.Path);
+            var service = CreateService(accountPath);
             var cancellationToken = CancellationToken.None;
             await service.SaveAsync(new AccountLoginRequest
             {
@@ -48,18 +52,17 @@ namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
 
             await service.SaveAsync(new AccountLoginRequest { RememberAccount = false }, cancellationToken);
 
-            Assert.IsFalse(File.Exists(GetAccountFilePath()));
+            Assert.IsFalse(File.Exists(accountPath));
         }
 
         [TestMethod]
         public async Task LoadSavedLoginAsync_CorruptJson_QuarantinesInvalidAccount()
         {
-            var service = CreateService();
-            string accountPath = GetAccountFilePath();
+            using var fixture = new TestTempDirectory();
+            string accountPath = GetAccountFilePath(fixture.Path);
+            var service = CreateService(accountPath);
             string settingsDirectory = Path.GetDirectoryName(accountPath)!;
             Directory.CreateDirectory(settingsDirectory);
-            foreach (string oldBackup in Directory.GetFiles(settingsDirectory, "account.json.corrupt-*"))
-                File.Delete(oldBackup);
             await File.WriteAllTextAsync(accountPath, "{not-json");
 
             AccountLoginRequest? result = await service.LoadSavedLoginAsync(CancellationToken.None);
@@ -68,17 +71,16 @@ namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
             Assert.IsFalse(File.Exists(accountPath));
             string[] backups = Directory.GetFiles(settingsDirectory, "account.json.corrupt-*");
             Assert.HasCount(1, backups);
-            File.Delete(backups[0]);
         }
 
         [TestMethod]
         public async Task LoadSavedLoginAsync_InvalidBase64_QuarantinesInvalidAccount()
         {
-            var service = CreateService();
-            string accountPath = GetAccountFilePath();
+            using var fixture = new TestTempDirectory();
+            string accountPath = GetAccountFilePath(fixture.Path);
+            var service = CreateService(accountPath);
             string settingsDirectory = Path.GetDirectoryName(accountPath)!;
             Directory.CreateDirectory(settingsDirectory);
-            DeleteCorruptBackups(settingsDirectory);
             await File.WriteAllTextAsync(
                 accountPath,
                 "{\"rememberAccount\":true,\"username\":\"user@example.com\",\"protectedPassword\":\"not-base64\",\"entropy\":\"also-not-base64\"}");
@@ -89,23 +91,18 @@ namespace DeepDroidChanger.Tests.Services.Implementations.Authentication
             Assert.IsFalse(File.Exists(accountPath));
             string[] backups = Directory.GetFiles(settingsDirectory, "account.json.corrupt-*");
             Assert.HasCount(1, backups);
-            File.Delete(backups[0]);
         }
 
-        private static AccountStoreService CreateService()
+        private static AccountStoreService CreateService(string accountPath)
         {
-            return new AccountStoreService(NullLogger<AccountStoreService>.Instance);
+            return new AccountStoreService(
+                accountPath,
+                NullLogger<AccountStoreService>.Instance);
         }
 
-        private static string GetAccountFilePath()
+        private static string GetAccountFilePath(string rootPath)
         {
-            return Path.Combine(AppContext.BaseDirectory, "Settings", "account.json");
-        }
-
-        private static void DeleteCorruptBackups(string settingsDirectory)
-        {
-            foreach (string backup in Directory.GetFiles(settingsDirectory, "account.json.corrupt-*"))
-                File.Delete(backup);
+            return Path.Combine(rootPath, "AppSettings", "account.json");
         }
     }
 }

@@ -137,6 +137,18 @@ Build Release:
 dotnet build .\DeepDroidChanger.slnx -c Release
 ```
 
+Mỗi project .NET có thư mục build output riêng. Với project WPF này và cấu hình
+mặc định hiện tại:
+
+- Debug executable:
+  `.\DeepDroidChanger\bin\Debug\net10.0-windows\DeepDroidChanger.exe`
+- Release executable:
+  `.\DeepDroidChanger\bin\Release\net10.0-windows\DeepDroidChanger.exe`
+
+`bin/<Configuration>/<TargetFramework>/` là cấu trúc output của project
+`DeepDroidChanger.csproj`, không phải một thư mục dữ liệu riêng của ứng dụng và
+không phải output dùng chung tại solution root.
+
 ## Kiểm thử
 
 ```powershell
@@ -148,13 +160,59 @@ Test suite dùng fake/mock cho Cognito, HTTP API và ADB. Việc xác nhận tư
 
 ## Dữ liệu runtime và bảo mật
 
-Các file runtime nằm cạnh executable trong `Settings/`; thư mục output `bin/` đã được Git ignore.
+Trong tài liệu này, **thư mục ứng dụng** là thư mục đang chứa
+`DeepDroidChanger.exe`. Ứng dụng lấy đường dẫn này từ
+`AppContext.BaseDirectory`, sau đó tạo `AppSettings/` và `DeviceManager/` trực
+tiếp bên trong. Vì vậy khi chạy bản Debug vừa build, cấu trúc thực tế là:
+
+```text
+DeepDroidChanger/bin/Debug/net10.0-windows/
+├── DeepDroidChanger.exe
+├── AppSettings/
+│   ├── app_settings.json
+│   └── account.json
+└── DeviceManager/
+    ├── devices.json
+    └── <serial>/
+        ├── random_config.json
+        ├── change_options_config.json
+        ├── update_integrity_config.json
+        ├── location_config.json
+        ├── timezone_config.json
+        └── proxy_config.json
+```
+
+Nếu executable được publish hoặc chuyển sang thư mục khác, hai thư mục dữ liệu
+trên cũng được tạo cạnh executable tại vị trí mới. Chúng được tạo khi ứng dụng
+chạy và service persistence được gọi; riêng thao tác `dotnet build` không tạo
+các file runtime này.
 
 | Tệp | Nội dung |
 | --- | --- |
-| `Settings/settings.json` | Theme, ngôn ngữ, sidebar, thiết bị đang chọn, tỉ lệ cột và cấu hình action |
-| `Settings/devices.json` | Danh sách thiết bị và cấu hình riêng theo serial |
-| `Settings/account.json` | Username và mật khẩu đã mã hóa khi bật Remember account |
+| `AppSettings/app_settings.json` | Theme, ngôn ngữ, sidebar, thiết bị đang chọn, tỉ lệ cột và cấu hình action |
+| `DeviceManager/devices.json` | Index thiết bị, chỉ gồm serial, name, type và dataPath |
+| `DeviceManager/<serial>/random_config.json` | Brand, Android version, quốc gia, nhà mạng, tùy chọn random SIM và Integrity security patch |
+| `DeviceManager/<serial>/change_options_config.json` | Tùy chọn Change Device và cleanup package |
+| `DeviceManager/<serial>/update_integrity_config.json` | Cấu hình dialog Update Integrity |
+| `DeviceManager/<serial>/location_config.json` | Cấu hình dialog Change Location |
+| `DeviceManager/<serial>/timezone_config.json` | Cấu hình dialog Change Timezone |
+| `DeviceManager/<serial>/proxy_config.json` | Cấu hình dialog Fake Proxy |
+| `AppSettings/account.json` | Username và mật khẩu đã mã hóa khi bật Remember account |
+
+Thời điểm persistence được giữ theo hành vi của ứng dụng:
+
+- Add/Delete Device ghi index và tạo/xóa thư mục thiết bị ngay khi thao tác hoàn tất.
+- Name được tự lưu sau debounce 300 ms; Type được lưu ngay. Các edit còn chờ
+  được flush khi rời Device Manager.
+- Brand, Android version, country, carrier và Change SIM được tự lưu sau
+  debounce 300 ms vào `random_config.json`. Device profile đầy đủ vừa random
+  chỉ tồn tại trong phiên chạy để thực hiện Change Device, không được ghi vào
+  config.
+- Advanced Change Options chỉ ghi kết quả sau khi người dùng xác nhận dialog.
+- Location, Timezone và Proxy tự lưu cấu hình hợp lệ khi chỉnh; nút Save hoặc
+  thao tác đóng dialog chờ hoàn tất mọi lượt ghi còn pending.
+- Update Integrity tự lưu mỗi thay đổi cấu hình và ghi lại kết quả cuối khi
+  người dùng xác nhận thực hiện.
 
 - JSON được ghi atomically; file hỏng được quarantine trước khi tạo cấu hình mặc định.
 - `account.json` chỉ giải mã được bởi cùng Windows user đã tạo file.

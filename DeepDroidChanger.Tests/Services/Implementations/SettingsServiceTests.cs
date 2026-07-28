@@ -16,7 +16,7 @@ public sealed class SettingsServiceTests
     public async Task LoadAsync_MissingFile_WritesDefaultSettings()
     {
         using var fixture = new TestTempDirectory();
-        string path = Path.Combine(fixture.Path, "settings.json");
+        string path = Path.Combine(fixture.Path, "app_settings.json");
         IThemeService themes = Substitute.For<IThemeService>();
         themes.NormalizeTheme(Arg.Any<string>()).Returns(ThemeConstants.Dark);
         var service = new SettingsService(path, themes, NullLogger<SettingsService>.Instance);
@@ -26,7 +26,6 @@ public sealed class SettingsServiceTests
         Assert.AreEqual(LanguageConstants.English, settings.Language);
         Assert.AreEqual(ThemeConstants.Dark, settings.Theme);
         Assert.IsFalse(settings.SidebarCollapsed);
-        Assert.AreEqual("Settings/devices.json", settings.DeviceDataFilePath);
         Assert.AreEqual(string.Empty, settings.SelectedDeviceSerial);
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
@@ -38,7 +37,7 @@ public sealed class SettingsServiceTests
     public async Task SaveLoadAsync_PreservesAppSettingsProperties()
     {
         using var fixture = new TestTempDirectory();
-        string path = Path.Combine(fixture.Path, "settings.json");
+        string path = Path.Combine(fixture.Path, "app_settings.json");
         IThemeService themes = Substitute.For<IThemeService>();
         themes.NormalizeTheme("light").Returns("light");
         var service = new SettingsService(path, themes, NullLogger<SettingsService>.Instance);
@@ -71,7 +70,7 @@ public sealed class SettingsServiceTests
     public async Task LoadAsync_CorruptJson_IsQuarantinedAndReplacedWithNormalizedDefaults()
     {
         using var fixture = new TestTempDirectory();
-        string path = Path.Combine(fixture.Path, "settings.json");
+        string path = Path.Combine(fixture.Path, "app_settings.json");
         await File.WriteAllTextAsync(path, "not-json");
         IThemeService themes = Substitute.For<IThemeService>();
         themes.NormalizeTheme(Arg.Any<string>()).Returns(ThemeConstants.Dark);
@@ -80,8 +79,9 @@ public sealed class SettingsServiceTests
         AppSettings settings = await service.LoadAsync(CancellationToken.None);
 
         Assert.AreEqual(ThemeConstants.Dark, settings.Theme);
-        Assert.HasCount(1, Directory.GetFiles(fixture.Path, "settings.json.corrupt-*"));
+        Assert.HasCount(1, Directory.GetFiles(fixture.Path, "app_settings.json.corrupt-*"));
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
         Assert.AreEqual(JsonValueKind.Object, document.RootElement.ValueKind);
     }
+
 }

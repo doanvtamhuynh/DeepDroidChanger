@@ -12,9 +12,7 @@ namespace DeepDroidChanger.ViewModels
     {
         private readonly ITimezoneDataService _timezoneDataService;
         private readonly IDeviceStoreService _deviceStoreService;
-        private readonly ISettingsService _settingsService;
         private readonly ILocalizationService _localizationService;
-        private readonly AppSettings _appSettings;
         private readonly ILogger<ChangeTimezoneViewModel> _logger;
         private readonly object _configSaveLock = new();
         private Task _pendingConfigSave = Task.CompletedTask;
@@ -29,9 +27,6 @@ namespace DeepDroidChanger.ViewModels
 
         [ObservableProperty]
         private string _deviceInfoText = string.Empty;
-
-        [ObservableProperty]
-        private string _deviceDataFilePath = string.Empty;
 
         [ObservableProperty]
         private bool _isDataMode = true;
@@ -57,24 +52,18 @@ namespace DeepDroidChanger.ViewModels
         public ChangeTimezoneViewModel(
             ITimezoneDataService timezoneDataService,
             IDeviceStoreService deviceStoreService,
-            ISettingsService settingsService,
             ILocalizationService localizationService,
-            AppSettings appSettings,
             ILogger<ChangeTimezoneViewModel> logger)
         {
             _timezoneDataService = timezoneDataService;
             _deviceStoreService = deviceStoreService;
-            _settingsService = settingsService;
             _localizationService = localizationService;
-            _appSettings = appSettings;
             _logger = logger;
 
             AllTimezones = new ObservableCollection<TimezoneOption>();
             Countries = new ObservableCollection<CountryOption>();
             FilteredCountries = new ObservableCollection<CountryOption>();
             CountryTimezones = new ObservableCollection<TimezoneOption>();
-
-            DeviceDataFilePath = _appSettings.DeviceDataFilePath;
         }
 
         public event EventHandler<bool>? CloseRequested;
@@ -114,8 +103,6 @@ namespace DeepDroidChanger.ViewModels
         partial void OnDeviceSerialChanged(string value) => UpdateDeviceInfoText();
 
         partial void OnDeviceNameChanged(string value) => UpdateDeviceInfoText();
-
-        partial void OnDeviceDataFilePathChanged(string value) => QueueConfigSave();
 
         private void UpdateDeviceInfoText()
         {
@@ -232,8 +219,7 @@ namespace DeepDroidChanger.ViewModels
             var snapshot = new TimezoneConfigSnapshot(
                 DeviceSerial,
                 mode,
-                SelectedTimezone?.Timezone ?? string.Empty,
-                DeviceDataFilePath);
+                SelectedTimezone?.Timezone ?? string.Empty);
 
             lock (_configSaveLock)
                 _pendingConfigSave = PersistConfigAfterAsync(_pendingConfigSave, snapshot);
@@ -253,8 +239,6 @@ namespace DeepDroidChanger.ViewModels
                     },
                     CancellationToken.None).ConfigureAwait(false);
 
-                _appSettings.DeviceDataFilePath = snapshot.DeviceDataFilePath;
-                await _settingsService.SaveAsync(_appSettings, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -438,7 +422,6 @@ namespace DeepDroidChanger.ViewModels
         private readonly record struct TimezoneConfigSnapshot(
             string Serial,
             ChangeTimezoneMode Mode,
-            string Timezone,
-            string DeviceDataFilePath);
+            string Timezone);
     }
 }

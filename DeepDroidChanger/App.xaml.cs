@@ -203,7 +203,6 @@ public sealed partial class App : Application
         target.Theme = source.Theme;
         target.SidebarCollapsed = source.SidebarCollapsed;
         target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
-        target.DeviceDataFilePath = source.DeviceDataFilePath;
         target.SelectedDeviceSerial = source.SelectedDeviceSerial;
     }
 }

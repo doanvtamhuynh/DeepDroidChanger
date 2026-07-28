@@ -187,13 +187,21 @@ obj/
 .vs/
 *.user
 
-Do not add a repository-wide `Settings/` ignore pattern. Two different
-concepts use the word "Settings" in this project:
+Do not add a repository-wide `Settings/` ignore pattern:
 
-- Runtime data is created beside the executable under
-  `bin/<Configuration>/net10.0-windows/Settings/` (for example,
-  `settings.json`, `devices.json`, and `account.json`). It is already ignored
-  because the entire `bin/` build output is ignored.
+- Runtime data is always created beside `DeepDroidChanger.exe`, using
+  `AppContext.BaseDirectory` as the application directory. In a normal local
+  build the executable is under the WPF project's
+  `DeepDroidChanger/bin/<Configuration>/net10.0-windows/` output directory;
+  after publish or deployment, the application directory is wherever the
+  executable is located. Application settings and the remembered account live
+  under `AppSettings/` (`app_settings.json` and `account.json`). The device
+  index lives at `DeviceManager/devices.json`, and each serial has its own
+  `DeviceManager/<serial>/` directory containing split per-device
+  configuration JSON files. Random selection and random behavior settings
+  share `random_config.json`; dialog-specific settings remain in their own
+  files. Repository-local build outputs are already ignored because the project
+  `bin/` directory is ignored.
 - The Settings application feature is source code and resources, including
   `Views/Settings/`, `ViewModels/SettingsViewModel.cs`, Settings services and
   models, and `Resources/Strings/Views/Settings*.xaml` /

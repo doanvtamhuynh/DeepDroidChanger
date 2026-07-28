@@ -1,5 +1,6 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Helpers;
+using DeepDroidChanger.Constants;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -10,9 +11,6 @@ namespace DeepDroidChanger.Services
 {
     public sealed class AccountStoreService : IAccountStoreService
     {
-        private const string SettingsFolderName = "Settings";
-        private const string AccountFileName = "account.json";
-
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
         {
             WriteIndented = true
@@ -21,16 +19,33 @@ namespace DeepDroidChanger.Services
         private static readonly SemaphoreSlim FileLock = new(1, 1);
 
         private readonly ILogger<AccountStoreService> _logger;
+        private readonly string _accountDirectory;
+        private readonly string _accountPath;
 
         public AccountStoreService(ILogger<AccountStoreService> logger)
+            : this(
+                Path.Combine(
+                    AppContext.BaseDirectory,
+                    RuntimeDataPathConstants.AppSettingsDirectoryName,
+                    RuntimeDataPathConstants.AccountFileName),
+                logger)
         {
+        }
+
+        internal AccountStoreService(
+            string accountPath,
+            ILogger<AccountStoreService> logger)
+        {
+            _accountPath = Path.GetFullPath(accountPath);
+            _accountDirectory = Path.GetDirectoryName(_accountPath)
+                ?? throw new ArgumentException("Account path must include a directory.", nameof(accountPath));
             _logger = logger;
         }
 
         public async Task<AccountLoginRequest?> LoadSavedLoginAsync(CancellationToken cancellationToken)
         {
             await FileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-            var path = GetAccountFilePath();
+            var path = _accountPath;
             try
             {
                 if (!File.Exists(path))
@@ -84,16 +99,14 @@ namespace DeepDroidChanger.Services
             await FileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                string accountPath = GetAccountFilePath();
                 if (!loginRequest.RememberAccount)
                 {
-                    if (File.Exists(accountPath))
-                        File.Delete(accountPath);
+                    DeleteAccountFiles();
 
                     return;
                 }
 
-                Directory.CreateDirectory(GetSettingsDirectory());
+                Directory.CreateDirectory(_accountDirectory);
                 byte[] entropy = RandomNumberGenerator.GetBytes(32);
                 AccountSettings account = new()
                 {
@@ -105,7 +118,7 @@ namespace DeepDroidChanger.Services
                 };
 
                 string json = JsonSerializer.Serialize(account, JsonOptions);
-                await AtomicFileWriter.WriteAllTextAsync(accountPath, json, cancellationToken)
+                await AtomicFileWriter.WriteAllTextAsync(_accountPath, json, cancellationToken)
                     .ConfigureAwait(false);
             }
             finally
@@ -119,15 +132,19 @@ namespace DeepDroidChanger.Services
             await FileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                string path = GetAccountFilePath();
-                if (File.Exists(path))
-                    File.Delete(path);
+                DeleteAccountFiles();
             }
             finally
             {
                 FileLock.Release();
             }
 
+        }
+
+        private void DeleteAccountFiles()
+        {
+            if (File.Exists(_accountPath))
+                File.Delete(_accountPath);
         }
 
         private static string Protect(string value, byte[] entropy)
@@ -146,16 +163,6 @@ namespace DeepDroidChanger.Services
             var entropy = Convert.FromBase64String(entropyValue);
             var unprotectedData = ProtectedData.Unprotect(data, entropy, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(unprotectedData);
-        }
-
-        private static string GetSettingsDirectory()
-        {
-            return Path.Combine(AppContext.BaseDirectory, SettingsFolderName);
-        }
-
-        private static string GetAccountFilePath()
-        {
-            return Path.Combine(GetSettingsDirectory(), AccountFileName);
         }
 
         private void QuarantineInvalidAccount(string accountPath)

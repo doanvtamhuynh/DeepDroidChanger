@@ -51,8 +51,9 @@ change.
   - Temporary extraction folders (e.g. unzip scratch folders, /tmp
     working directories)
   - User settings or runtime device data generated under
-    `bin/<Configuration>/net10.0-windows/Settings/` (see docs/DESIGN.md
-    section 7; `bin/` already excludes it from source control)
+    `bin/<Configuration>/net10.0-windows/AppSettings/` or
+    `bin/<Configuration>/net10.0-windows/DeviceManager/` (see docs/DESIGN.md
+    section 7; `bin/` already excludes both from source control)
   - Secrets, API keys, tokens, connection strings, .env files
   - bin/, obj/, .vs/, *.user (already covered by .gitignore; verify
     before committing if unsure)
