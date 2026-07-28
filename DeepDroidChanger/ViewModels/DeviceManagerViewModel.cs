@@ -447,9 +447,6 @@ namespace DeepDroidChanger.ViewModels
         {
             OnPropertyChanged(nameof(CanInteractWithSelectedDevice));
             DeleteDeviceCommand.NotifyCanExecuteChanged();
-            RebootDeviceCommand.NotifyCanExecuteChanged();
-            ViewDeviceInfoCommand.NotifyCanExecuteChanged();
-            CopySerialCommand.NotifyCanExecuteChanged();
             RandomDeviceCommand.NotifyCanExecuteChanged();
             ChangeDeviceCommand.NotifyCanExecuteChanged();
             ChangeWithoutWipeCommand.NotifyCanExecuteChanged();
@@ -465,7 +462,6 @@ namespace DeepDroidChanger.ViewModels
             InstallApkCommand.NotifyCanExecuteChanged();
             FakeProxyCommand.NotifyCanExecuteChanged();
             StopFakeProxyCommand.NotifyCanExecuteChanged();
-            ViewDeviceCommand.NotifyCanExecuteChanged();
         }
 
         private bool CanAddNewDevices()
@@ -582,15 +578,11 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task RebootDeviceAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
         {
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
                 return;
 
             SetDeviceLog(device, DeviceLogResourceKeys.RebootingDevice);
@@ -613,7 +605,7 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction))]
+        [RelayCommand]
         private async Task CopySerialAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
         {
             DeviceRowViewModel? targetDevice = device ?? SelectedDevice;
@@ -646,7 +638,7 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task ViewDeviceInfoAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
         {
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
@@ -1674,7 +1666,7 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task ViewDeviceAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
         {
             DeviceRowViewModel? targetDevice = await GetOnlineDeviceAsync(
@@ -1682,10 +1674,6 @@ namespace DeepDroidChanger.ViewModels
                     cancellationToken)
                 .ConfigureAwait(true);
             if (targetDevice == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(targetDevice);
-            if (actionLease == null)
                 return;
 
             SetDeviceLog(targetDevice, DeviceLogResourceKeys.OpeningDialog);

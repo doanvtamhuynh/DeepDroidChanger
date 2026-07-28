@@ -125,9 +125,12 @@
                         </MenuItem.Header>
                     </MenuItem>
 
+                    <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
+
                     <MenuItem Command="{Binding PlacementTarget.Tag.FactoryResetCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                              Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                              IsEnabled="{Binding PlacementTarget.DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                              Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
                         <MenuItem.Header>
                             <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
                                 <Grid.ColumnDefinitions>
@@ -136,15 +139,13 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="Restore"
-                                                         Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                                         Style="{DynamicResource DeviceActionsContextMenuDangerButtonIconStyle}"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{DynamicResource DeviceManager_RowMenuFactoryReset}"
-                                           Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                                           Style="{DynamicResource DeviceActionsContextMenuDangerButtonTextStyle}"/>
                             </Grid>
                         </MenuItem.Header>
                     </MenuItem>
-
-                    <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
 
                     <MenuItem Command="{Binding PlacementTarget.Tag.DeleteDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"

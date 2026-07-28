@@ -1624,6 +1624,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
         var firstRandomCompletion = new TaskCompletionSource<RandomDeviceResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var invocationCount = 0;
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        IDeviceViewerDialogService deviceViewerDialog = Substitute.For<IDeviceViewerDialogService>();
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
@@ -1637,7 +1639,12 @@ public sealed class DeviceManagerViewModelLifecycleTests
                     RandomDeviceStatus.Created,
                     new DeviceInfoApiDevice { Model = "Profile B" }));
             });
-        var viewModel = CreateViewModel(deviceList, carriers, randomDevice: randomDevice);
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceViewerDialog: deviceViewerDialog,
+            deviceAction: deviceAction);
         await viewModel.InitializeAsync(CancellationToken.None);
 
         DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
@@ -1657,8 +1664,20 @@ public sealed class DeviceManagerViewModelLifecycleTests
             CreateActionStateMessage(busyDeviceActionStates));
         Dictionary<string, bool> busyContextMenuStates = GetContextMenuActionStates(viewModel);
         Assert.IsTrue(
-            busyContextMenuStates.All(pair => !pair.Value),
+            busyContextMenuStates
+                .Where(pair => pair.Key != nameof(DeviceManagerViewModel.DeleteDeviceCommand))
+                .All(pair => pair.Value),
             CreateActionStateMessage(busyContextMenuStates));
+        Assert.IsFalse(
+            busyContextMenuStates[nameof(DeviceManagerViewModel.DeleteDeviceCommand)],
+            CreateActionStateMessage(busyContextMenuStates));
+        await viewModel.RebootDeviceCommand.ExecuteAsync(deviceA);
+        await deviceAction.Received(1).RebootAsync("A", Arg.Any<CancellationToken>());
+        await viewModel.ViewDeviceCommand.ExecuteAsync(deviceA);
+        await deviceViewerDialog.Received(1).ShowDeviceViewerAsync(
+            "A",
+            "Phone A",
+            Arg.Any<CancellationToken>());
 
         viewModel.SelectedDevice = deviceB;
 
@@ -2004,6 +2023,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         {
             [nameof(DeviceManagerViewModel.ViewDeviceCommand)] = viewModel.ViewDeviceCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.ViewDeviceInfoCommand)] = viewModel.ViewDeviceInfoCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.CopySerialCommand)] = viewModel.CopySerialCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.RebootDeviceCommand)] = viewModel.RebootDeviceCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.DeleteDeviceCommand)] = viewModel.DeleteDeviceCommand.CanExecute(targetDevice)
         };
@@ -2128,6 +2148,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
         IDeviceChangeService? deviceChange = null,
         IDeviceActionGuardService? deviceActionGuard = null,
+        IDeviceViewerDialogService? deviceViewerDialog = null,
+        IDeviceActionService? deviceAction = null,
         IFakeProxyDialogService? fakeProxyDialog = null,
         IProxyWorkflowService? proxyWorkflowService = null,
         AppSettings? settings = null)
@@ -2145,7 +2167,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             Substitute.For<IUpdateIntegrityDialogService>(),
             Substitute.For<IDeviceIntegrityService>(),
             Substitute.For<IInstallPackageDialogService>(),
-            Substitute.For<IDeviceViewerDialogService>(),
+            deviceViewerDialog ?? Substitute.For<IDeviceViewerDialogService>(),
             deleteDeviceConfirmation ?? Substitute.For<IDeleteDeviceConfirmationDialogService>(),
             changeDeviceConfirmation ?? Substitute.For<IChangeDeviceConfirmationDialogService>(),
             deviceActionConfirmationDialog ?? CreateDeviceActionConfirmationDialogService(),
@@ -2157,7 +2179,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             randomDevice ?? Substitute.For<IRandomDeviceService>(),
             simProfileService ?? Substitute.For<ISimProfileService>(),
             deviceActionGuard ?? new DeviceActionGuardService(),
-            Substitute.For<IDeviceActionService>(),
+            deviceAction ?? Substitute.For<IDeviceActionService>(),
             deviceChange ?? Substitute.For<IDeviceChangeService>(),
             CreateLocalizationService(),
             settings ?? new AppSettings(),
