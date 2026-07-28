@@ -1,3 +1,4 @@
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Helpers;
 using System.Text.Json;
@@ -7,7 +8,6 @@ namespace DeepDroidChanger.Services
 {
     public sealed class CarrierDataService : ICarrierDataService
     {
-        private const string CarriersResourcePath = "Assets/Data/carriers.json";
         private const string CountryIsoPropertyName = "country_iso";
         private const string CountryCodePropertyName = "country_code";
         private const string CountryNamePropertyName = "country_name";
@@ -35,7 +35,7 @@ namespace DeepDroidChanger.Services
         {
             try
             {
-                var json = AssetDataReader.ReadText(CarriersResourcePath);
+                var json = AssetDataReader.ReadText(AssetConstants.Data.CarriersPath);
                 using var document = JsonDocument.Parse(json);
                 var profiles = new List<CarrierProfile>();
                 var seenCarriers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

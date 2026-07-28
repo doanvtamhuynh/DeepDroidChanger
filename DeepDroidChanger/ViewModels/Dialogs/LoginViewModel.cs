@@ -1,6 +1,5 @@
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
-using DeepDroidChanger.Constants;
 using System.IO;
 using System.Security.Cryptography;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -86,8 +85,8 @@ namespace DeepDroidChanger.ViewModels
                     ErrorMessage = authentication.Status is
                         AccountAuthenticationStatus.ConfigurationError or
                         AccountAuthenticationStatus.ServiceUnavailable
-                            ? GetText(LoginResourceKeys.ServiceUnavailable)
-                            : GetText(LoginResourceKeys.AuthenticationFailed);
+                            ? GetText("Login_ErrorServiceUnavailable")
+                            : GetText("Login_ErrorAuthenticationFailed");
                     return;
                 }
 
@@ -104,25 +103,25 @@ namespace DeepDroidChanger.ViewModels
             catch (OperationCanceledException)
             {
                 _deviceSessionService.ClearSession();
-                ErrorMessage = GetText(LoginResourceKeys.Canceled);
+                ErrorMessage = GetText("Login_ErrorCanceled");
             }
             catch (IOException exception)
             {
                 _deviceSessionService.ClearSession();
                 _logger.LogWarning(exception, "Saved account could not be updated.");
-                ErrorMessage = GetText(LoginResourceKeys.AccountSaveFailed);
+                ErrorMessage = GetText("Login_ErrorAccountSaveFailed");
             }
             catch (UnauthorizedAccessException exception)
             {
                 _deviceSessionService.ClearSession();
                 _logger.LogWarning(exception, "Saved account could not be updated.");
-                ErrorMessage = GetText(LoginResourceKeys.AccountSaveFailed);
+                ErrorMessage = GetText("Login_ErrorAccountSaveFailed");
             }
             catch (CryptographicException exception)
             {
                 _deviceSessionService.ClearSession();
                 _logger.LogWarning(exception, "Saved account could not be protected.");
-                ErrorMessage = GetText(LoginResourceKeys.AccountSaveFailed);
+                ErrorMessage = GetText("Login_ErrorAccountSaveFailed");
             }
             finally
             {
@@ -137,7 +136,7 @@ namespace DeepDroidChanger.ViewModels
             if (string.IsNullOrWhiteSpace(Username)
                 || string.IsNullOrWhiteSpace(Password))
             {
-                ErrorMessage = GetText(LoginResourceKeys.MissingFields);
+                ErrorMessage = GetText("Login_ErrorMissingFields");
                 return false;
             }
 

@@ -28,8 +28,8 @@ public sealed class DeviceStoreService : IDeviceStoreService
         : this(
             Path.Combine(
                 AppContext.BaseDirectory,
-                RuntimeDataPathConstants.DeviceManagerDirectoryName,
-                RuntimeDataPathConstants.DevicesFileName),
+                AssetConstants.RuntimeData.DeviceManagerDirectoryName,
+                AssetConstants.RuntimeData.DevicesFileName),
             logger)
     {
     }
@@ -41,7 +41,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
             ?? throw new ArgumentException("Device store path must include a directory.", nameof(devicesPath));
         _applicationRootDirectory = string.Equals(
             Path.GetFileName(_deviceManagerDirectory),
-            RuntimeDataPathConstants.DeviceManagerDirectoryName,
+            AssetConstants.RuntimeData.DeviceManagerDirectoryName,
             StringComparison.OrdinalIgnoreCase)
             ? Path.GetDirectoryName(_deviceManagerDirectory) ?? _deviceManagerDirectory
             : _deviceManagerDirectory;
@@ -237,24 +237,24 @@ public sealed class DeviceStoreService : IDeviceStoreService
     {
         string directory = GetDeviceDirectory(entry.Serial);
         DeviceRandomConfig randomConfig = await ReadJsonOrDefaultAsync<DeviceRandomConfig>(
-            Path.Combine(directory, RuntimeDataPathConstants.RandomConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.RandomConfigFileName),
             cancellationToken).ConfigureAwait(false);
 
         DeviceChangeOptions changeOptions = await ReadJsonOrDefaultAsync<DeviceChangeOptions>(
-            Path.Combine(directory, RuntimeDataPathConstants.ChangeOptionsConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.ChangeOptionsConfigFileName),
             cancellationToken).ConfigureAwait(false);
         DeviceUpdateIntegrityConfig updateIntegrity =
             await ReadJsonOrDefaultAsync<DeviceUpdateIntegrityConfig>(
-                Path.Combine(directory, RuntimeDataPathConstants.UpdateIntegrityConfigFileName),
+                Path.Combine(directory, AssetConstants.RuntimeData.UpdateIntegrityConfigFileName),
                 cancellationToken).ConfigureAwait(false);
         DeviceLocationConfig location = await ReadJsonOrDefaultAsync<DeviceLocationConfig>(
-            Path.Combine(directory, RuntimeDataPathConstants.LocationConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.LocationConfigFileName),
             cancellationToken).ConfigureAwait(false);
         DeviceTimezoneConfig timezone = await ReadJsonOrDefaultAsync<DeviceTimezoneConfig>(
-            Path.Combine(directory, RuntimeDataPathConstants.TimezoneConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.TimezoneConfigFileName),
             cancellationToken).ConfigureAwait(false);
         DeviceProxyConfig proxy = await ReadJsonOrDefaultAsync<DeviceProxyConfig>(
-            Path.Combine(directory, RuntimeDataPathConstants.ProxyConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.ProxyConfigFileName),
             cancellationToken).ConfigureAwait(false);
 
         return new StoredDeviceConfig
@@ -349,7 +349,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
         Directory.CreateDirectory(directory);
 
         await WriteJsonAsync(
-            Path.Combine(directory, RuntimeDataPathConstants.RandomConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.RandomConfigFileName),
             new DeviceRandomConfig
             {
                 CountryIso = device.CountryIso,
@@ -364,11 +364,11 @@ public sealed class DeviceStoreService : IDeviceStoreService
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
-            Path.Combine(directory, RuntimeDataPathConstants.ChangeOptionsConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.ChangeOptionsConfigFileName),
             DeviceChangeOptionsHelper.CreateNormalizedCopy(device.ChangeOptions),
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
-            Path.Combine(directory, RuntimeDataPathConstants.UpdateIntegrityConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.UpdateIntegrityConfigFileName),
             new DeviceUpdateIntegrityConfig
             {
                 FromServer = device.UpdateIntegrityFromServer,
@@ -379,7 +379,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
-            Path.Combine(directory, RuntimeDataPathConstants.LocationConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.LocationConfigFileName),
             new DeviceLocationConfig
             {
                 Mode = device.LocationMode,
@@ -390,7 +390,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
-            Path.Combine(directory, RuntimeDataPathConstants.TimezoneConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.TimezoneConfigFileName),
             new DeviceTimezoneConfig
             {
                 Mode = device.TimezoneMode,
@@ -398,7 +398,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
-            Path.Combine(directory, RuntimeDataPathConstants.ProxyConfigFileName),
+            Path.Combine(directory, AssetConstants.RuntimeData.ProxyConfigFileName),
             new DeviceProxyConfig
             {
                 FullString = device.ProxyFullString,

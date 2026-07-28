@@ -22,7 +22,7 @@ public sealed class DeviceTimezoneServiceTests
 
         await adb.Received(1).PutSettingAsync("SERIAL", "global", "auto_time_zone", "0", Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
-            "SERIAL", PropertyConstants.Prop_Timezone, "Asia/Ho_Chi_Minh", Arg.Any<CancellationToken>());
+            "SERIAL", PropertyConstants.Timezone, "Asia/Ho_Chi_Minh", Arg.Any<CancellationToken>());
         await adb.Received(1).BroadcastAsync("SERIAL", "android.intent.action.TIMEZONE_CHANGED", Arg.Any<CancellationToken>());
         await adb.Received(1).BroadcastAsync("SERIAL", "android.intent.action.TIME_SET", Arg.Any<CancellationToken>());
     }
@@ -60,7 +60,7 @@ public sealed class DeviceTimezoneServiceTests
         Assert.AreEqual("Asia/Ho_Chi_Minh", timezone);
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            PropertyConstants.Prop_Timezone,
+            PropertyConstants.Timezone,
             "Asia/Ho_Chi_Minh",
             Arg.Any<CancellationToken>());
     }

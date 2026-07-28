@@ -15,9 +15,9 @@ namespace DeepDroidChanger.Services
 
         public string NormalizeLanguage(string language)
         {
-            return string.Equals(language, LanguageConstants.Vietnamese, StringComparison.OrdinalIgnoreCase)
-                ? LanguageConstants.Vietnamese
-                : LanguageConstants.English;
+            return string.Equals(language, "vi", StringComparison.OrdinalIgnoreCase)
+                ? "vi"
+                : "en";
         }
 
         public string GetString(string resourceKey)
@@ -34,11 +34,11 @@ namespace DeepDroidChanger.Services
             EnsureBaseDictionary();
             RemoveVietnameseDictionary();
 
-            if (normalizedLanguage == LanguageConstants.Vietnamese)
+            if (normalizedLanguage == "vi")
             {
                 Application.Current.Resources.MergedDictionaries.Add(new ResourceDictionary
                 {
-                    Source = new Uri(ResourcePathConstants.VietnameseStrings, UriKind.Relative)
+                    Source = new Uri(AssetConstants.Localization.VietnameseStrings, UriKind.Relative)
                 });
             }
         }
@@ -50,7 +50,7 @@ namespace DeepDroidChanger.Services
 
             Application.Current.Resources.MergedDictionaries.Add(new ResourceDictionary
             {
-                Source = new Uri(ResourcePathConstants.BaseStrings, UriKind.Relative)
+                Source = new Uri(AssetConstants.Localization.BaseStrings, UriKind.Relative)
             });
         }
 
@@ -66,12 +66,12 @@ namespace DeepDroidChanger.Services
 
         private static bool IsBaseDictionary(ResourceDictionary dictionary)
         {
-            return IsDictionary(dictionary, ResourcePathConstants.BaseStrings);
+            return IsDictionary(dictionary, AssetConstants.Localization.BaseStrings);
         }
 
         private static bool IsVietnameseDictionary(ResourceDictionary dictionary)
         {
-            return IsDictionary(dictionary, ResourcePathConstants.VietnameseStrings);
+            return IsDictionary(dictionary, AssetConstants.Localization.VietnameseStrings);
         }
 
         private static bool IsDictionary(ResourceDictionary dictionary, string source)

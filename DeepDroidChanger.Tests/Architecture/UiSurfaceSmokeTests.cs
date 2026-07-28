@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using DeepDroidChanger.Behaviors;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
@@ -37,10 +36,10 @@ public sealed class UiSurfaceSmokeTests
                 VerifyInteractiveStyles();
                 VerifyEditorRowsAndDataTemplates(provider);
 
-                foreach (string language in new[] { LanguageConstants.English, LanguageConstants.Vietnamese })
+                foreach (string language in new[] { "en", "vi" })
                 {
                     localization.ApplyLanguage(language);
-                    foreach (string theme in new[] { ThemeConstants.Light, ThemeConstants.Dark })
+                    foreach (string theme in new[] { "Light", "Dark" })
                     {
                         themes.ApplyTheme(theme);
                         MeasureSurface(provider.GetRequiredService<MainWindow>());
@@ -303,16 +302,16 @@ public sealed class UiSurfaceSmokeTests
         var dataGrid = new DataGrid();
         var nameColumn = new DataGridTextColumn { Width = new DataGridLength(1, DataGridLengthUnitType.Star) };
         var processColumn = new DataGridTextColumn { Width = new DataGridLength(1, DataGridLengthUnitType.Star) };
-        DeviceTableColumnLayoutBehavior.SetColumnKey(nameColumn, DeviceTableColumnSettings.Name);
-        DeviceTableColumnLayoutBehavior.SetColumnKey(processColumn, DeviceTableColumnSettings.Process);
+        DeviceTableColumnLayoutBehavior.SetColumnKey(nameColumn, "Name");
+        DeviceTableColumnLayoutBehavior.SetColumnKey(processColumn, "Process");
         dataGrid.Columns.Add(nameColumn);
         dataGrid.Columns.Add(processColumn);
         DeviceTableColumnLayoutBehavior.SetColumnRatios(
             dataGrid,
             new Dictionary<string, double>
             {
-                [DeviceTableColumnSettings.Name] = 0.25,
-                [DeviceTableColumnSettings.Process] = 0.75
+                ["Name"] = 0.25,
+                ["Process"] = 0.75
             });
         DeviceTableColumnLayoutBehavior.SetPersistColumnRatios(dataGrid, true);
 
@@ -368,11 +367,14 @@ public sealed class UiSurfaceSmokeTests
         Assert.IsTrue(deviceGrid.CanUserResizeColumns);
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceGrid.HorizontalScrollBarVisibility);
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceGrid.VerticalScrollBarVisibility);
-        Assert.HasCount(DeviceTableColumnSettings.DefaultRatios.Count, deviceGrid.Columns);
+        string[] expectedColumnKeys =
+            ["Index", "Selected", "Serial", "Name", "Type", "Active", "Status", "Process"];
+
+        Assert.HasCount(expectedColumnKeys.Length, deviceGrid.Columns);
         string[] columnKeys = deviceGrid.Columns
             .Select(DeviceTableColumnLayoutBehavior.GetColumnKey)
             .ToArray();
-        CollectionAssert.AreEquivalent(DeviceTableColumnSettings.DefaultRatios.Keys.ToArray(), columnKeys);
+        CollectionAssert.AreEquivalent(expectedColumnKeys, columnKeys);
         Assert.AreEqual(columnKeys.Length, columnKeys.Distinct(StringComparer.Ordinal).Count());
         var deviceManagerRootGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceManagerRootGrid"));
         Assert.AreEqual(new GridLength(360d), deviceManagerRootGrid.RowDefinitions[2].Height);

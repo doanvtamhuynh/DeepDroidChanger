@@ -1,5 +1,4 @@
 using DeepDroidChanger.Models;
-using DeepDroidChanger.Constants;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -43,7 +42,7 @@ namespace DeepDroidChanger.Services
 
         public DeviceRandomApiService(ILogger<DeviceRandomApiService> logger)
             : this(
-                new HttpClient { Timeout = TimeSpan.FromSeconds(DeviceInfoApiConstants.RequestTimeoutSeconds) },
+                new HttpClient { Timeout = TimeSpan.FromSeconds(30) },
                 logger,
                 disposeHttpClient: true)
         {
@@ -69,7 +68,7 @@ namespace DeepDroidChanger.Services
             ArgumentNullException.ThrowIfNull(session);
             ArgumentNullException.ThrowIfNull(selection);
 
-            for (int attempt = 1; attempt <= DeviceInfoApiConstants.RandomDeviceMaximumAttempts; attempt++)
+            for (int attempt = 1; attempt <= 4; attempt++)
             {
                 DeviceInfoApiDevice? device = await SendRandomDeviceQueryAsync(
                         session,
@@ -82,7 +81,7 @@ namespace DeepDroidChanger.Services
                 _logger.LogDebug(
                     "Random device API returned null on attempt {Attempt}/{MaximumAttempts} for brand {Brand} and SDK {Sdk}.",
                     attempt,
-                    DeviceInfoApiConstants.RandomDeviceMaximumAttempts,
+                    4,
                     selection.Brand,
                     selection.Sdk);
             }

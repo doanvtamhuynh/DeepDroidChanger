@@ -1,6 +1,5 @@
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
-using DeepDroidChanger.Constants;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -103,7 +102,7 @@ namespace DeepDroidChanger.ViewModels
                 _localizationService.GetString("DeviceViewer_WindowTitleFormat"),
                 name,
                 serial);
-            DeviceIpText = GetLogText(DeviceLogResourceKeys.DeviceViewerIpChecking);
+            DeviceIpText = GetLogText("Log_DeviceViewerIpChecking");
             MarkStarting();
         }
 
@@ -118,7 +117,7 @@ namespace DeepDroidChanger.ViewModels
             IsDeviceChecking = true;
 
             DeviceStatusText = _localizationService.GetString("DeviceViewer_StatusChecking");
-            StreamLogText = GetLogText(DeviceLogResourceKeys.StartingStream);
+            StreamLogText = GetLogText("Log_StartingStream");
         }
 
         public void MarkStreaming()
@@ -132,7 +131,7 @@ namespace DeepDroidChanger.ViewModels
             IsDeviceChecking = false;
 
             DeviceStatusText = _localizationService.GetString("DeviceViewer_StatusConnected");
-            StreamLogText = GetLogText(DeviceLogResourceKeys.Streaming);
+            StreamLogText = GetLogText("Log_Streaming");
         }
 
         public void MarkStreamError()
@@ -146,7 +145,7 @@ namespace DeepDroidChanger.ViewModels
             IsDeviceChecking = false;
 
             DeviceStatusText = _localizationService.GetString("DeviceViewer_StatusDisconnected");
-            StreamLogText = GetLogText(DeviceLogResourceKeys.StreamFailed);
+            StreamLogText = GetLogText("Log_StreamFailed");
         }
 
         public void MarkWaitingForDevice()
@@ -160,12 +159,12 @@ namespace DeepDroidChanger.ViewModels
             IsDeviceChecking = false;
 
             DeviceStatusText = _localizationService.GetString("DeviceViewer_StatusDisconnected");
-            StreamLogText = GetLogText(DeviceLogResourceKeys.WaitingForDevice);
+            StreamLogText = GetLogText("Log_WaitingForDevice");
         }
 
         public void MarkDeviceIpUnavailable()
         {
-            DeviceIpText = GetLogText(DeviceLogResourceKeys.DeviceViewerNoInternet);
+            DeviceIpText = GetLogText("Log_DeviceViewerNoInternet");
         }
 
         public async Task RefreshDeviceIpAsync(CancellationToken cancellationToken, bool showCheckingState)
@@ -173,7 +172,7 @@ namespace DeepDroidChanger.ViewModels
             cancellationToken.ThrowIfCancellationRequested();
 
             if (showCheckingState)
-                DeviceIpText = GetLogText(DeviceLogResourceKeys.DeviceViewerIpChecking);
+                DeviceIpText = GetLogText("Log_DeviceViewerIpChecking");
 
             if (string.IsNullOrWhiteSpace(Serial))
             {
@@ -185,7 +184,7 @@ namespace DeepDroidChanger.ViewModels
             {
                 var info = await _adbIpGeolocationService.GetDeviceIpGeolocationAsync(Serial, cancellationToken).ConfigureAwait(true);
                 DeviceIpText = string.IsNullOrWhiteSpace(info.PublicIp)
-                    ? GetLogText(DeviceLogResourceKeys.DeviceViewerNoInternet)
+                    ? GetLogText("Log_DeviceViewerNoInternet")
                     : info.PublicIp;
             }
             catch (OperationCanceledException)
@@ -223,7 +222,7 @@ namespace DeepDroidChanger.ViewModels
             _logger.LogWarning(
                 "Execution of {ActionName} skipped because device serial is empty.",
                 GetLogText(actionResourceKey));
-            SetDeviceLog(DeviceLogResourceKeys.MissingSerial);
+            SetDeviceLog("Log_MissingSerial");
             return false;
         }
 
@@ -237,81 +236,81 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 await action();
-                SetFormattedDeviceLog(DeviceLogResourceKeys.SendKeyEventSuccessFormat, actionName);
+                SetFormattedDeviceLog("Log_SendKeyEventSuccessFormat", actionName);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to perform {ActionName} on device {Serial}.", actionName, Serial);
-                SetFormattedDeviceLog(DeviceLogResourceKeys.SendKeyEventFailedFormat, actionName);
+                SetFormattedDeviceLog("Log_SendKeyEventFailedFormat", actionName);
             }
         }
 
         [RelayCommand]
         private Task BackAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.Back, cancellationToken), DeviceLogResourceKeys.ActionBack);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 4, cancellationToken), "Log_ActionBack");
 
         [RelayCommand]
         private Task HomeAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.Home, cancellationToken), DeviceLogResourceKeys.ActionHome);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 3, cancellationToken), "Log_ActionHome");
 
         [RelayCommand]
         private Task RecentAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.RecentApps, cancellationToken), DeviceLogResourceKeys.ActionRecent);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 187, cancellationToken), "Log_ActionRecent");
 
         [RelayCommand]
         private Task PowerAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.Power, cancellationToken), DeviceLogResourceKeys.ActionPower);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 26, cancellationToken), "Log_ActionPower");
 
         [RelayCommand]
         private Task VolumeUpAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.VolumeUp, cancellationToken), DeviceLogResourceKeys.ActionVolumeUp);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 24, cancellationToken), "Log_ActionVolumeUp");
 
         [RelayCommand]
         private Task VolumeDownAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.VolumeDown, cancellationToken), DeviceLogResourceKeys.ActionVolumeDown);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 25, cancellationToken), "Log_ActionVolumeDown");
 
         [RelayCommand]
         private Task EnterAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.Enter, cancellationToken), DeviceLogResourceKeys.ActionEnter);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 66, cancellationToken), "Log_ActionEnter");
 
         [RelayCommand]
         private Task ScreenshotAsync(CancellationToken cancellationToken) =>
-            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, AdbKeyEventConstants.Screenshot, cancellationToken), DeviceLogResourceKeys.ActionScreenshot);
+            ExecuteInputOperationAsync(() => _adbCommandService.SendKeyEventAsync(Serial, 120, cancellationToken), "Log_ActionScreenshot");
 
         [RelayCommand]
         private async Task SendInputTextAsync(CancellationToken cancellationToken)
         {
-            if (!TryValidateSerial(DeviceLogResourceKeys.ActionInputText))
+            if (!TryValidateSerial("Log_ActionInputText"))
                 return;
 
             if (string.IsNullOrWhiteSpace(InputText))
             {
-                SetDeviceLog(DeviceLogResourceKeys.InputTextEmpty);
+                SetDeviceLog("Log_InputTextEmpty");
                 return;
             }
 
             try
             {
                 await _adbCommandService.SendTextAsync(Serial, InputText, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(DeviceLogResourceKeys.InputTextSent);
+                SetDeviceLog("Log_InputTextSent");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send input text to device {Serial}.", Serial);
-                SetDeviceLog(DeviceLogResourceKeys.InputTextFailed);
+                SetDeviceLog("Log_InputTextFailed");
             }
         }
 
         [RelayCommand]
         private async Task RunShellCommandAsync(CancellationToken cancellationToken)
         {
-            if (!TryValidateSerial(DeviceLogResourceKeys.ActionShellCommand))
+            if (!TryValidateSerial("Log_ActionShellCommand"))
                 return;
 
             var command = ShellCommand.Trim();
             if (string.IsNullOrWhiteSpace(command))
             {
-                SetDeviceLog(DeviceLogResourceKeys.ShellCommandEmpty);
+                SetDeviceLog("Log_ShellCommandEmpty");
                 return;
             }
 
@@ -323,12 +322,12 @@ namespace DeepDroidChanger.ViewModels
                 {
                     if (string.IsNullOrEmpty(summary))
                     {
-                        SetDeviceLog(DeviceLogResourceKeys.ShellCommandNoOutput);
+                        SetDeviceLog("Log_ShellCommandNoOutput");
                         return;
                     }
 
                     SetFormattedDeviceLog(
-                        DeviceLogResourceKeys.ShellCommandSuccessFormat,
+                        "Log_ShellCommandSuccessFormat",
                         summary);
                     return;
                 }
@@ -341,16 +340,16 @@ namespace DeepDroidChanger.ViewModels
                     result.StandardError.Length);
 
                 SetFormattedDeviceLog(
-                    DeviceLogResourceKeys.ShellCommandFailedFormat,
+                    "Log_ShellCommandFailedFormat",
                     string.IsNullOrEmpty(summary)
-                        ? GetLogText(DeviceLogResourceKeys.ShellCommandUnknownResult)
+                        ? GetLogText("Log_ShellCommandUnknownResult")
                         : summary);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to run ADB shell command on device {Serial}.", Serial);
                 SetFormattedDeviceLog(
-                    DeviceLogResourceKeys.ShellCommandFailedFormat,
+                    "Log_ShellCommandFailedFormat",
                     ex.Message);
             }
         }

@@ -25,7 +25,7 @@ namespace DeepDroidChanger.Services
             _logger.LogInformation("Applying timezone {Timezone} to device {Serial}.", timezone, serial);
 
             await _adbCommandService.PutSettingAsync(serial, "global", "auto_time_zone", "0", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Prop_Timezone, timezone, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Timezone, timezone, cancellationToken).ConfigureAwait(false);
             await _adbCommandService.BroadcastAsync(serial, "android.intent.action.TIMEZONE_CHANGED", cancellationToken).ConfigureAwait(false);
             await _adbCommandService.PutSettingAsync(serial, "system", "time_12_24", "24", cancellationToken).ConfigureAwait(false);
             await _adbCommandService.BroadcastAsync(serial, "android.intent.action.TIME_SET", cancellationToken).ConfigureAwait(false);

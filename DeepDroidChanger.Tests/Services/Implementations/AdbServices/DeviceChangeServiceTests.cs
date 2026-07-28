@@ -32,22 +32,22 @@ public sealed partial class DeviceChangeServiceTests
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimEnabled,
+            PropertyConstants.Spoof.SimEnabled,
             "1",
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimIccid,
+            PropertyConstants.Spoof.SimIccid,
             profile.Iccid,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimOperatorNumeric,
+            PropertyConstants.Spoof.SimOperatorNumeric,
             profile.OperatorNumeric,
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.ProductModel,
+            PropertyConstants.Spoof.ProductModel,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await adb.DidNotReceiveWithAnyArgs().SetWifiAsync(default!, default, default);
@@ -84,12 +84,12 @@ public sealed partial class DeviceChangeServiceTests
         await cleanup.Received(1).DeleteSsaidAsync("SERIAL", Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.ProductModel,
+            PropertyConstants.Spoof.ProductModel,
             profile.Model!,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimIccid,
+            PropertyConstants.Spoof.SimIccid,
             profile.Iccid,
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().PutSettingAsync(
@@ -149,7 +149,7 @@ public sealed partial class DeviceChangeServiceTests
             adb.DeleteSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
             adb.SetPropertyAsync(
                 "SERIAL",
-                DeviceSpoofPropertyConstants.ProductModel,
+                PropertyConstants.Spoof.ProductModel,
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>());
             adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
@@ -226,7 +226,7 @@ public sealed partial class DeviceChangeServiceTests
             adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
             adb.RunAdbShellAsync(
                 "SERIAL",
-                DeviceChangeConstants.BootCompletedCommand,
+                "getprop sys.boot_completed",
                 Arg.Any<CancellationToken>());
             cleanup.CleanPostRebootAsync("SERIAL", Arg.Any<CancellationToken>());
         });
@@ -250,22 +250,22 @@ public sealed partial class DeviceChangeServiceTests
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.ProductModel,
+            PropertyConstants.Spoof.ProductModel,
             profile.Model!,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.BuildDate,
+            PropertyConstants.Spoof.BuildDate,
             profile.BuildDate!,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.BuildDateUtc,
+            PropertyConstants.Spoof.BuildDateUtc,
             profile.BuildDateUtc!,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.Bootloader,
+            PropertyConstants.Spoof.Bootloader,
             profile.Bootloader!,
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().PutSettingAsync(
@@ -281,17 +281,17 @@ public sealed partial class DeviceChangeServiceTests
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.WifiMac,
+            PropertyConstants.Spoof.WifiMac,
             profile.WifiMacAddress,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimEnabled,
+            PropertyConstants.Spoof.SimEnabled,
             "1",
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
+            PropertyConstants.Spoof.BypassReadOnlyProperties,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await cleanup.Received(1).CleanAsync("SERIAL", options, Arg.Any<CancellationToken>());
@@ -303,7 +303,7 @@ public sealed partial class DeviceChangeServiceTests
             progress.Report(DeviceChangeStage.ApplyingProfile);
             adb.SetPropertyAsync(
                 "SERIAL",
-                DeviceSpoofPropertyConstants.ProductModel,
+                PropertyConstants.Spoof.ProductModel,
                 profile.Model!,
                 Arg.Any<CancellationToken>());
             progress.Report(DeviceChangeStage.ClearingData);
@@ -316,7 +316,7 @@ public sealed partial class DeviceChangeServiceTests
             adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
             adb.RunAdbShellAsync(
                 "SERIAL",
-                DeviceChangeConstants.BootCompletedCommand,
+                "getprop sys.boot_completed",
                 Arg.Any<CancellationToken>());
             cleanup.CleanPostRebootAsync("SERIAL", Arg.Any<CancellationToken>());
         });
@@ -349,7 +349,7 @@ public sealed partial class DeviceChangeServiceTests
                     CancellationToken.None));
 
         StringAssert.Contains(exception.Message, "Device profile verification failed");
-        StringAssert.Contains(exception.Message, DeviceSpoofPropertyConstants.ProductModel);
+        StringAssert.Contains(exception.Message, PropertyConstants.Spoof.ProductModel);
         await adb.Received(1).RebootAsync("SERIAL", Arg.Any<CancellationToken>());
     }
 
@@ -372,17 +372,17 @@ public sealed partial class DeviceChangeServiceTests
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimEnabled,
+            PropertyConstants.Spoof.SimEnabled,
             "0",
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimIccid,
+            PropertyConstants.Spoof.SimIccid,
             string.Empty,
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimIccid,
+            PropertyConstants.Spoof.SimIccid,
             profile.Iccid,
             Arg.Any<CancellationToken>());
     }
@@ -430,12 +430,12 @@ public sealed partial class DeviceChangeServiceTests
         await adb.DidNotReceive().SetWifiAsync("SERIAL", true, Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.WifiMac,
+            PropertyConstants.Spoof.WifiMac,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.BluetoothMac,
+            PropertyConstants.Spoof.BluetoothMac,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
     }
@@ -464,17 +464,17 @@ public sealed partial class DeviceChangeServiceTests
         await adb.Received(1).SetWifiAsync("SERIAL", false, Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.WifiMac,
+            PropertyConstants.Spoof.WifiMac,
             profile.WifiMacAddress,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.BluetoothMac,
+            PropertyConstants.Spoof.BluetoothMac,
             profile.BluetoothMacAddress,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.WifiBssid,
+            PropertyConstants.Spoof.WifiBssid,
             profile.WifiBssid,
             Arg.Any<CancellationToken>());
         await adb.Received(1).PutSettingAsync(
@@ -513,7 +513,7 @@ public sealed partial class DeviceChangeServiceTests
             Arg.Any<CancellationToken>());
         await adb.Received(1).RunAdbShellAsync(
             "SERIAL",
-            DeviceChangeConstants.DisableBluetoothCommand,
+            "svc bluetooth disable",
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetWifiAsync("SERIAL", true, Arg.Any<CancellationToken>());
         Received.InOrder(() =>
@@ -521,7 +521,7 @@ public sealed partial class DeviceChangeServiceTests
             adb.SetWifiAsync("SERIAL", false, Arg.Any<CancellationToken>());
             adb.SetPropertyAsync(
                 "SERIAL",
-                DeviceSpoofPropertyConstants.ProductBrand,
+                PropertyConstants.Spoof.ProductBrand,
                 profile.Brand!,
                 Arg.Any<CancellationToken>());
             adb.RebootAsync("SERIAL", Arg.Any<CancellationToken>());
@@ -557,12 +557,12 @@ public sealed partial class DeviceChangeServiceTests
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.ProductModel,
+            PropertyConstants.Spoof.ProductModel,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
+            PropertyConstants.Spoof.BypassReadOnlyProperties,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await adb.DidNotReceiveWithAnyArgs().RebootAsync(default!, default);
@@ -613,12 +613,12 @@ public sealed partial class DeviceChangeServiceTests
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimEnabled,
+            PropertyConstants.Spoof.SimEnabled,
             "0",
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimImsi,
+            PropertyConstants.Spoof.SimImsi,
             string.Empty,
             Arg.Any<CancellationToken>());
     }
@@ -645,17 +645,17 @@ public sealed partial class DeviceChangeServiceTests
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimEnabled,
+            PropertyConstants.Spoof.SimEnabled,
             "1",
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimIccid,
+            PropertyConstants.Spoof.SimIccid,
             profile.Iccid,
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.SimImsi,
+            PropertyConstants.Spoof.SimImsi,
             profile.Imsi,
             Arg.Any<CancellationToken>());
     }
@@ -709,7 +709,7 @@ public sealed partial class DeviceChangeServiceTests
             adb.GetSettingAsync("SERIAL", "secure", "android_id", Arg.Any<CancellationToken>());
             adb.SetPropertyAsync(
                 "SERIAL",
-                DeviceSpoofPropertyConstants.ProductModel,
+                PropertyConstants.Spoof.ProductModel,
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>());
             cleanup.CleanAsync("SERIAL", Arg.Any<DeviceChangeOptions>(), Arg.Any<CancellationToken>());
@@ -842,7 +842,7 @@ public sealed partial class DeviceChangeServiceTests
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            DeviceSpoofPropertyConstants.ProductModel,
+            PropertyConstants.Spoof.ProductModel,
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
         await adb.DidNotReceiveWithAnyArgs().RebootAsync(default!, default);
@@ -873,14 +873,14 @@ public sealed partial class DeviceChangeServiceTests
             });
         adb.GetSettingAsync(
                 "SERIAL",
-                DeviceChangeConstants.GlobalSettingsNamespace,
-                DeviceChangeConstants.DeviceNameSetting,
+                DeviceSettingsInfoConstants.GlobalNamespace,
+                DeviceSettingsInfoConstants.DeviceName,
                 Arg.Any<CancellationToken>())
             .Returns("e3qxxx");
         adb.GetSettingAsync(
                 "SERIAL",
-                DeviceChangeConstants.SecureSettingsNamespace,
-                DeviceChangeConstants.BluetoothNameSetting,
+                DeviceSettingsInfoConstants.SecureNamespace,
+                DeviceSettingsInfoConstants.BluetoothName,
                 Arg.Any<CancellationToken>())
             .Returns("e3qxxx");
         return adb;

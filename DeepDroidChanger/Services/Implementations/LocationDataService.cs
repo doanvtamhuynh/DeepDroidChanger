@@ -1,3 +1,4 @@
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Helpers;
 using System.Text.Json;
@@ -7,7 +8,6 @@ namespace DeepDroidChanger.Services
 {
     public sealed class LocationDataService : ILocationDataService
     {
-        private const string TimezonesResourcePath = "Assets/Data/location-timezones.json";
         private const string CountryCodePropertyName = "country_code";
         private const string CountryNamePropertyName = "country_name";
         private const string CityNamePropertyName = "city_name";
@@ -35,7 +35,7 @@ namespace DeepDroidChanger.Services
         {
             try
             {
-                var json = AssetDataReader.ReadText(TimezonesResourcePath);
+                var json = AssetDataReader.ReadText(AssetConstants.Data.LocationTimezonesPath);
                 using var document = JsonDocument.Parse(json);
                 var options = new List<LocationOption>();
 

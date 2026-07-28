@@ -63,7 +63,7 @@ public sealed class AdbCommandServiceTests
         await processRunner.DidNotReceive().RunAsync(
             Arg.Any<string>(),
             Arg.Is<string>(arguments => arguments.Contains(
-                DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
+                PropertyConstants.Spoof.BypassReadOnlyProperties,
                 StringComparison.Ordinal)),
             Arg.Any<CancellationToken>());
     }
@@ -83,7 +83,7 @@ public sealed class AdbCommandServiceTests
             processRunner.RunAsync(
                 Arg.Any<string>(),
                 Arg.Is<string>(arguments => arguments.Contains(
-                    $"shell setprop {DeviceSpoofPropertyConstants.BypassReadOnlyProperties} '1'",
+                    $"shell setprop {PropertyConstants.Spoof.BypassReadOnlyProperties} '1'",
                     StringComparison.Ordinal)),
                 CancellationToken.None);
             processRunner.RunAsync(
@@ -95,7 +95,7 @@ public sealed class AdbCommandServiceTests
             processRunner.RunAsync(
                 Arg.Any<string>(),
                 Arg.Is<string>(arguments => arguments.Contains(
-                    $"shell setprop {DeviceSpoofPropertyConstants.BypassReadOnlyProperties} '0'",
+                    $"shell setprop {PropertyConstants.Spoof.BypassReadOnlyProperties} '0'",
                     StringComparison.Ordinal)),
                 CancellationToken.None);
         });
@@ -123,7 +123,7 @@ public sealed class AdbCommandServiceTests
         await processRunner.Received(1).RunAsync(
             Arg.Any<string>(),
             Arg.Is<string>(arguments => arguments.Contains(
-                $"shell setprop {DeviceSpoofPropertyConstants.BypassReadOnlyProperties} '0'",
+                $"shell setprop {PropertyConstants.Spoof.BypassReadOnlyProperties} '0'",
                 StringComparison.Ordinal)),
             CancellationToken.None);
     }
@@ -134,7 +134,7 @@ public sealed class AdbCommandServiceTests
         IProcessRunnerService processRunner = Substitute.For<IProcessRunnerService>();
         processRunner.RunAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => callInfo.ArgAt<string>(1).Contains(
-                    $"setprop {DeviceSpoofPropertyConstants.BypassReadOnlyProperties} '0'",
+                    $"setprop {PropertyConstants.Spoof.BypassReadOnlyProperties} '0'",
                     StringComparison.Ordinal)
                 ? new CommandResult(1, string.Empty, "disable failed")
                 : new CommandResult(0, string.Empty, string.Empty));

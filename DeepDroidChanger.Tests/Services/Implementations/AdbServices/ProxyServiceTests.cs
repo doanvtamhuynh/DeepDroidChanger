@@ -57,7 +57,7 @@ public sealed class ProxyServiceTests
             port,
             username,
             password,
-            DeepProxyConstants.SocksProxyType,
+            "Socks 5",
             CancellationToken.None));
 
         await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
@@ -82,7 +82,7 @@ public sealed class ProxyServiceTests
     public async Task StartProxyAsync_ValidEndpoint_OrchestratesAdbWithoutLiveNetworkOrDelay()
     {
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
-        adb.GetPropertyAsync("SERIAL", PropertyConstants.Prop_DeepDroidDevice, Arg.Any<CancellationToken>())
+        adb.GetPropertyAsync("SERIAL", PropertyConstants.DeepDroidDevice, Arg.Any<CancellationToken>())
             .Returns("1");
         adb.RunAdbShellAsync("SERIAL", Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new CommandResult(0, string.Empty, string.Empty));
@@ -107,17 +107,17 @@ public sealed class ProxyServiceTests
             1080,
             "user",
             "password",
-            DeepProxyConstants.SocksProxyType,
+            "Socks 5",
             CancellationToken.None);
 
         await adb.Received(1).SetWifiAsync("SERIAL", false, Arg.Any<CancellationToken>());
         await adb.Received(1).SetWifiAsync("SERIAL", true, Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
-            "SERIAL", DeepProxyConstants.ProxyIpProperty, "proxy.example", Arg.Any<CancellationToken>());
+            "SERIAL", PropertyConstants.Proxy.Ip, "proxy.example", Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
-            "SERIAL", DeepProxyConstants.InterfaceIpv4Property, "10.20.30.40", Arg.Any<CancellationToken>());
+            "SERIAL", PropertyConstants.Proxy.InterfaceIpv4, "10.20.30.40", Arg.Any<CancellationToken>());
         await adb.Received(1).OpenLinkAsync(
-            "SERIAL", DeepProxyConstants.BrowserLeaksUrl, Arg.Any<CancellationToken>());
+            "SERIAL", UrlConstants.BrowserLeaks, Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -126,7 +126,7 @@ public sealed class ProxyServiceTests
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
         adb.RunAdbShellAsync("SERIAL", Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new CommandResult(0, string.Empty, string.Empty));
-        adb.GetPropertyAsync("SERIAL", PropertyConstants.Prop_DeepDroidDevice, Arg.Any<CancellationToken>())
+        adb.GetPropertyAsync("SERIAL", PropertyConstants.DeepDroidDevice, Arg.Any<CancellationToken>())
             .Returns<Task<string>>(_ => throw new InvalidOperationException("device validation failed"));
         var service = new ProxyService(
             adb,
@@ -138,11 +138,11 @@ public sealed class ProxyServiceTests
 
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => service.StartProxyAsync(
             "SERIAL", "proxy.example", 1080, string.Empty, string.Empty,
-            DeepProxyConstants.SocksProxyType, CancellationToken.None));
+            "Socks 5", CancellationToken.None));
 
         await adb.Received(1).SetWifiAsync("SERIAL", false, Arg.Any<CancellationToken>());
         await adb.Received(1).SetWifiAsync("SERIAL", true, CancellationToken.None);
         await adb.Received(2).SetPropertyAsync(
-            "SERIAL", DeepProxyConstants.ProxyIpProperty, string.Empty, Arg.Any<CancellationToken>());
+            "SERIAL", PropertyConstants.Proxy.Ip, string.Empty, Arg.Any<CancellationToken>());
     }
 }

@@ -26,8 +26,8 @@ namespace DeepDroidChanger.Services
             : this(
                 Path.Combine(
                     AppContext.BaseDirectory,
-                    RuntimeDataPathConstants.AppSettingsDirectoryName,
-                    RuntimeDataPathConstants.AccountFileName),
+                    AssetConstants.RuntimeData.AppSettingsDirectoryName,
+                    AssetConstants.RuntimeData.AccountFileName),
                 logger)
         {
         }

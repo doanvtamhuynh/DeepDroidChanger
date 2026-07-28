@@ -25,8 +25,8 @@ namespace DeepDroidChanger.Services
             : this(
                 Path.Combine(
                     AppContext.BaseDirectory,
-                    RuntimeDataPathConstants.AppSettingsDirectoryName,
-                    RuntimeDataPathConstants.AppSettingsFileName),
+                    AssetConstants.RuntimeData.AppSettingsDirectoryName,
+                    AssetConstants.RuntimeData.AppSettingsFileName),
                 themeService,
                 logger)
         {
@@ -129,7 +129,9 @@ namespace DeepDroidChanger.Services
             settings.Theme = _themeService.NormalizeTheme(settings.Theme);
             settings.DeviceTableColumnRatios ??= new Dictionary<string, double>();
 
-            var validKeys = DeviceTableColumnSettings.DefaultRatios.Keys.ToHashSet(StringComparer.Ordinal);
+            var validKeys = new HashSet<string>(
+                ["Index", "Selected", "Serial", "Name", "Type", "Active", "Status", "Process"],
+                StringComparer.Ordinal);
             foreach (var key in settings.DeviceTableColumnRatios.Keys.ToArray())
             {
                 if (!validKeys.Contains(key) || settings.DeviceTableColumnRatios[key] <= 0)
@@ -137,7 +139,19 @@ namespace DeepDroidChanger.Services
             }
 
             if (settings.DeviceTableColumnRatios.Count == 0)
-                settings.DeviceTableColumnRatios = new Dictionary<string, double>(DeviceTableColumnSettings.DefaultRatios);
+            {
+                settings.DeviceTableColumnRatios = new Dictionary<string, double>
+                {
+                    ["Index"] = 0.55,
+                    ["Selected"] = 0.55,
+                    ["Serial"] = 1.05,
+                    ["Name"] = 1.05,
+                    ["Type"] = 0.9,
+                    ["Active"] = 1.05,
+                    ["Status"] = 1.0,
+                    ["Process"] = 1.95
+                };
+            }
 
             settings.SelectedDeviceSerial ??= string.Empty;
         }

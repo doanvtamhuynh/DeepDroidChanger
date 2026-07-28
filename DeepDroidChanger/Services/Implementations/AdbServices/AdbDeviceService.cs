@@ -30,7 +30,7 @@ namespace DeepDroidChanger.Services
 
         public Task<string> GetDeviceTypeAsync(string serial, CancellationToken cancellationToken)
         {
-            return _adbCommandService.GetPropertyAsync(serial, PropertyConstants.Prop_DeepDroidDevice, cancellationToken);
+            return _adbCommandService.GetPropertyAsync(serial, PropertyConstants.DeepDroidDevice, cancellationToken);
         }
 
         public static IReadOnlyList<AdbDevice> ParseDevices(string output)

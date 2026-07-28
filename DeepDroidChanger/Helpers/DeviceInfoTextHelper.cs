@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Services;
 
 namespace DeepDroidChanger.Helpers;
@@ -11,7 +10,7 @@ public static class DeviceInfoTextHelper
         string deviceSerial)
     {
         string name = string.IsNullOrWhiteSpace(deviceName) ? deviceSerial : deviceName;
-        string format = localizationService.GetString(DeviceLogResourceKeys.DeviceInfoTextFormat);
+        string format = localizationService.GetString("Log_DeviceInfoTextFormat");
         return string.Format(format, name, deviceSerial);
     }
 }

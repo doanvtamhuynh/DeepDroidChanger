@@ -19,9 +19,20 @@ public sealed partial class DeviceChangeServiceTests
     private const string MarkerFileName = "deepdroidchanger_matrix_marker";
 
     private static readonly (string Brand, string AndroidVersion)[] Matrix =
-        DeviceProfileOptions.AndroidVersionsByBrand
-            .SelectMany(pair => pair.Value.Select(version => (pair.Key, version)))
-            .ToArray();
+    [
+        ("Google", "Android 13"),
+        ("Google", "Android 14"),
+        ("Google", "Android 15"),
+        ("Samsung", "Android 13"),
+        ("Samsung", "Android 14"),
+        ("Samsung", "Android 15"),
+        ("Xiaomi", "Android 13"),
+        ("Xiaomi", "Android 14"),
+        ("Xiaomi", "Android 15"),
+        ("OnePlus", "Android 13"),
+        ("OPPO", "Android 14"),
+        ("vivo", "Android 14")
+    ];
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -265,17 +276,17 @@ public sealed partial class DeviceChangeServiceTests
 
         CommandResult rootResult = await adb.RunAdbAsync(
             expectedSerial,
-            AdbToolConstants.AdbRootCommand,
+            "root",
             cancellationToken);
         Assert.AreEqual(0, rootResult.ExitCode, "Unable to restart adbd as root.");
         CommandResult waitResult = await adb.RunAdbAsync(
             expectedSerial,
-            AdbToolConstants.AdbWaitForDeviceCommand,
+            "wait-for-device",
             cancellationToken);
         Assert.AreEqual(0, waitResult.ExitCode, "Rooted device did not reconnect.");
         CommandResult identityResult = await adb.RunAdbShellAsync(
             expectedSerial,
-            DeviceChangeConstants.RootIdentityCommand,
+            "id -u",
             cancellationToken);
         Assert.AreEqual("0", identityResult.StandardOutput.Trim(), "ADB session is not root.");
     }
@@ -415,13 +426,13 @@ public sealed partial class DeviceChangeServiceTests
             await adb.GetPropertyAsync(serial, "ro.build.version.security_patch", cancellationToken),
             await adb.GetSettingAsync(
                 serial,
-                DeviceChangeConstants.GlobalSettingsNamespace,
-                DeviceChangeConstants.DeviceNameSetting,
+                DeviceSettingsInfoConstants.GlobalNamespace,
+                DeviceSettingsInfoConstants.DeviceName,
                 cancellationToken),
             await adb.GetSettingAsync(
                 serial,
-                DeviceChangeConstants.SecureSettingsNamespace,
-                DeviceChangeConstants.BluetoothNameSetting,
+                DeviceSettingsInfoConstants.SecureNamespace,
+                DeviceSettingsInfoConstants.BluetoothName,
                 cancellationToken));
     }
 
@@ -500,9 +511,9 @@ public sealed partial class DeviceChangeServiceTests
     {
         return androidVersion switch
         {
-            DeviceProfileOptions.Android13 => "33",
-            DeviceProfileOptions.Android14 => "34",
-            DeviceProfileOptions.Android15 => "35",
+            "Android 13" => "33",
+            "Android 14" => "34",
+            "Android 15" => "35",
             _ => throw new AssertFailedException($"Unsupported Android version: {androidVersion}")
         };
     }
@@ -511,9 +522,9 @@ public sealed partial class DeviceChangeServiceTests
     {
         return androidVersion switch
         {
-            DeviceProfileOptions.Android13 => "13",
-            DeviceProfileOptions.Android14 => "14",
-            DeviceProfileOptions.Android15 => "15",
+            "Android 13" => "13",
+            "Android 14" => "14",
+            "Android 15" => "15",
             _ => throw new AssertFailedException($"Unsupported Android version: {androidVersion}")
         };
     }

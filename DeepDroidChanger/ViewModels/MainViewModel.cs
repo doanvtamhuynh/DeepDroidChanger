@@ -14,9 +14,6 @@ namespace DeepDroidChanger.ViewModels
         private const double ExpandedWidth = 248;
         private const double CollapsedWidth = 56;
 
-        private const string EnglishFlag = "pack://application:,,,/Assets/Icons/flag_en.ico";
-        private const string VietnameseFlag = "pack://application:,,,/Assets/Icons/flag_vn.ico";
-
         private readonly AppSettings _settings;
         private readonly ILocalizationService _localizationService;
         private readonly IThemeService _themeService;
@@ -35,8 +32,8 @@ namespace DeepDroidChanger.ViewModels
             _themeService = themeService;
             _settingsService = settingsService;
 
-            Language = _localizationService.NormalizeLanguage(_settings.Language ?? LanguageConstants.English);
-            Theme = _themeService.NormalizeTheme(_settings.Theme ?? ThemeConstants.Dark);
+            Language = _localizationService.NormalizeLanguage(_settings.Language ?? "en");
+            Theme = _themeService.NormalizeTheme(_settings.Theme ?? "Dark");
             _isSidebarCollapsed = _settings.SidebarCollapsed;
             _activeView = AppView.DeviceManager;
 
@@ -123,7 +120,9 @@ namespace DeepDroidChanger.ViewModels
         public Thickness ThemeButtonMargin => IsSidebarCollapsed ? new Thickness(0, 6, 0, 0) : new Thickness(12, 0, 0, 0);
         public PackIconKind ToggleIconKind => IsSidebarCollapsed ? PackIconKind.ChevronRight : PackIconKind.ChevronLeft;
         public PackIconKind ThemeIconKind => _themeService.IsDarkTheme(Theme) ? PackIconKind.WeatherNight : PackIconKind.WhiteBalanceSunny;
-        public string LanguageFlagSource => Language == LanguageConstants.Vietnamese ? VietnameseFlag : EnglishFlag;
+        public string LanguageFlagSource => Language == "vi"
+            ? AssetConstants.Icons.VietnameseFlag
+            : AssetConstants.Icons.EnglishFlag;
 
         public void NavigateInitialView()
         {
@@ -144,7 +143,7 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand]
         private void ToggleLanguage()
         {
-            Language = Language == LanguageConstants.Vietnamese ? LanguageConstants.English : LanguageConstants.Vietnamese;
+            Language = Language == "vi" ? "en" : "vi";
             _localizationService.ApplyLanguage(Language);
         }
 

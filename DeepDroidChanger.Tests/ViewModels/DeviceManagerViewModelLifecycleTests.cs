@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
@@ -876,7 +875,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.IsTrue(viewModel.ChangeDeviceCommand.CanExecute(null));
         await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
 
-        Assert.Contains(DeviceLogResourceKeys.DeviceMustBeOnline, processLogs);
+        Assert.Contains("Log_DeviceMustBeOnline", processLogs);
         await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(
             default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
@@ -921,7 +920,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
 
         Assert.AreEqual(
             2,
-            processLogs.Count(log => log == DeviceLogResourceKeys.RandomDeviceRequired));
+            processLogs.Count(log => log == "Log_RandomDeviceRequired"));
         await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(
             default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
@@ -959,7 +958,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.IsTrue(viewModel.ChangeSimCommand.CanExecute(null));
         await viewModel.ChangeSimCommand.ExecuteAsync(null);
 
-        Assert.Contains(DeviceLogResourceKeys.RandomSimRequired, processLogs);
+        Assert.Contains("Log_RandomSimRequired", processLogs);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeSimAsync(
             default!, default!, default);
         await viewModel.DeactivateAsync();
@@ -1260,7 +1259,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
 
         await viewModel.ViewDeviceInfoCommand.ExecuteAsync(viewModel.SelectedDevice);
 
-        Assert.Contains(DeviceLogResourceKeys.DeviceMustBeOnline, processLogs);
+        Assert.Contains("Log_DeviceMustBeOnline", processLogs);
 
         viewModel.ApplyDeviceListSnapshot(new DeviceListSnapshot(
             storedDevices,
@@ -1310,7 +1309,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.IsTrue(viewModel.DeleteDeviceCommand.CanExecute(device));
         await viewModel.DeleteDeviceCommand.ExecuteAsync(device);
 
-        Assert.DoesNotContain(DeviceLogResourceKeys.DeviceMustBeOnline, processLogs);
+        Assert.DoesNotContain("Log_DeviceMustBeOnline", processLogs);
         await confirmation.Received(1).ShowDeleteDeviceConfirmationAsync(
             "Offline phone",
             "A",
@@ -1760,15 +1759,15 @@ public sealed class DeviceManagerViewModelLifecycleTests
         viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
         var ratios = new Dictionary<string, double>
         {
-            [DeviceTableColumnSettings.Name] = 0.4,
-            [DeviceTableColumnSettings.Process] = 0.6
+            ["Name"] = 0.4,
+            ["Process"] = 0.6
         };
 
         await viewModel.SaveColumnRatiosCommand.ExecuteAsync(ratios);
 
         Assert.AreSame(settings.DeviceTableColumnRatios, viewModel.DeviceTableColumnRatios);
-        Assert.AreEqual(0.4, viewModel.DeviceTableColumnRatios[DeviceTableColumnSettings.Name]);
-        Assert.AreEqual(0.6, viewModel.DeviceTableColumnRatios[DeviceTableColumnSettings.Process]);
+        Assert.AreEqual(0.4, viewModel.DeviceTableColumnRatios["Name"]);
+        Assert.AreEqual(0.6, viewModel.DeviceTableColumnRatios["Process"]);
         Assert.Contains(nameof(DeviceManagerViewModel.DeviceTableColumnRatios), changedProperties);
         await deviceConfig.Received(1).SaveSettingsAsync(Arg.Any<CancellationToken>());
         viewModel.Dispose();
@@ -1805,7 +1804,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
         await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
-        Assert.AreEqual(DeviceLogResourceKeys.Ready, viewModel.Devices[0].Process);
+        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
@@ -1941,7 +1940,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
 
-        Assert.AreEqual(DeviceLogResourceKeys.Ready, viewModel.Devices[0].Process);
+        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
 
         await viewModel.DeactivateAsync();
         viewModel.Dispose();

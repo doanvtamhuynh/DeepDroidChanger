@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
@@ -18,9 +17,9 @@ public sealed class InstallPackageViewModelTests
             .Returns(["first.apk", "second.apk"]);
         IPackageInstallService installer = Substitute.For<IPackageInstallService>();
         installer.InstallAsync("SERIAL", "first.apk", Arg.Any<InstallPackageOptions>(), Arg.Any<CancellationToken>())
-            .Returns(new InstallPackageResult("first.apk", true, DeviceLogResourceKeys.InstallPackageSuccess));
+            .Returns(new InstallPackageResult("first.apk", true, "Log_InstallPackageSuccess"));
         installer.InstallAsync("SERIAL", "second.apk", Arg.Any<InstallPackageOptions>(), Arg.Any<CancellationToken>())
-            .Returns(new InstallPackageResult("second.apk", false, DeviceLogResourceKeys.InstallPackageAdbFailure));
+            .Returns(new InstallPackageResult("second.apk", false, "Log_InstallPackageAdbFailure"));
         using var viewModel = CreateViewModel(filePicker, installer);
         viewModel.Initialize("SERIAL", "Pixel");
         viewModel.AddFilesCommand.Execute(null);
@@ -47,7 +46,7 @@ public sealed class InstallPackageViewModelTests
             {
                 CancellationToken token = callInfo.ArgAt<CancellationToken>(3);
                 await Task.Delay(Timeout.InfiniteTimeSpan, token);
-                return new InstallPackageResult("slow.apk", true, DeviceLogResourceKeys.InstallPackageSuccess);
+                return new InstallPackageResult("slow.apk", true, "Log_InstallPackageSuccess");
             });
         using var viewModel = CreateViewModel(filePicker, installer);
         viewModel.Initialize("SERIAL", "Pixel");
@@ -70,9 +69,9 @@ public sealed class InstallPackageViewModelTests
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
         localization.GetString(Arg.Any<string>()).Returns(callInfo =>
-            callInfo.Arg<string>() is DeviceLogResourceKeys.InstallPackageCompleteFormat
-                or DeviceLogResourceKeys.InstallPackagePartialFormat
-                or DeviceLogResourceKeys.InstallPackageFailedFormat
+            callInfo.Arg<string>() is "Log_InstallPackageCompleteFormat"
+                or "Log_InstallPackagePartialFormat"
+                or "Log_InstallPackageFailedFormat"
                 ? "{0}/{1}"
                 : callInfo.Arg<string>());
         return new InstallPackageViewModel(

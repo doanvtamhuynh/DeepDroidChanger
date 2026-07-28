@@ -1,5 +1,4 @@
 using System.Net;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -127,7 +126,7 @@ public sealed class DeviceRandomApiServiceTests
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    responseIndex < DeviceInfoApiConstants.RandomDeviceMaximumAttempts
+                    responseIndex < 4
                         ? nullJson
                         : validJson)
             });
@@ -143,7 +142,7 @@ public sealed class DeviceRandomApiServiceTests
             CancellationToken.None);
 
         Assert.AreEqual("Pixel 9", device.Model);
-        Assert.AreEqual(DeviceInfoApiConstants.RandomDeviceMaximumAttempts, handler.RequestCount);
+        Assert.AreEqual(4, handler.RequestCount);
     }
 
     private static AccountSession CreateSession()

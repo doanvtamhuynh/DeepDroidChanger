@@ -29,7 +29,7 @@ namespace DeepDroidChanger.Services
 
         public async Task<CommandResult> RunAdbAsync(string arguments, CancellationToken cancellationToken)
         {
-            var adbPath = await ResolveToolPathAsync(AdbToolConstants.AdbExecutableName, cancellationToken).ConfigureAwait(false);
+            var adbPath = await ResolveToolPathAsync(AssetConstants.Tools.AdbExecutableName, cancellationToken).ConfigureAwait(false);
             _logger.LogDebug(
                 "Running ADB tool {AdbPath}. ArgumentLength: {ArgumentLength}",
                 adbPath,
@@ -39,7 +39,7 @@ namespace DeepDroidChanger.Services
 
         public Task<CommandResult> RunAdbAsync(string serial, string arguments, CancellationToken cancellationToken)
         {
-            return RunAdbAsync($"{AdbToolConstants.SerialSelectorArgument} {QuoteProcessArgument(serial)} {arguments}", cancellationToken);
+            return RunAdbAsync($"{"-s"} {QuoteProcessArgument(serial)} {arguments}", cancellationToken);
         }
 
         public Task<CommandResult> RunAdbShellAsync(string serial, string shellCommand, CancellationToken cancellationToken)
@@ -56,10 +56,10 @@ namespace DeepDroidChanger.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(shellScript);
 
             string adbPath = await ResolveToolPathAsync(
-                    AdbToolConstants.AdbExecutableName,
+                    AssetConstants.Tools.AdbExecutableName,
                     cancellationToken)
                 .ConfigureAwait(false);
-            string arguments = $"{AdbToolConstants.SerialSelectorArgument} {QuoteProcessArgument(serial)} shell sh";
+            string arguments = $"{"-s"} {QuoteProcessArgument(serial)} shell sh";
             string normalizedScript = shellScript
                 .Replace(WindowsNewLine, "\n", StringComparison.Ordinal)
                 .Replace(CarriageReturn, NewLine);
@@ -77,7 +77,7 @@ namespace DeepDroidChanger.Services
 
         public async Task<CommandResult> RunFastbootAsync(string arguments, CancellationToken cancellationToken)
         {
-            var fastbootPath = await ResolveToolPathAsync(AdbToolConstants.FastbootExecutableName, cancellationToken).ConfigureAwait(false);
+            var fastbootPath = await ResolveToolPathAsync(AssetConstants.Tools.FastbootExecutableName, cancellationToken).ConfigureAwait(false);
             _logger.LogDebug(
                 "Running Fastboot tool {FastbootPath}. ArgumentLength: {ArgumentLength}",
                 fastbootPath,
@@ -129,8 +129,8 @@ namespace DeepDroidChanger.Services
             {
                 await SetPropertyCoreAsync(
                         serial,
-                        DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
-                        DeviceSpoofPropertyConstants.BypassEnabledValue,
+                        PropertyConstants.Spoof.BypassReadOnlyProperties,
+                        "1",
                         cancellationToken)
                     .ConfigureAwait(false);
                 await SetPropertyCoreAsync(serial, propertyName, value, cancellationToken)
@@ -147,8 +147,8 @@ namespace DeepDroidChanger.Services
                 {
                     await SetPropertyCoreAsync(
                             serial,
-                            DeviceSpoofPropertyConstants.BypassReadOnlyProperties,
-                            DeviceSpoofPropertyConstants.BypassDisabledValue,
+                            PropertyConstants.Spoof.BypassReadOnlyProperties,
+                            "0",
                             CancellationToken.None)
                         .ConfigureAwait(false);
                 }
@@ -204,7 +204,7 @@ namespace DeepDroidChanger.Services
 
         public async Task<string> CurlAsync(string serial, string url, CancellationToken cancellationToken)
         {
-            var command = $"curl --fail --silent --show-error --max-time {IpGeolocationConstants.CurlTimeoutSeconds} {QuoteShellValue(url)}";
+            var command = $"curl --fail --silent --show-error --max-time {15} {QuoteShellValue(url)}";
             var result = await RunAdbShellAsync(serial, command, cancellationToken).ConfigureAwait(false);
             return ProcessCommandResult(result, serial, "curl endpoint", isWrite: false);
         }
@@ -239,8 +239,8 @@ namespace DeepDroidChanger.Services
 
         private static async Task<string> ResolveToolPathAsync(string executableName, CancellationToken cancellationToken)
         {
-            var outputPath = Path.Combine(AppContext.BaseDirectory, AdbToolConstants.ToolsRootRelativePath, AdbToolConstants.PlatformToolsDirectoryName, executableName);
-            var projectPath = Path.Combine(Environment.CurrentDirectory, AdbToolConstants.ToolsRootRelativePath, AdbToolConstants.PlatformToolsDirectoryName, executableName);
+            var outputPath = Path.Combine(AppContext.BaseDirectory, AssetConstants.Tools.RootRelativePath, AssetConstants.Tools.PlatformToolsDirectoryName, executableName);
+            var projectPath = Path.Combine(Environment.CurrentDirectory, AssetConstants.Tools.RootRelativePath, AssetConstants.Tools.PlatformToolsDirectoryName, executableName);
 
             if (await FileExistsAsync(outputPath, cancellationToken).ConfigureAwait(false))
                 return outputPath;
@@ -269,7 +269,7 @@ namespace DeepDroidChanger.Services
         public async Task SendKeyEventAsync(string serial, int keyCode, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Sending keyevent {KeyCode} to device {Serial}.", keyCode, serial);
-            var command = string.Format(AdbShellCommandConstants.InputKeyEventCommandFormat, keyCode);
+            var command = string.Format("input keyevent {0}", keyCode);
             var result = await RunAdbShellAsync(serial, command, cancellationToken).ConfigureAwait(false);
             if (result.ExitCode != 0)
             {
@@ -285,7 +285,7 @@ namespace DeepDroidChanger.Services
             _logger.LogInformation("Sending input text to device {Serial}. TextLength: {TextLength}.", serial, text.Length);
 
             var command = string.Format(
-                AdbShellCommandConstants.InputTextCommandFormat,
+                "input text {0}",
                 QuoteShellValue(normalizedText));
             var result = await RunAdbShellAsync(serial, command, cancellationToken).ConfigureAwait(false);
             ProcessCommandResult(result, serial, SendInputTextPurpose, isWrite: true);
@@ -296,7 +296,7 @@ namespace DeepDroidChanger.Services
         public async Task RebootAsync(string serial, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Sending reboot command to device {Serial}.", serial);
-            var result = await RunAdbAsync(serial, AdbToolConstants.AdbRebootCommand, cancellationToken).ConfigureAwait(false);
+            var result = await RunAdbAsync(serial, "reboot", cancellationToken).ConfigureAwait(false);
             if (result.ExitCode != 0)
             {
                 throw new InvalidOperationException(
@@ -374,7 +374,7 @@ namespace DeepDroidChanger.Services
                 .Replace(CarriageReturn, Space)
                 .Replace(NewLine, Space)
                 .Replace(Tab, Space)
-                .Replace(SpaceText, AdbShellCommandConstants.InputTextSpaceToken, StringComparison.Ordinal);
+                .Replace(SpaceText, "%s", StringComparison.Ordinal);
         }
     }
 }

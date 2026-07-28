@@ -102,7 +102,7 @@ public sealed class DeviceStoreServiceTests
         using JsonDocument randomConfig = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(
                 deviceDirectory,
-                RuntimeDataPathConstants.RandomConfigFileName)));
+                AssetConstants.RuntimeData.RandomConfigFileName)));
         Assert.AreEqual(
             "Google",
             randomConfig.RootElement.GetProperty("brand").GetString());
@@ -174,7 +174,7 @@ public sealed class DeviceStoreServiceTests
         string directory = GetDeviceDirectory(fixture.Path, "SERIAL");
         string locationPath = Path.Combine(
             directory,
-            RuntimeDataPathConstants.LocationConfigFileName);
+            AssetConstants.RuntimeData.LocationConfigFileName);
         await File.WriteAllTextAsync(locationPath, "{not-json");
 
         IReadOnlyList<StoredDeviceConfig> loaded = await service.LoadAsync(CancellationToken.None);
@@ -218,15 +218,15 @@ public sealed class DeviceStoreServiceTests
     {
         return Path.Combine(
             rootPath,
-            RuntimeDataPathConstants.DeviceManagerDirectoryName,
-            RuntimeDataPathConstants.DevicesFileName);
+            AssetConstants.RuntimeData.DeviceManagerDirectoryName,
+            AssetConstants.RuntimeData.DevicesFileName);
     }
 
     private static string GetDeviceDirectory(string rootPath, string serial)
     {
         return Path.Combine(
             rootPath,
-            RuntimeDataPathConstants.DeviceManagerDirectoryName,
+            AssetConstants.RuntimeData.DeviceManagerDirectoryName,
             serial);
     }
 
@@ -248,12 +248,12 @@ public sealed class DeviceStoreServiceTests
     {
         string[] expectedFiles =
         [
-            RuntimeDataPathConstants.RandomConfigFileName,
-            RuntimeDataPathConstants.ChangeOptionsConfigFileName,
-            RuntimeDataPathConstants.UpdateIntegrityConfigFileName,
-            RuntimeDataPathConstants.LocationConfigFileName,
-            RuntimeDataPathConstants.TimezoneConfigFileName,
-            RuntimeDataPathConstants.ProxyConfigFileName
+            AssetConstants.RuntimeData.RandomConfigFileName,
+            AssetConstants.RuntimeData.ChangeOptionsConfigFileName,
+            AssetConstants.RuntimeData.UpdateIntegrityConfigFileName,
+            AssetConstants.RuntimeData.LocationConfigFileName,
+            AssetConstants.RuntimeData.TimezoneConfigFileName,
+            AssetConstants.RuntimeData.ProxyConfigFileName
         ];
 
         Assert.IsTrue(Directory.Exists(directory));

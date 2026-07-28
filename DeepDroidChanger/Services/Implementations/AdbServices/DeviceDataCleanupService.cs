@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using Microsoft.Extensions.Logging;
@@ -173,7 +172,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         string[] commands =
         [
             CreateDeleteDirectoryContentsCommand(DropBoxDirectoryPath),
-            DeviceChangeConstants.SyncCommand
+            "sync"
         ];
         await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Deleted post-reboot DropBox files while preserving its directory on {Serial}.", serial);
@@ -187,7 +186,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         string[] commands =
         [
             CreateRemoveFileCommand(SsaidFilePattern),
-            DeviceChangeConstants.SyncCommand
+            "sync"
         ];
         await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Deleted stored SSAID files on {Serial} so Android can regenerate them.", serial);
@@ -297,7 +296,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             commands.Add("pm trim-caches 999G");
         }
 
-        commands.Add(DeviceChangeConstants.SyncCommand);
+        commands.Add("sync");
         return commands;
     }
 

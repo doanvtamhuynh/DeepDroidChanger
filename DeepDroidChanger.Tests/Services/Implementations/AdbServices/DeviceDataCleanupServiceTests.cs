@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -504,7 +503,7 @@ public sealed class DeviceDataCleanupServiceTests
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().RunAdbShellAsync(
             "SERIAL",
-            DeviceChangeConstants.RootIdentityCommand,
+            "id -u",
             Arg.Any<CancellationToken>());
     }
 

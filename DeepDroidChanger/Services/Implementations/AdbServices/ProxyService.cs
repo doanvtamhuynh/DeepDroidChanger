@@ -65,7 +65,7 @@ namespace DeepDroidChanger.Services
                 throw new ArgumentOutOfRangeException(nameof(port), port, "Proxy port must be between 1 and 65535.");
             if (string.IsNullOrWhiteSpace(username) != string.IsNullOrWhiteSpace(password))
                 throw new ArgumentException("Proxy username and password must either both be provided or both be empty.");
-            if (!string.Equals(proxyType, DeepProxyConstants.SocksProxyType, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(proxyType, "Socks 5", StringComparison.OrdinalIgnoreCase))
                 throw new NotSupportedException("Fake Proxy currently supports SOCKS5 only.");
 
             var hasCredentials = !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(password);
@@ -94,7 +94,7 @@ namespace DeepDroidChanger.Services
                 await _adbCommandService.SetWifiAsync(serial, enabled: true, cancellationToken).ConfigureAwait(false);
                 wifiDisableAttempted = false;
                 await WaitForDeviceNetworkAsync(serial, cancellationToken).ConfigureAwait(false);
-                await _adbCommandService.OpenLinkAsync(serial, DeepProxyConstants.BrowserLeaksUrl, cancellationToken).ConfigureAwait(false);
+                await _adbCommandService.OpenLinkAsync(serial, UrlConstants.BrowserLeaks, cancellationToken).ConfigureAwait(false);
             }
             catch
             {
@@ -135,12 +135,12 @@ namespace DeepDroidChanger.Services
 
             foreach (var propertyName in new[]
                      {
-                         DeepProxyConstants.ProxyIpProperty,
-                         DeepProxyConstants.ProxyPortProperty,
-                         DeepProxyConstants.ProxyUsernameProperty,
-                         DeepProxyConstants.ProxyPasswordProperty,
-                         DeepProxyConstants.InterfaceIpv4Property,
-                         DeepProxyConstants.InterfaceIpv4PrefixProperty
+                         PropertyConstants.Proxy.Ip,
+                         PropertyConstants.Proxy.Port,
+                         PropertyConstants.Proxy.Username,
+                         PropertyConstants.Proxy.Password,
+                         PropertyConstants.Proxy.InterfaceIpv4,
+                         PropertyConstants.Proxy.InterfaceIpv4Prefix
                      })
             {
                 await TrySetPropertyAsync(serial, propertyName, string.Empty, cancellationToken).ConfigureAwait(false);
@@ -152,7 +152,7 @@ namespace DeepDroidChanger.Services
             {
                 var result = await _adbCommandService.RunAdbShellAsync(
                     serial,
-                    $"am start-foreground-service -n {DeepProxyConstants.ServiceComponent} -a {DeepProxyConstants.DisconnectAction}",
+                    $"am start-foreground-service -n {"hev.sockstun/.TProxyService"} -a {"hev.sockstun.DISCONNECT"}",
                     cancellationToken).ConfigureAwait(false);
                 if (result.ExitCode != 0)
                 {
@@ -160,8 +160,8 @@ namespace DeepDroidChanger.Services
                 }
             }, "disconnect DeepProxy service").ConfigureAwait(false);
 
-            await SafeExecuteAsync(() => _adbCommandService.ForceStopPackageAsync(serial, DeepProxyConstants.PackageName, cancellationToken), "force stop package").ConfigureAwait(false);
-            await SafeExecuteAsync(() => _adbCommandService.ClearPackageAsync(serial, DeepProxyConstants.PackageName, cancellationToken), "clear package").ConfigureAwait(false);
+            await SafeExecuteAsync(() => _adbCommandService.ForceStopPackageAsync(serial, "hev.sockstun", cancellationToken), "force stop package").ConfigureAwait(false);
+            await SafeExecuteAsync(() => _adbCommandService.ClearPackageAsync(serial, "hev.sockstun", cancellationToken), "clear package").ConfigureAwait(false);
 
             _logger.LogInformation("SOCKS5 fake proxy stopped on device {Serial}.", serial);
         }
@@ -187,9 +187,9 @@ namespace DeepDroidChanger.Services
                 using var handler = new HttpClientHandler { Proxy = proxy };
                 using var client = new HttpClient(handler, disposeHandler: true)
                 {
-                    Timeout = TimeSpan.FromSeconds(IpGeolocationConstants.HttpTimeoutSeconds),
+                    Timeout = TimeSpan.FromSeconds(15),
                 };
-                using var response = await client.GetAsync(IpGeolocationConstants.Endpoint, cancellationToken).ConfigureAwait(false);
+                using var response = await client.GetAsync(UrlConstants.IpGeolocation, cancellationToken).ConfigureAwait(false);
                 var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
                 if (IsRateLimited(response, out bool retryAfterProvided))
@@ -315,14 +315,14 @@ namespace DeepDroidChanger.Services
         private async Task<string?> FetchRandomInterfaceIpAsync(string countryCode, CancellationToken cancellationToken)
         {
             var normalizedCountryCode = countryCode.Trim().ToLowerInvariant();
-            var url = string.Format(CultureInfo.InvariantCulture, DeepProxyConstants.CountryIpv4BlocksUrlFormat, normalizedCountryCode);
+            var url = string.Format(CultureInfo.InvariantCulture, UrlConstants.CountryIpv4BlocksFormat, normalizedCountryCode);
 
             try
             {
                 _logger.LogDebug("Fetching country CIDR list for {CountryCode}.", normalizedCountryCode);
                 using var client = new HttpClient
                 {
-                    Timeout = TimeSpan.FromSeconds(DeepProxyConstants.RemoteRequestTimeoutSeconds),
+                    Timeout = TimeSpan.FromSeconds(15),
                 };
                 var data = await client.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
                 var cidrs = data
@@ -370,16 +370,16 @@ namespace DeepDroidChanger.Services
             _logger.LogInformation("Setting DeepProxy properties for device {Serial}.", serial);
             await EnsureDeepDroidDeviceAsync(serial, cancellationToken).ConfigureAwait(false);
 
-            await _adbCommandService.SetPropertyAsync(serial, DeepProxyConstants.ProxyIpProperty, host, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, DeepProxyConstants.ProxyPortProperty, port.ToString(CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, DeepProxyConstants.ProxyUsernameProperty, username ?? string.Empty, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, DeepProxyConstants.ProxyPasswordProperty, password ?? string.Empty, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Proxy.Ip, host, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Proxy.Port, port.ToString(CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Proxy.Username, username ?? string.Empty, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Proxy.Password, password ?? string.Empty, cancellationToken).ConfigureAwait(false);
 
             var interfaceIpParts = interfaceIp.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            await _adbCommandService.SetPropertyAsync(serial, DeepProxyConstants.InterfaceIpv4Property, interfaceIpParts[0], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Proxy.InterfaceIpv4, interfaceIpParts[0], cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(
                 serial,
-                DeepProxyConstants.InterfaceIpv4PrefixProperty,
+                PropertyConstants.Proxy.InterfaceIpv4Prefix,
                 interfaceIpParts.Length == 2 ? interfaceIpParts[1] : string.Empty,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -387,12 +387,12 @@ namespace DeepDroidChanger.Services
         private async Task StartDeepProxyServiceAsync(string serial, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Opening DeepProxy package on device {Serial}.", serial);
-            await _adbCommandService.OpenPackageAsync(serial, DeepProxyConstants.PackageName, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.OpenPackageAsync(serial, "hev.sockstun", cancellationToken).ConfigureAwait(false);
             await _delay(TimeSpan.FromMilliseconds(OpenPackageDelayMilliseconds), cancellationToken).ConfigureAwait(false);
 
             var resultAppOps = await _adbCommandService.RunAdbShellAsync(
                 serial,
-                $"cmd appops set {DeepProxyConstants.PackageName} {DeepProxyConstants.EstablishVpnServiceAppOp} allow",
+                $"cmd appops set {"hev.sockstun"} {"ESTABLISH_VPN_SERVICE"} allow",
                 cancellationToken).ConfigureAwait(false);
             if (resultAppOps.ExitCode != 0)
             {
@@ -401,7 +401,7 @@ namespace DeepDroidChanger.Services
 
             var resultVpn = await _adbCommandService.RunAdbShellAsync(
                 serial,
-                $"am start-foreground-service -n {DeepProxyConstants.ServiceComponent} -a {DeepProxyConstants.ConnectAction}",
+                $"am start-foreground-service -n {"hev.sockstun/.TProxyService"} -a {"hev.sockstun.CONNECT"}",
                 cancellationToken).ConfigureAwait(false);
             if (resultVpn.ExitCode != 0)
             {
@@ -410,7 +410,7 @@ namespace DeepDroidChanger.Services
 
             var resultMainActivity = await _adbCommandService.RunAdbShellAsync(
                 serial,
-                $"am start-activity -n {DeepProxyConstants.ServiceMainActivity}",
+                $"am start-activity -n {"hev.sockstun/.MainActivity"}",
                 cancellationToken).ConfigureAwait(false);
             if (resultMainActivity.ExitCode != 0)
             {
@@ -425,7 +425,7 @@ namespace DeepDroidChanger.Services
 
             while (stopwatch.Elapsed < InternetCheckTimeout)
             {
-                var publicIp = await _adbCommandService.CurlAsync(serial, DeepProxyConstants.PublicIpCheckUrl, cancellationToken).ConfigureAwait(false);
+                var publicIp = await _adbCommandService.CurlAsync(serial, UrlConstants.PublicIp, cancellationToken).ConfigureAwait(false);
                 _logger.LogInformation(
                     "Device network check attempt {Attempt} for {Serial}. ElapsedSeconds: {ElapsedSeconds}. PublicIpPresent: {PublicIpPresent}",
                     attempt,
@@ -462,11 +462,11 @@ namespace DeepDroidChanger.Services
 
         private async Task EnsureDeepDroidDeviceAsync(string serial, CancellationToken cancellationToken)
         {
-            var marker = await _adbCommandService.GetPropertyAsync(serial, PropertyConstants.Prop_DeepDroidDevice, cancellationToken).ConfigureAwait(false);
+            var marker = await _adbCommandService.GetPropertyAsync(serial, PropertyConstants.DeepDroidDevice, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(marker))
                 return;
 
-            _logger.LogError("Device {Serial} is not a DeepDroid device. Property {PropertyName} was empty.", serial, PropertyConstants.Prop_DeepDroidDevice);
+            _logger.LogError("Device {Serial} is not a DeepDroid device. Property {PropertyName} was empty.", serial, PropertyConstants.DeepDroidDevice);
             throw new InvalidOperationException($"Device {serial} is not a DeepDroid device.");
         }
 

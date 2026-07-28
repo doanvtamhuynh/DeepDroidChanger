@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Themes;
 using Microsoft.Extensions.Logging;
 
@@ -22,19 +21,19 @@ public sealed class ThemeService : IThemeService
 
     public string NormalizeTheme(string theme)
     {
-        return string.Equals(theme, ThemeConstants.Light, StringComparison.OrdinalIgnoreCase)
-            ? ThemeConstants.Light
-            : ThemeConstants.Dark;
+        return string.Equals(theme, "Light", StringComparison.OrdinalIgnoreCase)
+            ? "Light"
+            : "Dark";
     }
 
     public string ToggleTheme(string theme)
     {
-        return IsDarkTheme(theme) ? ThemeConstants.Light : ThemeConstants.Dark;
+        return IsDarkTheme(theme) ? "Light" : "Dark";
     }
 
     public bool IsDarkTheme(string theme)
     {
-        return NormalizeTheme(theme) == ThemeConstants.Dark;
+        return NormalizeTheme(theme) == "Dark";
     }
 
     public void ApplyTheme(string theme)
@@ -75,7 +74,7 @@ public sealed class ThemeService : IThemeService
 
         object baseTheme = Enum.Parse(
             baseThemeParameter.ParameterType,
-            isDark ? ThemeConstants.Dark : ThemeConstants.Light);
+            isDark ? "Dark" : "Light");
         setBaseTheme.Invoke(theme, [baseTheme]);
         setTheme.Invoke(paletteHelper, [theme]);
 

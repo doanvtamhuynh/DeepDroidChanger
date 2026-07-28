@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 
 namespace DeepDroidChanger.Helpers;
 
@@ -8,10 +7,10 @@ public static class DeviceTypeHelper
     {
         return type?.Trim().ToLowerInvariant() switch
         {
-            DeviceTypeOptions.Sargo => DeviceTypeOptions.Sargo,
-            DeviceTypeOptions.Starlte => DeviceTypeOptions.Starlte,
-            DeviceTypeOptions.Tissot => DeviceTypeOptions.Tissot,
-            _ => DeviceTypeOptions.Unknown
+            "sargo" => "sargo",
+            "starlte" => "starlte",
+            "tissot" => "tissot",
+            _ => "unknown"
         };
     }
 
@@ -19,10 +18,10 @@ public static class DeviceTypeHelper
     {
         return Normalize(type) switch
         {
-            DeviceTypeOptions.Sargo => "3A",
-            DeviceTypeOptions.Starlte => "S9",
-            DeviceTypeOptions.Tissot => "MiA1",
-            _ => DeviceTypeOptions.Unknown
+            "sargo" => "3A",
+            "starlte" => "S9",
+            "tissot" => "MiA1",
+            _ => "unknown"
         };
     }
 }

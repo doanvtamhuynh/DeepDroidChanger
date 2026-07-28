@@ -1,13 +1,12 @@
 using System.IO;
 using System.Reflection;
 using System.Text;
+using DeepDroidChanger.Constants;
 
 namespace DeepDroidChanger.Helpers;
 
 public static class AssetDataReader
 {
-    private const string DataRootPath = "Assets/Data/";
-
     public static string ReadText(string relativePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
@@ -17,7 +16,7 @@ public static class AssetDataReader
             .TrimStart('/');
         string[] pathSegments = normalizedRelativePath.Split('/');
 
-        if (!normalizedRelativePath.StartsWith(DataRootPath, StringComparison.Ordinal)
+        if (!normalizedRelativePath.StartsWith(AssetConstants.Data.RootPath, StringComparison.Ordinal)
             || pathSegments.Any(segment => segment.Length == 0 || segment is "." or ".."))
         {
             throw new InvalidOperationException("Asset path must resolve inside the embedded data directory.");

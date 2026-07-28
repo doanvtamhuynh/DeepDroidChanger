@@ -1,5 +1,4 @@
 using System.Text.Json;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 
 namespace DeepDroidChanger.Helpers;
@@ -19,23 +18,23 @@ public static class IpGeolocationResponseParser
             if (root.ValueKind != JsonValueKind.Object)
                 return false;
 
-            bool success = root.TryGetProperty(IpGeolocationConstants.Success, out JsonElement successElement)
+            bool success = root.TryGetProperty("success", out JsonElement successElement)
                 && successElement.ValueKind is JsonValueKind.True or JsonValueKind.False
                 && successElement.GetBoolean();
             string timezone = GetNestedString(
                 root,
-                IpGeolocationConstants.Timezone,
-                IpGeolocationConstants.TimezoneId);
+                "timezone",
+                "id");
 
             info = new IpGeolocationInfo
             {
                 Success = success,
-                PublicIp = GetString(root, IpGeolocationConstants.Ip),
-                CountryCode = GetString(root, IpGeolocationConstants.CountryCode),
-                Latitude = GetDouble(root, IpGeolocationConstants.Latitude),
-                Longitude = GetDouble(root, IpGeolocationConstants.Longitude),
+                PublicIp = GetString(root, "ip"),
+                CountryCode = GetString(root, "country_code"),
+                Latitude = GetDouble(root, "latitude"),
+                Longitude = GetDouble(root, "longitude"),
                 Timezone = timezone,
-                Message = GetString(root, IpGeolocationConstants.Message)
+                Message = GetString(root, "message")
             };
 
             return info.Success && !string.IsNullOrWhiteSpace(info.Timezone);

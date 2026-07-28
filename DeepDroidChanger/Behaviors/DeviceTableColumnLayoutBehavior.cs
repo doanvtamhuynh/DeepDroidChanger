@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -169,7 +168,7 @@ namespace DeepDroidChanger.Behaviors
 
                 try
                 {
-                    ApplyRatios(GetColumnRatios(_dataGrid) ?? DeviceTableColumnSettings.DefaultRatios);
+                    ApplyRatios(GetColumnRatios(_dataGrid) ?? CreateDefaultRatios());
                 }
                 finally
                 {
@@ -257,11 +256,26 @@ namespace DeepDroidChanger.Behaviors
 
                 var totalWidth = keyedColumns.Sum(column => column.Width);
                 if (totalWidth < MinimumTotalWidth)
-                    return new Dictionary<string, double>(DeviceTableColumnSettings.DefaultRatios);
+                    return CreateDefaultRatios();
 
                 return keyedColumns.ToDictionary(
                     column => column.Key,
                     column => column.Width / totalWidth);
+            }
+
+            private static Dictionary<string, double> CreateDefaultRatios()
+            {
+                return new Dictionary<string, double>
+                {
+                    ["Index"] = 0.55,
+                    ["Selected"] = 0.55,
+                    ["Serial"] = 1.05,
+                    ["Name"] = 1.05,
+                    ["Type"] = 0.9,
+                    ["Active"] = 1.05,
+                    ["Status"] = 1.0,
+                    ["Process"] = 1.95
+                };
             }
 
             private List<KeyedColumn> GetKeyedColumns()

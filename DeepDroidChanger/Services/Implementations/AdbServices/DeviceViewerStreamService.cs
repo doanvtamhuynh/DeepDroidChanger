@@ -149,12 +149,12 @@ namespace DeepDroidChanger.Services
 
         private static void AddScrcpyArguments(ProcessStartInfo startInfo, string serial, string windowTitle)
         {
-            startInfo.ArgumentList.Add(AdbToolConstants.ScrcpySerialArgument);
+            startInfo.ArgumentList.Add("--serial");
             startInfo.ArgumentList.Add(serial);
-            startInfo.ArgumentList.Add(AdbToolConstants.ScrcpyWindowTitleArgument);
+            startInfo.ArgumentList.Add("--window-title");
             startInfo.ArgumentList.Add(windowTitle);
-            startInfo.ArgumentList.Add(AdbToolConstants.ScrcpyWindowBorderlessArgument);
-            startInfo.ArgumentList.Add(AdbToolConstants.ScrcpyNoAudioArgument);
+            startInfo.ArgumentList.Add("--window-borderless");
+            startInfo.ArgumentList.Add("--no-audio");
         }
 
         private async Task<IntPtr> FindStreamWindowAsync(
@@ -231,21 +231,21 @@ namespace DeepDroidChanger.Services
 
         private static string CreateWindowTitle(string serial)
         {
-            return $"{AdbToolConstants.ScrcpyWindowTitlePrefix}-{serial}-{Guid.NewGuid():N}";
+            return $"{"DeepDroidChangerScrcpy"}-{serial}-{Guid.NewGuid():N}";
         }
 
         internal static async Task<string> ResolveToolPathAsync(CancellationToken cancellationToken)
         {
             var outputPath = Path.Combine(
                 AppContext.BaseDirectory,
-                AdbToolConstants.ToolsRootRelativePath,
-                AdbToolConstants.ViewScreenDirectoryName,
-                AdbToolConstants.ScrcpyExecutableName);
+                AssetConstants.Tools.RootRelativePath,
+                AssetConstants.Tools.ViewScreenDirectoryName,
+                AssetConstants.Tools.ScrcpyExecutableName);
             var projectPath = Path.Combine(
                 Environment.CurrentDirectory,
-                AdbToolConstants.ToolsRootRelativePath,
-                AdbToolConstants.ViewScreenDirectoryName,
-                AdbToolConstants.ScrcpyExecutableName);
+                AssetConstants.Tools.RootRelativePath,
+                AssetConstants.Tools.ViewScreenDirectoryName,
+                AssetConstants.Tools.ScrcpyExecutableName);
 
             if (await FileExistsAsync(outputPath, cancellationToken).ConfigureAwait(false))
                 return outputPath;
@@ -253,7 +253,7 @@ namespace DeepDroidChanger.Services
             if (await FileExistsAsync(projectPath, cancellationToken).ConfigureAwait(false))
                 return projectPath;
 
-            return AdbToolConstants.ScrcpyExecutableName;
+            return AssetConstants.Tools.ScrcpyExecutableName;
         }
 
         private static Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken)

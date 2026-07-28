@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Tests.Helpers;
@@ -28,7 +27,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations
                 storedDevices,
                 "serial",
                 "Pixel",
-                DeviceTypeOptions.Sargo,
+                "sargo",
                 country,
                 carrier,
                 includeSelectedCarrierConfig: true,
@@ -36,7 +35,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations
 
             Assert.IsTrue(saved);
             Assert.AreEqual("Pixel", storedDevices[0].Name);
-            Assert.AreEqual(DeviceTypeOptions.Sargo, storedDevices[0].Type);
+            Assert.AreEqual("sargo", storedDevices[0].Type);
             Assert.AreEqual("us", storedDevices[0].CountryIso);
             Assert.AreEqual("AT&T Wireless Inc.", storedDevices[0].Carrier);
             Assert.AreEqual("310", storedDevices[0].CarrierMcc);

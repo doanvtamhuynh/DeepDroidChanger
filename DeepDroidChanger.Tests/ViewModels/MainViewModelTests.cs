@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
@@ -14,16 +13,16 @@ public sealed class MainViewModelTests
     {
         var settings = new AppSettings
         {
-            Language = LanguageConstants.English,
-            Theme = ThemeConstants.Dark,
+            Language = "en",
+            Theme = "Dark",
         };
         ILocalizationService localization = Substitute.For<ILocalizationService>();
-        localization.NormalizeLanguage(Arg.Any<string>()).Returns(LanguageConstants.English);
+        localization.NormalizeLanguage(Arg.Any<string>()).Returns("en");
         IThemeService themes = Substitute.For<IThemeService>();
-        themes.NormalizeTheme(Arg.Any<string>()).Returns(ThemeConstants.Dark);
-        themes.IsDarkTheme(ThemeConstants.Dark).Returns(true);
-        themes.IsDarkTheme(ThemeConstants.Light).Returns(false);
-        themes.ToggleTheme(ThemeConstants.Dark).Returns(ThemeConstants.Light);
+        themes.NormalizeTheme(Arg.Any<string>()).Returns("Dark");
+        themes.IsDarkTheme("Dark").Returns(true);
+        themes.IsDarkTheme("Light").Returns(false);
+        themes.ToggleTheme("Dark").Returns("Light");
         var viewModel = new MainViewModel(settings, localization, themes, Substitute.For<ISettingsService>());
         var navigation = new List<AppView>();
         viewModel.NavigationRequested += navigation.Add;
@@ -40,13 +39,13 @@ public sealed class MainViewModelTests
         Assert.AreEqual(248d, viewModel.SidebarWidth.Value);
 
         viewModel.ToggleLanguageCommand.Execute(null);
-        Assert.AreEqual(LanguageConstants.Vietnamese, viewModel.Language);
+        Assert.AreEqual("vi", viewModel.Language);
         Assert.Contains("flag_vn.ico", viewModel.LanguageFlagSource);
-        localization.Received(1).ApplyLanguage(LanguageConstants.Vietnamese);
+        localization.Received(1).ApplyLanguage("vi");
 
         viewModel.ToggleThemeCommand.Execute(null);
-        Assert.AreEqual(ThemeConstants.Light, viewModel.Theme);
-        themes.Received(1).ApplyTheme(ThemeConstants.Light);
+        Assert.AreEqual("Light", viewModel.Theme);
+        themes.Received(1).ApplyTheme("Light");
 
         viewModel.NavigateSettingsCommand.Execute(null);
         Assert.IsTrue(viewModel.IsSettingsActive);
@@ -59,11 +58,11 @@ public sealed class MainViewModelTests
     public void NavigateInitialView_RaisesCurrentNavigation()
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
-        localization.NormalizeLanguage(Arg.Any<string>()).Returns(LanguageConstants.English);
+        localization.NormalizeLanguage(Arg.Any<string>()).Returns("en");
         IThemeService themes = Substitute.For<IThemeService>();
-        themes.NormalizeTheme(Arg.Any<string>()).Returns(ThemeConstants.Dark);
+        themes.NormalizeTheme(Arg.Any<string>()).Returns("Dark");
         var viewModel = new MainViewModel(
-            new AppSettings { Language = LanguageConstants.English, Theme = ThemeConstants.Dark },
+            new AppSettings { Language = "en", Theme = "Dark" },
             localization,
             themes,
             Substitute.For<ISettingsService>());
@@ -80,19 +79,19 @@ public sealed class MainViewModelTests
     {
         var settings = new AppSettings
         {
-            Language = LanguageConstants.English,
-            Theme = ThemeConstants.Dark,
+            Language = "en",
+            Theme = "Dark",
             SelectedDeviceSerial = "SERIAL",
             DeviceTableColumnRatios = new Dictionary<string, double>
             {
-                [DeviceTableColumnSettings.Name] = 0.75,
-                [DeviceTableColumnSettings.Status] = 0.25
+                ["Name"] = 0.75,
+                ["Status"] = 0.25
             }
         };
         ILocalizationService localization = Substitute.For<ILocalizationService>();
-        localization.NormalizeLanguage(Arg.Any<string>()).Returns(LanguageConstants.English);
+        localization.NormalizeLanguage(Arg.Any<string>()).Returns("en");
         IThemeService themes = Substitute.For<IThemeService>();
-        themes.NormalizeTheme(Arg.Any<string>()).Returns(ThemeConstants.Dark);
+        themes.NormalizeTheme(Arg.Any<string>()).Returns("Dark");
         themes.IsDarkTheme(Arg.Any<string>()).Returns(true);
         ISettingsService settingsService = Substitute.For<ISettingsService>();
         var viewModel = new MainViewModel(settings, localization, themes, settingsService);
@@ -102,6 +101,6 @@ public sealed class MainViewModelTests
         await settingsService.Received(1).SaveAsync(settings, CancellationToken.None);
         await settingsService.DidNotReceiveWithAnyArgs().LoadAsync(default);
         Assert.AreEqual("SERIAL", settings.SelectedDeviceSerial);
-        Assert.AreEqual(0.75, settings.DeviceTableColumnRatios[DeviceTableColumnSettings.Name]);
+        Assert.AreEqual(0.75, settings.DeviceTableColumnRatios["Name"]);
     }
 }

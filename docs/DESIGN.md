@@ -67,7 +67,12 @@ DeepDroidChanger/ (solution root)
     Converters/   IValueConverter, IMultiValueConverter
     Behaviors/    attached behavior (Microsoft.Xaml.Behaviors)
     Helpers/      extension methods, static utilities
-    Constants/    constants only, no hardcoded string/number elsewhere
+    Constants/    constants only, limited to:
+      PropertyConstants.cs            Android/device property keys
+      DeviceSettingsInfoConstants.cs  Android setting namespaces and keys
+      UrlConstants.cs                 remote URLs
+      AuthenticationConstants.cs      authentication identifiers
+      AssetConstants.cs               asset/runtime paths and file names
 
     Resources/    XAML ResourceDictionary only
       Strings/
@@ -125,7 +130,15 @@ Extension methods go in Helpers/, not here.
 Behaviors/ holds only attached behaviors bound from XAML. Business
 logic goes in Services/.
 
-Constants/ holds constants only, no processing logic.
+Constants/ holds constants only, no processing logic. It must contain exactly
+the five catalog files listed in section 2. Only property keys, Android setting
+namespaces/keys, URLs, authentication identifiers, and asset/runtime paths or
+file names belong there. Operational values, command text, arguments, key-event
+codes, timeouts, failure codes, option values, filters, column keys, and
+localization resource keys must stay directly in the code that owns them.
+Feature-local file extensions, temporary-directory names, manifest names, and
+other workflow-specific file values are not shared assets; keep them directly
+in the owning service.
 
 Models/ holds plain POCO data only, no logic, no service calls, no I/O.
 

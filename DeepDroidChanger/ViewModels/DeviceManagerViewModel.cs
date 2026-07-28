@@ -1,6 +1,5 @@
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -162,14 +161,14 @@ namespace DeepDroidChanger.ViewModels
             DeviceInfo.PropertyChanged += OnDeviceInfoPropertyChanged;
             _deviceActionGuardService.BusyStateChanged += OnDeviceBusyStateChanged;
 
-            Brands = DeviceProfileOptions.Brands;
-            UpdateAndroidVersionOptions(DeviceProfileOptions.Random, null);
-            TypeOptions = DeviceTypeOptions.All;
+            Brands = ["Random", "Google", "Samsung", "Xiaomi", "OnePlus", "OPPO", "vivo"];
+            UpdateAndroidVersionOptions("Random", null);
+            TypeOptions = ["sargo", "starlte", "tissot", "unknown"];
             NewDeviceCountText = string.Format(_localizationService.GetString("DeviceManager_NewDeviceCount"), 0);
 
             SelectedBrand = Brands.FirstOrDefault();
             SelectedAndroidVersion = AndroidVersions.FirstOrDefault();
-            _selectedDeviceFilter = DeviceFilterKeys.All;
+            _selectedDeviceFilter = "All";
         }
 
         public ObservableCollection<DeviceRowViewModel> Devices { get; }
@@ -365,7 +364,7 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                await Task.Delay(UiTimingConstants.MinimumActionStatusMilliseconds, cancellationToken).ConfigureAwait(true);
+                await Task.Delay(1000, cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
@@ -381,7 +380,7 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                await Task.Delay(UiTimingConstants.MinimumActionStatusMilliseconds, cancellationToken).ConfigureAwait(true);
+                await Task.Delay(1000, cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
@@ -413,7 +412,7 @@ namespace DeepDroidChanger.ViewModels
         {
             IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
             if (lease == null)
-                SetDeviceLog(device, DeviceLogResourceKeys.ActionAlreadyInProgress);
+                SetDeviceLog(device, "Log_ActionAlreadyInProgress");
 
             return lease;
         }
@@ -473,18 +472,18 @@ namespace DeepDroidChanger.ViewModels
         private async Task AddNewDevicesAsync(CancellationToken cancellationToken)
         {
             IsLoadingDevices = true;
-            await ShowToolbarLogAsync(DeviceLogResourceKeys.AddDevicesOpening, cancellationToken).ConfigureAwait(true);
+            await ShowToolbarLogAsync("Log_AddDevicesOpening", cancellationToken).ConfigureAwait(true);
 
             try
             {
                 var selectedDevices = await _addDevicesDialogService.ShowAddDevicesAsync(cancellationToken).ConfigureAwait(true);
                 if (selectedDevices.Count == 0)
                 {
-                    await ShowToolbarLogAsync(DeviceLogResourceKeys.AddDevicesCanceled, cancellationToken).ConfigureAwait(true);
+                    await ShowToolbarLogAsync("Log_AddDevicesCanceled", cancellationToken).ConfigureAwait(true);
                     return;
                 }
 
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.SavingDevices, cancellationToken).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_SavingDevices", cancellationToken).ConfigureAwait(true);
 
                 await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
                 try
@@ -499,16 +498,16 @@ namespace DeepDroidChanger.ViewModels
                     _deviceRefreshLock.Release();
                 }
 
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.AddDevicesSuccess, cancellationToken).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_AddDevicesSuccess", cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.AddDevicesCanceled, CancellationToken.None).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_AddDevicesCanceled", CancellationToken.None).ConfigureAwait(true);
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to add new devices.");
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.AddDevicesFailed, CancellationToken.None).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_AddDevicesFailed", CancellationToken.None).ConfigureAwait(true);
             }
             finally
             {
@@ -535,12 +534,12 @@ namespace DeepDroidChanger.ViewModels
 
                 if (!confirmed)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.DeleteDeviceCanceled, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_DeleteDeviceCanceled", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
-                SetDeviceLog(device, DeviceLogResourceKeys.DeletingDevice);
+                SetDeviceLog(device, "Log_DeletingDevice");
 
                 await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
                 try
@@ -550,8 +549,8 @@ namespace DeepDroidChanger.ViewModels
                         .ConfigureAwait(true);
                     if (!deleteResult.Removed)
                     {
-                        await ShowDeviceLogAsync(device, DeviceLogResourceKeys.DeleteDeviceFailed, cancellationToken).ConfigureAwait(true);
-                        SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                        await ShowDeviceLogAsync(device, "Log_DeleteDeviceFailed", cancellationToken).ConfigureAwait(true);
+                        SetDeviceLog(device, "Log_Ready");
                         return;
                     }
 
@@ -564,17 +563,17 @@ namespace DeepDroidChanger.ViewModels
                     _deviceRefreshLock.Release();
                 }
 
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.DeleteDeviceSuccess, cancellationToken).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_DeleteDeviceSuccess", cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to delete device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.DeleteDeviceFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_DeleteDeviceFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -585,23 +584,23 @@ namespace DeepDroidChanger.ViewModels
             if (device == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.RebootingDevice);
+            SetDeviceLog(device, "Log_RebootingDevice");
 
             try
             {
                 await _deviceActionService.RebootAsync(device.Serial, cancellationToken).ConfigureAwait(true);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RebootDeviceSuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_RebootDeviceSuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to reboot device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RebootDeviceFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_RebootDeviceFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -628,13 +627,13 @@ namespace DeepDroidChanger.ViewModels
 
             if (success)
             {
-                await ShowDeviceLogAsync(targetDevice, DeviceLogResourceKeys.CopySerialSuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(targetDevice, "Log_CopySerialSuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(targetDevice, "Log_Ready");
             }
             else
             {
-                await ShowDeviceLogAsync(targetDevice, DeviceLogResourceKeys.CopySerialFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(targetDevice, "Log_CopySerialFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(targetDevice, "Log_Ready");
             }
         }
 
@@ -652,7 +651,7 @@ namespace DeepDroidChanger.ViewModels
             DeviceRowViewModel? device = SelectedDevice;
             if (device == null)
             {
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.SelectDeviceFirst, cancellationToken).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_SelectDeviceFirst", cancellationToken).ConfigureAwait(true);
                 return;
             }
 
@@ -664,7 +663,7 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.RandomDevice);
+                SetDeviceLog(device, "Log_RandomDevice");
                 RandomDeviceRequest request = CreateCurrentRandomDeviceRequest();
                 var randomResult = await _randomDeviceService
                     .CreateRandomProfileAsync(request, cancellationToken)
@@ -672,31 +671,31 @@ namespace DeepDroidChanger.ViewModels
 
                 if (randomResult.Status == RandomDeviceStatus.LoginRequired)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceLoginRequired, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceLoginRequired", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
                 if (randomResult.Status == RandomDeviceStatus.Failed || randomResult.Profile == null)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceFailed", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
                 ApplyRandomDeviceInfo(device.Serial, randomResult.Profile);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceSuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            await ShowDeviceLogAsync(device, "Log_RandomDeviceSuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Unexpected failure while randomizing device info.");
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            await ShowDeviceLogAsync(device, "Log_RandomDeviceFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -718,7 +717,7 @@ namespace DeepDroidChanger.ViewModels
             CopyFormValuesToProfile(profile);
             DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
             bool changeSimEnabled = IsChangeSimEnabled;
-            SetDeviceLog(device, DeviceLogResourceKeys.ChangeDevice);
+            SetDeviceLog(device, "Log_ChangeDevice");
 
             try
             {
@@ -731,14 +730,14 @@ namespace DeepDroidChanger.ViewModels
                     .ConfigureAwait(true);
                 if (!confirmed)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceCanceled, cancellationToken).ConfigureAwait(true);
+                await ShowDeviceLogAsync(device, "Log_ChangeDeviceCanceled", cancellationToken).ConfigureAwait(true);
                     return;
                 }
 
                 IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
                     device,
-                    DeviceLogResourceKeys.ChangeDevice,
-                    DeviceLogResourceKeys.ChangeDeviceSuccess);
+                    "Log_ChangeDevice",
+                    "Log_ChangeDeviceSuccess");
                 await _deviceChangeService
                     .ChangeAsync(
                         device.Serial,
@@ -749,7 +748,7 @@ namespace DeepDroidChanger.ViewModels
                         cancellationToken)
                     .ConfigureAwait(true);
 
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceSuccess, cancellationToken).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_ChangeDeviceSuccess", cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
@@ -757,11 +756,11 @@ namespace DeepDroidChanger.ViewModels
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to change device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceFailed, CancellationToken.None).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_ChangeDeviceFailed", CancellationToken.None).ConfigureAwait(true);
             }
             finally
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -793,17 +792,17 @@ namespace DeepDroidChanger.ViewModels
                 {
                     await ShowDeviceLogAsync(
                             device,
-                            DeviceLogResourceKeys.ChangeWithoutWipeCanceled,
+                    "Log_ChangeWithoutWipeCanceled",
                             cancellationToken)
                         .ConfigureAwait(true);
                     return;
                 }
 
-                SetDeviceLog(device, DeviceLogResourceKeys.ChangeWithoutWipe);
+                SetDeviceLog(device, "Log_ChangeWithoutWipe");
                 IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
                     device,
-                    DeviceLogResourceKeys.ChangeWithoutWipe,
-                    DeviceLogResourceKeys.ChangeWithoutWipeSuccess);
+                    "Log_ChangeWithoutWipe",
+                    "Log_ChangeWithoutWipeSuccess");
                 await _deviceChangeService
                     .ChangeWithoutWipeAsync(
                         device.Serial,
@@ -815,7 +814,7 @@ namespace DeepDroidChanger.ViewModels
                     .ConfigureAwait(true);
                 await ShowDeviceLogAsync(
                         device,
-                        DeviceLogResourceKeys.ChangeWithoutWipeSuccess,
+                "Log_ChangeWithoutWipeSuccess",
                         cancellationToken)
                     .ConfigureAwait(true);
             }
@@ -827,13 +826,13 @@ namespace DeepDroidChanger.ViewModels
                 _logger.LogError(exception, "Failed to change device {Serial} without wiping data.", device.Serial);
                 await ShowDeviceLogAsync(
                         device,
-                        DeviceLogResourceKeys.ChangeWithoutWipeFailed,
+                "Log_ChangeWithoutWipeFailed",
                         CancellationToken.None)
                     .ConfigureAwait(true);
             }
             finally
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -859,17 +858,17 @@ namespace DeepDroidChanger.ViewModels
                 {
                     await ShowDeviceLogAsync(
                             device,
-                            DeviceLogResourceKeys.WipeWithoutChangeCanceled,
+                    "Log_WipeWithoutChangeCanceled",
                             cancellationToken)
                         .ConfigureAwait(true);
                     return;
                 }
 
-                SetDeviceLog(device, DeviceLogResourceKeys.WipeWithoutChange);
+                SetDeviceLog(device, "Log_WipeWithoutChange");
                 IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
                     device,
-                    DeviceLogResourceKeys.WipeWithoutChange,
-                    DeviceLogResourceKeys.WipeWithoutChangeSuccess);
+                    "Log_WipeWithoutChange",
+                    "Log_WipeWithoutChangeSuccess");
                 await _deviceChangeService
                     .WipeWithoutChangeAsync(
                         device.Serial,
@@ -879,7 +878,7 @@ namespace DeepDroidChanger.ViewModels
                     .ConfigureAwait(true);
                 await ShowDeviceLogAsync(
                         device,
-                        DeviceLogResourceKeys.WipeWithoutChangeSuccess,
+                "Log_WipeWithoutChangeSuccess",
                         cancellationToken)
                     .ConfigureAwait(true);
             }
@@ -891,13 +890,13 @@ namespace DeepDroidChanger.ViewModels
                 _logger.LogError(exception, "Failed to wipe device {Serial} without changing identity.", device.Serial);
                 await ShowDeviceLogAsync(
                         device,
-                        DeviceLogResourceKeys.WipeWithoutChangeFailed,
+                "Log_WipeWithoutChangeFailed",
                         CancellationToken.None)
                     .ConfigureAwait(true);
             }
             finally
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -917,7 +916,7 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
+            SetDeviceLog(device, "Log_OpeningDialog");
             try
             {
                 AdvancedChangeConfigDialogResult? result = await _advancedChangeConfigDialogService
@@ -940,7 +939,7 @@ namespace DeepDroidChanger.ViewModels
                 QueueSelectedDeviceProfileSave();
                 await ShowDeviceLogAsync(
                         device,
-                        DeviceLogResourceKeys.AdvancedChangeConfigSaved,
+                        "Log_AdvancedChangeConfigSaved",
                         cancellationToken)
                     .ConfigureAwait(true);
             }
@@ -952,13 +951,13 @@ namespace DeepDroidChanger.ViewModels
                 _logger.LogError(exception, "Failed to configure advanced Change Device options for {Serial}.", device.Serial);
                 await ShowDeviceLogAsync(
                         device,
-                        DeviceLogResourceKeys.AdvancedChangeConfigFailed,
+                        "Log_AdvancedChangeConfigFailed",
                         CancellationToken.None)
                     .ConfigureAwait(true);
             }
             finally
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -987,27 +986,27 @@ namespace DeepDroidChanger.ViewModels
                     .ConfigureAwait(true);
                 if (!confirmed)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceCanceled, cancellationToken).ConfigureAwait(true);
+                await ShowDeviceLogAsync(device, "Log_ChangeDeviceCanceled", cancellationToken).ConfigureAwait(true);
                     return;
                 }
 
                 DeviceInfoApiDevice? profile;
                 try
                 {
-                    SetDeviceLog(device, DeviceLogResourceKeys.RandomDevice);
+                    SetDeviceLog(device, "Log_RandomDevice");
                     var randomResult = await _randomDeviceService
                         .CreateRandomProfileAsync(randomRequest, cancellationToken)
                         .ConfigureAwait(true);
 
                     if (randomResult.Status == RandomDeviceStatus.LoginRequired)
                     {
-                        await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceLoginRequired, cancellationToken).ConfigureAwait(true);
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceLoginRequired", cancellationToken).ConfigureAwait(true);
                         return;
                     }
 
                     if (randomResult.Status == RandomDeviceStatus.Failed || randomResult.Profile == null)
                     {
-                        await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, cancellationToken).ConfigureAwait(true);
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceFailed", cancellationToken).ConfigureAwait(true);
                         return;
                     }
 
@@ -1021,17 +1020,17 @@ namespace DeepDroidChanger.ViewModels
                 catch (Exception exception)
                 {
                     _logger.LogError(exception, "Unexpected failure while randomizing device info.");
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceFailed, CancellationToken.None).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_RandomDeviceFailed", CancellationToken.None).ConfigureAwait(true);
                     return;
                 }
-                SetDeviceLog(device, DeviceLogResourceKeys.ChangeDevice);
+                SetDeviceLog(device, "Log_ChangeDevice");
 
                 try
                 {
                     IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
                         device,
-                        DeviceLogResourceKeys.ChangeDevice,
-                        DeviceLogResourceKeys.ChangeDeviceSuccess);
+                        "Log_ChangeDevice",
+                    "Log_ChangeDeviceSuccess");
                     await _deviceChangeService
                         .ChangeAsync(
                             device.Serial,
@@ -1042,7 +1041,7 @@ namespace DeepDroidChanger.ViewModels
                             cancellationToken)
                         .ConfigureAwait(true);
 
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceSuccess, cancellationToken).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_ChangeDeviceSuccess", cancellationToken).ConfigureAwait(true);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1050,12 +1049,12 @@ namespace DeepDroidChanger.ViewModels
                 catch (Exception exception)
                 {
                     _logger.LogError(exception, "Failed to change device {Serial}.", device.Serial);
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeDeviceFailed, CancellationToken.None).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_ChangeDeviceFailed", CancellationToken.None).ConfigureAwait(true);
                 }
             }
             finally
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1072,21 +1071,21 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.RandomSim);
+                SetDeviceLog(device, "Log_RandomSim");
                 SimProfile simProfile = _simProfileService.CreateRandomProfile(SelectedCountry, SelectedCarrier);
                 ApplyRandomSimInfo(device.Serial, simProfile);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomSimSuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            await ShowDeviceLogAsync(device, "Log_RandomSimSuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to generate random SIM information.");
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomSimFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            await ShowDeviceLogAsync(device, "Log_RandomSimFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1101,7 +1100,7 @@ namespace DeepDroidChanger.ViewModels
         {
             if (device == null)
             {
-                await ShowToolbarLogAsync(DeviceLogResourceKeys.SelectDeviceFirst, cancellationToken).ConfigureAwait(true);
+                await ShowToolbarLogAsync("Log_SelectDeviceFirst", cancellationToken).ConfigureAwait(true);
                 return null;
             }
 
@@ -1125,8 +1124,8 @@ namespace DeepDroidChanger.ViewModels
             if (device.ConnectionStatus == AdbDeviceStatus.Online)
                 return device;
 
-            await ShowDeviceLogAsync(device, DeviceLogResourceKeys.DeviceMustBeOnline, cancellationToken).ConfigureAwait(true);
-            SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+            await ShowDeviceLogAsync(device, "Log_DeviceMustBeOnline", cancellationToken).ConfigureAwait(true);
+            SetDeviceLog(device, "Log_Ready");
             return null;
         }
 
@@ -1137,8 +1136,8 @@ namespace DeepDroidChanger.ViewModels
             if (_randomDeviceProfiles.TryGetValue(device.Serial, out DeviceInfoApiDevice? profile))
                 return profile;
 
-            await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomDeviceRequired, cancellationToken).ConfigureAwait(true);
-            SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceRequired", cancellationToken).ConfigureAwait(true);
+            SetDeviceLog(device, "Log_Ready");
             return null;
         }
 
@@ -1155,8 +1154,8 @@ namespace DeepDroidChanger.ViewModels
 
             if (!_randomSimProfiles.TryGetValue(device.Serial, out SimProfile? profile))
             {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.RandomSimRequired, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_RandomSimRequired", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
                 return;
             }
 
@@ -1169,17 +1168,17 @@ namespace DeepDroidChanger.ViewModels
                     .ConfigureAwait(true);
                 if (!confirmed)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeSimCanceled, cancellationToken)
+                await ShowDeviceLogAsync(device, "Log_ChangeSimCanceled", cancellationToken)
                         .ConfigureAwait(true);
                     return;
                 }
 
-                SetDeviceLog(device, DeviceLogResourceKeys.ChangeSim);
+                SetDeviceLog(device, "Log_ChangeSim");
                 await _deviceChangeService
                     .ChangeSimAsync(device.Serial, editedProfile, cancellationToken)
                     .ConfigureAwait(true);
                 _randomSimProfiles[device.Serial] = editedProfile;
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeSimSuccess, cancellationToken).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_ChangeSimSuccess", cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
@@ -1187,11 +1186,11 @@ namespace DeepDroidChanger.ViewModels
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to change SIM information on device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeSimFailed, CancellationToken.None).ConfigureAwait(true);
+            await ShowDeviceLogAsync(device, "Log_ChangeSimFailed", CancellationToken.None).ConfigureAwait(true);
             }
             finally
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1206,7 +1205,7 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
+            SetDeviceLog(device, "Log_OpeningDialog");
 
             try
             {
@@ -1216,16 +1215,16 @@ namespace DeepDroidChanger.ViewModels
 
                 if (dialogResult == null)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeLocationCanceled, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_ChangeLocationCanceled", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
                 SetDeviceLog(
                     device,
                     dialogResult.Mode == ChangeLocationMode.DeviceIp
-                        ? DeviceLogResourceKeys.ResolvingByIp
-                        : DeviceLogResourceKeys.ApplyingLocation);
+                        ? "Log_ResolvingByIp"
+                        : "Log_ApplyingLocation");
                 DeviceLocationResult locationResult = await _deviceLocationService
                     .ApplyAsync(device.Serial, dialogResult, cancellationToken)
                     .ConfigureAwait(true);
@@ -1240,19 +1239,19 @@ namespace DeepDroidChanger.ViewModels
                         cancellationToken)
                     .ConfigureAwait(true);
 
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeLocationSuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_ChangeLocationSuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeLocationCanceled, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_ChangeLocationCanceled", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to change location for device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeLocationFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_ChangeLocationFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1267,7 +1266,7 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
+            SetDeviceLog(device, "Log_OpeningDialog");
 
             try
             {
@@ -1277,16 +1276,16 @@ namespace DeepDroidChanger.ViewModels
 
                 if (dialogResult == null)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeTimezoneCanceled, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_ChangeTimezoneCanceled", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
                 SetDeviceLog(
                     device,
                     dialogResult.Mode == ChangeTimezoneMode.DeviceIp
-                        ? DeviceLogResourceKeys.ResolvingByIp
-                        : DeviceLogResourceKeys.ApplyingTimezone);
+                        ? "Log_ResolvingByIp"
+                        : "Log_ApplyingTimezone");
                 string appliedTimezone = await _deviceTimezoneService
                     .ApplyAsync(device.Serial, dialogResult, cancellationToken)
                     .ConfigureAwait(true);
@@ -1298,19 +1297,19 @@ namespace DeepDroidChanger.ViewModels
                         cancellationToken)
                     .ConfigureAwait(true);
 
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeTimezoneSuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_ChangeTimezoneSuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeTimezoneCanceled, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_ChangeTimezoneCanceled", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to change timezone for device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.ChangeTimezoneFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_ChangeTimezoneFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1437,15 +1436,15 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
+            SetDeviceLog(device, "Log_OpeningDialog");
 
             try
             {
                 var storedDevice = _storedDevices.FirstOrDefault(d => SerialEquals(d.Serial, device.Serial));
                 if (storedDevice == null)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.UpdateIntegrityFailed, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_UpdateIntegrityFailed", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
@@ -1460,8 +1459,8 @@ namespace DeepDroidChanger.ViewModels
 
                 if (dialogResult == null)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.UpdateIntegrityCanceled, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_UpdateIntegrityCanceled", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
@@ -1470,27 +1469,27 @@ namespace DeepDroidChanger.ViewModels
                 await ShowDeviceLogAsync(
                         device,
                         dialogResult.UpdateIntegrityEnabled
-                            ? DeviceLogResourceKeys.UpdatingIntegrity
-                            : DeviceLogResourceKeys.UpdatingKeybox,
+                            ? "Log_UpdatingIntegrity"
+                            : "Log_UpdatingKeybox",
                         cancellationToken)
                     .ConfigureAwait(true);
                 await _deviceIntegrityService
                     .ApplyAsync(device.Serial, dialogResult, cancellationToken)
                     .ConfigureAwait(true);
 
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.UpdateIntegritySuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_UpdateIntegritySuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.UpdateIntegrityCanceled, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_UpdateIntegrityCanceled", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to update integrity for device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.UpdateIntegrityFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_UpdateIntegrityFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1505,7 +1504,7 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.InstallPackageOpening);
+            SetDeviceLog(device, "Log_InstallPackageOpening");
 
             try
             {
@@ -1515,8 +1514,8 @@ namespace DeepDroidChanger.ViewModels
 
                 if (dialogResult == null || dialogResult.TotalCount == 0)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.InstallPackageCanceled, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_InstallPackageCanceled", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
@@ -1528,33 +1527,33 @@ namespace DeepDroidChanger.ViewModels
                         dialogResult.SuccessCount,
                         dialogResult.TotalCount)
                     .ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.InstallPackageCanceled, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_InstallPackageCanceled", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to install package for selected device.");
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.InstallPackageAdbFailure, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_InstallPackageAdbFailure", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
         private static string CreateInstallPackageSummaryKey(InstallPackageDialogResult result)
         {
             if (result.Canceled)
-                return DeviceLogResourceKeys.InstallPackageCanceled;
+                return "Log_InstallPackageCanceled";
 
             if (result.FailedCount == 0 && result.SuccessCount == result.TotalCount)
-                return DeviceLogResourceKeys.InstallPackageCompleteFormat;
+                return "Log_InstallPackageCompleteFormat";
 
             if (result.SuccessCount > 0)
-                return DeviceLogResourceKeys.InstallPackagePartialFormat;
+                return "Log_InstallPackagePartialFormat";
 
-            return DeviceLogResourceKeys.InstallPackageFailedFormat;
+            return "Log_InstallPackageFailedFormat";
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
@@ -1568,7 +1567,7 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.OpeningDialog);
+            SetDeviceLog(device, "Log_OpeningDialog");
 
             try
             {
@@ -1578,12 +1577,12 @@ namespace DeepDroidChanger.ViewModels
 
                 if (dialogResult == null)
                 {
-                    await ShowDeviceLogAsync(device, DeviceLogResourceKeys.FakeProxyCanceled, cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                    await ShowDeviceLogAsync(device, "Log_FakeProxyCanceled", cancellationToken).ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
-                SetDeviceLog(device, DeviceLogResourceKeys.StartingProxy);
+                SetDeviceLog(device, "Log_StartingProxy");
 
                 ProxyWorkflowResult workflowResult = await _proxyWorkflowService
                     .ApplyAsync(device.Serial, dialogResult, cancellationToken)
@@ -1593,7 +1592,7 @@ namespace DeepDroidChanger.ViewModels
                 {
                     await ShowDeviceLogAsync(
                             device,
-                            DeviceLogResourceKeys.ProxyLocationByIpFailed,
+                            "Log_ProxyLocationByIpFailed",
                             cancellationToken)
                         .ConfigureAwait(true);
                 }
@@ -1602,7 +1601,7 @@ namespace DeepDroidChanger.ViewModels
                 {
                     await ShowDeviceLogAsync(
                             device,
-                            DeviceLogResourceKeys.ProxyTimezoneByIpFailed,
+                            "Log_ProxyTimezoneByIpFailed",
                             cancellationToken)
                         .ConfigureAwait(true);
                 }
@@ -1613,22 +1612,22 @@ namespace DeepDroidChanger.ViewModels
                 await ShowDeviceLogAsync(
                         device,
                         postProxyUpdatesSucceeded
-                            ? DeviceLogResourceKeys.FakeProxySuccess
-                            : DeviceLogResourceKeys.FakeProxyPartialSuccess,
+                            ? "Log_FakeProxySuccess"
+                            : "Log_FakeProxyPartialSuccess",
                         cancellationToken)
                     .ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.FakeProxyCanceled, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_FakeProxyCanceled", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to apply fake proxy for device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.FakeProxyFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_FakeProxyFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1643,7 +1642,7 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            SetDeviceLog(device, DeviceLogResourceKeys.StoppingProxy);
+            SetDeviceLog(device, "Log_StoppingProxy");
 
             try
             {
@@ -1651,18 +1650,18 @@ namespace DeepDroidChanger.ViewModels
                     .StopProxyAsync(device.Serial, cancellationToken)
                     .ConfigureAwait(true);
 
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.StopFakeProxySuccess, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_StopFakeProxySuccess", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(device, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to stop fake proxy for device {Serial}.", device.Serial);
-                await ShowDeviceLogAsync(device, DeviceLogResourceKeys.StopFakeProxyFailed, CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, DeviceLogResourceKeys.Ready);
+                await ShowDeviceLogAsync(device, "Log_StopFakeProxyFailed", CancellationToken.None).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
             }
         }
 
@@ -1676,21 +1675,21 @@ namespace DeepDroidChanger.ViewModels
             if (targetDevice == null)
                 return;
 
-            SetDeviceLog(targetDevice, DeviceLogResourceKeys.OpeningDialog);
+            SetDeviceLog(targetDevice, "Log_OpeningDialog");
 
             try
             {
                 await _deviceViewerDialogService.ShowDeviceViewerAsync(targetDevice.Serial, targetDevice.Name, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(targetDevice, "Log_Ready");
             }
             catch (OperationCanceledException)
             {
-                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(targetDevice, "Log_Ready");
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to open device viewer for device {Serial}.", targetDevice.Serial);
-                SetDeviceLog(targetDevice, DeviceLogResourceKeys.Ready);
+                SetDeviceLog(targetDevice, "Log_Ready");
             }
         }
 
@@ -1903,10 +1902,10 @@ namespace DeepDroidChanger.ViewModels
         {
             return SelectedDeviceFilter switch
             {
-                DeviceFilterKeys.Online => device.ConnectionStatus == AdbDeviceStatus.Online,
-                DeviceFilterKeys.Offline => device.ConnectionStatus != AdbDeviceStatus.Online,
-                DeviceFilterKeys.Active => string.Equals(device.Active, DeviceFilterKeys.Active, StringComparison.OrdinalIgnoreCase),
-                DeviceFilterKeys.Inactive => string.Equals(device.Active, DeviceFilterKeys.Inactive, StringComparison.OrdinalIgnoreCase),
+                "Online" => device.ConnectionStatus == AdbDeviceStatus.Online,
+                "Offline" => device.ConnectionStatus != AdbDeviceStatus.Online,
+                "Active" => string.Equals(device.Active, "Active", StringComparison.OrdinalIgnoreCase),
+                "Inactive" => string.Equals(device.Active, "Inactive", StringComparison.OrdinalIgnoreCase),
                 _ => true
             };
         }
@@ -2084,7 +2083,7 @@ namespace DeepDroidChanger.ViewModels
                     ?? FindCountryOption(DefaultCountryIso)
                     ?? Countries.FirstOrDefault();
 
-                SelectedBrand = FindOption(Brands, storedDevice?.Brand) ?? DeviceProfileOptions.Random;
+                SelectedBrand = FindOption(Brands, storedDevice?.Brand) ?? "Random";
                 UpdateAndroidVersionOptions(SelectedBrand, storedDevice?.AndroidVersion);
                 IsChangeSimEnabled = storedDevice?.ChangeSimEnabled ?? true;
                 _useIntegritySecurityPatch = storedDevice?.UseIntegritySecurityPatch ?? true;
@@ -2174,19 +2173,20 @@ namespace DeepDroidChanger.ViewModels
 
         private void UpdateAndroidVersionOptions(string? brand, string? preferredVersion)
         {
-            IReadOnlyList<string> compatibleVersions = string.IsNullOrWhiteSpace(brand)
-                || string.Equals(brand, DeviceProfileOptions.Random, StringComparison.OrdinalIgnoreCase)
-                || !DeviceProfileOptions.AndroidVersionsByBrand.TryGetValue(brand, out IReadOnlyList<string>? versions)
-                    ? DeviceProfileOptions.SupportedAndroidVersions
-                    : versions;
+            IReadOnlyList<string> compatibleVersions = brand?.Trim().ToLowerInvariant() switch
+            {
+                "oneplus" => ["Android 13"],
+                "oppo" or "vivo" => ["Android 14"],
+                _ => ["Android 13", "Android 14", "Android 15"]
+            };
 
             AndroidVersions.Clear();
-            AndroidVersions.Add(DeviceProfileOptions.Random);
+            AndroidVersions.Add("Random");
             foreach (string version in compatibleVersions)
                 AndroidVersions.Add(version);
 
             SelectedAndroidVersion = FindOption(AndroidVersions, preferredVersion)
-                ?? DeviceProfileOptions.Random;
+                ?? "Random";
         }
 
         private void QueueSelectedDeviceProfileSave()
@@ -2349,7 +2349,7 @@ namespace DeepDroidChanger.ViewModels
                 storedDevice,
                 connectedDevice,
                 GetConnectionStatusText(connectionStatus),
-                GetLogText(DeviceLogResourceKeys.Ready));
+                GetLogText("Log_Ready"));
             deviceRow.IsActionBusy = _deviceActionGuardService.IsBusy(deviceRow.Serial);
             return deviceRow;
         }
@@ -2532,9 +2532,9 @@ namespace DeepDroidChanger.ViewModels
 
             return sdk?.Trim() switch
             {
-                "33" => DeviceProfileOptions.Android13,
-                "34" => DeviceProfileOptions.Android14,
-                "35" => DeviceProfileOptions.Android15,
+                "33" => "Android 13",
+                "34" => "Android 14",
+                "35" => "Android 15",
                 _ => string.Empty
             };
         }
@@ -2620,12 +2620,12 @@ namespace DeepDroidChanger.ViewModels
         {
             return stage switch
             {
-                DeviceChangeStage.Preparing => DeviceLogResourceKeys.ChangeDevicePreparing,
-                DeviceChangeStage.ApplyingProfile => DeviceLogResourceKeys.ChangeDeviceApplyingProfile,
-                DeviceChangeStage.ClearingData => DeviceLogResourceKeys.ChangeDeviceClearingData,
-                DeviceChangeStage.Rebooting => DeviceLogResourceKeys.ChangeDeviceRebooting,
-                DeviceChangeStage.WaitingForDevice => DeviceLogResourceKeys.WaitingForDevice,
-                DeviceChangeStage.Verifying => DeviceLogResourceKeys.ChangeDeviceVerifying,
+            DeviceChangeStage.Preparing => "Log_ChangeDevicePreparing",
+            DeviceChangeStage.ApplyingProfile => "Log_ChangeDeviceApplyingProfile",
+            DeviceChangeStage.ClearingData => "Log_ChangeDeviceClearingData",
+            DeviceChangeStage.Rebooting => "Log_ChangeDeviceRebooting",
+                DeviceChangeStage.WaitingForDevice => "Log_WaitingForDevice",
+            DeviceChangeStage.Verifying => "Log_ChangeDeviceVerifying",
                 DeviceChangeStage.Completed => completedLogKey,
                 _ => actionLogKey
             };

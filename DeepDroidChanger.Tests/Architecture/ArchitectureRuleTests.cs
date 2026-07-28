@@ -199,6 +199,27 @@ public sealed class ArchitectureRuleTests
     }
 
     [TestMethod]
+    public void Constants_ContainOnlyApprovedCatalogFiles()
+    {
+        string constantsDirectory = Path.Combine(GetProjectRoot(), "Constants");
+        string[] expectedFiles =
+        [
+            "AssetConstants.cs",
+            "AuthenticationConstants.cs",
+            "DeviceSettingsInfoConstants.cs",
+            "PropertyConstants.cs",
+            "UrlConstants.cs"
+        ];
+        string[] actualFiles = Directory
+            .GetFiles(constantsDirectory, "*.cs", SearchOption.AllDirectories)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray()!;
+
+        CollectionAssert.AreEqual(expectedFiles, actualFiles);
+    }
+
+    [TestMethod]
     public void Constants_ContainNoProcessingMethods()
     {
         string constantsDirectory = Path.Combine(GetProjectRoot(), "Constants");
@@ -210,6 +231,111 @@ public sealed class ArchitectureRuleTests
         {
             string source = File.ReadAllText(file);
             Assert.IsFalse(methodPattern.IsMatch(source), $"Constants file contains processing logic: '{file}'.");
+        }
+    }
+
+    [TestMethod]
+    public void Constants_ExposeOnlyStringConstants()
+    {
+        string constantsDirectory = Path.Combine(GetProjectRoot(), "Constants");
+        var nonStringConstantPattern = new Regex(
+            "\\bpublic\\s+const\\s+(?!string\\b)",
+            RegexOptions.CultureInvariant);
+
+        foreach (string file in Directory.GetFiles(constantsDirectory, "*.cs", SearchOption.AllDirectories))
+        {
+            string source = File.ReadAllText(file);
+            Assert.IsFalse(
+                nonStringConstantPattern.IsMatch(source),
+                $"Constants catalog exposes a non-string value: '{file}'.");
+        }
+    }
+
+    [TestMethod]
+    public void AssetConstants_ContainOnlyApprovedSharedAssetAndRuntimeCatalogs()
+    {
+        string path = Path.Combine(GetProjectRoot(), "Constants", "AssetConstants.cs");
+        string source = File.ReadAllText(path);
+        string[] expectedNestedCatalogs =
+        [
+            "Data",
+            "Icons",
+            "Localization",
+            "RuntimeData",
+            "Themes",
+            "Tools"
+        ];
+        string[] actualNestedCatalogs = Regex
+            .Matches(source, "\\bpublic\\s+static\\s+class\\s+(?<name>[A-Za-z0-9_]+)")
+            .Select(match => match.Groups["name"].Value)
+            .Where(name => !string.Equals(name, "AssetConstants", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(expectedNestedCatalogs, actualNestedCatalogs);
+    }
+
+    [TestMethod]
+    public void DeviceSettingsInfoConstants_ContainOnlyNamespacesAndSettingKeys()
+    {
+        string path = Path.Combine(GetProjectRoot(), "Constants", "DeviceSettingsInfoConstants.cs");
+        string source = File.ReadAllText(path);
+        string[] expectedNames =
+        [
+            "AndroidId",
+            "BluetoothAddress",
+            "BluetoothAddressValid",
+            "BluetoothName",
+            "DeviceName",
+            "GlobalNamespace",
+            "RandomMac",
+            "ScreenTimeout",
+            "SecureNamespace",
+            "SystemNamespace",
+            "WifiP2pDeviceName"
+        ];
+        string[] actualNames = Regex
+            .Matches(source, "\\bpublic\\s+const\\s+string\\s+(?<name>[A-Za-z0-9_]+)\\s*=")
+            .Select(match => match.Groups["name"].Value)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        CollectionAssert.AreEqual(expectedNames, actualNames);
+    }
+
+    [TestMethod]
+    public void Constants_ExcludeOperationalValuesArgumentsAndCommands()
+    {
+        string constantsDirectory = Path.Combine(GetProjectRoot(), "Constants");
+        string[] memberNames = Directory
+            .GetFiles(constantsDirectory, "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path => Regex.Matches(
+                File.ReadAllText(path),
+                "\\b(?:public|private|internal)\\s+const\\s+string\\s+(?<name>[A-Za-z0-9_]+)\\s*="))
+            .Select(match => match.Groups["name"].Value)
+            .Where(name => !string.Equals(name, "ChangeOptionsConfigFileName", StringComparison.Ordinal))
+            .ToArray();
+        string[] forbiddenMemberTerms =
+        [
+            "Argument",
+            "Command",
+            "DisabledValue",
+            "EnabledValue",
+            "FailureCode",
+            "Filter",
+            "KeyEvent",
+            "Option",
+            "ResourceKey",
+            "RootUserId",
+            "TimeoutMilliseconds",
+            "TimeoutSeconds"
+        ];
+
+        foreach (string term in forbiddenMemberTerms)
+        {
+            Assert.IsFalse(
+                memberNames.Any(name => name.Contains(term, StringComparison.Ordinal)),
+                $"Constants catalogs contain forbidden operational member term '{term}'.");
         }
     }
 

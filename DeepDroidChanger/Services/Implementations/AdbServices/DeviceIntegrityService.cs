@@ -14,7 +14,7 @@ namespace DeepDroidChanger.Services
     {
         private static readonly HttpClient HttpClientInstance = new()
         {
-            Timeout = TimeSpan.FromSeconds(IntegrityConstants.DownloadTimeoutSeconds),
+            Timeout = TimeSpan.FromSeconds(30),
         };
         private readonly IAdbCommandService _adbCommandService;
         private readonly IRandomService _randomService;
@@ -46,11 +46,11 @@ namespace DeepDroidChanger.Services
             try
             {
                 string pifJson = await _downloadString(
-                        IntegrityConstants.PifUrl,
-                        IntegrityConstants.MaxPifBytes,
+                        UrlConstants.Pif,
+                        2 * 1024 * 1024,
                         cancellationToken)
                     .ConfigureAwait(false);
-                EnsureContentSize(pifJson, IntegrityConstants.MaxPifBytes, "PIF JSON");
+                EnsureContentSize(pifJson, 2 * 1024 * 1024, "PIF JSON");
 
                 IReadOnlyList<Integrity> candidates = ParsePifJson(pifJson)?
                     .Where(item => !string.IsNullOrWhiteSpace(item.SECURITY_PATCH))
@@ -87,11 +87,11 @@ namespace DeepDroidChanger.Services
             if (fromServer)
             {
                 pifJson = await _downloadString(
-                        IntegrityConstants.PifUrl,
-                        IntegrityConstants.MaxPifBytes,
+                        UrlConstants.Pif,
+                        2 * 1024 * 1024,
                         cancellationToken)
                     .ConfigureAwait(false);
-                EnsureContentSize(pifJson, IntegrityConstants.MaxPifBytes, "PIF JSON");
+                EnsureContentSize(pifJson, 2 * 1024 * 1024, "PIF JSON");
             }
             else
             {
@@ -101,7 +101,7 @@ namespace DeepDroidChanger.Services
                 }
                 pifJson = await ReadLocalTextAsync(
                         jsonPath,
-                        IntegrityConstants.MaxPifBytes,
+                        2 * 1024 * 1024,
                         "PIF JSON",
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -134,22 +134,22 @@ namespace DeepDroidChanger.Services
 
             var releaseVersion = string.IsNullOrEmpty(pifData.RELEASE) ? splitFingerprint[3] : pifData.RELEASE;
 
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifType, "user", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifTags, "release-keys", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifBrand, splitFingerprint[0], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifProduct, splitFingerprint[1], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifDevice, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifBoard, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifHardware, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifId, splitFingerprint[4], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifIncremental, splitFingerprint[5], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifFingerprint, fingerprint, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifManufacturer, pifData.MANUFACTURER ?? "Google", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifModel, pifData.MODEL ?? "Pixel", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifSecurityPatch, pifData.SECURITY_PATCH!, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifDeviceInitialSdkInt, pifData.DEVICE_INITIAL_SDK_INT ?? "21", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifSdkInt, pifData.SDK_INT ?? "32", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, IntegrityConstants.Prop_PifRelease, releaseVersion, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Type, "user", cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Tags, "release-keys", cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Brand, splitFingerprint[0], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Product, splitFingerprint[1], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Device, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Board, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Hardware, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Id, splitFingerprint[4], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Incremental, splitFingerprint[5], cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Fingerprint, fingerprint, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Manufacturer, pifData.MANUFACTURER ?? "Google", cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Model, pifData.MODEL ?? "Pixel", cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.SecurityPatch, pifData.SECURITY_PATCH!, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.DeviceInitialSdkInt, pifData.DEVICE_INITIAL_SDK_INT ?? "21", cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.SdkInt, pifData.SDK_INT ?? "32", cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Release, releaseVersion, cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("Successfully updated Integrity/PIF settings for device {Serial}.", serial);
         }
@@ -168,8 +168,8 @@ namespace DeepDroidChanger.Services
             if (fromServer)
             {
                 var xmlContent = await _downloadString(
-                        IntegrityConstants.KeyboxUrl,
-                        IntegrityConstants.MaxKeyboxBytes,
+                        UrlConstants.Keybox,
+                        1024 * 1024,
                         cancellationToken)
                     .ConfigureAwait(false);
                 ValidateKeyboxXml(xmlContent);
@@ -186,7 +186,7 @@ namespace DeepDroidChanger.Services
                 }
                 string xmlContent = await ReadLocalTextAsync(
                         keyboxPath,
-                        IntegrityConstants.MaxKeyboxBytes,
+                        1024 * 1024,
                         "Keybox XML",
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -279,7 +279,7 @@ namespace DeepDroidChanger.Services
 
         private static void ValidateKeyboxXml(string xmlContent)
         {
-            EnsureContentSize(xmlContent, IntegrityConstants.MaxKeyboxBytes, "Keybox XML");
+            EnsureContentSize(xmlContent, 1024 * 1024, "Keybox XML");
             if (string.IsNullOrWhiteSpace(xmlContent))
                 throw new InvalidOperationException("Keybox XML is empty.");
 
@@ -287,7 +287,7 @@ namespace DeepDroidChanger.Services
             {
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
-                MaxCharactersInDocument = IntegrityConstants.MaxKeyboxBytes
+                MaxCharactersInDocument = 1024 * 1024
             };
 
             try
@@ -297,9 +297,9 @@ namespace DeepDroidChanger.Services
                 XDocument document = XDocument.Load(xmlReader, LoadOptions.None);
                 XElement? root = document.Root;
                 bool hasKeybox = root != null
-                    && string.Equals(root.Name.LocalName, IntegrityConstants.KeyboxRootElement, StringComparison.Ordinal)
+                    && string.Equals(root.Name.LocalName, "AndroidAttestation", StringComparison.Ordinal)
                     && root.Descendants().Any(element =>
-                        string.Equals(element.Name.LocalName, IntegrityConstants.KeyboxElement, StringComparison.Ordinal));
+                        string.Equals(element.Name.LocalName, "Keybox", StringComparison.Ordinal));
                 if (!hasKeybox)
                     throw new InvalidOperationException("Keybox XML does not contain the required Android attestation structure.");
             }

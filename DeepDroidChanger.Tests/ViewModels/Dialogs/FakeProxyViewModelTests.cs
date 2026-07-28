@@ -1,6 +1,5 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Tests.Fakes;
 using DeepDroidChanger.ViewModels;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -42,7 +41,7 @@ public sealed class FakeProxyViewModelTests
         await viewModel.FlushPendingConfigSaveAsync();
 
         Assert.AreEqual("proxy.example:1080:user:password", config.ProxyFullString);
-        Assert.AreEqual(DeepProxyConstants.SocksProxyType, config.ProxyType);
+        Assert.AreEqual("Socks 5", config.ProxyType);
         Assert.IsFalse(config.ProxyChangeLocationByIp);
         Assert.IsFalse(config.ProxyChangeTimezoneByIp);
         await store.Received().UpdateAsync(

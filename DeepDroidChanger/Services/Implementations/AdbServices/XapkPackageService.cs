@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using System.IO;
 using System.IO.Compression;
@@ -32,14 +31,14 @@ namespace DeepDroidChanger.Services
             Directory.CreateDirectory(outputDirectory);
             await ExtractArchiveSafelyAsync(xapkPath, outputDirectory, cancellationToken).ConfigureAwait(false);
 
-            var manifestPath = Path.Combine(outputDirectory, AdbInstallConstants.XapkManifestFileName);
+            var manifestPath = Path.Combine(outputDirectory, "manifest.json");
             if (!File.Exists(manifestPath))
-                throw new InvalidDataException(AdbInstallConstants.XapkManifestFileName);
+                throw new InvalidDataException("manifest.json");
 
             var manifestJson = await File.ReadAllTextAsync(manifestPath, cancellationToken).ConfigureAwait(false);
             var packageName = ReadPackageName(manifestJson);
             if (string.IsNullOrWhiteSpace(packageName))
-                throw new InvalidDataException(AdbInstallConstants.PackageNameJsonProperty);
+                throw new InvalidDataException("package_name");
 
             var apkFilePaths = Directory
                 .EnumerateFiles(outputDirectory, ApkSearchPattern, SearchOption.AllDirectories)
@@ -48,7 +47,7 @@ namespace DeepDroidChanger.Services
                 .ToArray();
 
             if (apkFilePaths.Length == 0)
-                throw new InvalidDataException(AdbInstallConstants.ApkExtension);
+                throw new InvalidDataException(".apk");
 
             var obbFiles = Directory
                 .EnumerateFiles(outputDirectory, ObbSearchPattern, SearchOption.AllDirectories)
@@ -123,10 +122,10 @@ namespace DeepDroidChanger.Services
             using var document = JsonDocument.Parse(manifestJson);
             var root = document.RootElement;
 
-            if (TryGetStringProperty(root, AdbInstallConstants.PackageNameJsonProperty, out var packageName))
+            if (TryGetStringProperty(root, "package_name", out var packageName))
                 return packageName;
 
-            if (TryGetStringProperty(root, AdbInstallConstants.AlternatePackageNameJsonProperty, out var alternatePackageName))
+            if (TryGetStringProperty(root, "package", out var alternatePackageName))
                 return alternatePackageName;
 
             return string.Empty;

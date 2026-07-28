@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -23,9 +22,9 @@ public sealed class PackageInstallServiceTests
                 "SERIAL", unsupportedPath, new InstallPackageOptions(false, false), CancellationToken.None);
 
             Assert.IsFalse(missing.Success);
-            Assert.AreEqual(DeviceLogResourceKeys.InstallPackageFileMissing, missing.MessageResourceKey);
+            Assert.AreEqual("Log_InstallPackageFileMissing", missing.MessageResourceKey);
             Assert.IsFalse(unsupported.Success);
-            Assert.AreEqual(DeviceLogResourceKeys.InstallPackageUnsupportedFile, unsupported.MessageResourceKey);
+            Assert.AreEqual("Log_InstallPackageUnsupportedFile", unsupported.MessageResourceKey);
             await adb.DidNotReceiveWithAnyArgs().RunAdbAsync(default!, default!, default);
         }
         finally
@@ -34,12 +33,12 @@ public sealed class PackageInstallServiceTests
         }
     }
 
-    [DataRow("INSTALL_FAILED_ALREADY_EXISTS", DeviceLogResourceKeys.InstallPackageAlreadyExists)]
-    [DataRow("INSTALL_FAILED_INSUFFICIENT_STORAGE", DeviceLogResourceKeys.InstallPackageInsufficientStorage)]
-    [DataRow("INSTALL_FAILED_INVALID_APK", DeviceLogResourceKeys.InstallPackageInvalidApk)]
-    [DataRow("INSTALL_FAILED_NO_MATCHING_ABIS", DeviceLogResourceKeys.InstallPackageNoMatchingAbis)]
-    [DataRow("INSTALL_FAILED_MISSING_SHARED_LIBRARY: detail", DeviceLogResourceKeys.InstallPackageMissingSharedLibrary)]
-    [DataRow("INSTALL_FAILED_OTHER", DeviceLogResourceKeys.InstallPackageAdbFailureCodeFormat)]
+    [DataRow("INSTALL_FAILED_ALREADY_EXISTS", "Log_InstallPackageAlreadyExists")]
+    [DataRow("INSTALL_FAILED_INSUFFICIENT_STORAGE", "Log_InstallPackageInsufficientStorage")]
+    [DataRow("INSTALL_FAILED_INVALID_APK", "Log_InstallPackageInvalidApk")]
+    [DataRow("INSTALL_FAILED_NO_MATCHING_ABIS", "Log_InstallPackageNoMatchingAbis")]
+    [DataRow("INSTALL_FAILED_MISSING_SHARED_LIBRARY: detail", "Log_InstallPackageMissingSharedLibrary")]
+    [DataRow("INSTALL_FAILED_OTHER", "Log_InstallPackageAdbFailureCodeFormat")]
     [TestMethod]
     public async Task InstallAsync_KnownAdbFailure_MapsLocalizedCategory(string failureCode, string expectedKey)
     {
@@ -215,7 +214,7 @@ public sealed class PackageInstallServiceTests
                 "SERIAL", xapkPath, new InstallPackageOptions(false, false), CancellationToken.None);
 
             Assert.IsFalse(result.Success);
-            Assert.AreEqual(DeviceLogResourceKeys.InstallPackageObbPushFailed, result.MessageResourceKey);
+            Assert.AreEqual("Log_InstallPackageObbPushFailed", result.MessageResourceKey);
         }
         finally
         {

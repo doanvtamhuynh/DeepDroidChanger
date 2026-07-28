@@ -4,7 +4,6 @@
              xmlns:behaviors="clr-namespace:DeepDroidChanger.Behaviors"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:models="clr-namespace:DeepDroidChanger.Models"
-             xmlns:constants="clr-namespace:DeepDroidChanger.Constants"
              Background="Transparent">
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
@@ -50,19 +49,19 @@
                 <ComboBox SelectedValue="{Binding SelectedDeviceFilter, Mode=TwoWay}"
                           SelectedValuePath="Tag"
                           Style="{StaticResource DeviceFilterComboBoxStyle}">
-                    <ComboBoxItem Tag="{x:Static constants:DeviceFilterKeys.All}"
+                    <ComboBoxItem Tag="All"
                                   Content="{DynamicResource DeviceManager_FilterAll}"
                                   Style="{StaticResource DeviceFilterComboBoxItemStyle}"/>
-                    <ComboBoxItem Tag="{x:Static constants:DeviceFilterKeys.Online}"
+                    <ComboBoxItem Tag="Online"
                                   Content="{DynamicResource DeviceManager_FilterOnline}"
                                   Style="{StaticResource DeviceFilterComboBoxItemStyle}"/>
-                    <ComboBoxItem Tag="{x:Static constants:DeviceFilterKeys.Offline}"
+                    <ComboBoxItem Tag="Offline"
                                   Content="{DynamicResource DeviceManager_FilterOffline}"
                                   Style="{StaticResource DeviceFilterComboBoxItemStyle}"/>
-                    <ComboBoxItem Tag="{x:Static constants:DeviceFilterKeys.Active}"
+                    <ComboBoxItem Tag="Active"
                                   Content="{DynamicResource DeviceManager_FilterActive}"
                                   Style="{StaticResource DeviceFilterComboBoxItemStyle}"/>
-                    <ComboBoxItem Tag="{x:Static constants:DeviceFilterKeys.Inactive}"
+                    <ComboBoxItem Tag="Inactive"
                                   Content="{DynamicResource DeviceManager_FilterInactive}"
                                   Style="{StaticResource DeviceFilterComboBoxItemStyle}"/>
                 </ComboBox>
@@ -81,7 +80,7 @@
                   Style="{StaticResource DeviceManagerGridStyle}">
             <DataGrid.Columns>
                 <DataGridTextColumn Binding="{Binding Index}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Index}"
+                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Index"
                                     Width="0.55*"
                                     MinWidth="72"
                                     IsReadOnly="True"
@@ -92,7 +91,7 @@
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridCheckBoxColumn Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Selected}"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Selected"
                                         Width="0.55*"
                                         MinWidth="72"
                                         ElementStyle="{StaticResource DeviceGridCheckBoxStyle}"
@@ -103,7 +102,7 @@
                     </DataGridCheckBoxColumn.Header>
                 </DataGridCheckBoxColumn>
                 <DataGridTextColumn Binding="{Binding Serial}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Serial}"
+                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Serial"
                                     Width="1.05*"
                                     MinWidth="110"
                                     IsReadOnly="True"
@@ -113,7 +112,7 @@
                                    Style="{StaticResource DeviceManagerColumnHeaderTextStyle}"/>
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Name}"
+                <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Name"
                                         Width="1.05*"
                                         MinWidth="110"
                                         CellStyle="{StaticResource DeviceManagerCellStretchStyle}">
@@ -130,7 +129,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Type}"
+                <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Type"
                                         Width="0.9*"
                                         MinWidth="90"
                                         CellStyle="{StaticResource DeviceManagerCellStretchStyle}">
@@ -154,7 +153,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTextColumn Binding="{Binding Active}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Active}"
+                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Active"
                                     Width="1.05*"
                                     MinWidth="110"
                                     IsReadOnly="True"
@@ -165,7 +164,7 @@
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridTextColumn Binding="{Binding Status}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Status}"
+                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Status"
                                     Width="1*"
                                     MinWidth="100"
                                     IsReadOnly="True"
@@ -176,7 +175,7 @@
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridTextColumn Binding="{Binding Process}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="{x:Static constants:DeviceTableColumnSettings.Process}"
+                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Process"
                                     Width="1.95*"
                                     MinWidth="150"
                                     IsReadOnly="True"

@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.ViewModels;
 
@@ -37,7 +36,7 @@ public static class DeviceRowFactory
             storedDevice.Serial,
             storedDevice.Name,
             storedDevice.Type,
-            DeviceFilterKeys.Inactive,
+            "Inactive",
             connectedDevice?.Status ?? AdbDeviceStatus.Offline,
             statusText,
             readyLogText);

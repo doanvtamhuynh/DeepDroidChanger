@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
@@ -36,7 +35,7 @@ namespace DeepDroidChanger.ViewModels
             _localizationService = localizationService;
             _logger = logger;
             Packages.CollectionChanged += OnPackagesChanged;
-            SummaryText = GetLogText(DeviceLogResourceKeys.InstallPackagePending);
+            SummaryText = GetLogText("Log_InstallPackagePending");
         }
 
         public ObservableCollection<InstallPackageQueueItemViewModel> Packages { get; } = new();
@@ -114,15 +113,15 @@ namespace DeepDroidChanger.ViewModels
         {
             ResetRunStateForQueueChange();
 
-            var filter = GetLogText(DeviceLogResourceKeys.InstallPackageFilePickerFilter);
-            var title = GetLogText(DeviceLogResourceKeys.InstallPackageFilePickerTitle);
+            var filter = GetLogText("Log_InstallPackageFilePickerFilter");
+            var title = GetLogText("Log_InstallPackageFilePickerTitle");
             var selectedFiles = _filePickerDialogService.ShowOpenFileDialogMulti(filter, title);
             foreach (var filePath in selectedFiles)
             {
                 if (Packages.Any(item => string.Equals(item.FilePath, filePath, StringComparison.OrdinalIgnoreCase)))
                     continue;
 
-                Packages.Add(new InstallPackageQueueItemViewModel(filePath, GetLogText(DeviceLogResourceKeys.InstallPackagePending)));
+                Packages.Add(new InstallPackageQueueItemViewModel(filePath, GetLogText("Log_InstallPackagePending")));
             }
         }
 
@@ -143,7 +142,7 @@ namespace DeepDroidChanger.ViewModels
         {
             if (Packages.Count == 0)
             {
-                SummaryText = GetLogText(DeviceLogResourceKeys.InstallPackageNoFiles);
+                SummaryText = GetLogText("Log_InstallPackageNoFiles");
                 return;
             }
 
@@ -162,7 +161,7 @@ namespace DeepDroidChanger.ViewModels
                     installToken.ThrowIfCancellationRequested();
 
                     package.Progress = InstallingProgress;
-                    package.StatusText = GetLogText(DeviceLogResourceKeys.InstallPackageInstalling);
+                    package.StatusText = GetLogText("Log_InstallPackageInstalling");
 
                     try
                     {
@@ -176,7 +175,7 @@ namespace DeepDroidChanger.ViewModels
                     {
                         IsCanceled = true;
                         package.Progress = EmptyProgress;
-                        package.StatusText = GetLogText(DeviceLogResourceKeys.InstallPackageCanceled);
+                        package.StatusText = GetLogText("Log_InstallPackageCanceled");
                         break;
                     }
                     catch (Exception)
@@ -187,7 +186,7 @@ namespace DeepDroidChanger.ViewModels
                             new InstallPackageResult(
                                 package.FilePath,
                                 false,
-                                DeviceLogResourceKeys.InstallPackageAdbFailure));
+                                "Log_InstallPackageAdbFailure"));
                     }
 
                     completedCount++;
@@ -202,7 +201,7 @@ namespace DeepDroidChanger.ViewModels
                 IsInstalling = false;
                 HasCompleted = true;
                 SummaryText = IsCanceled
-                    ? GetLogText(DeviceLogResourceKeys.InstallPackageCanceled)
+                    ? GetLogText("Log_InstallPackageCanceled")
                     : CreateSummaryText();
             }
         }
@@ -281,7 +280,7 @@ namespace DeepDroidChanger.ViewModels
             ResetRunState();
             foreach (var package in Packages)
             {
-                package.StatusText = GetLogText(DeviceLogResourceKeys.InstallPackagePending);
+                package.StatusText = GetLogText("Log_InstallPackagePending");
                 package.Progress = EmptyProgress;
                 package.IsSuccessful = false;
                 package.IsFailed = false;
@@ -295,19 +294,19 @@ namespace DeepDroidChanger.ViewModels
             IsCanceled = false;
             HasCompleted = false;
             OverallProgress = EmptyProgress;
-            SummaryText = GetLogText(DeviceLogResourceKeys.InstallPackagePending);
+            SummaryText = GetLogText("Log_InstallPackagePending");
         }
 
         private string CreateSummaryText()
         {
             var totalCount = Packages.Count;
             if (totalCount == 0)
-                return GetLogText(DeviceLogResourceKeys.InstallPackageNoFiles);
+                return GetLogText("Log_InstallPackageNoFiles");
 
             if (_failedCount == 0 && _successCount == totalCount)
             {
                 return string.Format(
-                    GetLogText(DeviceLogResourceKeys.InstallPackageCompleteFormat),
+                    GetLogText("Log_InstallPackageCompleteFormat"),
                     _successCount,
                     totalCount);
             }
@@ -315,13 +314,13 @@ namespace DeepDroidChanger.ViewModels
             if (_successCount > 0)
             {
                 return string.Format(
-                    GetLogText(DeviceLogResourceKeys.InstallPackagePartialFormat),
+                    GetLogText("Log_InstallPackagePartialFormat"),
                     _successCount,
                     totalCount);
             }
 
             return string.Format(
-                GetLogText(DeviceLogResourceKeys.InstallPackageFailedFormat),
+                GetLogText("Log_InstallPackageFailedFormat"),
                 _successCount,
                 totalCount);
         }

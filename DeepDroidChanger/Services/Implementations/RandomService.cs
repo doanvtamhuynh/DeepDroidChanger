@@ -1,3 +1,4 @@
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using System.IO;
 using System.Security.Cryptography;
@@ -7,9 +8,6 @@ namespace DeepDroidChanger.Services
 {
     public sealed class RandomService : IRandomService
     {
-        private const string MacVendorsResourcePath = "Assets/Data/mac_vendors.json";
-        private const string ImeiTacsResourcePath = "Assets/Data/imei_tacs.json";
-        private const string NamesResourcePath = "Assets/Data/names.txt";
         private static readonly IReadOnlyList<string> FallbackNames =
             ["Alex", "Jordan", "Morgan", "Taylor"];
         internal static readonly IReadOnlyList<string> FallbackMacPrefixes =
@@ -144,7 +142,7 @@ namespace DeepDroidChanger.Services
         {
             try
             {
-                string json = AssetDataReader.ReadText(ImeiTacsResourcePath);
+                string json = AssetDataReader.ReadText(AssetConstants.Data.ImeiTacsPath);
                 Dictionary<string, string[]>? source = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
                 return source?.ToDictionary(
                     pair => pair.Key,
@@ -169,7 +167,7 @@ namespace DeepDroidChanger.Services
         {
             try
             {
-                var json = AssetDataReader.ReadText(MacVendorsResourcePath);
+                var json = AssetDataReader.ReadText(AssetConstants.Data.MacVendorsPath);
                 var prefixes = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
                 return prefixes?.ToDictionary(
                     pair => pair.Key,
@@ -191,7 +189,7 @@ namespace DeepDroidChanger.Services
         {
             try
             {
-                string text = AssetDataReader.ReadText(NamesResourcePath);
+                string text = AssetDataReader.ReadText(AssetConstants.Data.NamesPath);
                 string[] names = text
                     .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .Where(name => name.Length > 0)

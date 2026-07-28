@@ -1,5 +1,4 @@
 using DeepDroidChanger.Models;
-using DeepDroidChanger.Constants;
 using System.IO;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -42,16 +41,16 @@ namespace DeepDroidChanger.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!File.Exists(filePath))
-                return CreateFailure(filePath, DeviceLogResourceKeys.InstallPackageFileMissing);
+                return CreateFailure(filePath, "Log_InstallPackageFileMissing");
 
             var extension = Path.GetExtension(filePath);
-            if (string.Equals(extension, AdbInstallConstants.ApkExtension, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(extension, ".apk", StringComparison.OrdinalIgnoreCase))
                 return await InstallApkAsync(serial, filePath, options, cancellationToken).ConfigureAwait(false);
 
-            if (string.Equals(extension, AdbInstallConstants.XapkExtension, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(extension, ".xapk", StringComparison.OrdinalIgnoreCase))
                 return await InstallXapkAsync(serial, filePath, options, cancellationToken).ConfigureAwait(false);
 
-            return CreateFailure(filePath, DeviceLogResourceKeys.InstallPackageUnsupportedFile);
+            return CreateFailure(filePath, "Log_InstallPackageUnsupportedFile");
         }
 
         private async Task<InstallPackageResult> InstallApkAsync(
@@ -94,29 +93,29 @@ namespace DeepDroidChanger.Services
 
                 var obbPushed = await PushObbFilesAsync(serial, packageInfo, cancellationToken).ConfigureAwait(false);
                 if (!obbPushed)
-                    return CreateFailure(xapkPath, DeviceLogResourceKeys.InstallPackageObbPushFailed);
+                    return CreateFailure(xapkPath, "Log_InstallPackageObbPushFailed");
 
                 return CreateSuccess(xapkPath);
             }
             catch (InvalidDataException)
             {
                 _logger.LogWarning("Invalid XAPK package.");
-                return CreateFailure(xapkPath, DeviceLogResourceKeys.InstallPackageInvalidXapk);
+                return CreateFailure(xapkPath, "Log_InstallPackageInvalidXapk");
             }
             catch (JsonException)
             {
                 _logger.LogWarning("Invalid XAPK manifest.");
-                return CreateFailure(xapkPath, DeviceLogResourceKeys.InstallPackageInvalidXapk);
+                return CreateFailure(xapkPath, "Log_InstallPackageInvalidXapk");
             }
             catch (IOException)
             {
                 _logger.LogWarning("Failed to read or extract package file.");
-                return CreateFailure(xapkPath, DeviceLogResourceKeys.InstallPackageInvalidXapk);
+                return CreateFailure(xapkPath, "Log_InstallPackageInvalidXapk");
             }
             catch (UnauthorizedAccessException)
             {
                 _logger.LogWarning("Package file access denied.");
-                return CreateFailure(xapkPath, DeviceLogResourceKeys.InstallPackageInvalidXapk);
+                return CreateFailure(xapkPath, "Log_InstallPackageInvalidXapk");
             }
             finally
             {
@@ -134,7 +133,7 @@ namespace DeepDroidChanger.Services
             var installOptions = CreateInstallOptions(options);
             var quotedApkPaths = string.Join(" ", apkPaths.Select(QuoteProcessArgument));
             var arguments = string.Format(
-                AdbInstallConstants.InstallMultipleArgumentsFormat,
+                "install-multiple -r {0}",
                 $"{installOptions}{quotedApkPaths}");
 
             var result = await _commandService.RunAdbAsync(serial, arguments, cancellationToken).ConfigureAwait(false);
@@ -149,8 +148,8 @@ namespace DeepDroidChanger.Services
             if (packageInfo.ObbFiles.Count == 0)
                 return true;
 
-            var remoteDirectory = string.Format(AdbInstallConstants.AndroidObbRemoteDirectoryFormat, packageInfo.PackageName);
-            var mkdirCommand = string.Format(AdbInstallConstants.MakeDirectoryCommandFormat, QuoteShellValue(remoteDirectory));
+            var remoteDirectory = string.Format("/sdcard/Android/obb/{0}", packageInfo.PackageName);
+            var mkdirCommand = string.Format("mkdir -p {0}", QuoteShellValue(remoteDirectory));
             var mkdirResult = await _commandService.RunAdbShellAsync(serial, mkdirCommand, cancellationToken).ConfigureAwait(false);
             if (mkdirResult.ExitCode != 0)
                 return false;
@@ -161,7 +160,7 @@ namespace DeepDroidChanger.Services
 
                 var remotePath = $"{remoteDirectory}/{obbFile.FileName}";
                 var pushArguments = string.Format(
-                    AdbInstallConstants.PushArgumentsFormat,
+                    "push {0} {1}",
                     QuoteProcessArgument(obbFile.LocalPath),
                     QuoteProcessArgument(remotePath));
                 var pushResult = await _commandService.RunAdbAsync(serial, pushArguments, cancellationToken).ConfigureAwait(false);
@@ -175,7 +174,7 @@ namespace DeepDroidChanger.Services
         private static string CreateInstallArguments(string apkPath, InstallPackageOptions options)
         {
             return string.Format(
-                AdbInstallConstants.InstallApkArgumentsFormat,
+                "install -r {0}{1}",
                 CreateInstallOptions(options),
                 QuoteProcessArgument(apkPath));
         }
@@ -183,14 +182,14 @@ namespace DeepDroidChanger.Services
         private static string CreateInstallOptions(InstallPackageOptions options)
         {
             var grantPermissionsArgument = options.GrantPermissions ? GrantPermissionsArgument : EmptyOption;
-            var allowDowngradeArgument = options.AllowDowngrade ? AdbInstallConstants.AllowDowngradeArgument : EmptyOption;
+            var allowDowngradeArgument = options.AllowDowngrade ? "-d " : EmptyOption;
             return $"{grantPermissionsArgument}{allowDowngradeArgument}";
         }
 
         private static InstallPackageResult ParseInstallResult(string filePath, CommandResult result)
         {
             var output = $"{result.StandardOutput}\n{result.StandardError}";
-            if (output.Contains(AdbInstallConstants.SuccessOutputToken, StringComparison.OrdinalIgnoreCase))
+            if (output.Contains("Success", StringComparison.OrdinalIgnoreCase))
                 return CreateSuccess(filePath);
 
             var failureCode = ExtractFailureCode(output);
@@ -199,17 +198,17 @@ namespace DeepDroidChanger.Services
 
             return result.ExitCode == 0
                 ? CreateSuccess(filePath)
-                : CreateFailure(filePath, DeviceLogResourceKeys.InstallPackageAdbFailure);
+                : CreateFailure(filePath, "Log_InstallPackageAdbFailure");
         }
 
         private static string ExtractFailureCode(string output)
         {
-            var start = output.IndexOf(AdbInstallConstants.FailureOutputPrefix, StringComparison.OrdinalIgnoreCase);
+            var start = output.IndexOf("Failure [", StringComparison.OrdinalIgnoreCase);
             if (start < 0)
                 return string.Empty;
 
-            start += AdbInstallConstants.FailureOutputPrefix.Length;
-            var end = output.IndexOf(AdbInstallConstants.FailureOutputSuffix, start, StringComparison.OrdinalIgnoreCase);
+            start += "Failure [".Length;
+            var end = output.IndexOf("]", start, StringComparison.OrdinalIgnoreCase);
             if (end <= start)
                 return string.Empty;
 
@@ -221,33 +220,33 @@ namespace DeepDroidChanger.Services
             var failureCategory = ExtractFailureCategory(failureCode);
             return failureCategory switch
             {
-                AdbInstallConstants.AlreadyExistsFailureCode => CreateFailure(
+                "INSTALL_FAILED_ALREADY_EXISTS" => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageAlreadyExists,
+                    "Log_InstallPackageAlreadyExists",
                     failureCode),
-                AdbInstallConstants.VersionDowngradeFailureCode => CreateFailure(
+                "INSTALL_FAILED_VERSION_DOWNGRADE" => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageVersionDowngrade,
+                    "Log_InstallPackageVersionDowngrade",
                     failureCode),
-                AdbInstallConstants.InsufficientStorageFailureCode => CreateFailure(
+                "INSTALL_FAILED_INSUFFICIENT_STORAGE" => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageInsufficientStorage,
+                    "Log_InstallPackageInsufficientStorage",
                     failureCode),
-                AdbInstallConstants.InvalidApkFailureCode => CreateFailure(
+                "INSTALL_FAILED_INVALID_APK" => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageInvalidApk,
+                    "Log_InstallPackageInvalidApk",
                     failureCode),
-                AdbInstallConstants.NoMatchingAbisFailureCode => CreateFailure(
+                "INSTALL_FAILED_NO_MATCHING_ABIS" => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageNoMatchingAbis,
+                    "Log_InstallPackageNoMatchingAbis",
                     failureCode),
-                AdbInstallConstants.MissingSharedLibraryFailureCode => CreateFailure(
+                "INSTALL_FAILED_MISSING_SHARED_LIBRARY" => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageMissingSharedLibrary,
+                    "Log_InstallPackageMissingSharedLibrary",
                     failureCode),
                 _ => CreateFailure(
                     filePath,
-                    DeviceLogResourceKeys.InstallPackageAdbFailureCodeFormat,
+                    "Log_InstallPackageAdbFailureCodeFormat",
                     failureCode,
                     failureCode)
             };
@@ -255,7 +254,7 @@ namespace DeepDroidChanger.Services
 
         private static string ExtractFailureCategory(string failureCode)
         {
-            var detailSeparatorIndex = failureCode.IndexOf(AdbInstallConstants.FailureCodeDetailSeparator);
+            var detailSeparatorIndex = failureCode.IndexOf(':');
             return detailSeparatorIndex <= 0
                 ? failureCode.Trim()
                 : failureCode[..detailSeparatorIndex].Trim();
@@ -263,7 +262,7 @@ namespace DeepDroidChanger.Services
 
         private static InstallPackageResult CreateSuccess(string filePath)
         {
-            return new InstallPackageResult(filePath, true, DeviceLogResourceKeys.InstallPackageSuccess);
+            return new InstallPackageResult(filePath, true, "Log_InstallPackageSuccess");
         }
 
         private static InstallPackageResult CreateFailure(
@@ -284,8 +283,8 @@ namespace DeepDroidChanger.Services
         {
             return Path.Combine(
                 Path.GetTempPath(),
-                AdbInstallConstants.TempInstallDirectoryName,
-                AdbInstallConstants.TempInstallSubdirectoryName,
+                "DeepDroidChanger",
+                "Install",
                 Guid.NewGuid().ToString("N"));
         }
 

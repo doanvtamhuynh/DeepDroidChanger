@@ -1,6 +1,5 @@
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -50,7 +49,7 @@ namespace DeepDroidChanger.ViewModels
         private string _proxyPassword = string.Empty;
 
         [ObservableProperty]
-        private string _selectedProxyType = DeepProxyConstants.SocksProxyType;
+        private string _selectedProxyType = "Socks 5";
 
         [ObservableProperty]
         private bool _proxyChangeLocationByIp = true;
@@ -58,7 +57,7 @@ namespace DeepDroidChanger.ViewModels
         [ObservableProperty]
         private bool _proxyChangeTimezoneByIp = true;
 
-        public IReadOnlyList<string> ProxyTypes { get; } = new[] { DeepProxyConstants.SocksProxyType };
+        public IReadOnlyList<string> ProxyTypes { get; } = new[] { "Socks 5" };
 
         public event EventHandler<bool>? CloseRequested;
 
@@ -100,7 +99,7 @@ namespace DeepDroidChanger.ViewModels
                     string.Equals(device.Serial, DeviceSerial, StringComparison.OrdinalIgnoreCase));
                 if (config != null)
                 {
-                    SelectedProxyType = string.IsNullOrWhiteSpace(config.ProxyType) ? DeepProxyConstants.SocksProxyType : config.ProxyType;
+                    SelectedProxyType = string.IsNullOrWhiteSpace(config.ProxyType) ? "Socks 5" : config.ProxyType;
                     FullProxyString = config.ProxyFullString ?? string.Empty;
                     ProxyChangeLocationByIp = config.ProxyChangeLocationByIp;
                     ProxyChangeTimezoneByIp = config.ProxyChangeTimezoneByIp;
@@ -109,7 +108,7 @@ namespace DeepDroidChanger.ViewModels
                 }
                 else
                 {
-                    SelectedProxyType = DeepProxyConstants.SocksProxyType;
+                    SelectedProxyType = "Socks 5";
                     FullProxyString = string.Empty;
                     ProxyChangeLocationByIp = true;
                     ProxyChangeTimezoneByIp = true;
@@ -296,7 +295,7 @@ namespace DeepDroidChanger.ViewModels
                     port,
                     ProxyUsername.Trim(),
                     ProxyPassword.Trim(),
-                    DeepProxyConstants.SocksProxyType,
+                    "Socks 5",
                     ProxyChangeLocationByIp,
                     ProxyChangeTimezoneByIp);
             }

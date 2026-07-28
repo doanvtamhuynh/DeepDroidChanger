@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using System.Collections.ObjectModel;
@@ -42,7 +41,7 @@ namespace DeepDroidChanger.ViewModels
             _pollingService = pollingService;
             _logger = logger;
             Devices = new ObservableCollection<AddDeviceRowViewModel>();
-            TypeOptions = DeviceTypeOptions.All;
+            TypeOptions = ["sargo", "starlte", "tissot", "unknown"];
         }
 
         public event EventHandler<bool>? CloseRequested;

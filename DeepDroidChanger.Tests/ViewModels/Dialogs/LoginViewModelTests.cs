@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
@@ -14,11 +13,11 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
         [TestMethod]
         public void SignInCommand_MissingFields_SetsLocalizedError()
         {
-            var viewModel = CreateViewModel(LanguageConstants.Vietnamese);
+            var viewModel = CreateViewModel("vi");
 
             viewModel.SignInCommand.Execute(null);
 
-            Assert.AreEqual(Expected(LanguageConstants.Vietnamese, LoginResourceKeys.MissingFields), viewModel.ErrorMessage);
+            Assert.AreEqual(Expected("vi", "Login_ErrorMissingFields"), viewModel.ErrorMessage);
         }
 
         [TestMethod]
@@ -30,7 +29,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             };
             var sessionService = new FakeDeviceSessionService();
             var viewModel = CreateViewModel(
-                LanguageConstants.English,
+                "en",
                 new FakeAccountStoreService(),
                 authService,
                 sessionService);
@@ -39,7 +38,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
 
             await viewModel.SignInCommand.ExecuteAsync(null);
 
-            Assert.AreEqual(Expected(LanguageConstants.English, LoginResourceKeys.ServiceUnavailable), viewModel.ErrorMessage);
+            Assert.AreEqual(Expected("en", "Login_ErrorServiceUnavailable"), viewModel.ErrorMessage);
         }
 
         [TestMethod]
@@ -51,7 +50,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             };
             var sessionService = new FakeDeviceSessionService();
             var viewModel = CreateViewModel(
-                LanguageConstants.English,
+                "en",
                 new FakeAccountStoreService(),
                 authService,
                 sessionService);
@@ -60,7 +59,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
 
             await viewModel.SignInCommand.ExecuteAsync(null);
 
-            Assert.AreEqual(Expected(LanguageConstants.English, LoginResourceKeys.ServiceUnavailable), viewModel.ErrorMessage);
+            Assert.AreEqual(Expected("en", "Login_ErrorServiceUnavailable"), viewModel.ErrorMessage);
         }
 
         [TestMethod]
@@ -69,7 +68,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             var accountStore = new FakeAccountStoreService();
             var authService = new FakeAccountAuthenticationService();
             var sessionService = new FakeDeviceSessionService();
-            var viewModel = CreateViewModel(LanguageConstants.English, accountStore, authService, sessionService);
+            var viewModel = CreateViewModel("en", accountStore, authService, sessionService);
             var closeResult = false;
             viewModel.Username = "user@example.com";
             viewModel.Password = "secret-password";
@@ -93,7 +92,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             };
             var sessionService = new FakeDeviceSessionService();
             var viewModel = CreateViewModel(
-                LanguageConstants.English,
+                "en",
                 new FakeAccountStoreService(),
                 authService,
                 sessionService);
@@ -106,7 +105,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
 
             Assert.IsFalse(closeRequested);
             Assert.IsTrue(sessionService.WasCleared);
-            Assert.AreEqual(Expected(LanguageConstants.English, LoginResourceKeys.AuthenticationFailed), viewModel.ErrorMessage);
+            Assert.AreEqual(Expected("en", "Login_ErrorAuthenticationFailed"), viewModel.ErrorMessage);
         }
 
         [TestMethod]
@@ -119,7 +118,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             var sessionService = new FakeDeviceSessionService();
             sessionService.SetSession(new AccountSession("https://example.com", "authorization", "stale-token"));
             var viewModel = CreateViewModel(
-                LanguageConstants.English,
+                "en",
                 new FakeAccountStoreService(),
                 authService,
                 sessionService);
@@ -130,7 +129,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
 
             Assert.IsTrue(sessionService.WasCleared);
             Assert.IsNull(sessionService.CurrentSession);
-            Assert.AreEqual(Expected(LanguageConstants.English, LoginResourceKeys.Canceled), viewModel.ErrorMessage);
+            Assert.AreEqual(Expected("en", "Login_ErrorCanceled"), viewModel.ErrorMessage);
         }
 
         private static LoginViewModel CreateViewModel(string language)

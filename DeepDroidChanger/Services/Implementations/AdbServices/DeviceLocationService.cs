@@ -57,8 +57,8 @@ namespace DeepDroidChanger.Services
 
             _logger.LogInformation("Applying configured location to device {Serial}.", serial);
 
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Prop_Latitude, safeLat, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Prop_Longitude, safeLon, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Latitude, safeLat, cancellationToken).ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Longitude, safeLon, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<DeviceLocationResult> ResolveLocationByDeviceIpAsync(string serial, CancellationToken cancellationToken)

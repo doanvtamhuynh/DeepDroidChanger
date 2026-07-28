@@ -11,9 +11,9 @@ public sealed class DeviceViewerStreamServiceTests
     {
         string expectedPath = Path.Combine(
             AppContext.BaseDirectory,
-            AdbToolConstants.ToolsRootRelativePath,
-            AdbToolConstants.ViewScreenDirectoryName,
-            AdbToolConstants.ScrcpyExecutableName);
+            AssetConstants.Tools.RootRelativePath,
+            AssetConstants.Tools.ViewScreenDirectoryName,
+            AssetConstants.Tools.ScrcpyExecutableName);
 
         string actualPath = await DeviceViewerStreamService.ResolveToolPathAsync(CancellationToken.None);
 

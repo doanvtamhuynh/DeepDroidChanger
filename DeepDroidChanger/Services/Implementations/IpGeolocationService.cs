@@ -24,7 +24,7 @@ namespace DeepDroidChanger.Services
         {
             _logger.LogDebug("Resolving IP geolocation through device network for {Serial}.", serial);
 
-            var primaryInfo = await TryGetIpGeolocationAsync(serial, IpGeolocationConstants.Endpoint, cancellationToken).ConfigureAwait(false);
+            var primaryInfo = await TryGetIpGeolocationAsync(serial, UrlConstants.IpGeolocation, cancellationToken).ConfigureAwait(false);
             if (primaryInfo != null)
                 return primaryInfo;
 

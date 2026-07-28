@@ -86,14 +86,14 @@ public sealed class DeviceIntegrityServiceTests
             await service.UpdateIntegrityAsync("SERIAL", fromServer: false, jsonPath, CancellationToken.None);
 
             await adb.Received(1).SetPropertyAsync(
-                "SERIAL", IntegrityConstants.Prop_PifFingerprint,
+                "SERIAL", PropertyConstants.Integrity.Fingerprint,
                 "google/redfin/redfin:13/TQ3A/123456:user/release-keys",
                 Arg.Any<CancellationToken>());
             await adb.Received(1).SetPropertyAsync(
-                "SERIAL", IntegrityConstants.Prop_PifSecurityPatch, "2025-01-05",
+                "SERIAL", PropertyConstants.Integrity.SecurityPatch, "2025-01-05",
                 Arg.Any<CancellationToken>());
             await adb.Received(1).SetPropertyAsync(
-                "SERIAL", IntegrityConstants.Prop_PifModel, "Pixel 5",
+                "SERIAL", PropertyConstants.Integrity.Model, "Pixel 5",
                 Arg.Any<CancellationToken>());
         }
         finally
@@ -130,13 +130,13 @@ public sealed class DeviceIntegrityServiceTests
             adb,
             random,
             NullLogger<DeviceIntegrityService>.Instance,
-            (url, _, _) => Task.FromResult(url == IntegrityConstants.PifUrl ? pifJson : string.Empty));
+            (url, _, _) => Task.FromResult(url == UrlConstants.Pif ? pifJson : string.Empty));
 
         await service.UpdateIntegrityAsync("SERIAL", fromServer: true, jsonPath: null, CancellationToken.None);
 
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
-            IntegrityConstants.Prop_PifModel,
+            PropertyConstants.Integrity.Model,
             "Pixel 5",
             Arg.Any<CancellationToken>());
     }
@@ -191,7 +191,7 @@ public sealed class DeviceIntegrityServiceTests
     public async Task UpdateKeyboxAsync_OversizedDownload_DoesNotCallAdb()
     {
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
-        string oversizedXml = $"<AndroidAttestation><Keybox>{new string('x', IntegrityConstants.MaxKeyboxBytes)}</Keybox></AndroidAttestation>";
+        string oversizedXml = $"<AndroidAttestation><Keybox>{new string('x', 1024 * 1024)}</Keybox></AndroidAttestation>";
         var service = new DeviceIntegrityService(
             adb,
             Substitute.For<IRandomService>(),
@@ -208,7 +208,7 @@ public sealed class DeviceIntegrityServiceTests
     public async Task UpdateIntegrityAsync_OversizedDownload_DoesNotCallAdb()
     {
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
-        string oversizedJson = new string('x', IntegrityConstants.MaxPifBytes + 1);
+        string oversizedJson = new string('x', 2 * 1024 * 1024 + 1);
         var service = new DeviceIntegrityService(
             adb,
             Substitute.For<IRandomService>(),

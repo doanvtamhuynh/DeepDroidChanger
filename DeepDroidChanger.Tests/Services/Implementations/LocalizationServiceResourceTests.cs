@@ -1,7 +1,5 @@
-using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using DeepDroidChanger.Constants;
 
 namespace DeepDroidChanger.Tests.Services.Implementations;
 
@@ -60,14 +58,25 @@ public sealed class LocalizationServiceResourceTests
             [Path.Combine(stringsDirectory, "RuntimeMessages.xaml")]);
         IReadOnlyDictionary<string, string> vietnamese = LoadResources(
             [Path.Combine(stringsDirectory, "RuntimeMessages.vi.xaml")]);
-        string[] requiredKeys = typeof(DeviceLogResourceKeys)
-            .GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
-            .Select(field => (string)field.GetRawConstantValue()!)
+        string projectRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
+        var resourceKeyPattern = new Regex(
+            "\"(?<key>Log_[A-Za-z0-9_]+)\"",
+            RegexOptions.CultureInvariant);
+        string[] requiredKeys = Directory
+            .GetFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(path => resourceKeyPattern.Matches(File.ReadAllText(path)))
+            .Select(match => match.Groups["key"].Value)
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
 
-        CollectionAssert.AreEquivalent(requiredKeys, english.Keys.ToArray());
-        CollectionAssert.AreEquivalent(requiredKeys, vietnamese.Keys.ToArray());
+        Assert.IsEmpty(
+            requiredKeys.Except(english.Keys, StringComparer.Ordinal).ToArray(),
+            "Runtime message keys are missing from the English resource dictionary.");
+        Assert.IsEmpty(
+            requiredKeys.Except(vietnamese.Keys, StringComparer.Ordinal).ToArray(),
+            "Runtime message keys are missing from the Vietnamese resource dictionary.");
     }
 
     [TestMethod]

@@ -60,7 +60,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             await SetPropertiesAsync(serial, CreateSimProperties(profile), cancellationToken).ConfigureAwait(false);
             await RunRequiredShellAsync(
                     serial,
-                    DeviceChangeConstants.SyncCommand,
+                    "sync",
                     "sync changed SIM information",
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -93,7 +93,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 await _adb.SetWifiAsync(serial, false, cancellationToken).ConfigureAwait(false);
                 await RunRequiredShellAsync(
                         serial,
-                        DeviceChangeConstants.DisableBluetoothCommand,
+                        "svc bluetooth disable",
                         "disable Bluetooth before changing identity",
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -199,7 +199,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             {
                 await RunRequiredShellAsync(
                         serial,
-                        DeviceChangeConstants.DisableBluetoothCommand,
+                        "svc bluetooth disable",
                         "disable Bluetooth before changing identity",
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -288,22 +288,22 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private async Task EnsureRootAsync(string serial, CancellationToken cancellationToken)
     {
         CommandResult rootResult = await _adb
-            .RunAdbAsync(serial, AdbToolConstants.AdbRootCommand, cancellationToken)
+            .RunAdbAsync(serial, "root", cancellationToken)
             .ConfigureAwait(false);
         EnsureSuccess(rootResult, serial, "restart adbd as root");
 
         CommandResult waitResult = await _adb
-            .RunAdbAsync(serial, AdbToolConstants.AdbWaitForDeviceCommand, cancellationToken)
+            .RunAdbAsync(serial, "wait-for-device", cancellationToken)
             .ConfigureAwait(false);
         EnsureSuccess(waitResult, serial, "wait for rooted device");
 
         CommandResult identityResult = await _adb
-            .RunAdbShellAsync(serial, DeviceChangeConstants.RootIdentityCommand, cancellationToken)
+            .RunAdbShellAsync(serial, "id -u", cancellationToken)
             .ConfigureAwait(false);
         EnsureSuccess(identityResult, serial, "verify root access");
         if (!string.Equals(
                 identityResult.StandardOutput.Trim(),
-                DeviceChangeConstants.RootUserId,
+                "0",
                 StringComparison.Ordinal))
             throw new InvalidOperationException($"Device {serial} does not provide ADB root access.");
     }
@@ -352,22 +352,22 @@ public sealed class DeviceChangeService : IDeviceChangeService
         string bluetoothName = FirstValue(profile.SettingBluetoothName, deviceName);
         await _adb.PutSettingAsync(
                 serial,
-                DeviceChangeConstants.GlobalSettingsNamespace,
-                DeviceChangeConstants.DeviceNameSetting,
+                DeviceSettingsInfoConstants.GlobalNamespace,
+                DeviceSettingsInfoConstants.DeviceName,
                 deviceName,
                 cancellationToken)
             .ConfigureAwait(false);
         await _adb.PutSettingAsync(
                 serial,
-                DeviceChangeConstants.SecureSettingsNamespace,
-                DeviceChangeConstants.BluetoothNameSetting,
+                DeviceSettingsInfoConstants.SecureNamespace,
+                DeviceSettingsInfoConstants.BluetoothName,
                 bluetoothName,
                 cancellationToken)
             .ConfigureAwait(false);
         await _adb.PutSettingAsync(
                 serial,
-                DeviceChangeConstants.GlobalSettingsNamespace,
-                DeviceChangeConstants.WifiP2pDeviceNameSetting,
+                DeviceSettingsInfoConstants.GlobalNamespace,
+                DeviceSettingsInfoConstants.WifiP2pDeviceName,
                 deviceName,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -375,41 +375,41 @@ public sealed class DeviceChangeService : IDeviceChangeService
         {
             await _adb.DeleteSettingAsync(
                     serial,
-                    DeviceChangeConstants.SecureSettingsNamespace,
-                    DeviceChangeConstants.BluetoothAddressSetting,
+                    DeviceSettingsInfoConstants.SecureNamespace,
+                    DeviceSettingsInfoConstants.BluetoothAddress,
                     cancellationToken)
                 .ConfigureAwait(false);
             await _adb.DeleteSettingAsync(
                     serial,
-                    DeviceChangeConstants.SecureSettingsNamespace,
-                    DeviceChangeConstants.BluetoothAddressValidSetting,
+                    DeviceSettingsInfoConstants.SecureNamespace,
+                    DeviceSettingsInfoConstants.BluetoothAddressValid,
                     cancellationToken)
                 .ConfigureAwait(false);
             await _adb.PutSettingAsync(
                     serial,
-                    DeviceChangeConstants.GlobalSettingsNamespace,
-                    DeviceChangeConstants.RandomMacSetting,
-                    DeviceChangeConstants.EnabledValue,
+                    DeviceSettingsInfoConstants.GlobalNamespace,
+                    DeviceSettingsInfoConstants.RandomMac,
+                    "1",
                     cancellationToken)
                 .ConfigureAwait(false);
         }
 
         await _adb.PutSettingAsync(
                 serial,
-                DeviceChangeConstants.SystemSettingsNamespace,
-                DeviceChangeConstants.ScreenTimeoutSetting,
-                DeviceChangeConstants.ScreenTimeoutValue,
+                DeviceSettingsInfoConstants.SystemNamespace,
+                DeviceSettingsInfoConstants.ScreenTimeout,
+                "1800000",
                 cancellationToken)
             .ConfigureAwait(false);
         await RunRequiredShellAsync(
                 serial,
-                DeviceChangeConstants.DisableLockScreenCommand,
+                "locksettings set-disabled true",
                 "disable lock screen",
                 cancellationToken)
             .ConfigureAwait(false);
         await RunRequiredShellAsync(
                 serial,
-                DeviceChangeConstants.SyncCommand,
+                "sync",
                 "sync changed identity",
                 cancellationToken)
             .ConfigureAwait(false);
@@ -430,46 +430,46 @@ public sealed class DeviceChangeService : IDeviceChangeService
     {
         List<KeyValuePair<string, string>> properties =
         [
-            Pair(DeviceSpoofPropertyConstants.ProductBrand, profile.Brand),
-            Pair(DeviceSpoofPropertyConstants.ProductDevice, profile.Code),
-            Pair(DeviceSpoofPropertyConstants.ProductManufacturer, profile.Manufacturer),
-            Pair(DeviceSpoofPropertyConstants.ProductModel, profile.Model),
-            Pair(DeviceSpoofPropertyConstants.ProductName, profile.Name),
-            Pair(DeviceSpoofPropertyConstants.BuildFingerprint, profile.Fingerprint),
-            Pair(DeviceSpoofPropertyConstants.BuildId, profile.BuildId),
-            Pair(DeviceSpoofPropertyConstants.BuildIncremental, profile.BuildIncremental),
-            Pair(DeviceSpoofPropertyConstants.BuildDate, profile.BuildDate),
-            Pair(DeviceSpoofPropertyConstants.BuildDateUtc, profile.BuildDateUtc),
-            Pair(DeviceSpoofPropertyConstants.BuildUser, profile.BuildUser),
-            Pair(DeviceSpoofPropertyConstants.BuildHost, profile.BuildHost),
-            Pair(DeviceSpoofPropertyConstants.BuildFlavor, profile.BuildFlavor),
-            Pair(DeviceSpoofPropertyConstants.BuildProduct, profile.Product),
-            Pair(DeviceSpoofPropertyConstants.Hardware, profile.Hardware),
-            Pair(DeviceSpoofPropertyConstants.Board, profile.Board),
-            Pair(DeviceSpoofPropertyConstants.Platform, profile.Platform),
-            Pair(DeviceSpoofPropertyConstants.Bootloader, profile.Bootloader),
-            Pair(DeviceSpoofPropertyConstants.SocManufacturer, profile.Manufacturer),
-            Pair(DeviceSpoofPropertyConstants.SocModel, profile.Hardware),
-            Pair(DeviceSpoofPropertyConstants.SecurityPatch, profile.SecurityPatch),
-            Pair(DeviceSpoofPropertyConstants.AndroidRelease, profile.Release),
-            Pair(DeviceSpoofPropertyConstants.BuildDisplayId, profile.BuildDisplayId),
-            Pair(DeviceSpoofPropertyConstants.BuildDescription, profile.BuildDescription),
-            Pair(DeviceSpoofPropertyConstants.ClientIdBase, string.Concat("android-", profile.Brand)),
-            Pair(DeviceSpoofPropertyConstants.Baseband, profile.Baseband),
-            Pair(DeviceSpoofPropertyConstants.SerialNumber, profile.Serial),
-            Pair(DeviceSpoofPropertyConstants.DeviceName, FirstValue(profile.SettingDeviceName, profile.Name, profile.Model)),
-            Pair(DeviceSpoofPropertyConstants.VbmetaDigest, profile.VbmetaDigest),
-            Pair(DeviceSpoofPropertyConstants.Imei0, profile.Imei),
-            Pair(DeviceSpoofPropertyConstants.Imei1, profile.Imei1),
-            Pair(DeviceSpoofPropertyConstants.BluetoothName, profile.SettingBluetoothName),
-            Pair(DeviceSpoofPropertyConstants.WifiSsid, profile.WifiSsid)
+            Pair(PropertyConstants.Spoof.ProductBrand, profile.Brand),
+            Pair(PropertyConstants.Spoof.ProductDevice, profile.Code),
+            Pair(PropertyConstants.Spoof.ProductManufacturer, profile.Manufacturer),
+            Pair(PropertyConstants.Spoof.ProductModel, profile.Model),
+            Pair(PropertyConstants.Spoof.ProductName, profile.Name),
+            Pair(PropertyConstants.Spoof.BuildFingerprint, profile.Fingerprint),
+            Pair(PropertyConstants.Spoof.BuildId, profile.BuildId),
+            Pair(PropertyConstants.Spoof.BuildIncremental, profile.BuildIncremental),
+            Pair(PropertyConstants.Spoof.BuildDate, profile.BuildDate),
+            Pair(PropertyConstants.Spoof.BuildDateUtc, profile.BuildDateUtc),
+            Pair(PropertyConstants.Spoof.BuildUser, profile.BuildUser),
+            Pair(PropertyConstants.Spoof.BuildHost, profile.BuildHost),
+            Pair(PropertyConstants.Spoof.BuildFlavor, profile.BuildFlavor),
+            Pair(PropertyConstants.Spoof.BuildProduct, profile.Product),
+            Pair(PropertyConstants.Spoof.Hardware, profile.Hardware),
+            Pair(PropertyConstants.Spoof.Board, profile.Board),
+            Pair(PropertyConstants.Spoof.Platform, profile.Platform),
+            Pair(PropertyConstants.Spoof.Bootloader, profile.Bootloader),
+            Pair(PropertyConstants.Spoof.SocManufacturer, profile.Manufacturer),
+            Pair(PropertyConstants.Spoof.SocModel, profile.Hardware),
+            Pair(PropertyConstants.Spoof.SecurityPatch, profile.SecurityPatch),
+            Pair(PropertyConstants.Spoof.AndroidRelease, profile.Release),
+            Pair(PropertyConstants.Spoof.BuildDisplayId, profile.BuildDisplayId),
+            Pair(PropertyConstants.Spoof.BuildDescription, profile.BuildDescription),
+            Pair(PropertyConstants.Spoof.ClientIdBase, string.Concat("android-", profile.Brand)),
+            Pair(PropertyConstants.Spoof.Baseband, profile.Baseband),
+            Pair(PropertyConstants.Spoof.SerialNumber, profile.Serial),
+            Pair(PropertyConstants.Spoof.DeviceName, FirstValue(profile.SettingDeviceName, profile.Name, profile.Model)),
+            Pair(PropertyConstants.Spoof.VbmetaDigest, profile.VbmetaDigest),
+            Pair(PropertyConstants.Spoof.Imei0, profile.Imei),
+            Pair(PropertyConstants.Spoof.Imei1, profile.Imei1),
+            Pair(PropertyConstants.Spoof.BluetoothName, profile.SettingBluetoothName),
+            Pair(PropertyConstants.Spoof.WifiSsid, profile.WifiSsid)
         ];
 
         if (changeMacAddress)
         {
-            properties.Add(Pair(DeviceSpoofPropertyConstants.BluetoothMac, profile.BluetoothMacAddress));
-            properties.Add(Pair(DeviceSpoofPropertyConstants.WifiMac, profile.WifiMacAddress));
-            properties.Add(Pair(DeviceSpoofPropertyConstants.WifiBssid, profile.WifiBssid));
+            properties.Add(Pair(PropertyConstants.Spoof.BluetoothMac, profile.BluetoothMacAddress));
+            properties.Add(Pair(PropertyConstants.Spoof.WifiMac, profile.WifiMacAddress));
+            properties.Add(Pair(PropertyConstants.Spoof.WifiBssid, profile.WifiBssid));
         }
 
         return properties;
@@ -513,43 +513,43 @@ public sealed class DeviceChangeService : IDeviceChangeService
         return
         [
             Pair(
-                DeviceSpoofPropertyConstants.SimEnabled,
-                enabled ? DeviceChangeConstants.EnabledValue : DeviceChangeConstants.DisabledValue),
-            Pair(DeviceSpoofPropertyConstants.SimIccid, iccid),
-            Pair(DeviceSpoofPropertyConstants.SimImsi, imsi),
-            Pair(DeviceSpoofPropertyConstants.SimPhoneNumber, phoneNumber),
-            Pair(DeviceSpoofPropertyConstants.SimOperatorName, operatorName),
-            Pair(DeviceSpoofPropertyConstants.SimOperatorCountry, operatorCountry),
-            Pair(DeviceSpoofPropertyConstants.SimOperatorNumeric, operatorNumeric),
-            Pair(DeviceSpoofPropertyConstants.Sim2Enabled, DeviceChangeConstants.DisabledValue),
-            Pair(DeviceSpoofPropertyConstants.Sim2Iccid, string.Empty),
-            Pair(DeviceSpoofPropertyConstants.Sim2Imsi, string.Empty),
-            Pair(DeviceSpoofPropertyConstants.Sim2PhoneNumber, string.Empty)
+                PropertyConstants.Spoof.SimEnabled,
+                enabled ? "1" : "0"),
+            Pair(PropertyConstants.Spoof.SimIccid, iccid),
+            Pair(PropertyConstants.Spoof.SimImsi, imsi),
+            Pair(PropertyConstants.Spoof.SimPhoneNumber, phoneNumber),
+            Pair(PropertyConstants.Spoof.SimOperatorName, operatorName),
+            Pair(PropertyConstants.Spoof.SimOperatorCountry, operatorCountry),
+            Pair(PropertyConstants.Spoof.SimOperatorNumeric, operatorNumeric),
+            Pair(PropertyConstants.Spoof.Sim2Enabled, "0"),
+            Pair(PropertyConstants.Spoof.Sim2Iccid, string.Empty),
+            Pair(PropertyConstants.Spoof.Sim2Imsi, string.Empty),
+            Pair(PropertyConstants.Spoof.Sim2PhoneNumber, string.Empty)
         ];
     }
 
     private async Task WaitForBootCompletedAsync(string serial, CancellationToken cancellationToken)
     {
         CommandResult waitResult = await _adb
-            .RunAdbAsync(serial, AdbToolConstants.AdbWaitForDeviceCommand, cancellationToken)
+            .RunAdbAsync(serial, "wait-for-device", cancellationToken)
             .ConfigureAwait(false);
         EnsureSuccess(waitResult, serial, "wait for rebooted device");
 
-        for (int attempt = 0; attempt < DeviceChangeConstants.BootCompletionPollAttempts; attempt++)
+        for (int attempt = 0; attempt < 90; attempt++)
         {
             CommandResult bootResult = await _adb
-                .RunAdbShellAsync(serial, DeviceChangeConstants.BootCompletedCommand, cancellationToken)
+                .RunAdbShellAsync(serial, "getprop sys.boot_completed", cancellationToken)
                 .ConfigureAwait(false);
             if (bootResult.ExitCode == 0
                 && string.Equals(
                     bootResult.StandardOutput.Trim(),
-                    DeviceChangeConstants.BootCompletedValue,
+                    "1",
                     StringComparison.Ordinal))
             {
                 return;
             }
 
-            await Task.Delay(DeviceChangeConstants.BootCompletionPollDelayMilliseconds, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(2000, cancellationToken).ConfigureAwait(false);
         }
 
         throw new TimeoutException($"Device {serial} did not finish booting after Change Device.");
@@ -641,8 +641,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
     {
         return _adb.GetSettingAsync(
             serial,
-            DeviceChangeConstants.SecureSettingsNamespace,
-            DeviceChangeConstants.AndroidIdSetting,
+            DeviceSettingsInfoConstants.SecureNamespace,
+            DeviceSettingsInfoConstants.AndroidId,
             cancellationToken);
     }
 
@@ -652,8 +652,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
     {
         return _adb.DeleteSettingAsync(
             serial,
-            DeviceChangeConstants.SecureSettingsNamespace,
-            DeviceChangeConstants.AndroidIdSetting,
+            DeviceSettingsInfoConstants.SecureNamespace,
+            DeviceSettingsInfoConstants.AndroidId,
             cancellationToken);
     }
 
@@ -679,48 +679,48 @@ public sealed class DeviceChangeService : IDeviceChangeService
     {
         var mismatches = new List<string>();
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.ProductBrand,
-            "ro.product.brand",
+            PropertyConstants.Spoof.ProductBrand,
+            PropertyConstants.Runtime.ProductBrand,
             expected.Brand,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.ProductManufacturer,
-            "ro.product.manufacturer",
+            PropertyConstants.Spoof.ProductManufacturer,
+            PropertyConstants.Runtime.ProductManufacturer,
             expected.Manufacturer,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.ProductModel,
-            "ro.product.model",
+            PropertyConstants.Spoof.ProductModel,
+            PropertyConstants.Runtime.ProductModel,
             expected.Model,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.ProductDevice,
-            "ro.product.device",
+            PropertyConstants.Spoof.ProductDevice,
+            PropertyConstants.Runtime.ProductDevice,
             expected.Code,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.ProductName,
-            "ro.product.name",
+            PropertyConstants.Spoof.ProductName,
+            PropertyConstants.Runtime.ProductName,
             expected.Name,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.AndroidRelease,
-            "ro.build.version.release",
+            PropertyConstants.Spoof.AndroidRelease,
+            PropertyConstants.Runtime.AndroidRelease,
             expected.Release,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.BuildFingerprint,
-            "ro.build.fingerprint",
+            PropertyConstants.Spoof.BuildFingerprint,
+            PropertyConstants.Runtime.BuildFingerprint,
             expected.Fingerprint,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.BuildId,
-            "ro.build.id",
+            PropertyConstants.Spoof.BuildId,
+            PropertyConstants.Runtime.BuildId,
             expected.BuildId,
             mismatches);
         await VerifyPropertyAsync(
-            DeviceSpoofPropertyConstants.SecurityPatch,
-            "ro.build.version.security_patch",
+            PropertyConstants.Spoof.SecurityPatch,
+            PropertyConstants.Runtime.SecurityPatch,
             expected.SecurityPatch,
             mismatches);
 
@@ -730,8 +730,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
             expected.Model);
         string actualDeviceName = await _adb.GetSettingAsync(
                 serial,
-                DeviceChangeConstants.GlobalSettingsNamespace,
-                DeviceChangeConstants.DeviceNameSetting,
+                DeviceSettingsInfoConstants.GlobalNamespace,
+                DeviceSettingsInfoConstants.DeviceName,
                 cancellationToken)
             .ConfigureAwait(false);
         AddMismatch(
@@ -745,8 +745,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
             expectedDeviceName);
         string actualBluetoothName = await _adb.GetSettingAsync(
                 serial,
-                DeviceChangeConstants.SecureSettingsNamespace,
-                DeviceChangeConstants.BluetoothNameSetting,
+                DeviceSettingsInfoConstants.SecureNamespace,
+                DeviceSettingsInfoConstants.BluetoothName,
                 cancellationToken)
             .ConfigureAwait(false);
         AddMismatch(

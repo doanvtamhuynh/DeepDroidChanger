@@ -1,4 +1,3 @@
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using System.Globalization;
 
@@ -6,24 +5,23 @@ namespace DeepDroidChanger.Services
 {
     public sealed class DeviceRandomProfileService : IDeviceRandomProfileService
     {
-        public const string RandomOption = DeviceProfileOptions.Random;
-
         private const string DefaultBrand = "samsung";
         private const int DefaultSdk = 33;
         private const string BuildDateFormat = "ddd MMM dd HH:mm:ss 'UTC' yyyy";
         private static readonly DateTimeOffset FallbackBuildDateStartUtc =
             new(2025, 10, 5, 0, 0, 0, TimeSpan.Zero);
         private static readonly string[] BrandsPool = { "google", "OnePlus", "OPPO", "samsung", "vivo", "Xiaomi" };
-        private static readonly IReadOnlyList<string> SupportedSdkLevels =
-            DeviceProfileOptions.SupportedAndroidVersions
-                .Select(NormalizeSdk)
-                .Select(sdk => sdk.ToString())
-                .ToArray();
+        private static readonly IReadOnlyList<string> SupportedSdkLevels = ["33", "34", "35"];
         private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> BrandOsMap =
-            DeviceProfileOptions.AndroidVersionsByBrand.ToDictionary(
-                pair => pair.Key,
-                pair => (IReadOnlyList<string>)pair.Value.Select(NormalizeSdk).Select(sdk => sdk.ToString()).ToArray(),
-                StringComparer.OrdinalIgnoreCase);
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Google"] = SupportedSdkLevels,
+                ["Samsung"] = SupportedSdkLevels,
+                ["Xiaomi"] = SupportedSdkLevels,
+                ["OnePlus"] = ["33"],
+                ["OPPO"] = ["34"],
+                ["vivo"] = ["34"]
+            };
         private static readonly IReadOnlyDictionary<string, string> BrandAlias = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["samsung"] = "samsung",
@@ -435,7 +433,8 @@ namespace DeepDroidChanger.Services
 
         private static bool IsRandom(string? value)
         {
-            return string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), RandomOption, StringComparison.OrdinalIgnoreCase);
+            return string.IsNullOrWhiteSpace(value)
+                || string.Equals(value.Trim(), "Random", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeBrand(string? value)

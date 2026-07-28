@@ -1,4 +1,5 @@
 using System.Windows;
+using DeepDroidChanger.Constants;
 
 namespace DeepDroidChanger.Themes;
 
@@ -10,9 +11,6 @@ public enum AppTheme
 
 public static class ThemeManager
 {
-    private const string LightThemePath = "/DeepDroidChanger;component/Resources/Themes/Theme.Light.xaml";
-    private const string DarkThemePath = "/DeepDroidChanger;component/Resources/Themes/Theme.Dark.xaml";
-
     public static void Apply(AppTheme theme)
     {
         ResourceDictionary resources = Application.Current.Resources;
@@ -23,7 +21,9 @@ public static class ThemeManager
         ResourceDictionary newTheme = new()
         {
             Source = new Uri(
-                theme == AppTheme.Dark ? DarkThemePath : LightThemePath,
+                theme == AppTheme.Dark
+                    ? AssetConstants.Themes.DarkDictionary
+                    : AssetConstants.Themes.LightDictionary,
                 UriKind.Relative)
         };
 
@@ -46,7 +46,7 @@ public static class ThemeManager
 
         string path = source.OriginalString;
 
-        return path.EndsWith("Theme.Light.xaml", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith("Theme.Dark.xaml", StringComparison.OrdinalIgnoreCase);
+        return path.EndsWith(AssetConstants.Themes.LightFileName, StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(AssetConstants.Themes.DarkFileName, StringComparison.OrdinalIgnoreCase);
     }
 }

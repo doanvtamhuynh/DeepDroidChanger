@@ -8,11 +8,11 @@ public static class DeviceInfoApiOptionsHelper
     public static void ApplyDefaults(DeviceInfoApiOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        options.Endpoint = DeviceInfoApiConstants.Endpoint;
-        options.UserPoolId = DeviceInfoApiConstants.UserPoolId;
-        options.ClientId = DeviceInfoApiConstants.ClientId;
-        options.Region = DeviceInfoApiConstants.Region;
-        options.AuthenticationHeaderName = DeviceInfoApiConstants.AuthenticationHeaderName;
+        options.Endpoint = UrlConstants.DeviceInfoApi;
+        options.UserPoolId = AuthenticationConstants.UserPoolId;
+        options.ClientId = AuthenticationConstants.ClientId;
+        options.Region = AuthenticationConstants.Region;
+        options.AuthenticationHeaderName = AuthenticationConstants.HeaderName;
     }
 
     public static bool IsValid(DeviceInfoApiOptions options)

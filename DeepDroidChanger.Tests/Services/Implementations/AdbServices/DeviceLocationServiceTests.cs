@@ -22,9 +22,9 @@ public sealed class DeviceLocationServiceTests
         await service.ApplyLocationAsync("SERIAL", "10.5", "-20.25", CancellationToken.None);
 
         await adb.Received(1).SetPropertyAsync(
-            "SERIAL", PropertyConstants.Prop_Latitude, "10.5000", Arg.Any<CancellationToken>());
+            "SERIAL", PropertyConstants.Latitude, "10.5000", Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
-            "SERIAL", PropertyConstants.Prop_Longitude, "-20.2500", Arg.Any<CancellationToken>());
+            "SERIAL", PropertyConstants.Longitude, "-20.2500", Arg.Any<CancellationToken>());
     }
 
     [DataRow("91", "0")]
