@@ -17,7 +17,7 @@
     <sys:String x:Key="DeviceManager_ColumnStatus">Trạng thái</sys:String>
     <sys:String x:Key="DeviceManager_ColumnProcess">Tiến trình</sys:String>
     <sys:String x:Key="DeviceManager_TabChangeInfoSingle">Đổi thông tin thiết bị</sys:String>
-    <sys:String x:Key="DeviceManager_TabFlashRom">Flash ROM</sys:String>
+    <sys:String x:Key="DeviceManager_TabChangeInfoMultiple">Đổi thông tin nhiều thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_DeviceInfoHeader">Thông tin thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_DeviceConfigHeader">Cấu hình thiết bị</sys:String>
     <sys:String x:Key="DeviceManager_ActionSingleHeader">Thao tác thiết bị</sys:String>
@@ -74,7 +74,7 @@
     <sys:String x:Key="DeviceManager_RowMenuEnablePlayStore">Bật Play Store</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuDisableWifi">Tắt Wi-Fi</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuEnableWifi">Bật Wi-Fi</sys:String>
-    <sys:String x:Key="DeviceManager_FlashRomPlaceholder">Chức năng Flash ROM hiện chưa được triển khai.</sys:String>
+    <sys:String x:Key="DeviceManager_ChangeInfoMultiplePlaceholder">Chức năng đổi thông tin nhiều thiết bị hiện chưa được triển khai.</sys:String>
 
     <sys:String x:Key="DeviceManager_FilterLabel">Lọc:</sys:String>
     <sys:String x:Key="DeviceManager_FilterAll">Tất cả</sys:String>

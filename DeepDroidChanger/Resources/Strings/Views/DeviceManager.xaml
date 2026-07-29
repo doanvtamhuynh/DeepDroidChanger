@@ -17,7 +17,7 @@
     <sys:String x:Key="DeviceManager_ColumnStatus">Status</sys:String>
     <sys:String x:Key="DeviceManager_ColumnProcess">Process</sys:String>
     <sys:String x:Key="DeviceManager_TabChangeInfoSingle">Change Single Device Info</sys:String>
-    <sys:String x:Key="DeviceManager_TabFlashRom">Flash ROM</sys:String>
+    <sys:String x:Key="DeviceManager_TabChangeInfoMultiple">Change Multiple Devices' Info</sys:String>
     <sys:String x:Key="DeviceManager_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="DeviceManager_DeviceConfigHeader">Device Configuration</sys:String>
     <sys:String x:Key="DeviceManager_ActionSingleHeader">Single Device Actions</sys:String>
@@ -74,7 +74,7 @@
     <sys:String x:Key="DeviceManager_RowMenuEnablePlayStore">Enable Play Store</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuDisableWifi">Disable Wi-Fi</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuEnableWifi">Enable Wi-Fi</sys:String>
-    <sys:String x:Key="DeviceManager_FlashRomPlaceholder">Flash ROM is not implemented.</sys:String>
+    <sys:String x:Key="DeviceManager_ChangeInfoMultiplePlaceholder">Changing information for multiple devices is not implemented yet.</sys:String>
 
     <sys:String x:Key="DeviceManager_FilterLabel">Filter:</sys:String>
     <sys:String x:Key="DeviceManager_FilterAll">All</sys:String>

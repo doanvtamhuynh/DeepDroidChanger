@@ -468,7 +468,7 @@
             <Setter Property="Margin" Value="8,0,0,0"/>
         </Style>
 
-        <Style x:Key="DeviceFlashPlaceholderTextStyle"
+        <Style x:Key="DeviceMultipleChangePlaceholderTextStyle"
                TargetType="TextBlock"
                BasedOn="{StaticResource AppLabelTextStyle}">
             <Setter Property="FontSize"
@@ -1715,11 +1715,11 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="{DynamicResource DeviceManager_TabFlashRom}"
+            <TabItem Header="{DynamicResource DeviceManager_TabChangeInfoMultiple}"
                      Style="{StaticResource UnderlineTabItemStyle}">
                 <Grid>
-                    <TextBlock Text="{DynamicResource DeviceManager_FlashRomPlaceholder}"
-                               Style="{StaticResource DeviceFlashPlaceholderTextStyle}"/>
+                    <TextBlock Text="{DynamicResource DeviceManager_ChangeInfoMultiplePlaceholder}"
+                               Style="{StaticResource DeviceMultipleChangePlaceholderTextStyle}"/>
                 </Grid>
             </TabItem>
         </TabControl>
