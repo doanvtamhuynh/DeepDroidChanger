@@ -128,4 +128,15 @@
     <sys:String x:Key="Log_ProxyTimezoneByIpFailed">Proxy applied, but timezone by IP failed. Please change timezone manually.</sys:String>
     <sys:String x:Key="Log_CopySerialSuccess">Serial copied to clipboard</sys:String>
     <sys:String x:Key="Log_CopySerialFailed">Failed to copy serial</sys:String>
+    <sys:String x:Key="Log_GooglePackageStateFailed">Failed to read GMS and Play Store state</sys:String>
+    <sys:String x:Key="Log_GmsEnabled">GMS enabled</sys:String>
+    <sys:String x:Key="Log_GmsDisabled">GMS disabled</sys:String>
+    <sys:String x:Key="Log_GmsToggleFailed">Failed to change GMS state</sys:String>
+    <sys:String x:Key="Log_PlayStoreEnabled">Play Store enabled</sys:String>
+    <sys:String x:Key="Log_PlayStoreDisabled">Play Store disabled</sys:String>
+    <sys:String x:Key="Log_PlayStoreToggleFailed">Failed to change Play Store state</sys:String>
+    <sys:String x:Key="Log_ContextMenuStateFailed">Failed to read one or more device states</sys:String>
+    <sys:String x:Key="Log_WifiEnabled">Wi-Fi enabled</sys:String>
+    <sys:String x:Key="Log_WifiDisabled">Wi-Fi disabled</sys:String>
+    <sys:String x:Key="Log_WifiToggleFailed">Failed to change Wi-Fi state</sys:String>
 </ResourceDictionary>

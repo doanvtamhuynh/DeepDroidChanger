@@ -2023,6 +2023,9 @@ public sealed class DeviceManagerViewModelLifecycleTests
             [nameof(DeviceManagerViewModel.ViewDeviceCommand)] = viewModel.ViewDeviceCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.ViewDeviceInfoCommand)] = viewModel.ViewDeviceInfoCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.CopySerialCommand)] = viewModel.CopySerialCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.ToggleGmsCommand)] = viewModel.ToggleGmsCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.TogglePlayStoreCommand)] = viewModel.TogglePlayStoreCommand.CanExecute(targetDevice),
+            [nameof(DeviceManagerViewModel.ToggleWifiCommand)] = viewModel.ToggleWifiCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.RebootDeviceCommand)] = viewModel.RebootDeviceCommand.CanExecute(targetDevice),
             [nameof(DeviceManagerViewModel.DeleteDeviceCommand)] = viewModel.DeleteDeviceCommand.CanExecute(targetDevice)
         };
@@ -2128,6 +2131,265 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(viewModel.Devices[0]));
 
         await viewModel.CopySerialCommand.ExecuteAsync(viewModel.Devices[0]);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RefreshGooglePackageState_UpdatesBothRowStates()
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL", Name = "Phone", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [new AdbDevice("SERIAL", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        deviceAction.GetGooglePackageStateAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new GooglePackageState(IsGmsDisabled: true, IsPlayStoreDisabled: false));
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        await viewModel.RefreshGooglePackageStateCommand.ExecuteAsync(device);
+
+        Assert.IsTrue(device.IsGmsDisabled);
+        Assert.IsFalse(device.IsPlayStoreDisabled);
+        await deviceAction.Received(1).GetGooglePackageStateAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RefreshContextMenuState_UpdatesGooglePackagesAndWifiTogether()
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL", Name = "Phone", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [new AdbDevice("SERIAL", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        deviceAction.GetGooglePackageStateAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new GooglePackageState(IsGmsDisabled: false, IsPlayStoreDisabled: true));
+        deviceAction.GetWifiEnabledAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(true);
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        await viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
+
+        Assert.IsFalse(device.IsGmsDisabled);
+        Assert.IsTrue(device.IsPlayStoreDisabled);
+        Assert.IsTrue(device.IsWifiEnabled);
+        await deviceAction.Received(1).GetGooglePackageStateAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
+        await deviceAction.Received(1).GetWifiEnabledAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RefreshContextMenuState_DisablesToggleActionsUntilRefreshCompletes()
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL", Name = "Phone", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [new AdbDevice("SERIAL", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var packageStateCompletion =
+            new TaskCompletionSource<GooglePackageState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        deviceAction.GetGooglePackageStateAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(packageStateCompletion.Task);
+        deviceAction.GetWifiEnabledAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(true);
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel device = viewModel.Devices.Single();
+
+        Task refreshTask = viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
+
+        Assert.IsTrue(device.IsContextMenuStateLoading);
+        Assert.IsFalse(device.CanToggleContextMenuActions);
+
+        packageStateCompletion.SetResult(new GooglePackageState(false, false));
+        await refreshTask;
+
+        Assert.IsFalse(device.IsContextMenuStateLoading);
+        Assert.IsTrue(device.CanToggleContextMenuActions);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    [DataRow(true, true)]
+    [DataRow(false, false)]
+    public async Task ToggleGooglePackages_UsesFreshStateToChooseEnableOrDisable(
+        bool initiallyDisabled,
+        bool expectedEnabledArgument)
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL", Name = "Phone", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [new AdbDevice("SERIAL", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        deviceAction.GetGooglePackageStateAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new GooglePackageState(initiallyDisabled, initiallyDisabled));
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel device = viewModel.Devices.Single();
+
+        await viewModel.ToggleGmsCommand.ExecuteAsync(device);
+        await viewModel.TogglePlayStoreCommand.ExecuteAsync(device);
+
+        await deviceAction.Received(1).SetGmsEnabledAsync(
+            "SERIAL",
+            expectedEnabledArgument,
+            Arg.Any<CancellationToken>());
+        await deviceAction.Received(1).SetPlayStoreEnabledAsync(
+            "SERIAL",
+            expectedEnabledArgument,
+            Arg.Any<CancellationToken>());
+        await deviceAction.Received(2).GetGooglePackageStateAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
+        Assert.AreEqual(!expectedEnabledArgument, device.IsPlayStoreDisabled);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    public async Task ToggleWifi_UsesFreshStateToChooseOppositeSvcAction(
+        bool initiallyEnabled,
+        bool expectedEnabledArgument)
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL", Name = "Phone", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [new AdbDevice("SERIAL", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        deviceAction.GetWifiEnabledAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(initiallyEnabled);
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel device = viewModel.Devices.Single();
+
+        await viewModel.ToggleWifiCommand.ExecuteAsync(device);
+
+        await deviceAction.Received(1).GetWifiEnabledAsync(
+            "SERIAL",
+            Arg.Any<CancellationToken>());
+        await deviceAction.Received(1).SetWifiEnabledAsync(
+            "SERIAL",
+            expectedEnabledArgument,
+            Arg.Any<CancellationToken>());
+        Assert.AreEqual(expectedEnabledArgument, device.IsWifiEnabled);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task RefreshAndToggleContextMenuActions_OfflineDevice_DoNotCallAdbService()
+    {
+        var storedDevices = new[]
+        {
+            new StoredDeviceConfig { Serial = "SERIAL", Name = "Phone", Type = "Phone" }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, []));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel device = viewModel.Devices.Single();
+
+        await viewModel.RefreshGooglePackageStateCommand.ExecuteAsync(device);
+        await viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
+        await viewModel.ToggleGmsCommand.ExecuteAsync(device);
+        await viewModel.TogglePlayStoreCommand.ExecuteAsync(device);
+        await viewModel.ToggleWifiCommand.ExecuteAsync(device);
+
+        await deviceAction.DidNotReceiveWithAnyArgs()
+            .GetGooglePackageStateAsync(default!, default);
+        await deviceAction.DidNotReceiveWithAnyArgs()
+            .SetGmsEnabledAsync(default!, default, default);
+        await deviceAction.DidNotReceiveWithAnyArgs()
+            .SetPlayStoreEnabledAsync(default!, default, default);
+        await deviceAction.DidNotReceiveWithAnyArgs()
+            .GetWifiEnabledAsync(default!, default);
+        await deviceAction.DidNotReceiveWithAnyArgs()
+            .SetWifiEnabledAsync(default!, default, default);
 
         await viewModel.DeactivateAsync();
         viewModel.Dispose();

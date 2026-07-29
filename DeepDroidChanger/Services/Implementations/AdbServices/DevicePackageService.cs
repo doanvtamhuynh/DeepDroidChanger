@@ -25,6 +25,30 @@ public sealed class DevicePackageService : IDevicePackageService
         return await ListPackagesAsync(serial, "pm list packages -3", cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<string>> GetDisabledPackagesAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
+        return await ListPackagesAsync(serial, "pm list packages -d", cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SetPackageEnabledAsync(
+        string serial,
+        string packageName,
+        bool enabled,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageName);
+
+        string action = enabled ? "enable" : "disable";
+        CommandResult result = await _adb
+            .RunAdbShellAsync(serial, $"pm {action} {packageName}", cancellationToken)
+            .ConfigureAwait(false);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"Unable to {action} package {packageName} on device {serial}.");
+    }
+
     private async Task<IReadOnlyList<string>> ListPackagesAsync(
         string serial,
         string command,

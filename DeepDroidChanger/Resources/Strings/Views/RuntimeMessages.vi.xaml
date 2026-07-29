@@ -128,4 +128,15 @@
     <sys:String x:Key="Log_ProxyTimezoneByIpFailed">Đã áp dụng proxy, nhưng đổi múi giờ theo IP thất bại. Vui lòng tự đổi múi giờ.</sys:String>
     <sys:String x:Key="Log_CopySerialSuccess">Đã sao chép serial vào bộ nhớ tạm</sys:String>
     <sys:String x:Key="Log_CopySerialFailed">Không thể sao chép serial</sys:String>
+    <sys:String x:Key="Log_GooglePackageStateFailed">Không thể đọc trạng thái GMS và Play Store</sys:String>
+    <sys:String x:Key="Log_GmsEnabled">Đã bật GMS</sys:String>
+    <sys:String x:Key="Log_GmsDisabled">Đã tắt GMS</sys:String>
+    <sys:String x:Key="Log_GmsToggleFailed">Không thể thay đổi trạng thái GMS</sys:String>
+    <sys:String x:Key="Log_PlayStoreEnabled">Đã bật Play Store</sys:String>
+    <sys:String x:Key="Log_PlayStoreDisabled">Đã tắt Play Store</sys:String>
+    <sys:String x:Key="Log_PlayStoreToggleFailed">Không thể thay đổi trạng thái Play Store</sys:String>
+    <sys:String x:Key="Log_ContextMenuStateFailed">Không thể đọc một hoặc nhiều trạng thái thiết bị</sys:String>
+    <sys:String x:Key="Log_WifiEnabled">Đã bật Wi-Fi</sys:String>
+    <sys:String x:Key="Log_WifiDisabled">Đã tắt Wi-Fi</sys:String>
+    <sys:String x:Key="Log_WifiToggleFailed">Không thể thay đổi trạng thái Wi-Fi</sys:String>
 </ResourceDictionary>

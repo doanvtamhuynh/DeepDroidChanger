@@ -166,6 +166,51 @@ public sealed class AdbCommandServiceTests
     }
 
     [TestMethod]
+    public async Task GetSettingAsync_WifiState_UsesRequestedGlobalSettingCommand()
+    {
+        IProcessRunnerService processRunner = Substitute.For<IProcessRunnerService>();
+        processRunner.RunAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, "1\r\n", string.Empty));
+        var service = new AdbCommandService(processRunner, new TestLogger<AdbCommandService>());
+
+        string value = await service.GetSettingAsync(
+            "SERIAL",
+            "global",
+            "wifi_on",
+            CancellationToken.None);
+
+        Assert.AreEqual("1", value);
+        await processRunner.Received(1).RunAsync(
+            Arg.Any<string>(),
+            Arg.Is<string>(arguments => arguments.Contains(
+                "shell settings get global wifi_on",
+                StringComparison.Ordinal)),
+            CancellationToken.None);
+    }
+
+    [TestMethod]
+    [DataRow(true, "svc wifi enable")]
+    [DataRow(false, "svc wifi disable")]
+    public async Task SetWifiAsync_UsesRequestedSvcWifiCommand(
+        bool enabled,
+        string expectedShellCommand)
+    {
+        IProcessRunnerService processRunner = Substitute.For<IProcessRunnerService>();
+        processRunner.RunAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, string.Empty, string.Empty));
+        var service = new AdbCommandService(processRunner, new TestLogger<AdbCommandService>());
+
+        await service.SetWifiAsync("SERIAL", enabled, CancellationToken.None);
+
+        await processRunner.Received(1).RunAsync(
+            Arg.Any<string>(),
+            Arg.Is<string>(arguments => arguments.Contains(
+                $"shell {expectedShellCommand}",
+                StringComparison.Ordinal)),
+            CancellationToken.None);
+    }
+
+    [TestMethod]
     public async Task CurlAsync_UsesHttpsSafeFailureAndTimeoutOptions()
     {
         IProcessRunnerService processRunner = Substitute.For<IProcessRunnerService>();

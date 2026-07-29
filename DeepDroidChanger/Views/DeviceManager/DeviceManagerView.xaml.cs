@@ -75,6 +75,16 @@ namespace DeepDroidChanger.Views
             row.Focus();
         }
 
+        private async void OnDeviceRowContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (sender is not DataGridRow { DataContext: DeviceRowViewModel device })
+                return;
+
+            await _viewModel.RefreshContextMenuStateCommand
+                .ExecuteAsync(device)
+                .ConfigureAwait(true);
+        }
+
         private static T? FindVisualParent<T>(DependencyObject? dependencyObject)
             where T : DependencyObject
         {

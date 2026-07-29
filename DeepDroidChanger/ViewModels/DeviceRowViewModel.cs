@@ -11,6 +11,10 @@ public sealed class DeviceRowViewModel : ObservableObject
     private string _status;
     private string _process;
     private bool _isActionBusy;
+    private bool _isGmsDisabled;
+    private bool _isPlayStoreDisabled;
+    private bool _isWifiEnabled;
+    private bool _isContextMenuStateLoading;
 
     public DeviceRowViewModel(
         int index,
@@ -80,4 +84,34 @@ public sealed class DeviceRowViewModel : ObservableObject
     }
 
     public bool CanEdit => !IsActionBusy;
+
+    public bool IsGmsDisabled
+    {
+        get => _isGmsDisabled;
+        set => SetProperty(ref _isGmsDisabled, value);
+    }
+
+    public bool IsPlayStoreDisabled
+    {
+        get => _isPlayStoreDisabled;
+        set => SetProperty(ref _isPlayStoreDisabled, value);
+    }
+
+    public bool IsWifiEnabled
+    {
+        get => _isWifiEnabled;
+        set => SetProperty(ref _isWifiEnabled, value);
+    }
+
+    public bool IsContextMenuStateLoading
+    {
+        get => _isContextMenuStateLoading;
+        set
+        {
+            if (SetProperty(ref _isContextMenuStateLoading, value))
+                OnPropertyChanged(nameof(CanToggleContextMenuActions));
+        }
+    }
+
+    public bool CanToggleContextMenuActions => !IsContextMenuStateLoading;
 }

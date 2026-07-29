@@ -48,6 +48,72 @@ public sealed class DevicePackageServiceTests
     }
 
     [TestMethod]
+    public async Task GetDisabledPackagesAsync_UsesDisabledPackageManagerFilter()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        adb.RunAdbShellAsync("SERIAL", "pm list packages -d", Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(
+                0,
+                "package:com.google.android.gms\npackage:com.android.vending\n",
+                string.Empty));
+        var service = new DevicePackageService(adb);
+
+        IReadOnlyList<string> packages =
+            await service.GetDisabledPackagesAsync("SERIAL", CancellationToken.None);
+
+        CollectionAssert.AreEqual(
+            new[] { "com.android.vending", "com.google.android.gms" },
+            packages.ToArray());
+        await adb.Received(1).RunAdbShellAsync(
+            "SERIAL",
+            "pm list packages -d",
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    [DataRow(true, "pm enable com.google.android.gms")]
+    [DataRow(false, "pm disable com.google.android.gms")]
+    public async Task SetPackageEnabledAsync_UsesRequestedPackageManagerAction(
+        bool enabled,
+        string expectedCommand)
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        adb.RunAdbShellAsync("SERIAL", expectedCommand, Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, "Package state changed", string.Empty));
+        var service = new DevicePackageService(adb);
+
+        await service.SetPackageEnabledAsync(
+            "SERIAL",
+            "com.google.android.gms",
+            enabled,
+            CancellationToken.None);
+
+        await adb.Received(1).RunAdbShellAsync(
+            "SERIAL",
+            expectedCommand,
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task SetPackageEnabledAsync_AdbFailure_Throws()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        adb.RunAdbShellAsync(
+                "SERIAL",
+                "pm disable com.google.android.gms",
+                Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(1, string.Empty, "device offline"));
+        var service = new DevicePackageService(adb);
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            service.SetPackageEnabledAsync(
+                "SERIAL",
+                "com.google.android.gms",
+                enabled: false,
+                CancellationToken.None));
+    }
+
+    [TestMethod]
     public async Task GetInstalledPackagesAsync_FiltersPackageNamesEndingWithUnderscore()
     {
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();

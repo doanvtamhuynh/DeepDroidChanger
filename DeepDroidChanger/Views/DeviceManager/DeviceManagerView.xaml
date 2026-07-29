@@ -33,9 +33,69 @@
                     Value="{DynamicResource DeviceGridRowContextMenuStyle}"/>
         </Style>
 
+        <Style x:Key="DeviceActionsContextMenuToggleTextBaseStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontFamily"
+                    Value="{StaticResource Metric.FontFamily}"/>
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextPrimary}"/>
+            <Setter Property="VerticalAlignment"
+                    Value="Center"/>
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="DeviceActionsContextMenuGmsTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource DeviceActionsContextMenuToggleTextBaseStyle}">
+            <Setter Property="Text"
+                    Value="{DynamicResource DeviceManager_RowMenuDisableGms}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsGmsDisabled, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                             Value="True">
+                    <Setter Property="Text"
+                            Value="{DynamicResource DeviceManager_RowMenuEnableGms}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DeviceActionsContextMenuPlayStoreTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource DeviceActionsContextMenuToggleTextBaseStyle}">
+            <Setter Property="Text"
+                    Value="{DynamicResource DeviceManager_RowMenuDisablePlayStore}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsPlayStoreDisabled, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                             Value="True">
+                    <Setter Property="Text"
+                            Value="{DynamicResource DeviceManager_RowMenuEnablePlayStore}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DeviceActionsContextMenuWifiTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource DeviceActionsContextMenuToggleTextBaseStyle}">
+            <Setter Property="Text"
+                    Value="{DynamicResource DeviceManager_RowMenuEnableWifi}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsWifiEnabled, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                             Value="True">
+                    <Setter Property="Text"
+                            Value="{DynamicResource DeviceManager_RowMenuDisableWifi}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="DeviceGridRowContextMenuStyle"
                TargetType="DataGridRow"
                BasedOn="{StaticResource {x:Type DataGridRow}}">
+            <EventSetter Event="ContextMenuOpening"
+                         Handler="OnDeviceRowContextMenuOpening"/>
             <Setter Property="FocusVisualStyle"
                     Value="{StaticResource AppFocusVisualStyle}"/>
             <Setter Property="Tag"
@@ -96,6 +156,63 @@
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource DeviceManager_RowMenuCopySerial}"
                                                Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                                </Grid>
+                            </MenuItem.Header>
+                        </MenuItem>
+
+                        <MenuItem Command="{Binding PlacementTarget.Tag.ToggleGmsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                            <MenuItem.Header>
+                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="Google"
+                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                    <TextBlock Grid.Column="1"
+                                               Style="{StaticResource DeviceActionsContextMenuGmsTextStyle}"/>
+                                </Grid>
+                            </MenuItem.Header>
+                        </MenuItem>
+
+                        <MenuItem Command="{Binding PlacementTarget.Tag.TogglePlayStoreCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                            <MenuItem.Header>
+                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="GooglePlay"
+                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                    <TextBlock Grid.Column="1"
+                                               Style="{StaticResource DeviceActionsContextMenuPlayStoreTextStyle}"/>
+                                </Grid>
+                            </MenuItem.Header>
+                        </MenuItem>
+
+                        <MenuItem Command="{Binding PlacementTarget.Tag.ToggleWifiCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                            <MenuItem.Header>
+                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="Wifi"
+                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                    <TextBlock Grid.Column="1"
+                                               Style="{StaticResource DeviceActionsContextMenuWifiTextStyle}"/>
                                 </Grid>
                             </MenuItem.Header>
                         </MenuItem>

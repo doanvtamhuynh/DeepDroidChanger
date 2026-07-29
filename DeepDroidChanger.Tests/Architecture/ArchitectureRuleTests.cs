@@ -12,6 +12,7 @@ public sealed class ArchitectureRuleTests
         string projectRoot = GetProjectRoot();
         string solutionRoot = GetSolutionRoot();
         string canonicalView = Path.Combine(projectRoot, "Views", "DeviceManager", "DeviceManagerView.xaml");
+        string canonicalViewCodeBehind = string.Concat(canonicalView, ".cs");
         string canonicalViewModel = Path.Combine(projectRoot, "ViewModels", "DeviceManagerViewModel.cs");
         string obsoleteFeatureTheme = Path.Combine(projectRoot, "Resources", "Themes", "DeviceManager.xaml");
         string canonicalStrings = Path.Combine(projectRoot, "Resources", "Strings", "Views", "DeviceManager.xaml");
@@ -23,6 +24,7 @@ public sealed class ArchitectureRuleTests
             "DeviceManagerViewModelLifecycleTests.cs");
 
         Assert.IsTrue(File.Exists(canonicalView));
+        Assert.IsTrue(File.Exists(canonicalViewCodeBehind));
         Assert.IsTrue(File.Exists(canonicalViewModel));
         Assert.IsFalse(File.Exists(obsoleteFeatureTheme));
         Assert.IsTrue(File.Exists(canonicalStrings));
@@ -63,6 +65,52 @@ public sealed class ArchitectureRuleTests
         Assert.Contains("<UserControl.Resources>", deviceManagerView, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", deviceManagerView, StringComparison.Ordinal);
         Assert.Contains("DataGridCheckBoxStyle", deviceManagerView, StringComparison.Ordinal);
+        int copySerialIndex = deviceManagerView.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.CopySerialCommand",
+            StringComparison.Ordinal);
+        int toggleGmsIndex = deviceManagerView.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.ToggleGmsCommand",
+            StringComparison.Ordinal);
+        int togglePlayStoreIndex = deviceManagerView.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.TogglePlayStoreCommand",
+            StringComparison.Ordinal);
+        int toggleWifiIndex = deviceManagerView.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.ToggleWifiCommand",
+            StringComparison.Ordinal);
+        int rebootIndex = deviceManagerView.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.RebootDeviceCommand",
+            StringComparison.Ordinal);
+        Assert.IsTrue(
+            copySerialIndex < toggleGmsIndex
+            && toggleGmsIndex < togglePlayStoreIndex
+            && togglePlayStoreIndex < toggleWifiIndex
+            && toggleWifiIndex < rebootIndex,
+            "Google package and Wi-Fi actions must appear below Copy Serial and above Reboot Device.");
+        Assert.Contains(
+            "Handler=\"OnDeviceRowContextMenuOpening\"",
+            deviceManagerView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "PlacementTarget.DataContext.IsGmsDisabled",
+            deviceManagerView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "PlacementTarget.DataContext.IsPlayStoreDisabled",
+            deviceManagerView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "PlacementTarget.DataContext.IsWifiEnabled",
+            deviceManagerView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "PlacementTarget.DataContext.CanToggleContextMenuActions",
+            deviceManagerView,
+            StringComparison.Ordinal);
+        string deviceManagerViewCodeBehind = File.ReadAllText(canonicalViewCodeBehind);
+        Assert.Contains(
+            "RefreshContextMenuStateCommand",
+            deviceManagerViewCodeBehind,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             "StaticResource AddDevice",
             deviceManagerView,
@@ -81,6 +129,7 @@ public sealed class ArchitectureRuleTests
             "AdbDevice.cs",
             "AdbDeviceStatus.cs",
             "DeviceViewerStreamBounds.cs",
+            "GooglePackageState.cs",
             "InstallPackageOptions.cs",
             "InstallPackageResult.cs",
             "Integrity.cs",

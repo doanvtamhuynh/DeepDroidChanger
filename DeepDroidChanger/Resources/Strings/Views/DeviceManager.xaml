@@ -68,6 +68,12 @@
     <sys:String x:Key="DeviceManager_RowMenuDeviceInfo">Device Info</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuFactoryReset">Factory Reset</sys:String>
     <sys:String x:Key="DeviceManager_RowMenuCopySerial">Copy Serial</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuDisableGms">Disable GMS</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuEnableGms">Enable GMS</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuDisablePlayStore">Disable Play Store</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuEnablePlayStore">Enable Play Store</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuDisableWifi">Disable Wi-Fi</sys:String>
+    <sys:String x:Key="DeviceManager_RowMenuEnableWifi">Enable Wi-Fi</sys:String>
     <sys:String x:Key="DeviceManager_FlashRomPlaceholder">Flash ROM is not implemented.</sys:String>
 
     <sys:String x:Key="DeviceManager_FilterLabel">Filter:</sys:String>

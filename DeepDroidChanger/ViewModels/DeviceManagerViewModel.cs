@@ -638,6 +638,221 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
+        private async Task RefreshGooglePackageStateAsync(
+            DeviceRowViewModel? device,
+            CancellationToken cancellationToken)
+        {
+            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            if (device == null)
+                return;
+
+            try
+            {
+                GooglePackageState state = await _deviceActionService
+                    .GetGooglePackageStateAsync(device.Serial, cancellationToken)
+                    .ConfigureAwait(true);
+                ApplyGooglePackageState(device, state);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to read Google package state for device {Serial}.", device.Serial);
+                await ShowDeviceLogAsync(
+                        device,
+                        "Log_GooglePackageStateFailed",
+                        CancellationToken.None)
+                    .ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
+            }
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
+        private async Task RefreshContextMenuStateAsync(
+            DeviceRowViewModel? device,
+            CancellationToken cancellationToken)
+        {
+            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            if (device == null)
+                return;
+
+            device.IsContextMenuStateLoading = true;
+            try
+            {
+                Task<GooglePackageState> googlePackageStateTask = _deviceActionService
+                    .GetGooglePackageStateAsync(device.Serial, cancellationToken);
+                Task<bool> wifiStateTask = _deviceActionService
+                    .GetWifiEnabledAsync(device.Serial, cancellationToken);
+
+                try
+                {
+                    await Task.WhenAll(googlePackageStateTask, wifiStateTask).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to read context menu state for device {Serial}.", device.Serial);
+                }
+
+                if (googlePackageStateTask.IsCompletedSuccessfully)
+                    ApplyGooglePackageState(device, googlePackageStateTask.Result);
+
+                if (wifiStateTask.IsCompletedSuccessfully)
+                    device.IsWifiEnabled = wifiStateTask.Result;
+
+                if (!googlePackageStateTask.IsCompletedSuccessfully
+                    || !wifiStateTask.IsCompletedSuccessfully)
+                {
+                    await ShowDeviceLogAsync(
+                            device,
+                            "Log_ContextMenuStateFailed",
+                            CancellationToken.None)
+                        .ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_Ready");
+                }
+            }
+            finally
+            {
+                device.IsContextMenuStateLoading = false;
+            }
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
+        private Task ToggleGmsAsync(
+            DeviceRowViewModel? device,
+            CancellationToken cancellationToken)
+        {
+            return ToggleGooglePackageAsync(device, isGms: true, cancellationToken);
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
+        private Task TogglePlayStoreAsync(
+            DeviceRowViewModel? device,
+            CancellationToken cancellationToken)
+        {
+            return ToggleGooglePackageAsync(device, isGms: false, cancellationToken);
+        }
+
+        private async Task ToggleGooglePackageAsync(
+            DeviceRowViewModel? device,
+            bool isGms,
+            CancellationToken cancellationToken)
+        {
+            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            if (device == null)
+                return;
+
+            try
+            {
+                GooglePackageState state = await _deviceActionService
+                    .GetGooglePackageStateAsync(device.Serial, cancellationToken)
+                    .ConfigureAwait(true);
+                ApplyGooglePackageState(device, state);
+
+                bool enabled = isGms ? state.IsGmsDisabled : state.IsPlayStoreDisabled;
+                if (isGms)
+                {
+                    await _deviceActionService
+                        .SetGmsEnabledAsync(device.Serial, enabled, cancellationToken)
+                        .ConfigureAwait(true);
+                    device.IsGmsDisabled = !enabled;
+                }
+                else
+                {
+                    await _deviceActionService
+                        .SetPlayStoreEnabledAsync(device.Serial, enabled, cancellationToken)
+                        .ConfigureAwait(true);
+                    device.IsPlayStoreDisabled = !enabled;
+                }
+
+                string successLog = (isGms, enabled) switch
+                {
+                    (true, true) => "Log_GmsEnabled",
+                    (true, false) => "Log_GmsDisabled",
+                    (false, true) => "Log_PlayStoreEnabled",
+                    _ => "Log_PlayStoreDisabled"
+                };
+                await ShowDeviceLogAsync(device, successLog, cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
+            }
+            catch (OperationCanceledException)
+            {
+                SetDeviceLog(device, "Log_Ready");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Failed to toggle {Package} for device {Serial}.",
+                    isGms ? "GMS" : "Play Store",
+                    device.Serial);
+                await ShowDeviceLogAsync(
+                        device,
+                        isGms ? "Log_GmsToggleFailed" : "Log_PlayStoreToggleFailed",
+                        CancellationToken.None)
+                    .ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
+            }
+        }
+
+        private static void ApplyGooglePackageState(
+            DeviceRowViewModel device,
+            GooglePackageState state)
+        {
+            device.IsGmsDisabled = state.IsGmsDisabled;
+            device.IsPlayStoreDisabled = state.IsPlayStoreDisabled;
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
+        private async Task ToggleWifiAsync(
+            DeviceRowViewModel? device,
+            CancellationToken cancellationToken)
+        {
+            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            if (device == null)
+                return;
+
+            try
+            {
+                bool isWifiEnabled = await _deviceActionService
+                    .GetWifiEnabledAsync(device.Serial, cancellationToken)
+                    .ConfigureAwait(true);
+                device.IsWifiEnabled = isWifiEnabled;
+
+                bool enabled = !isWifiEnabled;
+                await _deviceActionService
+                    .SetWifiEnabledAsync(device.Serial, enabled, cancellationToken)
+                    .ConfigureAwait(true);
+                device.IsWifiEnabled = enabled;
+
+                await ShowDeviceLogAsync(
+                        device,
+                        enabled ? "Log_WifiEnabled" : "Log_WifiDisabled",
+                        cancellationToken)
+                    .ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
+            }
+            catch (OperationCanceledException)
+            {
+                SetDeviceLog(device, "Log_Ready");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to toggle Wi-Fi for device {Serial}.", device.Serial);
+                await ShowDeviceLogAsync(
+                        device,
+                        "Log_WifiToggleFailed",
+                        CancellationToken.None)
+                    .ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
+            }
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task ViewDeviceInfoAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
         {
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
