@@ -50,7 +50,7 @@ if ($branchRate -lt $MinimumBranchRate) {
 }
 
 $criticalClasses = @(
-    'DeepDroidChanger.Services.AccountAuthenticationService',
+    'DeepDroidChanger.Authentication.Internal.AccountAuthenticationService',
     'DeepDroidChanger.Services.DeviceIntegrityService',
     'DeepDroidChanger.Services.DeviceRandomProfileService',
     'DeepDroidChanger.Services.DeviceViewerCoordinatorService',

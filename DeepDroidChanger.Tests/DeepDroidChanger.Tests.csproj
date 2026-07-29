@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DeepDroidChanger.Authentication\DeepDroidChanger.Authentication.csproj" />
     <ProjectReference Include="..\DeepDroidChanger\DeepDroidChanger.csproj" />
   </ItemGroup>
 

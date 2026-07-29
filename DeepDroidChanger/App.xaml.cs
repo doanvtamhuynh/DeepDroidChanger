@@ -1,4 +1,5 @@
 using System.Windows;
+using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
@@ -116,10 +117,7 @@ public sealed partial class App : Application
         services.AddSingleton<ICarrierDataService, CarrierDataService>();
         services.AddSingleton<ITimezoneDataService, TimezoneDataService>();
         services.AddSingleton<ILocationDataService, LocationDataService>();
-        services.AddSingleton<IAccountStoreService, AccountStoreService>();
-
-        services.AddSingleton<IAccountAuthenticationService, AccountAuthenticationService>();
-        services.AddSingleton<IDeviceSessionService, DeviceSessionService>();
+        services.AddDeepDroidAuthentication();
         services.AddSingleton<IDeviceRandomApiService, DeviceRandomApiService>();
         services.AddSingleton<IIpGeolocationService, IpGeolocationService>();
         services.AddOptions<DeviceInfoApiOptions>()

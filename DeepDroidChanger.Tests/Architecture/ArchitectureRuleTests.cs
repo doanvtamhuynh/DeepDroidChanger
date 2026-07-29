@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace DeepDroidChanger.Tests.Architecture;
 
@@ -73,13 +74,6 @@ public sealed class ArchitectureRuleTests
 
         AssertFilesInFolder(
             modelsDirectory,
-            "Authentication",
-            "AccountAuthenticationResult.cs",
-            "AccountLoginRequest.cs",
-            "AccountSession.cs",
-            "AccountSettings.cs");
-        AssertFilesInFolder(
-            modelsDirectory,
             "AdbServices",
             "AdbDevice.cs",
             "AdbDeviceStatus.cs",
@@ -107,18 +101,6 @@ public sealed class ArchitectureRuleTests
         string interfacesDirectory = Path.Combine(servicesDirectory, "Interfaces");
         string implementationsDirectory = Path.Combine(servicesDirectory, "Implementations");
 
-        AssertFilesInFolder(
-            interfacesDirectory,
-            "Authentication",
-            "IAccountAuthenticationService.cs",
-            "IAccountStoreService.cs",
-            "IDeviceSessionService.cs");
-        AssertFilesInFolder(
-            implementationsDirectory,
-            "Authentication",
-            "AccountAuthenticationService.cs",
-            "AccountStoreService.cs",
-            "DeviceSessionService.cs");
         AssertFilesInFolder(
             interfacesDirectory,
             "DeviceInfo",
@@ -184,6 +166,186 @@ public sealed class ArchitectureRuleTests
     }
 
     [TestMethod]
+    public void AuthenticationProject_UsesCanonicalStructureAndOneWayDependencies()
+    {
+        string solutionRoot = GetSolutionRoot();
+        string authenticationRoot = Path.Combine(
+            solutionRoot,
+            "DeepDroidChanger.Authentication");
+        string authenticationProject = Path.Combine(
+            authenticationRoot,
+            "DeepDroidChanger.Authentication.csproj");
+        string applicationProject = Path.Combine(
+            solutionRoot,
+            "DeepDroidChanger",
+            "DeepDroidChanger.csproj");
+        string testProject = Path.Combine(
+            solutionRoot,
+            "DeepDroidChanger.Tests",
+            "DeepDroidChanger.Tests.csproj");
+
+        AssertFilesInFolder(
+            authenticationRoot,
+            "Constants",
+            "AccountStoreConstants.cs",
+            "AuthenticationConstants.cs");
+        AssertFilesInFolder(
+            authenticationRoot,
+            "Models",
+            "AccountAuthenticationResult.cs",
+            "AccountLoginRequest.cs",
+            "AccountSession.cs",
+            "AccountStoreOptions.cs",
+            "AuthenticationOptions.cs",
+            "IdentityProviderAuthenticationResult.cs");
+        AssertFilesInFolder(
+            Path.Combine(authenticationRoot, "Services"),
+            "Interfaces",
+            "IAccountAuthenticationService.cs",
+            "IAccountStoreService.cs",
+            "IAuthenticationSessionService.cs",
+            "IIdentityProviderClient.cs");
+        AssertFilesInFolder(
+            Path.Combine(authenticationRoot, "Services"),
+            "Implementations",
+            "AccountAuthenticationService.cs",
+            "AccountStoreService.cs",
+            "AuthenticationSessionService.cs",
+            "CognitoIdentityProviderClient.cs");
+
+        XDocument authenticationDocument = XDocument.Load(authenticationProject);
+        XDocument applicationDocument = XDocument.Load(applicationProject);
+        XDocument testDocument = XDocument.Load(testProject);
+        string[] authenticationReferences = GetProjectReferences(authenticationDocument);
+        string[] applicationReferences = GetProjectReferences(applicationDocument);
+        string[] testReferences = GetProjectReferences(testDocument);
+
+        Assert.IsEmpty(authenticationReferences);
+        Assert.IsFalse(authenticationDocument.Descendants()
+            .Any(element => element.Name.LocalName == "UseWPF"
+                && string.Equals(element.Value, "true", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(authenticationDocument.Descendants()
+            .Any(element => element.Name.LocalName == "InternalsVisibleTo"));
+        Assert.Contains(
+            @"..\DeepDroidChanger.Authentication\DeepDroidChanger.Authentication.csproj",
+            applicationReferences);
+        Assert.Contains(
+            @"..\DeepDroidChanger.Authentication\DeepDroidChanger.Authentication.csproj",
+            testReferences);
+        Assert.Contains(
+            @"..\DeepDroidChanger\DeepDroidChanger.csproj",
+            testReferences);
+
+        string applicationProjectSource = File.ReadAllText(applicationProject);
+        string authenticationProjectSource = File.ReadAllText(authenticationProject);
+        Assert.DoesNotContain(
+            "Amazon.Extensions.CognitoAuthentication",
+            applicationProjectSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Amazon.Extensions.CognitoAuthentication",
+            authenticationProjectSource,
+            StringComparison.Ordinal);
+
+        string coverageSettings = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "DeepDroidChanger.Tests",
+            "coverage.settings.xml"));
+        string coverageVerification = File.ReadAllText(Path.Combine(
+            solutionRoot,
+            "DeepDroidChanger.Tests",
+            "verify-coverage.ps1"));
+        Assert.Contains(
+            @"DeepDroidChanger(?:\.Authentication)?\.dll$",
+            coverageSettings,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            @"DeepDroidChanger\.Authentication\.Internal",
+            coverageSettings,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "DeepDroidChanger.Authentication.Internal.AccountAuthenticationService",
+            coverageVerification,
+            StringComparison.Ordinal);
+
+        string[] authenticationSourceFiles = Directory.GetFiles(
+            authenticationRoot,
+            "*.cs",
+            SearchOption.AllDirectories);
+        string[] forbiddenNamespaces =
+        [
+            "DeepDroidChanger.Models",
+            "DeepDroidChanger.Services",
+            "DeepDroidChanger.ViewModels",
+            "DeepDroidChanger.Views"
+        ];
+        Assert.IsFalse(authenticationSourceFiles.Any(path =>
+            forbiddenNamespaces.Any(forbiddenNamespace =>
+                File.ReadAllText(path).Contains(
+                    forbiddenNamespace,
+                    StringComparison.Ordinal))));
+        Assert.IsFalse(authenticationSourceFiles.Any(path =>
+            File.ReadAllText(path).Contains(
+                "InternalsVisibleTo",
+                StringComparison.Ordinal)));
+        string constantsDirectory = Path.Combine(authenticationRoot, "Constants");
+        Assert.IsTrue(Directory.GetFiles(
+                constantsDirectory,
+                "*.cs",
+                SearchOption.TopDirectoryOnly)
+            .All(path => Path.GetFileNameWithoutExtension(path)
+                .EndsWith("Constants", StringComparison.Ordinal)));
+        Assert.IsFalse(authenticationSourceFiles.Any(path =>
+            File.ReadAllText(path).Contains(
+                "appsync-api",
+                StringComparison.OrdinalIgnoreCase)));
+
+        string deviceInfoApiInterface = File.ReadAllText(Path.Combine(
+            GetProjectRoot(),
+            "Services",
+            "Interfaces",
+            "DeviceInfo",
+            "IDeviceRandomApiService.cs"));
+        string deviceInfoProfileInterface = File.ReadAllText(Path.Combine(
+            GetProjectRoot(),
+            "Services",
+            "Interfaces",
+            "DeviceInfo",
+            "IDeviceRandomProfileService.cs"));
+        Assert.DoesNotContain(
+            "AccountSession",
+            deviceInfoApiInterface,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "DeepDroidChanger.Authentication",
+            deviceInfoApiInterface,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "AccountSession",
+            deviceInfoProfileInterface,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "DeepDroidChanger.Authentication",
+            deviceInfoProfileInterface,
+            StringComparison.Ordinal);
+
+        string implementationsDirectory = Path.Combine(
+            authenticationRoot,
+            "Services",
+            "Implementations");
+        foreach (string implementationFile in Directory.GetFiles(
+                     implementationsDirectory,
+                     "*.cs",
+                     SearchOption.TopDirectoryOnly))
+        {
+            Assert.Contains(
+                "internal sealed class",
+                File.ReadAllText(implementationFile),
+                StringComparison.Ordinal);
+        }
+    }
+
+    [TestMethod]
     public void Models_ContainDataOnlyAndDoNotReferenceUpperLayers()
     {
         string modelsDirectory = Path.Combine(GetProjectRoot(), "Models");
@@ -205,7 +367,6 @@ public sealed class ArchitectureRuleTests
         string[] expectedFiles =
         [
             "AssetConstants.cs",
-            "AuthenticationConstants.cs",
             "DeviceSettingsInfoConstants.cs",
             "PropertyConstants.cs",
             "UrlConstants.cs"
@@ -432,6 +593,17 @@ public sealed class ArchitectureRuleTests
     private static string GetProjectRoot()
     {
         return Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
+    }
+
+    private static string[] GetProjectReferences(XDocument document)
+    {
+        return document
+            .Descendants()
+            .Where(element => element.Name.LocalName == "ProjectReference")
+            .Select(element => element.Attribute("Include")?.Value)
+            .Where(value => value != null)
+            .Cast<string>()
+            .ToArray();
     }
 
     private static void AssertFilesInFolder(string root, string folder, params string[] fileNames)

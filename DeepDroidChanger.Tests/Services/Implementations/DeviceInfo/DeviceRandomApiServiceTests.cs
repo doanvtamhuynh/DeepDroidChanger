@@ -1,7 +1,9 @@
 using System.Net;
+using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.DeviceInfo;
 
@@ -16,10 +18,11 @@ public sealed class DeviceRandomApiServiceTests
         using var httpClient = new HttpClient(handler);
         using var service = new DeviceRandomApiService(
             httpClient,
+            CreateOptions(),
+            CreateSessionService(),
             NullLogger<DeviceRandomApiService>.Instance);
 
         await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.GetRandomDeviceAsync(
-            CreateSession(),
             new RandomDeviceSelection("Google", 35),
             CancellationToken.None));
 
@@ -37,11 +40,12 @@ public sealed class DeviceRandomApiServiceTests
         using var httpClient = new HttpClient(handler);
         using var service = new DeviceRandomApiService(
             httpClient,
+            CreateOptions(),
+            CreateSessionService(),
             NullLogger<DeviceRandomApiService>.Instance);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => service.GetRandomDeviceAsync(
-            CreateSession(),
             new RandomDeviceSelection("Google", 35),
             cancellation.Token));
 
@@ -59,10 +63,11 @@ public sealed class DeviceRandomApiServiceTests
         using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromMilliseconds(100) };
         using var service = new DeviceRandomApiService(
             httpClient,
+            CreateOptions(),
+            CreateSessionService(),
             NullLogger<DeviceRandomApiService>.Instance);
 
         await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.GetRandomDeviceAsync(
-            CreateSession(),
             new RandomDeviceSelection("Google", 35),
             CancellationToken.None));
 
@@ -76,10 +81,11 @@ public sealed class DeviceRandomApiServiceTests
         using var httpClient = new HttpClient(handler);
         using var service = new DeviceRandomApiService(
             httpClient,
+            CreateOptions(),
+            CreateSessionService(),
             NullLogger<DeviceRandomApiService>.Instance);
 
         await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() => service.GetRandomDeviceAsync(
-            CreateSession(),
             new RandomDeviceSelection("Google", 35),
             CancellationToken.None));
     }
@@ -100,10 +106,11 @@ public sealed class DeviceRandomApiServiceTests
         using var httpClient = new HttpClient(handler);
         using var service = new DeviceRandomApiService(
             httpClient,
+            CreateOptions(),
+            CreateSessionService(),
             NullLogger<DeviceRandomApiService>.Instance);
 
         DeviceInfoApiDevice device = await service.GetRandomDeviceAsync(
-            CreateSession(),
             new RandomDeviceSelection("Google", 35),
             CancellationToken.None);
 
@@ -111,6 +118,7 @@ public sealed class DeviceRandomApiServiceTests
         Assert.AreEqual("1760000000", device.BuildDateUtc);
         Assert.AreEqual("cloudripper-14.5", device.Bootloader);
         Assert.IsNotNull(capturedRequest);
+        Assert.AreEqual("https://example.test/graphql", capturedRequest.RequestUri?.AbsoluteUri);
         Assert.AreEqual("test-token", capturedRequest.Headers.GetValues("X-Test-Auth").Single());
     }
 
@@ -134,10 +142,11 @@ public sealed class DeviceRandomApiServiceTests
         using var httpClient = new HttpClient(handler);
         using var service = new DeviceRandomApiService(
             httpClient,
+            CreateOptions(),
+            CreateSessionService(),
             NullLogger<DeviceRandomApiService>.Instance);
 
         DeviceInfoApiDevice device = await service.GetRandomDeviceAsync(
-            CreateSession(),
             new RandomDeviceSelection("Google", 35),
             CancellationToken.None);
 
@@ -145,9 +154,45 @@ public sealed class DeviceRandomApiServiceTests
         Assert.AreEqual(4, handler.RequestCount);
     }
 
-    private static AccountSession CreateSession()
+    [TestMethod]
+    public async Task GetRandomDeviceAsync_NoSession_ThrowsTypedFailureWithoutSendingRequest()
     {
-        return new AccountSession("https://example.test/graphql", "X-Test-Auth", "test-token");
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+        using var httpClient = new HttpClient(handler);
+        using var service = new DeviceRandomApiService(
+            httpClient,
+            CreateOptions(),
+            CreateSessionService(idToken: null),
+            NullLogger<DeviceRandomApiService>.Instance);
+
+        await Assert.ThrowsExactlyAsync<DeviceRandomApiException>(() =>
+            service.GetRandomDeviceAsync(
+                new RandomDeviceSelection("Google", 35),
+                CancellationToken.None));
+
+        Assert.AreEqual(0, handler.RequestCount);
+    }
+
+    private static IAuthenticationSessionService CreateSessionService(
+        string? idToken = "test-token")
+    {
+        IAuthenticationSessionService sessionService =
+            Substitute.For<IAuthenticationSessionService>();
+        sessionService.CurrentSession.Returns(
+            idToken is null
+                ? null
+                : new AccountSession(idToken));
+        return sessionService;
+    }
+
+    private static DeviceInfoApiOptions CreateOptions()
+    {
+        return new DeviceInfoApiOptions
+        {
+            Endpoint = "https://example.test/graphql",
+            AuthorizationHeaderName = "X-Test-Auth"
+        };
     }
 
     private sealed class StubHttpMessageHandler : HttpMessageHandler

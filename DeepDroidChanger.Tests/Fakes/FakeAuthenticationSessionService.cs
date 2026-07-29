@@ -1,9 +1,8 @@
-using DeepDroidChanger.Models;
-using DeepDroidChanger.Services;
+using DeepDroidChanger.Authentication;
 
 namespace DeepDroidChanger.Tests.Fakes
 {
-    public sealed class FakeDeviceSessionService : IDeviceSessionService
+    public sealed class FakeAuthenticationSessionService : IAuthenticationSessionService
     {
         public AccountSession? CurrentSession { get; private set; }
         public bool WasCleared { get; private set; }

@@ -9,6 +9,15 @@ here, stop and ask instead of guessing.
 WPF Desktop app, .NET net10.0-windows, MVVM pattern.
 DI via Microsoft.Extensions.Hosting (IHost), registered in App.xaml.cs.
 
+Authentication is a separate `net10.0-windows` class library. Dependency
+direction is strictly one-way:
+
+`DeepDroidChanger -> DeepDroidChanger.Authentication`
+
+The authentication project must never reference the WPF project, WPF
+framework APIs, Views, ViewModels, device services, or WPF resources.
+Consumers use only its public contracts and `AddDeepDroidAuthentication`.
+
 Layering rule:
 View (.xaml/.xaml.cs) - UI only: binding, pure UI events
 ViewModel - exposes Property/Command, calls Service
@@ -28,6 +37,32 @@ DeepDroidChanger/ (solution root)
   .gitignore
   AGENTS.md
 
+  DeepDroidChanger.Authentication/ (Windows authentication class library)
+    DeepDroidChanger.Authentication.csproj
+    Constants/
+      AccountStoreConstants.cs        internal account storage defaults
+      AuthenticationConstants.cs      internal Cognito defaults
+    DependencyInjection/
+      AuthenticationServiceCollectionExtensions.cs
+    Models/
+      AccountAuthenticationResult.cs
+      AccountLoginRequest.cs
+      AccountSession.cs
+      AccountStoreOptions.cs
+      AuthenticationOptions.cs
+      IdentityProviderAuthenticationResult.cs
+    Services/
+      Interfaces/
+        IAccountAuthenticationService.cs
+        IAccountStoreService.cs
+        IAuthenticationSessionService.cs
+        IIdentityProviderClient.cs
+      Implementations/
+        AccountAuthenticationService.cs
+        AccountStoreService.cs
+        AuthenticationSessionService.cs
+        CognitoIdentityProviderClient.cs
+
   DeepDroidChanger/ (main WPF project)
     App.xaml, App.xaml.cs
     MainWindow.xaml, MainWindow.xaml.cs
@@ -46,7 +81,6 @@ DeepDroidChanger/ (solution root)
     Models/
       <Noun>.cs   e.g. Device.cs, Carrier.cs, Timezone.cs
       AdbServices/<Noun>.cs
-      Authentication/<Noun>.cs
       DeviceInfo/<Noun>.cs
 
     Services/
@@ -54,13 +88,11 @@ DeepDroidChanger/ (solution root)
         I<Name>Service.cs        (shared service, no domain group)
         DialogServices/I<Name>DialogService.cs
         AdbServices/I<Name>Service.cs
-        Authentication/I<Name>Service.cs
         DeviceInfo/I<Name>Service.cs
       Implementations/
         <Name>Service.cs
         DialogServices/<Name>DialogService.cs
         AdbServices/<Name>Service.cs
-        Authentication/<Name>Service.cs
         DeviceInfo/<Name>Service.cs
 
     Controls/     custom control / reusable UserControl
@@ -71,7 +103,6 @@ DeepDroidChanger/ (solution root)
       PropertyConstants.cs            Android/device property keys
       DeviceSettingsInfoConstants.cs  Android setting namespaces and keys
       UrlConstants.cs                 remote URLs
-      AuthenticationConstants.cs      authentication identifiers
       AssetConstants.cs               asset/runtime paths and file names
 
     Resources/    XAML ResourceDictionary only
@@ -108,6 +139,8 @@ DeepDroidChanger/ (solution root)
 
   DeepDroidChanger.Tests/
     DeepDroidChanger.Tests.csproj
+    Authentication/ mirrors production Services/ of
+                    DeepDroidChanger.Authentication
     Architecture/ cross-cutting architecture, DI, security, resource,
                   and WPF surface smoke tests
     Fakes/        reusable test doubles only
@@ -130,10 +163,11 @@ Extension methods go in Helpers/, not here.
 Behaviors/ holds only attached behaviors bound from XAML. Business
 logic goes in Services/.
 
-Constants/ holds constants only, no processing logic. It must contain exactly
-the five catalog files listed in section 2. Only property keys, Android setting
-namespaces/keys, URLs, authentication identifiers, and asset/runtime paths or
-file names belong there. Operational values, command text, arguments, key-event
+Constants/ in the WPF project holds constants only, no processing logic. It
+must contain exactly the four catalog files listed in section 2. Only property
+keys, Android setting namespaces/keys, URLs, and asset/runtime paths or file
+names belong there. Authentication identifiers belong exclusively to the
+authentication project. Operational values, command text, arguments, key-event
 codes, timeouts, failure codes, option values, filters, column keys, and
 localization resource keys must stay directly in the code that owns them.
 Feature-local file extensions, temporary-directory names, manifest names, and
@@ -169,8 +203,8 @@ Full color/typography/spacing rules: see docs/THEMES.md.
 
 5. SERVICES
 
-Every service needs an interface in Services/Interfaces/, registered
-in App.xaml.cs.
+Every WPF-owned service needs an interface in Services/Interfaces/ and a
+direct registration in App.xaml.cs.
 
 Split services by domain when there are many:
 DialogServices/  controls opening/closing dialogs, returns result to
@@ -181,10 +215,30 @@ Shared services with no domain (ISettingsService, IRandomService, etc)
 stay flat directly in Services/Interfaces/ and
 Services/Implementations/, no subfolder.
 
+Authentication services are the exception to WPF service ownership: their
+public interfaces live in `DeepDroidChanger.Authentication/Services/Interfaces`
+and their implementations live in the matching `Services/Implementations`
+folder. The authentication project exposes one DI composition method,
+`AddDeepDroidAuthentication`, and keeps Cognito, DPAPI persistence, and atomic
+file-writing details internal. Cognito configuration belongs to
+`AuthenticationOptions`; account file persistence configuration belongs to
+`AccountStoreOptions`. `AccountSession` contains only the ID token.
+
+The Device Info GraphQL URL and authorization header are protected-resource
+API configuration, not identity-provider configuration. They remain owned by
+`DeviceInfoApiOptions` in the WPF project and use the names
+`DeviceInfoGraphQlApi` and `AuthorizationHeaderName`. Device Info service
+interfaces must not accept `AccountSession` or reference the authentication
+namespace. `DeviceRandomApiService` is the integration boundary that reads
+`IAuthenticationSessionService` and attaches the current ID token to the
+resource request.
+
 6. TESTS
 
 DeepDroidChanger.Tests/ structure must mirror ViewModels/ and
-Services/Implementations/ of the main project exactly.
+Services/Implementations/ of the main project exactly. Authentication tests
+live under `Authentication/` and mirror the new class library's production
+Services/ structure.
 Architecture/, Fakes/, and Helpers/ are the only permitted support
 folders outside that mirror and must not contain production business
 logic tests that belong under ViewModels/ or Services/.

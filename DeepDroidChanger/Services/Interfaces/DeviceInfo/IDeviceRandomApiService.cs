@@ -3,6 +3,8 @@ namespace DeepDroidChanger.Services
 {
     public interface IDeviceRandomApiService
     {
-        Task<DeviceInfoApiDevice> GetRandomDeviceAsync(AccountSession session, RandomDeviceSelection selection, CancellationToken cancellationToken);
+        Task<DeviceInfoApiDevice> GetRandomDeviceAsync(
+            RandomDeviceSelection selection,
+            CancellationToken cancellationToken);
     }
 }

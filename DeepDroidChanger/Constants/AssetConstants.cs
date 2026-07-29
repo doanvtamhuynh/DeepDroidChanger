@@ -33,7 +33,6 @@ public static class AssetConstants
     {
         public const string AppSettingsDirectoryName = "AppSettings";
         public const string AppSettingsFileName = "app_settings.json";
-        public const string AccountFileName = "account.json";
         public const string DeviceManagerDirectoryName = "DeviceManager";
         public const string DevicesFileName = "devices.json";
         public const string RandomConfigFileName = "random_config.json";

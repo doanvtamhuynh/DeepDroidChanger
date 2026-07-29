@@ -1,11 +1,10 @@
-using DeepDroidChanger.Models;
-using DeepDroidChanger.Services;
+using DeepDroidChanger.Authentication;
 
 namespace DeepDroidChanger.Tests.Fakes
 {
     public sealed class FakeAccountAuthenticationService : IAccountAuthenticationService
     {
-        public AccountSession Session { get; set; } = new("https://example.com/graphql", "authorization", "id-token");
+        public AccountSession Session { get; set; } = new("id-token");
         public AccountAuthenticationStatus Status { get; set; } = AccountAuthenticationStatus.Success;
         public Exception? ExceptionToThrow { get; set; }
         public AccountLoginRequest? LastRequest { get; private set; }

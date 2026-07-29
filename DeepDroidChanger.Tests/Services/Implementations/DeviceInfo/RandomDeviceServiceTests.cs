@@ -1,3 +1,4 @@
+using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using NSubstitute;
@@ -10,7 +11,7 @@ public sealed class RandomDeviceServiceTests
     [TestMethod]
     public async Task CreateRandomProfileAsync_NoSession_ReturnsLoginRequired()
     {
-        IDeviceSessionService session = Substitute.For<IDeviceSessionService>();
+        IAuthenticationSessionService session = Substitute.For<IAuthenticationSessionService>();
         var service = new RandomDeviceService(session, Substitute.For<IDeviceRandomProfileService>());
 
         RandomDeviceResult result = await service.CreateRandomProfileAsync(
@@ -24,11 +25,10 @@ public sealed class RandomDeviceServiceTests
     [TestMethod]
     public async Task CreateRandomProfileAsync_ApiFailure_ReturnsTypedFailure()
     {
-        IDeviceSessionService session = Substitute.For<IDeviceSessionService>();
-        session.CurrentSession.Returns(new AccountSession("https://example.test", "authorization", "token"));
+        IAuthenticationSessionService session = Substitute.For<IAuthenticationSessionService>();
+        session.CurrentSession.Returns(new AccountSession("token"));
         IDeviceRandomProfileService profiles = Substitute.For<IDeviceRandomProfileService>();
         profiles.CreateRandomProfileAsync(
-                Arg.Any<AccountSession>(),
                 Arg.Any<RandomDeviceRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns<Task<DeviceInfoApiDevice>>(_ => throw new DeviceRandomApiException("api failure"));
@@ -45,12 +45,11 @@ public sealed class RandomDeviceServiceTests
     [TestMethod]
     public async Task CreateRandomProfileAsync_Success_ReturnsProfile()
     {
-        IDeviceSessionService session = Substitute.For<IDeviceSessionService>();
-        session.CurrentSession.Returns(new AccountSession("https://example.test", "authorization", "token"));
+        IAuthenticationSessionService session = Substitute.For<IAuthenticationSessionService>();
+        session.CurrentSession.Returns(new AccountSession("token"));
         var expected = new DeviceInfoApiDevice { Model = "Pixel" };
         IDeviceRandomProfileService profiles = Substitute.For<IDeviceRandomProfileService>();
         profiles.CreateRandomProfileAsync(
-                Arg.Any<AccountSession>(),
                 Arg.Any<RandomDeviceRequest>(),
                 Arg.Any<CancellationToken>())
             .Returns(expected);

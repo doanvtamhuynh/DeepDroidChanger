@@ -1,5 +1,6 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
+using DeepDroidChanger.Authentication;
 using DeepDroidChanger.ViewModels;
 using DeepDroidChanger.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,7 +28,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             {
                 Status = AccountAuthenticationStatus.ConfigurationError
             };
-            var sessionService = new FakeDeviceSessionService();
+            var sessionService = new FakeAuthenticationSessionService();
             var viewModel = CreateViewModel(
                 "en",
                 new FakeAccountStoreService(),
@@ -48,7 +49,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             {
                 Status = AccountAuthenticationStatus.ServiceUnavailable
             };
-            var sessionService = new FakeDeviceSessionService();
+            var sessionService = new FakeAuthenticationSessionService();
             var viewModel = CreateViewModel(
                 "en",
                 new FakeAccountStoreService(),
@@ -67,7 +68,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
         {
             var accountStore = new FakeAccountStoreService();
             var authService = new FakeAccountAuthenticationService();
-            var sessionService = new FakeDeviceSessionService();
+            var sessionService = new FakeAuthenticationSessionService();
             var viewModel = CreateViewModel("en", accountStore, authService, sessionService);
             var closeResult = false;
             viewModel.Username = "user@example.com";
@@ -90,7 +91,7 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             {
                 Status = AccountAuthenticationStatus.AuthenticationFailed
             };
-            var sessionService = new FakeDeviceSessionService();
+            var sessionService = new FakeAuthenticationSessionService();
             var viewModel = CreateViewModel(
                 "en",
                 new FakeAccountStoreService(),
@@ -115,8 +116,8 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
             {
                 ExceptionToThrow = new OperationCanceledException()
             };
-            var sessionService = new FakeDeviceSessionService();
-            sessionService.SetSession(new AccountSession("https://example.com", "authorization", "stale-token"));
+            var sessionService = new FakeAuthenticationSessionService();
+            sessionService.SetSession(new AccountSession("stale-token"));
             var viewModel = CreateViewModel(
                 "en",
                 new FakeAccountStoreService(),
@@ -138,14 +139,14 @@ namespace DeepDroidChanger.Tests.ViewModels.Dialogs
                 language,
                 new FakeAccountStoreService(),
                 new FakeAccountAuthenticationService(),
-                new FakeDeviceSessionService());
+                new FakeAuthenticationSessionService());
         }
 
         private static LoginViewModel CreateViewModel(
             string language,
             IAccountStoreService accountStoreService,
             IAccountAuthenticationService authService,
-            IDeviceSessionService sessionService)
+            IAuthenticationSessionService sessionService)
         {
             ILocalizationService localization = Substitute.For<ILocalizationService>();
             localization.GetString(Arg.Any<string>())

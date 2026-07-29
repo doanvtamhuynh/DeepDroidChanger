@@ -49,12 +49,16 @@ namespace DeepDroidChanger.Services
             _simProfileService = simProfileService;
         }
 
-        public async Task<DeviceInfoApiDevice> CreateRandomProfileAsync(AccountSession session, RandomDeviceRequest request, CancellationToken cancellationToken)
+        public async Task<DeviceInfoApiDevice> CreateRandomProfileAsync(
+            RandomDeviceRequest request,
+            CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(request);
 
             var selection = SelectRandomValue(request.SelectedBrand, request.SelectedAndroidVersion);
-            var device = await _deviceRandomApiService.GetRandomDeviceAsync(session, selection, cancellationToken).ConfigureAwait(false);
+            var device = await _deviceRandomApiService
+                .GetRandomDeviceAsync(selection, cancellationToken)
+                .ConfigureAwait(false);
             NormalizeDeviceResponse(device, selection);
             if (request.UseIntegritySecurityPatch)
             {

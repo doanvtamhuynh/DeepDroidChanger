@@ -1,8 +1,11 @@
+using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
+using DeepDroidChanger.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -43,12 +46,13 @@ public sealed partial class DeviceChangeServiceTests
     {
         RequireOptIn(RunApiEnvironmentVariable);
         AccountSession session = await AuthenticateAsync(CancellationToken.None);
-        IDeviceRandomProfileService profiles = CreateProfileService();
+        var sessionService = new FakeAuthenticationSessionService();
+        sessionService.SetSession(session);
+        IDeviceRandomProfileService profiles = CreateProfileService(sessionService);
 
         foreach ((string brand, string androidVersion) in Matrix)
         {
             DeviceInfoApiDevice profile = await profiles.CreateRandomProfileAsync(
-                session,
                 CreateRequest(brand, androidVersion),
                 CancellationToken.None);
 
@@ -79,7 +83,8 @@ public sealed partial class DeviceChangeServiceTests
     {
         RequireOptIn(RunDeviceEnvironmentVariable);
         string serial = RequireEnvironmentVariable(SerialEnvironmentVariable);
-        IDeviceRandomProfileService profiles = CreateProfileService();
+        var sessionService = new FakeAuthenticationSessionService();
+        IDeviceRandomProfileService profiles = CreateProfileService(sessionService);
         (IAdbCommandService adb, IDeviceChangeService change) = CreateDeviceServices();
         int startIndex = ReadStartIndex();
 
@@ -100,9 +105,9 @@ public sealed partial class DeviceChangeServiceTests
             (string brand, string androidVersion) = Matrix[index];
             DeviceChangeOptions options = CreateOptions(index, packageName);
             AccountSession session = await AuthenticateAsync(CancellationToken.None);
+            sessionService.SetSession(session);
 
             DeviceInfoApiDevice fullProfile = await profiles.CreateRandomProfileAsync(
-                session,
                 CreateRequest(brand, androidVersion),
                 CancellationToken.None);
             await WriteMarkerAsync(adb, serial, packageName, "before-full", CancellationToken.None);
@@ -133,7 +138,6 @@ public sealed partial class DeviceChangeServiceTests
                 CancellationToken.None);
 
             DeviceInfoApiDevice noWipeProfile = await profiles.CreateRandomProfileAsync(
-                session,
                 CreateRequest(brand, androidVersion),
                 CancellationToken.None);
             await WriteMarkerAsync(adb, serial, packageName, "before-change-without-wipe", CancellationToken.None);
@@ -200,12 +204,16 @@ public sealed partial class DeviceChangeServiceTests
         }
     }
 
-    private static IDeviceRandomProfileService CreateProfileService()
+    private static IDeviceRandomProfileService CreateProfileService(
+        IAuthenticationSessionService sessionService)
     {
         IDeviceIntegrityService integrity = Substitute.For<IDeviceIntegrityService>();
         IRandomService random = new RandomService();
         return new DeviceRandomProfileService(
-            new DeviceRandomApiService(NullLogger<DeviceRandomApiService>.Instance),
+            new DeviceRandomApiService(
+                Options.Create(CreateDeviceInfoApiOptions()),
+                sessionService,
+                NullLogger<DeviceRandomApiService>.Instance),
             integrity,
             random,
             new SimProfileService(random));
@@ -235,11 +243,12 @@ public sealed partial class DeviceChangeServiceTests
     {
         string username = RequireEnvironmentVariable(UsernameEnvironmentVariable);
         string password = RequireEnvironmentVariable(PasswordEnvironmentVariable);
-        DeviceInfoApiOptions options = new();
-        DeviceInfoApiOptionsHelper.ApplyDefaults(options);
-        var authentication = new AccountAuthenticationService(
-            Options.Create(options),
-            NullLogger<AccountAuthenticationService>.Instance);
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddDeepDroidAuthentication();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        IAccountAuthenticationService authentication =
+            provider.GetRequiredService<IAccountAuthenticationService>();
         AccountAuthenticationResult result = await authentication.AuthenticateAsync(
             new AccountLoginRequest
             {
@@ -255,6 +264,13 @@ public sealed partial class DeviceChangeServiceTests
             "Cognito authentication failed.");
         return result.Session
             ?? throw new AssertFailedException("Authentication returned no Device Info API session.");
+    }
+
+    private static DeviceInfoApiOptions CreateDeviceInfoApiOptions()
+    {
+        DeviceInfoApiOptions options = new();
+        DeviceInfoApiOptionsHelper.ApplyDefaults(options);
+        return options;
     }
 
     private static async Task EnsureSingleRootedDeviceAsync(

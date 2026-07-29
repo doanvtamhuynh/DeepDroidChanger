@@ -1,4 +1,4 @@
-namespace DeepDroidChanger.Models;
+namespace DeepDroidChanger.Authentication;
 
 public sealed record AccountAuthenticationResult(
     AccountAuthenticationStatus Status,

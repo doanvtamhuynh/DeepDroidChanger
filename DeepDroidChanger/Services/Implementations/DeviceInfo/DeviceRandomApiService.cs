@@ -1,8 +1,10 @@
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Authentication;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DeepDroidChanger.Services
 {
@@ -37,41 +39,65 @@ namespace DeepDroidChanger.Services
 
         private readonly HttpClient _httpClient;
         private readonly bool _disposeHttpClient;
+        private readonly DeviceInfoApiOptions _options;
+        private readonly IAuthenticationSessionService _authenticationSessionService;
         private readonly ILogger<DeviceRandomApiService> _logger;
         private bool _disposed;
 
-        public DeviceRandomApiService(ILogger<DeviceRandomApiService> logger)
+        public DeviceRandomApiService(
+            IOptions<DeviceInfoApiOptions> options,
+            IAuthenticationSessionService authenticationSessionService,
+            ILogger<DeviceRandomApiService> logger)
             : this(
                 new HttpClient { Timeout = TimeSpan.FromSeconds(30) },
+                options.Value,
+                authenticationSessionService,
                 logger,
                 disposeHttpClient: true)
         {
         }
 
-        internal DeviceRandomApiService(HttpClient httpClient, ILogger<DeviceRandomApiService> logger)
-            : this(httpClient, logger, disposeHttpClient: false)
+        internal DeviceRandomApiService(
+            HttpClient httpClient,
+            DeviceInfoApiOptions options,
+            IAuthenticationSessionService authenticationSessionService,
+            ILogger<DeviceRandomApiService> logger)
+            : this(
+                httpClient,
+                options,
+                authenticationSessionService,
+                logger,
+                disposeHttpClient: false)
         {
         }
 
         private DeviceRandomApiService(
             HttpClient httpClient,
+            DeviceInfoApiOptions options,
+            IAuthenticationSessionService authenticationSessionService,
             ILogger<DeviceRandomApiService> logger,
             bool disposeHttpClient)
         {
             _httpClient = httpClient;
+            _options = options;
+            _authenticationSessionService = authenticationSessionService;
             _logger = logger;
             _disposeHttpClient = disposeHttpClient;
         }
 
-        public async Task<DeviceInfoApiDevice> GetRandomDeviceAsync(AccountSession session, RandomDeviceSelection selection, CancellationToken cancellationToken)
+        public async Task<DeviceInfoApiDevice> GetRandomDeviceAsync(
+            RandomDeviceSelection selection,
+            CancellationToken cancellationToken)
         {
-            ArgumentNullException.ThrowIfNull(session);
             ArgumentNullException.ThrowIfNull(selection);
+            string? idToken = _authenticationSessionService.CurrentSession?.IdToken;
+            if (string.IsNullOrWhiteSpace(idToken))
+                throw new DeviceRandomApiException("Authentication is required.");
 
             for (int attempt = 1; attempt <= 4; attempt++)
             {
                 DeviceInfoApiDevice? device = await SendRandomDeviceQueryAsync(
-                        session,
+                        idToken,
                         selection,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -99,11 +125,14 @@ namespace DeepDroidChanger.Services
                 _httpClient.Dispose();
         }
 
-        private async Task<DeviceInfoApiDevice?> SendRandomDeviceQueryAsync(AccountSession session, RandomDeviceSelection selection, CancellationToken cancellationToken)
+        private async Task<DeviceInfoApiDevice?> SendRandomDeviceQueryAsync(
+            string idToken,
+            RandomDeviceSelection selection,
+            CancellationToken cancellationToken)
         {
-            if (!Uri.TryCreate(session.Endpoint, UriKind.Absolute, out var endpoint))
+            if (!Uri.TryCreate(_options.Endpoint, UriKind.Absolute, out var endpoint))
             {
-                _logger.LogWarning("Random device request could not be sent due to invalid session endpoint.");
+                _logger.LogWarning("Random device request could not be sent due to invalid API endpoint.");
                 throw new DeviceRandomApiException("Random device request could not be sent.");
             }
 
@@ -120,7 +149,7 @@ namespace DeepDroidChanger.Services
             };
 
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            if (!request.Headers.TryAddWithoutValidation(session.AuthenticationHeaderName, session.IdToken))
+            if (!request.Headers.TryAddWithoutValidation(_options.AuthorizationHeaderName, idToken))
             {
                 _logger.LogWarning("Random device request could not be prepared: authentication header rejected.");
                 throw new DeviceRandomApiException("Random device request could not be prepared.");

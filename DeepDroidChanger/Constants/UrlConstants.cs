@@ -2,7 +2,7 @@ namespace DeepDroidChanger.Constants;
 
 public static class UrlConstants
 {
-    public const string DeviceInfoApi = "https://lvmafq6ajjgtvgxxebsdam7dhu.appsync-api.ap-southeast-1.amazonaws.com/graphql";
+    public const string DeviceInfoGraphQlApi = "https://lvmafq6ajjgtvgxxebsdam7dhu.appsync-api.ap-southeast-1.amazonaws.com/graphql";
     public const string IpGeolocation = "https://ipwho.is/";
     public const string Pif = "https://gitlab.com/doanvtamhuynh/database/-/raw/main/integrity_keybox_db/pif.json";
     public const string Keybox = "https://gitlab.com/doanvtamhuynh/database/-/raw/main/integrity_keybox_db/keybox.xml";

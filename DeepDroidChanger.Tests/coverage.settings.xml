@@ -3,7 +3,7 @@
   <CodeCoverage>
     <ModulePaths>
       <Include>
-        <ModulePath>.*DeepDroidChanger\.dll$</ModulePath>
+        <ModulePath>.*DeepDroidChanger(?:\.Authentication)?\.dll$</ModulePath>
       </Include>
       <Exclude>
         <ModulePath>.*DeepDroidChanger\.Tests\.dll$</ModulePath>
@@ -11,7 +11,7 @@
     </ModulePaths>
     <Functions>
       <Include>
-        <Function>^DeepDroidChanger\.(Services|ViewModels)\..*</Function>
+        <Function>^(?:DeepDroidChanger\.(?:Services|ViewModels)|DeepDroidChanger\.Authentication\.Internal)\..*</Function>
       </Include>
       <Exclude>
         <Function>.*\.InitializeComponent\(.*</Function>

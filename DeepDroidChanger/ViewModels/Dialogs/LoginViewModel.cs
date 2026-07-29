@@ -1,5 +1,6 @@
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Authentication;
 using System.IO;
 using System.Security.Cryptography;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -12,7 +13,7 @@ namespace DeepDroidChanger.ViewModels
     {
         private readonly IAccountStoreService _accountStoreService;
         private readonly IAccountAuthenticationService _accountAuthenticationService;
-        private readonly IDeviceSessionService _deviceSessionService;
+        private readonly IAuthenticationSessionService _authenticationSessionService;
         private readonly ILocalizationService _localizationService;
         private readonly ILogger<LoginViewModel> _logger;
 
@@ -34,13 +35,13 @@ namespace DeepDroidChanger.ViewModels
         public LoginViewModel(
             IAccountStoreService accountStoreService,
             IAccountAuthenticationService accountAuthenticationService,
-            IDeviceSessionService deviceSessionService,
+            IAuthenticationSessionService authenticationSessionService,
             ILocalizationService localizationService,
             ILogger<LoginViewModel> logger)
         {
             _accountStoreService = accountStoreService;
             _accountAuthenticationService = accountAuthenticationService;
-            _deviceSessionService = deviceSessionService;
+            _authenticationSessionService = authenticationSessionService;
             _localizationService = localizationService;
             _logger = logger;
         }
@@ -81,7 +82,7 @@ namespace DeepDroidChanger.ViewModels
                 if (authentication.Status != AccountAuthenticationStatus.Success
                     || authentication.Session == null)
                 {
-                    _deviceSessionService.ClearSession();
+                    _authenticationSessionService.ClearSession();
                     ErrorMessage = authentication.Status is
                         AccountAuthenticationStatus.ConfigurationError or
                         AccountAuthenticationStatus.ServiceUnavailable
@@ -90,7 +91,7 @@ namespace DeepDroidChanger.ViewModels
                     return;
                 }
 
-                _deviceSessionService.SetSession(authentication.Session);
+                _authenticationSessionService.SetSession(authentication.Session);
 
                 if (loginRequest.RememberAccount)
                     await _accountStoreService.SaveAsync(loginRequest, cancellationToken).ConfigureAwait(true);
@@ -102,24 +103,24 @@ namespace DeepDroidChanger.ViewModels
             }
             catch (OperationCanceledException)
             {
-                _deviceSessionService.ClearSession();
+                _authenticationSessionService.ClearSession();
                 ErrorMessage = GetText("Login_ErrorCanceled");
             }
             catch (IOException exception)
             {
-                _deviceSessionService.ClearSession();
+                _authenticationSessionService.ClearSession();
                 _logger.LogWarning(exception, "Saved account could not be updated.");
                 ErrorMessage = GetText("Login_ErrorAccountSaveFailed");
             }
             catch (UnauthorizedAccessException exception)
             {
-                _deviceSessionService.ClearSession();
+                _authenticationSessionService.ClearSession();
                 _logger.LogWarning(exception, "Saved account could not be updated.");
                 ErrorMessage = GetText("Login_ErrorAccountSaveFailed");
             }
             catch (CryptographicException exception)
             {
-                _deviceSessionService.ClearSession();
+                _authenticationSessionService.ClearSession();
                 _logger.LogWarning(exception, "Saved account could not be protected.");
                 ErrorMessage = GetText("Login_ErrorAccountSaveFailed");
             }

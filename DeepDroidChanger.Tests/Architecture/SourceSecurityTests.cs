@@ -8,8 +8,16 @@ public sealed class SourceSecurityTests
     [TestMethod]
     public void SourceFiles_DoNotContainCredentialBearingUrlsOrRawProcessArgumentLogs()
     {
-        string sourceRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
-        string[] sourceFiles = Directory.GetFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+        string solutionRoot = GetSolutionRoot();
+        string[] sourceFiles = new[]
+            {
+                Path.Combine(solutionRoot, "DeepDroidChanger"),
+                Path.Combine(solutionRoot, "DeepDroidChanger.Authentication")
+            }
+            .SelectMany(sourceRoot => Directory.GetFiles(
+                sourceRoot,
+                "*.cs",
+                SearchOption.AllDirectories))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
             .ToArray();

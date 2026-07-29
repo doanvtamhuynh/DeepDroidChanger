@@ -1,3 +1,4 @@
+using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
@@ -19,7 +20,12 @@ public sealed class DependencyInjectionTests
                 && type.Namespace == "DeepDroidChanger.Services"
                 && type.Name.EndsWith("Service", StringComparison.Ordinal))
             .ToArray();
+        Type[] authenticationInterfaces = typeof(IAccountAuthenticationService).Assembly
+            .GetExportedTypes()
+            .Where(type => type.IsInterface)
+            .ToArray();
         Type[] missing = serviceInterfaces
+            .Concat(authenticationInterfaces)
             .Where(serviceType => !services.Any(descriptor => descriptor.ServiceType == serviceType))
             .ToArray();
 
@@ -34,7 +40,10 @@ public sealed class DependencyInjectionTests
         App.RegisterServices(services, new AppSettings());
 
         AssertLifetime<ISettingsService>(services, ServiceLifetime.Singleton);
-        AssertLifetime<IDeviceSessionService>(services, ServiceLifetime.Singleton);
+        AssertLifetime<IAccountAuthenticationService>(services, ServiceLifetime.Singleton);
+        AssertLifetime<IAccountStoreService>(services, ServiceLifetime.Singleton);
+        AssertLifetime<IAuthenticationSessionService>(services, ServiceLifetime.Singleton);
+        AssertLifetime<IIdentityProviderClient>(services, ServiceLifetime.Singleton);
         AssertLifetime<IAdbCommandService>(services, ServiceLifetime.Singleton);
         AssertLifetime<IDeviceActionGuardService>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainViewModel>(services, ServiceLifetime.Singleton);
@@ -63,6 +72,8 @@ public sealed class DependencyInjectionTests
         Assert.IsNotNull(provider.GetRequiredService<ISettingsService>());
         Assert.IsNotNull(provider.GetRequiredService<IAdbCommandService>());
         Assert.IsNotNull(provider.GetRequiredService<IAccountAuthenticationService>());
+        Assert.IsNotNull(provider.GetRequiredService<IAccountStoreService>());
+        Assert.IsNotNull(provider.GetRequiredService<IAuthenticationSessionService>());
         Assert.IsNotNull(provider.GetRequiredService<DeviceManagerViewModel>());
     }
 

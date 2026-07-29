@@ -1,5 +1,4 @@
-using DeepDroidChanger.Models;
-using DeepDroidChanger.Services;
+using DeepDroidChanger.Authentication;
 
 namespace DeepDroidChanger.Tests.Fakes
 {
