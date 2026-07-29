@@ -70,7 +70,6 @@
     <sys:String x:Key="DeviceManager_RowMenuCopySerial">Copy Serial</sys:String>
     <sys:String x:Key="DeviceManager_FlashRomPlaceholder">Flash ROM is not implemented.</sys:String>
 
-    <!-- Filter Strings -->
     <sys:String x:Key="DeviceManager_FilterLabel">Filter:</sys:String>
     <sys:String x:Key="DeviceManager_FilterAll">All</sys:String>
     <sys:String x:Key="DeviceManager_FilterOnline">Online</sys:String>

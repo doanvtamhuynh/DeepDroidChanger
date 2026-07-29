@@ -441,7 +441,6 @@ namespace DeepDroidChanger.ViewModels
             foreach (var loc in locations)
                 CountryLocations.Add(loc);
 
-            // Select location by saved city name if present, otherwise default to first city in country
             if (!string.IsNullOrWhiteSpace(_lastCityName))
             {
                 var cityMatch = CountryLocations.FirstOrDefault(loc =>
@@ -458,7 +457,6 @@ namespace DeepDroidChanger.ViewModels
 
         private void RestoreLastLocation()
         {
-            // Match saved country code directly
             CountryOption? countryMatch = null;
             if (!string.IsNullOrWhiteSpace(_lastCountryCode))
             {
@@ -475,7 +473,6 @@ namespace DeepDroidChanger.ViewModels
                 SelectedCountry = Countries.FirstOrDefault();
             }
 
-            // Match saved city name directly
             if (!string.IsNullOrWhiteSpace(_lastCityName) && CountryLocations.Count > 0)
             {
                 var cityMatch = CountryLocations.FirstOrDefault(loc =>

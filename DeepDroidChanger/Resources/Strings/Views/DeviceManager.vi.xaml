@@ -70,7 +70,6 @@
     <sys:String x:Key="DeviceManager_RowMenuCopySerial">Sao chép Serial</sys:String>
     <sys:String x:Key="DeviceManager_FlashRomPlaceholder">Chức năng Flash ROM hiện chưa được triển khai.</sys:String>
 
-    <!-- Filter Strings -->
     <sys:String x:Key="DeviceManager_FilterLabel">Lọc:</sys:String>
     <sys:String x:Key="DeviceManager_FilterAll">Tất cả</sys:String>
     <sys:String x:Key="DeviceManager_FilterOnline">Online</sys:String>

@@ -357,14 +357,12 @@ namespace DeepDroidChanger.ViewModels
             foreach (var tz in timezones)
                 CountryTimezones.Add(tz);
 
-            // Keep current selection if it already belongs to this country
             if (SelectedTimezone != null && CountryTimezones.Any(tz => string.Equals(tz.Timezone, SelectedTimezone.Timezone, StringComparison.OrdinalIgnoreCase)))
             {
                 SelectedTimezone = CountryTimezones.First(tz => string.Equals(tz.Timezone, SelectedTimezone.Timezone, StringComparison.OrdinalIgnoreCase));
                 return;
             }
 
-            // Keep restored selection if it belongs to this country
             if (!string.IsNullOrWhiteSpace(_lastTimezone))
             {
                 var restoredMatch = CountryTimezones.FirstOrDefault(tz => string.Equals(tz.Timezone, _lastTimezone, StringComparison.OrdinalIgnoreCase));

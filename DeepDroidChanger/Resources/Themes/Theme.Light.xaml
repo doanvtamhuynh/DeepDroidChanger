@@ -1,7 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Core palette -->
     <Color x:Key="Color.WindowBackground">#F6F8FB</Color>
     <Color x:Key="Color.Surface">#FFFFFFFF</Color>
     <Color x:Key="Color.SurfaceAlt">#F1F5F9</Color>
@@ -35,7 +34,6 @@
     <Color x:Key="Color.BadgeInfoBackground">#EFF6FF</Color>
     <Color x:Key="Color.BadgeInfoForeground">#2563EB</Color>
 
-    <!-- Brushes -->
     <SolidColorBrush x:Key="Brush.WindowBackground" Color="{StaticResource Color.WindowBackground}"/>
     <SolidColorBrush x:Key="Brush.Surface" Color="{StaticResource Color.Surface}"/>
     <SolidColorBrush x:Key="Brush.SurfaceAlt" Color="{StaticResource Color.SurfaceAlt}"/>
