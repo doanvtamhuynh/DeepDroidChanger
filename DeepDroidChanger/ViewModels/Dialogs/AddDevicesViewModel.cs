@@ -200,6 +200,15 @@ namespace DeepDroidChanger.ViewModels
             AddCommand.NotifyCanExecuteChanged();
         }
 
+        [RelayCommand]
+        private void ToggleDeviceSelection(AddDeviceRowViewModel? device)
+        {
+            if (device is null)
+                return;
+
+            device.IsSelected = !device.IsSelected;
+        }
+
         [RelayCommand(CanExecute = nameof(CanAdd))]
         private void Add()
         {

@@ -135,6 +135,16 @@
         </Style.Triggers>
     </Style>
 
+    <Style x:Key="AddDevicesSelectionButtonStyle"
+           TargetType="Button"
+           BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+
     <Style x:Key="AddDevicesActionGridStyle" TargetType="Grid">
         <Setter Property="Margin" Value="0,14,0,0"/>
     </Style>
@@ -175,23 +185,33 @@
                   ItemsSource="{Binding Devices}"
                   Style="{StaticResource AddDevicesGridStyle}">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        Width="0.75*"
+                <DataGridTemplateColumn Width="0.75*"
                                         MinWidth="100"
-                                        ElementStyle="{StaticResource DataGridCheckBoxStyle}"
-                                        EditingElementStyle="{StaticResource DataGridCheckBoxStyle}">
-                    <DataGridCheckBoxColumn.Header>
+                                        CellStyle="{StaticResource AddDevicesCellStretchStyle}">
+                    <DataGridTemplateColumn.Header>
                         <TextBlock Text="{DynamicResource AddDevices_ColumnSelectDevice}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
-                    </DataGridCheckBoxColumn.Header>
-                </DataGridCheckBoxColumn>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{DynamicResource AddDevices_ColumnSelectDevice}"
+                                    Style="{StaticResource AddDevicesSelectionButtonStyle}">
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                          IsHitTestVisible="False"
+                                          Focusable="False"
+                                          Style="{StaticResource DataGridCheckBoxStyle}"/>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Binding="{Binding Serial}"
                                     Width="1.25*"
                                     MinWidth="150"
                                     IsReadOnly="True"
                                     ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
                     <DataGridTextColumn.Header>
-
                         <TextBlock Text="{DynamicResource AddDevices_ColumnSerial}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
                     </DataGridTextColumn.Header>

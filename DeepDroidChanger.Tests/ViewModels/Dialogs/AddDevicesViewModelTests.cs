@@ -105,4 +105,54 @@ public sealed class AddDevicesViewModelTests
             viewModel.Dispose();
         }
     }
+
+    [TestMethod]
+    public async Task ToggleDeviceSelectionCommand_TogglesSelectedDeviceAndSelectionState()
+    {
+        IAdbDeviceService adb = Substitute.For<IAdbDeviceService>();
+        adb.GetConnectedDevicesAsync(CancellationToken.None).Returns(
+        [
+            new AdbDevice("SERIAL", AdbDeviceStatus.Online)
+        ]);
+        adb.GetDeviceTypeAsync("SERIAL", CancellationToken.None).Returns("Phone");
+        IDeviceStoreService store = Substitute.For<IDeviceStoreService>();
+        store.LoadAsync(CancellationToken.None).Returns([]);
+        IUiDispatcherService dispatcher = Substitute.For<IUiDispatcherService>();
+        dispatcher.InvokeAsync(Arg.Any<Action>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                callInfo.Arg<Action>()();
+                return Task.CompletedTask;
+            });
+        var viewModel = new AddDevicesViewModel(
+            adb,
+            store,
+            dispatcher,
+            Substitute.For<ILocalizationService>(),
+            new PollingService(),
+            NullLogger<AddDevicesViewModel>.Instance);
+
+        try
+        {
+            await viewModel.InitializeAsync(CancellationToken.None);
+            AddDeviceRowViewModel device = viewModel.Devices.Single();
+
+            viewModel.ToggleDeviceSelectionCommand.Execute(device);
+
+            Assert.IsTrue(device.IsSelected);
+            Assert.IsTrue(viewModel.SelectAll);
+            Assert.IsTrue(viewModel.AddCommand.CanExecute(null));
+
+            viewModel.ToggleDeviceSelectionCommand.Execute(device);
+
+            Assert.IsFalse(device.IsSelected);
+            Assert.IsFalse(viewModel.SelectAll);
+            Assert.IsFalse(viewModel.AddCommand.CanExecute(null));
+        }
+        finally
+        {
+            await viewModel.DeactivateAsync();
+            viewModel.Dispose();
+        }
+    }
 }
