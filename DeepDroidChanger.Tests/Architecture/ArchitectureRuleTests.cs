@@ -13,7 +13,7 @@ public sealed class ArchitectureRuleTests
         string solutionRoot = GetSolutionRoot();
         string canonicalView = Path.Combine(projectRoot, "Views", "DeviceManager", "DeviceManagerView.xaml");
         string canonicalViewModel = Path.Combine(projectRoot, "ViewModels", "DeviceManagerViewModel.cs");
-        string canonicalTheme = Path.Combine(projectRoot, "Resources", "Themes", "DeviceManager.xaml");
+        string obsoleteFeatureTheme = Path.Combine(projectRoot, "Resources", "Themes", "DeviceManager.xaml");
         string canonicalStrings = Path.Combine(projectRoot, "Resources", "Strings", "Views", "DeviceManager.xaml");
         string canonicalVietnameseStrings = Path.Combine(projectRoot, "Resources", "Strings", "Views", "DeviceManager.vi.xaml");
         string canonicalTests = Path.Combine(
@@ -24,7 +24,7 @@ public sealed class ArchitectureRuleTests
 
         Assert.IsTrue(File.Exists(canonicalView));
         Assert.IsTrue(File.Exists(canonicalViewModel));
-        Assert.IsTrue(File.Exists(canonicalTheme));
+        Assert.IsFalse(File.Exists(obsoleteFeatureTheme));
         Assert.IsTrue(File.Exists(canonicalStrings));
         Assert.IsTrue(File.Exists(canonicalVietnameseStrings));
         Assert.IsTrue(File.Exists(canonicalTests));
@@ -60,6 +60,9 @@ public sealed class ArchitectureRuleTests
             "AddDevices_");
 
         string deviceManagerView = File.ReadAllText(canonicalView);
+        Assert.Contains("<UserControl.Resources>", deviceManagerView, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", deviceManagerView, StringComparison.Ordinal);
+        Assert.Contains("DataGridCheckBoxStyle", deviceManagerView, StringComparison.Ordinal);
         Assert.DoesNotContain(
             "StaticResource AddDevice",
             deviceManagerView,

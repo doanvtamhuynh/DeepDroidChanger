@@ -1,3 +1,4 @@
+
 <Window x:Class="DeepDroidChanger.Views.FakeProxyDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -13,15 +14,61 @@
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{StaticResource Metric.FontFamily}">
 
-    <Grid Style="{StaticResource FakeProxyRootGridStyle}">
+    <Window.Resources>
+
+        <Style x:Key="FakeProxyDeviceHeaderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <Style x:Key="FakeProxySelectorGridStyle" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <Style x:Key="FakeProxyTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource FlatTextBoxStyle}">
+            <Setter Property="SelectionBrush" Value="{DynamicResource Brush.SurfaceSelected}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="FakeProxyButtonTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="FakeProxyButtonIconStyle" TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+
+        <Style x:Key="FakeProxyCheckBoxStyle"
+               TargetType="CheckBox"
+               BasedOn="{StaticResource FlatCheckBoxStyle}">
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="FakeProxyOptionsGroupBoxStyle" TargetType="GroupBox"
+               BasedOn="{StaticResource OptionSectionGroupBoxStyle}">
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Style="{StaticResource DialogRootGridStyle}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Row 0: Device Info -->
-            <RowDefinition Height="Auto"/> <!-- Row 1: Options GroupBox -->
-            <RowDefinition Height="*"/>    <!-- Row 2: Inputs Selector Grid -->
-            <RowDefinition Height="Auto"/> <!-- Row 3: Action Buttons -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- DEVICE INFO -->
         <Border Grid.Row="0"
                 Style="{StaticResource FakeProxyDeviceHeaderStyle}">
             <Grid>
@@ -31,14 +78,13 @@
                 </Grid.ColumnDefinitions>
 
                 <materialDesign:PackIcon Kind="CellphoneCog"
-                                         Style="{StaticResource FakeProxyHeaderIconStyle}"/>
+                                         Style="{StaticResource DialogHeaderIconStyle}"/>
                 <TextBlock Grid.Column="1"
                            Text="{Binding DeviceInfoText}"
-                           Style="{StaticResource FakeProxyInfoDeviceTextStyle}"/>
+                           Style="{StaticResource DialogHeaderTextStyle}"/>
             </Grid>
         </Border>
 
-        <!-- OPTIONS SELECTION -->
         <GroupBox Grid.Row="1"
                   Header="{DynamicResource FakeProxy_OptionsGroupHeader}"
                   Style="{StaticResource FakeProxyOptionsGroupBoxStyle}">
@@ -52,7 +98,6 @@
             </StackPanel>
         </GroupBox>
 
-        <!-- INPUTS GRID -->
         <Grid Grid.Row="2"
               Style="{StaticResource FakeProxySelectorGridStyle}">
             <Grid.RowDefinitions>
@@ -67,58 +112,52 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Full Proxy -->
             <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,0,0,10">
                 <TextBlock Text="{DynamicResource FakeProxy_FullProxyLabel}"
-                           Style="{StaticResource FakeProxyInputLabelStyle}"/>
+                           Style="{StaticResource DialogInputLabelStyle}"/>
                 <TextBox x:Name="FullProxyTextBox"
                          Text="{Binding FullProxyString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FakeProxyTextBoxStyle}"/>
             </StackPanel>
 
-            <!-- Proxy Host -->
             <StackPanel Grid.Row="1" Grid.Column="0">
                 <TextBlock Text="{DynamicResource FakeProxy_HostLabel}"
-                           Style="{StaticResource FakeProxyInputLabelStyle}"/>
+                           Style="{StaticResource DialogInputLabelStyle}"/>
                 <TextBox x:Name="HostTextBox"
                          Text="{Binding ProxyHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FakeProxyTextBoxStyle}"/>
             </StackPanel>
 
-            <!-- Proxy Port -->
             <StackPanel Grid.Row="1" Grid.Column="2">
                 <TextBlock Text="{DynamicResource FakeProxy_PortLabel}"
-                           Style="{StaticResource FakeProxyInputLabelStyle}"/>
+                           Style="{StaticResource DialogInputLabelStyle}"/>
                 <TextBox x:Name="PortTextBox"
                          Text="{Binding ProxyPort, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FakeProxyTextBoxStyle}"/>
             </StackPanel>
 
-            <!-- Proxy Username -->
             <StackPanel Grid.Row="2" Grid.Column="0">
                 <TextBlock Text="{DynamicResource FakeProxy_UsernameLabel}"
-                           Style="{StaticResource FakeProxyInputLabelStyle}"/>
+                           Style="{StaticResource DialogInputLabelStyle}"/>
                 <TextBox x:Name="UsernameTextBox"
                          Text="{Binding ProxyUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FakeProxyTextBoxStyle}"/>
             </StackPanel>
 
-            <!-- Proxy Password -->
             <StackPanel Grid.Row="2" Grid.Column="2">
                 <TextBlock Text="{DynamicResource FakeProxy_PasswordLabel}"
-                           Style="{StaticResource FakeProxyInputLabelStyle}"/>
+                           Style="{StaticResource DialogInputLabelStyle}"/>
                 <TextBox x:Name="PasswordTextBox"
                          Text="{Binding ProxyPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FakeProxyTextBoxStyle}"/>
             </StackPanel>
 
-            <!-- Proxy Type -->
             <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3">
                 <TextBlock Text="{DynamicResource FakeProxy_TypeLabel}"
-                           Style="{StaticResource FakeProxyInputLabelStyle}"/>
+                           Style="{StaticResource DialogInputLabelStyle}"/>
                 <ComboBox ItemsSource="{Binding ProxyTypes}"
                           SelectedItem="{Binding SelectedProxyType, Mode=TwoWay}"
-                          Style="{StaticResource FakeProxyComboBoxStyle}">
+                          Style="{StaticResource DialogFormComboBoxStyle}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding}"/>
@@ -128,9 +167,8 @@
             </StackPanel>
         </Grid>
 
-        <!-- ACTION BUTTONS -->
         <Grid Grid.Row="3"
-              Style="{StaticResource FakeProxyActionGridStyle}">
+              Style="{StaticResource DialogActionGridStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -139,7 +177,7 @@
 
             <Button Grid.Column="2"
                     Command="{Binding SaveCommand}"
-                    Style="{StaticResource FakeProxySaveButtonStyle}">
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>

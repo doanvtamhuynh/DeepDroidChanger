@@ -1,3 +1,4 @@
+
 <Window x:Class="DeepDroidChanger.Views.UpdateIntegrityDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -13,7 +14,70 @@
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{StaticResource Metric.FontFamily}">
 
-    <Grid Style="{StaticResource UpdateIntegrityRootGridStyle}">
+    <Window.Resources>
+
+        <Style x:Key="UpdateIntegritySectionBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+
+        <Style x:Key="UpdateIntegrityCheckBoxStyle"
+               TargetType="CheckBox"
+               BasedOn="{StaticResource FlatCheckBoxStyle}">
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="UpdateIntegritySelectorGridStyle" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="UpdateIntegrityTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource FlatTextBoxStyle}">
+            <Setter Property="SelectionBrush" Value="{DynamicResource Brush.SurfaceSelected}"/>
+            <Setter Property="MinWidth" Value="260"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="materialDesign:HintAssist.Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+        </Style>
+
+        <Style x:Key="UpdateIntegrityBrowseButtonStyle" TargetType="Button"
+               BasedOn="{StaticResource MaterialDesignFlatButton}">
+            <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+            <Setter Property="MinWidth" Value="112"/>
+            <Setter Property="Margin" Value="4,0,0,8"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="UpdateIntegrityBrowseIconStyle" TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+
+        <Style x:Key="UpdateIntegrityBrowseButtonTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+            <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Style="{StaticResource DialogRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -23,7 +87,7 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Style="{StaticResource UpdateIntegrityDeviceHeaderStyle}">
+                Style="{StaticResource DialogHeaderBorderStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -31,16 +95,16 @@
                 </Grid.ColumnDefinitions>
 
                 <materialDesign:PackIcon Kind="CellphoneCog"
-                                         Style="{StaticResource UpdateIntegrityHeaderIconStyle}"/>
+                                         Style="{StaticResource DialogHeaderIconStyle}"/>
                 <TextBlock Grid.Column="1"
                            Text="{Binding DeviceInfoText}"
-                           Style="{StaticResource UpdateIntegrityInfoDeviceTextStyle}"/>
+                           Style="{StaticResource DialogHeaderTextStyle}"/>
             </Grid>
         </Border>
 
         <GroupBox Grid.Row="1"
                   Header="{DynamicResource UpdateIntegrity_SourceGroupHeader}"
-                  Style="{StaticResource UpdateIntegrityModeGroupBoxStyle}">
+                  Style="{StaticResource DialogOptionGroupBoxStyle}">
             <CheckBox Content="{DynamicResource UpdateIntegrity_SourceServer}"
                       IsChecked="{Binding UpdateIntegrityFromServer, Mode=TwoWay}"
                       Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
@@ -48,7 +112,7 @@
 
         <GroupBox Grid.Row="2"
                   Header="{DynamicResource UpdateIntegrity_TargetGroupHeader}"
-                  Style="{StaticResource UpdateIntegrityModeGroupBoxStyle}">
+                  Style="{StaticResource DialogOptionGroupBoxStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -80,7 +144,8 @@
                     <TextBlock Grid.Row="0"
                                Grid.ColumnSpan="2"
                                Text="{DynamicResource UpdateIntegrity_IntegrityFileLabel}"
-                               Style="{StaticResource UpdateIntegrityInputLabelStyle}"/>
+                               Style="{StaticResource DialogInputLabelStyle}"/>
+
                     <TextBox Grid.Row="1" Grid.Column="0"
                              Text="{Binding UpdateIntegrityFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource UpdateIntegrityTextBoxStyle}"
@@ -112,7 +177,7 @@
                     <TextBlock Grid.Row="0"
                                Grid.ColumnSpan="2"
                                Text="{DynamicResource UpdateIntegrity_KeyboxFileLabel}"
-                               Style="{StaticResource UpdateIntegrityInputLabelStyle}"/>
+                               Style="{StaticResource DialogInputLabelStyle}"/>
                     <TextBox Grid.Row="1" Grid.Column="0"
                              Text="{Binding UpdateKeyboxFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource UpdateIntegrityTextBoxStyle}"
@@ -134,7 +199,7 @@
         </Border>
 
         <Grid Grid.Row="4"
-              Style="{StaticResource UpdateIntegrityActionGridStyle}">
+              Style="{StaticResource DialogActionGridStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -142,17 +207,17 @@
 
             <Button Grid.Column="1"
                     Command="{Binding UpdateCommand}"
-                    Style="{StaticResource UpdateIntegritySaveButtonStyle}">
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <materialDesign:PackIcon Kind="Play"
-                                             Style="{StaticResource UpdateIntegrityButtonIconStyle}"/>
+                                             Style="{StaticResource PrimaryButtonIconStyle}"/>
                     <TextBlock Grid.Column="1"
                                Text="{DynamicResource UpdateIntegrity_UpdateButton}"
-                               Style="{StaticResource UpdateIntegrityButtonTextStyle}"/>
+                               Style="{StaticResource PrimaryButtonTextStyle}"/>
                 </Grid>
             </Button>
         </Grid>

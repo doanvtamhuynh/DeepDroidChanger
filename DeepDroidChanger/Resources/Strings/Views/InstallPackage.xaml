@@ -6,9 +6,7 @@
     <sys:String x:Key="InstallPackage_OptionsHeader">Install options</sys:String>
     <sys:String x:Key="InstallPackage_OptionsHelp">Default settings work for most installs.</sys:String>
     <sys:String x:Key="InstallPackage_GrantPermissions">Auto grant app permissions</sys:String>
-    <sys:String x:Key="InstallPackage_GrantPermissionsDescription">Recommended. Gives the app requested permissions during install, so fewer permission prompts appear after launch.</sys:String>
     <sys:String x:Key="InstallPackage_AllowDowngrade">Install older version if needed</sys:String>
-    <sys:String x:Key="InstallPackage_AllowDowngradeDescription">Off by default. Turn on only when replacing a newer installed app with an older APK/XAPK.</sys:String>
     <sys:String x:Key="InstallPackage_ColumnFile">File</sys:String>
     <sys:String x:Key="InstallPackage_ColumnStatus">Status</sys:String>
     <sys:String x:Key="InstallPackage_ColumnProgress">Progress</sys:String>

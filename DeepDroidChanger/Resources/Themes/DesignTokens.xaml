@@ -1,0 +1,84 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+<FontFamily x:Key="Metric.FontFamily" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">Segoe UI Variable, Segoe UI</FontFamily>
+
+<sys:Double x:Key="Metric.FontSize.Micro" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">11</sys:Double>
+
+<sys:Double x:Key="Metric.FontSize.Small" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">12</sys:Double>
+
+<sys:Double x:Key="Metric.FontSize.Body" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">14</sys:Double>
+
+<sys:Double x:Key="Metric.FontSize.Subtitle" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">16</sys:Double>
+
+<sys:Double x:Key="Metric.FontSize.SectionTitle" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">18</sys:Double>
+
+<sys:Double x:Key="Metric.FontSize.Title" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">20</sys:Double>
+
+<sys:Double x:Key="Metric.FontSize.Display" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">24</sys:Double>
+
+<sys:Double x:Key="Metric.ControlHeight" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">38</sys:Double>
+
+<sys:Double x:Key="Metric.ControlHeight.Comfortable" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">40</sys:Double>
+
+<sys:Double x:Key="Metric.DataGridRowHeight" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">40</sys:Double>
+
+<sys:Double x:Key="Metric.DataGridEditorRowHeight" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">48</sys:Double>
+
+<sys:Double x:Key="Metric.ToolbarMinHeight" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">40</sys:Double>
+
+<sys:Double x:Key="Metric.BorderThickness" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">1</sys:Double>
+
+<Thickness x:Key="Metric.BorderThickness.Uniform" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">1</Thickness>
+
+<sys:Double x:Key="Metric.Elevation.FloatingBlurRadius" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">28</sys:Double>
+
+<sys:Double x:Key="Metric.Elevation.FloatingShadowDepth" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">10</sys:Double>
+
+<sys:Double x:Key="Metric.Elevation.FloatingShadowOpacity" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">0.24</sys:Double>
+
+<sys:Double x:Key="Metric.Elevation.DialogBlurRadius" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">36</sys:Double>
+
+<sys:Double x:Key="Metric.Elevation.DialogShadowDepth" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">12</sys:Double>
+
+<sys:Double x:Key="Metric.Elevation.DialogShadowOpacity" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">0.28</sys:Double>
+
+<Duration x:Key="Metric.Animation.HoverDuration" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">0:0:0.17</Duration>
+
+<Duration x:Key="Metric.Animation.PressDuration" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">0:0:0.08</Duration>
+
+<CubicEase x:Key="Metric.Animation.EaseOut" EasingMode="EaseOut" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" />
+
+<Thickness x:Key="Spacing.ControlPadding" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">12,8</Thickness>
+
+<Thickness x:Key="Spacing.InputPadding" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">12,7</Thickness>
+
+<Thickness x:Key="Spacing.ItemPadding" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">12,9</Thickness>
+
+<Thickness x:Key="Spacing.PageMargin" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">16</Thickness>
+
+<Thickness x:Key="Spacing.CardPadding" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">16</Thickness>
+
+<Thickness x:Key="Spacing.CardPadding.Compact" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">12,10</Thickness>
+
+<Thickness x:Key="Spacing.ButtonPadding" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">16,8</Thickness>
+
+<CornerRadius x:Key="Radius.Small" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">6</CornerRadius>
+
+<CornerRadius x:Key="Radius.ExtraSmall" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">5</CornerRadius>
+
+<CornerRadius x:Key="Radius.Medium" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">8</CornerRadius>
+
+<CornerRadius x:Key="Radius.Large" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">12</CornerRadius>
+
+<CornerRadius x:Key="Radius.Circle" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">999</CornerRadius>
+
+<CornerRadius x:Key="Radius.Interactive" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">7</CornerRadius>
+
+<CornerRadius x:Key="Radius.Overlay" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">10</CornerRadius>
+
+<CornerRadius x:Key="Radius.TopMedium" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">8,8,0,0</CornerRadius>
+
+<CornerRadius x:Key="Radius.TopLeftMedium" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">8,0,0,0</CornerRadius>
+</ResourceDictionary>

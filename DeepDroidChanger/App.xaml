@@ -1,4 +1,4 @@
-﻿<Application x:Class="DeepDroidChanger.App"
+<Application x:Class="DeepDroidChanger.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
@@ -12,20 +12,6 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml" />
                 <ResourceDictionary Source="Resources/Themes/Controls.xaml" />
                 <ResourceDictionary Source="Resources/Strings/Strings.xaml" />
-                <ResourceDictionary Source="Resources/Themes/ConfirmationDialog.xaml" />
-                <ResourceDictionary Source="Resources/Themes/MainWindow.xaml" />
-                <ResourceDictionary Source="Resources/Themes/DeviceManager.xaml" />
-                <ResourceDictionary Source="Resources/Themes/AdvancedChangeConfig.xaml" />
-                <ResourceDictionary Source="Resources/Themes/AddDevices.xaml" />
-                <ResourceDictionary Source="Resources/Themes/Settings.xaml" />
-                <ResourceDictionary Source="Resources/Themes/ChangeTimezone.xaml" />
-                <ResourceDictionary Source="Resources/Themes/ChangeLocation.xaml" />
-                <ResourceDictionary Source="Resources/Themes/FakeProxy.xaml" />
-                <ResourceDictionary Source="Resources/Themes/UpdateIntegrity.xaml" />
-                <ResourceDictionary Source="Resources/Themes/InstallPackage.xaml" />
-                <ResourceDictionary Source="Resources/Themes/DeviceViewer.xaml" />
-                <ResourceDictionary Source="Resources/Themes/RandomDeviceInfo.xaml" />
-                <ResourceDictionary Source="Resources/Themes/Login.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

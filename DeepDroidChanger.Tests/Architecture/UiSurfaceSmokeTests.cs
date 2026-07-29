@@ -33,7 +33,7 @@ public sealed class UiSurfaceSmokeTests
                 ILocalizationService localization = provider.GetRequiredService<ILocalizationService>();
                 IThemeService themes = provider.GetRequiredService<IThemeService>();
                 VerifyMainShellNavigation(provider);
-                VerifyInteractiveStyles();
+                VerifyInteractiveStyles(provider);
                 VerifyEditorRowsAndDataTemplates(provider);
 
                 foreach (string language in new[] { "en", "vi" })
@@ -128,7 +128,10 @@ public sealed class UiSurfaceSmokeTests
         var text = Assert.IsInstanceOfType<TextBlock>(dialog.FindName("UpdateRandomDeviceInfoText"));
         object accentForeground = Application.Current.FindResource("Brush.AccentForeground");
 
-        Assert.AreSame(Application.Current.FindResource("MaterialDesignRaisedButton"), button.Style.BasedOn);
+        Style materialPrimary = Assert.IsInstanceOfType<Style>(
+            Application.Current.FindResource("MaterialPrimaryButtonStyle"));
+        Assert.AreSame(materialPrimary, button.Style.BasedOn);
+        Assert.AreSame(Application.Current.FindResource("MaterialDesignRaisedButton"), materialPrimary.BasedOn);
         Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.PlayArrow, icon.Kind);
         Assert.AreSame(accentForeground, button.Foreground);
         Assert.AreSame(accentForeground, icon.Foreground);
@@ -193,7 +196,7 @@ public sealed class UiSurfaceSmokeTests
         foreach (Button transferButton in transferButtons)
         {
             Assert.AreSame(
-                Application.Current.FindResource("AdvancedChangeConfigTransferButtonStyle"),
+                dialog.FindResource("AdvancedChangeConfigTransferButtonStyle"),
                 transferButton.Style);
             var scale = Assert.IsInstanceOfType<System.Windows.Media.ScaleTransform>(transferButton.LayoutTransform);
             Assert.AreEqual(0.7d, scale.ScaleX);
@@ -263,33 +266,33 @@ public sealed class UiSurfaceSmokeTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(yesButtonText.Text));
     }
 
-    private static void VerifyInteractiveStyles()
+    private static void VerifyInteractiveStyles(IServiceProvider provider)
     {
-        AssertButtonStyleStates("SidebarTabStyle");
-        AssertButtonStyleStates("BottomIconButtonStyle");
+        MainWindow mainWindow = provider.GetRequiredService<MainWindow>();
+        DeviceManagerView deviceManagerView = provider.GetRequiredService<DeviceManagerView>();
 
-        var rowStyle = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("DeviceGridRowContextMenuStyle"));
+        AssertButtonStyleStates(mainWindow, "SidebarTabStyle");
+        AssertButtonStyleStates(mainWindow, "BottomIconButtonStyle");
+
+        var rowStyle = Assert.IsInstanceOfType<Style>(deviceManagerView.FindResource("DeviceGridRowContextMenuStyle"));
         Assert.IsNotNull(rowStyle.BasedOn, "Device Manager rows must preserve shared hover, selected, and disabled states.");
         Assert.IsTrue(
             rowStyle.Setters.OfType<Setter>().Any(setter => setter.Property == Control.FocusVisualStyleProperty),
             "Device Manager rows must preserve a visible keyboard focus cue.");
 
-        var cellStyle = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("DeviceManagerCellStretchStyle"));
+        var cellStyle = Assert.IsInstanceOfType<Style>(deviceManagerView.FindResource("DeviceManagerCellStretchStyle"));
         Assert.IsNotNull(cellStyle.BasedOn, "Editable Device Manager cells must preserve shared selection and focus states.");
 
         var sharedTextEditor = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("InlineDataGridTextBoxStyle"));
         var sharedComboEditor = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("InlineDataGridComboBoxStyle"));
-        var addTextEditor = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("AddDeviceNameTextBoxStyle"));
-        var addComboEditor = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("AddDeviceTypeComboBoxStyle"));
-        Assert.AreSame(sharedTextEditor, addTextEditor.BasedOn);
-        Assert.AreSame(sharedComboEditor, addComboEditor.BasedOn);
+        Assert.IsNotNull(sharedComboEditor.BasedOn);
         AssertStyleTemplateTriggers(
             sharedTextEditor,
             UIElement.IsFocusedProperty,
             UIElement.IsEnabledProperty,
             Validation.HasErrorProperty);
 
-        var gridCheckBoxStyle = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("DeviceGridCheckBoxStyle"));
+        var gridCheckBoxStyle = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("DataGridCheckBoxStyle"));
         Assert.IsTrue(
             gridCheckBoxStyle.Setters.OfType<Setter>().Any(setter => setter.Property == Control.FocusVisualStyleProperty),
             "Device Manager row checkboxes must define a keyboard focus cue.");
@@ -324,9 +327,9 @@ public sealed class UiSurfaceSmokeTests
         DeviceTableColumnLayoutBehavior.SetPersistColumnRatios(dataGrid, false);
     }
 
-    private static void AssertButtonStyleStates(string resourceKey)
+    private static void AssertButtonStyleStates(FrameworkElement owner, string resourceKey)
     {
-        var style = Assert.IsInstanceOfType<Style>(Application.Current.FindResource(resourceKey));
+        var style = Assert.IsInstanceOfType<Style>(owner.FindResource(resourceKey));
         Assert.IsTrue(
             style.Setters.OfType<Setter>().Any(setter => setter.Property == Control.FocusVisualStyleProperty),
             $"{resourceKey} must define a keyboard focus cue.");
@@ -399,7 +402,7 @@ public sealed class UiSurfaceSmokeTests
         AssertGridPosition(deviceManagerView, "ChangeSimButton", 2, 1);
         var viewAllDeviceInfoButton = Assert.IsInstanceOfType<Button>(deviceManagerView.FindName("ViewAllDeviceInfoButton"));
         Assert.IsFalse(viewAllDeviceInfoButton.IsEnabled);
-        Assert.AreSame(Application.Current.FindResource("DeviceActionButtonStyle"), viewAllDeviceInfoButton.Style.BasedOn);
+        Assert.AreSame(deviceManagerView.FindResource("DeviceActionButtonStyle"), viewAllDeviceInfoButton.Style.BasedOn);
         AssertGridPosition(deviceManagerView, "DeviceInfoNameTextBox", 0, 1);
         AssertGridPosition(deviceManagerView, "DeviceInfoImeiTextBox", 0, 3);
         AssertGridPosition(deviceManagerView, "DeviceInfoHardwareTextBox", 1, 1);
@@ -437,7 +440,7 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreEqual(2, System.Windows.Controls.Grid.GetColumn(advancedChangeConfigButton));
         Assert.IsFalse(advancedChangeConfigButton.IsEnabled);
         Assert.AreSame(
-            Application.Current.FindResource("DeviceActionButtonStyle"),
+            deviceManagerView.FindResource("DeviceActionButtonStyle"),
             advancedChangeConfigButton.Style.BasedOn);
         Assert.AreEqual(new Thickness(8d, 0d, 0d, 0d), advancedChangeConfigButton.Margin);
         Assert.IsInstanceOfType<System.Windows.Controls.Grid>(advancedChangeConfigButton.Content);
@@ -452,11 +455,11 @@ public sealed class UiSurfaceSmokeTests
 
         var nameTextBox = new System.Windows.Controls.TextBox
         {
-            Style = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("AddDeviceNameTextBoxStyle"))
+            Style = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("InlineDataGridTextBoxStyle"))
         };
         var typeComboBox = new System.Windows.Controls.ComboBox
         {
-            Style = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("AddDeviceTypeComboBoxStyle"))
+            Style = Assert.IsInstanceOfType<Style>(Application.Current.FindResource("InlineDataGridComboBoxStyle"))
         };
         Assert.AreEqual(typeComboBox.Height, nameTextBox.Height);
         Assert.AreEqual(40d, nameTextBox.Height);
@@ -480,7 +483,7 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreEqual(2, randomDeviceInfoPanel.Columns);
         Assert.IsInstanceOfType<Button>(randomDeviceInfoDialog.FindName("UpdateRandomDeviceInfoButton"));
         Style randomDeviceInfoInputStyle = Assert.IsInstanceOfType<Style>(
-            Application.Current.FindResource("RandomDeviceInfoInputStyle"));
+            randomDeviceInfoDialog.FindResource("RandomDeviceInfoInputStyle"));
         foreach (string fieldKey in new[] { "Fingerprint", "Serial" })
         {
             var input = new TextBox
@@ -557,7 +560,20 @@ public sealed class UiSurfaceSmokeTests
 
         foreach (Size size in sizes)
         {
-            layoutRoot.Measure(size);
+            try
+            {
+                layoutRoot.Measure(size);
+            }
+            catch (InvalidOperationException exception)
+            {
+                string invalidMargins = string.Join(
+                    Environment.NewLine,
+                    FindElementsWithInvalidMargin(layoutRoot));
+                throw new InvalidOperationException(
+                    $"Failed to measure {surface.GetType().Name}.{Environment.NewLine}{invalidMargins}",
+                    exception);
+            }
+
             layoutRoot.Arrange(new Rect(new Point(), size));
             layoutRoot.UpdateLayout();
 
@@ -565,6 +581,36 @@ public sealed class UiSurfaceSmokeTests
             Assert.IsFalse(double.IsNaN(layoutRoot.DesiredSize.Height));
             Assert.IsGreaterThanOrEqualTo(0, layoutRoot.ActualWidth);
             Assert.IsGreaterThanOrEqualTo(0, layoutRoot.ActualHeight);
+        }
+    }
+
+    private static IEnumerable<string> FindElementsWithInvalidMargin(DependencyObject root)
+    {
+        var pending = new Queue<DependencyObject>();
+        pending.Enqueue(root);
+
+        while (pending.Count > 0)
+        {
+            DependencyObject current = pending.Dequeue();
+            if (current is FrameworkElement element)
+            {
+                string? invalidMargin = null;
+                try
+                {
+                    _ = element.Margin;
+                }
+                catch (InvalidOperationException exception)
+                {
+                    invalidMargin = $"{element.GetType().Name} '{element.Name}': {exception.Message}";
+                }
+
+                if (invalidMargin != null)
+                    yield return invalidMargin;
+            }
+
+            int childCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(current);
+            for (int index = 0; index < childCount; index++)
+                pending.Enqueue(System.Windows.Media.VisualTreeHelper.GetChild(current, index));
         }
     }
 

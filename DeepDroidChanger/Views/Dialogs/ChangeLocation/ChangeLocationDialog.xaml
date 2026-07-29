@@ -1,3 +1,4 @@
+
 <Window x:Class="DeepDroidChanger.Views.ChangeLocationDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -14,10 +15,45 @@
         FontFamily="{StaticResource Metric.FontFamily}">
 
     <Window.Resources>
+
+    <Style x:Key="ChangeLocationSelectorGridStyle" TargetType="Grid">
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
+    <Style x:Key="ChangeLocationInputLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+        <Setter Property="Margin" Value="0,4,0,4"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ChangeLocationHintTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+        <Setter Property="Margin" Value="2,-2,0,0"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <Style x:Key="ChangeLocationTextBoxStyle"
+           TargetType="TextBox"
+           BasedOn="{StaticResource FlatTextBoxStyle}">
+        <Setter Property="SelectionBrush" Value="{DynamicResource Brush.SurfaceSelected}"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="materialDesign:HintAssist.Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+    </Style>
+
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </Window.Resources>
 
-    <Grid Style="{StaticResource ChangeLocationRootGridStyle}">
+    <Grid Style="{StaticResource DialogRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -27,9 +63,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- DEVICE INFO -->
         <Border Grid.Row="0"
-                Style="{StaticResource ChangeLocationDeviceHeaderStyle}">
+                Style="{StaticResource DialogHeaderBorderStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -37,17 +72,16 @@
                 </Grid.ColumnDefinitions>
 
                 <materialDesign:PackIcon Kind="CellphoneCog"
-                                         Style="{StaticResource ChangeLocationHeaderIconStyle}"/>
+                                         Style="{StaticResource DialogHeaderIconStyle}"/>
                 <TextBlock Grid.Column="1"
                            Text="{Binding DeviceInfoText}"
-                           Style="{StaticResource ChangeLocationInfoDeviceTextStyle}"/>
+                           Style="{StaticResource DialogHeaderTextStyle}"/>
             </Grid>
         </Border>
 
-        <!-- MODE SELECTION -->
         <GroupBox Grid.Row="1"
                   Header="{DynamicResource ChangeLocation_ModeGroupHeader}"
-                  Style="{StaticResource ChangeLocationModeGroupBoxStyle}">
+                  Style="{StaticResource DialogOptionGroupBoxStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -56,7 +90,7 @@
 
                 <RadioButton Grid.Row="0"
                              IsChecked="{Binding IsConfigMode, Mode=TwoWay}"
-                             Style="{StaticResource ChangeLocationModeRadioStyle}">
+                             Style="{StaticResource CardRadioButtonStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="SquareEditOutline"
                                                  Width="18" Height="18"
@@ -70,7 +104,7 @@
 
                 <RadioButton Grid.Row="1"
                              IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
-                             Style="{StaticResource ChangeLocationModeRadioStyle}">
+                             Style="{StaticResource CardRadioButtonStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="Web"
                                                  Width="18" Height="18"
@@ -84,7 +118,6 @@
             </Grid>
         </GroupBox>
 
-        <!-- DATA LOCATION SELECTOR (BELOW RADIO BOX & ABOVE LAT/LON) -->
         <Grid Grid.Row="2" Style="{StaticResource ChangeLocationSelectorGridStyle}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -92,21 +125,19 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Search Box -->
             <TextBox Grid.Row="0"
                      Text="{Binding LocationSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     Style="{StaticResource ChangeLocationSearchTextBoxStyle}"
+                     Style="{StaticResource DialogSearchTextBoxStyle}"
                      materialDesign:HintAssist.Hint="{DynamicResource ChangeLocation_CountrySearchHint}"
                      IsEnabled="{Binding IsConfigMode}"/>
 
-            <!-- Country ComboBox -->
             <ComboBox x:Name="CountryComboBox"
                       Grid.Row="1"
                       ItemsSource="{Binding FilteredCountries}"
                       SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
                       IsDropDownOpen="{Binding IsCountryDropDownOpen, Mode=TwoWay}"
                       DropDownClosed="CountryComboBox_DropDownClosed"
-                      Style="{StaticResource ChangeLocationComboBoxStyle}"
+                      Style="{StaticResource DialogFormComboBoxStyle}"
                       IsEnabled="{Binding IsConfigMode}"
                       MaxDropDownHeight="220">
                 <ComboBox.ItemTemplate>
@@ -116,13 +147,12 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <!-- Location ComboBox -->
             <ComboBox x:Name="LocationComboBox"
                       Grid.Row="2"
                       ItemsSource="{Binding CountryLocations}"
                       SelectedItem="{Binding SelectedLocation, Mode=TwoWay}"
                       DropDownClosed="LocationComboBox_DropDownClosed"
-                      Style="{StaticResource ChangeLocationComboBoxStyle}"
+                      Style="{StaticResource DialogFormComboBoxStyle}"
                       IsEnabled="{Binding IsConfigMode}"
                       MaxDropDownHeight="220">
                 <ComboBox.ItemTemplate>
@@ -133,7 +163,6 @@
             </ComboBox>
         </Grid>
 
-        <!-- CONFIG INPUTS (LATITUDE / LONGITUDE) -->
         <Grid Grid.Row="3"
               Style="{StaticResource ChangeLocationSelectorGridStyle}">
             <Grid.RowDefinitions>
@@ -172,15 +201,13 @@
                        Style="{StaticResource ChangeLocationHintTextStyle}"/>
         </Grid>
 
-        <!-- LOADING -->
         <ProgressBar Grid.Row="4"
                      IsIndeterminate="True"
-                     Style="{StaticResource ChangeLocationProgressBarStyle}"
+                     Style="{StaticResource DialogLinearProgressBarStyle}"
                      Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-        <!-- ACTION BUTTONS -->
         <Grid Grid.Row="5"
-              Style="{StaticResource ChangeLocationActionGridStyle}">
+              Style="{StaticResource DialogActionGridStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -188,17 +215,17 @@
 
             <Button Grid.Column="1"
                     Command="{Binding SaveCommand}"
-                    Style="{StaticResource ChangeLocationSaveButtonStyle}">
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <materialDesign:PackIcon Kind="Play"
-                                             Style="{StaticResource ChangeLocationButtonIconStyle}"/>
+                                             Style="{StaticResource PrimaryButtonIconStyle}"/>
                     <TextBlock Grid.Column="1"
                                Text="{DynamicResource ChangeLocation_SaveButton}"
-                               Style="{StaticResource ChangeLocationButtonTextStyle}"/>
+                               Style="{StaticResource PrimaryButtonTextStyle}"/>
                 </Grid>
             </Button>
         </Grid>

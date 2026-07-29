@@ -11,24 +11,33 @@ Brush.*, Metric.*, Spacing.*, or Radius.* key defined here.
 Resources/Themes/
   Theme.Light.xaml   Color.* and Brush.* tokens for light mode
   Theme.Dark.xaml    Color.* and Brush.* tokens for dark mode
-  Controls.xaml      Metric.*, Spacing.*, Radius.* tokens, plus
-                     default styles for Window, TextBlock, Button,
-                     TextBox, ComboBox, CheckBox, RadioButton,
-                     DataGrid, ListBox, TabControl, GroupBox, etc.
+  DesignTokens.xaml  Metric.*, Spacing.*, and Radius.* tokens
+  Controls.xaml      ordered aggregator for all control dictionaries
+  *Control.xaml      implicit and named reusable styles grouped by target
+                     control type, e.g. ButtonControl.xaml,
+                     ComboBoxControl.xaml, and DataGridControl.xaml
   ThemeManager.cs    AppTheme enum (Light, Dark) and
                      ThemeManager.Apply(theme) to swap Theme.Light/
                      Dark.xaml in Application.Resources.MergedDictionaries
                      at runtime.
 
 Load order in App.xaml matters: color file first, MaterialDesign defaults,
-Controls.xaml, localization strings, then feature-specific dictionaries.
+Controls.xaml, then localization strings. Feature-specific resources are
+declared directly in their owning Window or UserControl.
 
   <ResourceDictionary.MergedDictionaries>
     <ResourceDictionary Source="Resources/Themes/Theme.Light.xaml"/>
     <ResourceDictionary Source="Resources/Themes/Controls.xaml"/>
     <ResourceDictionary Source="Resources/Strings/Strings.xaml"/>
-    <ResourceDictionary Source="Resources/Themes/MainWindow.xaml"/>
   </ResourceDictionary.MergedDictionaries>
+
+Controls.xaml must merge DesignTokens.xaml first, followed by control
+dictionaries in dependency order. Every control dictionary that references a
+Metric.*, Spacing.*, or Radius.* token with StaticResource must also merge
+DesignTokens.xaml directly. Do not rely on a sibling dictionary in
+Controls.xaml for StaticResource lookup. Any other reusable control-dictionary
+dependency must likewise be merged directly after DesignTokens.xaml; for
+example, CheckBoxControl.xaml merges Control.xaml for AppFocusVisualStyle.
 
 2. COLOR TOKENS (Brush.* - use DynamicResource, not StaticResource,
    so runtime theme switch works)
@@ -102,7 +111,7 @@ Default weight: SemiBold, for readability (never Regular by default).
   Metric.FontSize.Title      20   page/section title, Bold weight
   Metric.FontSize.Display    24   dialog/page display title
 
-Named text styles (Resources/Themes/Controls.xaml):
+Named text styles (Resources/Themes/TextBlockControl.xaml):
   TitleTextStyle       FontSize Title, Bold
   SubtitleTextStyle     FontSize Subtitle, Bold
   SecondaryTextStyle    Brush.TextSecondary, SemiBold
@@ -136,6 +145,7 @@ Named text styles (Resources/Themes/Controls.xaml):
   Spacing.ConfirmationDialog.* dialog-specific layout spacing
 
   Radius.Small    6    small controls, tags
+  Radius.ExtraSmall 5  compact surfaces that must preserve a 5px radius
   Radius.Medium   8    buttons, inputs, default
   Radius.Large    12   cards, panels, dialogs
   Radius.Circle   999  circular or pill-shaped elements
@@ -171,12 +181,12 @@ other than ThemeManager.Apply(theme). This means:
 
 7. WHEN ADDING A NEW SCREEN
 
-  7.1. Reuse existing named styles from Controls.xaml first
+  7.1. Reuse existing named styles exposed by Controls.xaml first
      (PrimaryButtonStyle, CardBorderStyle, TitleTextStyle, etc).
-  7.2. If a truly new visual pattern is needed, add it to
-     Resources/Themes/Controls.xaml (shared) or
-     Resources/Themes/<Feature>.xaml (feature-specific only), never
-     inline in the View.
+  7.2. Put a truly reusable pattern in the matching
+     Resources/Themes/<ControlName>Control.xaml. Put a pattern used by only
+     one screen directly in that view's Resources. Never create a
+     Resources/Themes/<Feature>.xaml dictionary.
   7.3. Any new color must be added to both Theme.Light.xaml and
      Theme.Dark.xaml with matching key names.
   7.4. Verify all 4 states (hover, pressed, selected/focus, disabled)

@@ -113,15 +113,14 @@ DeepDroidChanger/ (solution root)
       Themes/
         Theme.Light.xaml  color tokens for light mode (Color.*, Brush.*)
         Theme.Dark.xaml   color tokens for dark mode (Color.*, Brush.*)
-        Controls.xaml     shared metrics + control styles (Metric.*,
-                          Spacing.*, Radius.*, Button/TextBox/DataGrid
-                          styles, states: hover/pressed/selected/focus/
-                          disabled/validation error)
+        DesignTokens.xaml shared Metric.*, Spacing.*, and Radius.* values
+        Controls.xaml     aggregator for the control dictionaries below
+        <ControlName>Control.xaml
+                          reusable styles grouped by WPF control type
+                          (ButtonControl.xaml, ComboBoxControl.xaml,
+                          DataGridControl.xaml, etc.)
         ThemeManager.cs   runtime Light/Dark switch logic
         Generic.xaml      required if a Custom Control inherits Control
-        <Feature>.xaml    only when a view has styles that are not
-                          reusable elsewhere; keep flat, do not nest
-                          under Views/<Feature>/
 
       See docs/THEMES.md for the full color palette, typography scale,
       spacing/radius tokens, and state rules. Never hardcode a color,
@@ -190,14 +189,20 @@ Resources/Strings/Views/<Feature>.xaml (+ .vi.xaml version).
 Reason: easier to find text to translate, multiple translators can
 work in parallel without conflicts.
 
-Styles: keep shared, in Resources/Themes/Controls.xaml (metrics +
-control styles) and Resources/Themes/Theme.Light.xaml /
-Theme.Dark.xaml (color tokens). Do not create a Views/<Feature>/
-Styles.xaml pattern for every view.
-Only create a feature-specific style file
-(Resources/Themes/<Feature>.xaml, flat, no nested folder) when a view
-has styles that are truly not reusable elsewhere, e.g. a custom
-progress-bar animation for one dialog.
+Styles shared across the application belong in the matching
+Resources/Themes/<ControlName>Control.xaml dictionary. Controls.xaml is only
+the ordered aggregator, DesignTokens.xaml owns Metric.*/Spacing.*/Radius.*,
+and Theme.Light.xaml / Theme.Dark.xaml own color tokens. A control dictionary
+using a DesignTokens.xaml value through StaticResource must merge
+DesignTokens.xaml directly so that the dictionary remains independently
+loadable; aggregator order alone does not establish sibling StaticResource
+scope.
+
+Styles, templates, storyboards, geometries, and layout metrics used by only
+one Window or UserControl belong directly in that view's
+<Window.Resources> or <UserControl.Resources>. Do not create
+Resources/Themes/<Feature>.xaml dictionaries or a separate
+Views/<Feature>/Styles.xaml pattern.
 
 Full color/typography/spacing rules: see docs/THEMES.md.
 
@@ -270,9 +275,9 @@ Do not add a repository-wide `Settings/` ignore pattern:
   files. Repository-local build outputs are already ignored because the project
   `bin/` directory is ignored.
 - The Settings application feature is source code and resources, including
-  `Views/Settings/`, `ViewModels/SettingsViewModel.cs`, Settings services and
-  models, and `Resources/Strings/Views/Settings*.xaml` /
-  `Resources/Themes/Settings.xaml`. These files must remain trackable.
+  `Views/Settings/SettingsView.xaml` and its local styles,
+  `ViewModels/SettingsViewModel.cs`, Settings services and models, and
+  `Resources/Strings/Views/Settings*.xaml`. These files must remain trackable.
 
 Before changing `.gitignore` for a path named `Settings`, first resolve its
 actual location. Ignore the build-output path through `bin/`; never ignore a
@@ -291,7 +296,8 @@ source feature merely because its name is Settings.
   8.6. If there is display text: add to
      Resources/Strings/Views/<Name>.xaml (+ .vi.xaml version). Never
      hardcode strings in XAML or code-behind.
-  8.7. If a feature-specific style is needed: add
-     Resources/Themes/<Name>.xaml, merge into App.xaml.
+  8.7. Put feature-specific styles in the new view's Resources. Add a style
+     to the matching <ControlName>Control.xaml only when it is reusable by
+     multiple views.
   8.8. Write tests for the ViewModel and Service in
      DeepDroidChanger.Tests/.

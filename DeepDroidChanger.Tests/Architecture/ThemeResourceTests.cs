@@ -39,14 +39,8 @@ public sealed partial class ThemeResourceTests
     public void FeatureXaml_DoesNotHardcodePaletteTypographyOrCornerRadius()
     {
         string projectRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
-        string themesRoot = Path.Combine(projectRoot, "Resources", "Themes");
         string[] viewFiles = Directory.GetFiles(Path.Combine(projectRoot, "Views"), "*.xaml", SearchOption.AllDirectories);
-        string[] featureThemeFiles = Directory.GetFiles(themesRoot, "*.xaml", SearchOption.TopDirectoryOnly)
-            .Where(path => Path.GetFileName(path) is not (
-                "Theme.Light.xaml" or "Theme.Dark.xaml" or "Controls.xaml"))
-            .ToArray();
         string[] files = viewFiles.Append(Path.Combine(projectRoot, "MainWindow.xaml"))
-            .Concat(featureThemeFiles)
             .ToArray();
         var violations = new List<string>();
 
@@ -66,28 +60,39 @@ public sealed partial class ThemeResourceTests
     }
 
     [TestMethod]
-    public void ThemeFolder_ContainsOnlyCanonicalAndFeatureDictionaries()
+    public void ThemeFolder_ContainsOnlyCanonicalThemeAndControlDictionaries()
     {
         string themesRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger", "Resources", "Themes");
         HashSet<string> allowedNames = new(StringComparer.Ordinal)
         {
             "Theme.Light.xaml",
             "Theme.Dark.xaml",
+            "DesignTokens.xaml",
             "Controls.xaml",
-            "ConfirmationDialog.xaml",
-            "MainWindow.xaml",
-            "DeviceManager.xaml",
-            "AdvancedChangeConfig.xaml",
-            "Settings.xaml",
-            "Login.xaml",
-            "AddDevices.xaml",
-            "RandomDeviceInfo.xaml",
-            "ChangeLocation.xaml",
-            "ChangeTimezone.xaml",
-            "FakeProxy.xaml",
-            "UpdateIntegrity.xaml",
-            "InstallPackage.xaml",
-            "DeviceViewer.xaml",
+            "Control.xaml",
+            "WindowControl.xaml",
+            "GridControl.xaml",
+            "BorderControl.xaml",
+            "TextBlockControl.xaml",
+            "PackIconControl.xaml",
+            "ButtonControl.xaml",
+            "TextBoxControl.xaml",
+            "PasswordBoxControl.xaml",
+            "ComboBoxControl.xaml",
+            "CheckBoxControl.xaml",
+            "RadioButtonControl.xaml",
+            "ListBoxControl.xaml",
+            "ListViewControl.xaml",
+            "DataGridControl.xaml",
+            "TabControl.xaml",
+            "MenuControl.xaml",
+            "ProgressBarControl.xaml",
+            "SeparatorControl.xaml",
+            "ToolTipControl.xaml",
+            "GroupBoxControl.xaml",
+            "SliderControl.xaml",
+            "DatePickerControl.xaml",
+            "ScrollBarControl.xaml",
         };
         string[] files = Directory.GetFiles(themesRoot, "*.xaml", SearchOption.TopDirectoryOnly);
         string[] unexpected = files
@@ -104,6 +109,39 @@ public sealed partial class ThemeResourceTests
 
         Assert.IsEmpty(unexpected, $"Unexpected or shared resource dictionaries found: {string.Join(", ", unexpected)}");
         Assert.IsEmpty(legacyKeys, $"Legacy theme keys found: {string.Join(", ", legacyKeys)}");
+    }
+
+    [TestMethod]
+    public void ControlDictionaries_DeclareTheirStaticResourceDependencies()
+    {
+        string themesRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger", "Resources", "Themes");
+        string[] files = Directory.GetFiles(themesRoot, "*Control.xaml", SearchOption.TopDirectoryOnly);
+        var violations = new List<string>();
+
+        foreach (string path in files)
+        {
+            string text = File.ReadAllText(path);
+            bool usesDesignToken = text.Contains("{StaticResource Metric.", StringComparison.Ordinal)
+                || text.Contains("{StaticResource Spacing.", StringComparison.Ordinal)
+                || text.Contains("{StaticResource Radius.", StringComparison.Ordinal);
+
+            if (usesDesignToken
+                && !text.Contains("Source=\"DesignTokens.xaml\"", StringComparison.Ordinal))
+            {
+                violations.Add($"{Path.GetFileName(path)} -> DesignTokens.xaml");
+            }
+
+            if (text.Contains("{StaticResource AppFocusVisualStyle}", StringComparison.Ordinal)
+                && !text.Contains("x:Key=\"AppFocusVisualStyle\"", StringComparison.Ordinal)
+                && !text.Contains("Source=\"Control.xaml\"", StringComparison.Ordinal))
+            {
+                violations.Add($"{Path.GetFileName(path)} -> Control.xaml");
+            }
+        }
+
+        Assert.IsEmpty(
+            violations,
+            $"Control dictionaries have undeclared StaticResource dependencies: {string.Join(", ", violations)}");
     }
 
     [TestMethod]
@@ -130,9 +168,9 @@ public sealed partial class ThemeResourceTests
         string path = Path.Combine(
             GetSolutionRoot(),
             "DeepDroidChanger",
-            "Resources",
-            "Themes",
-            "DeviceManager.xaml");
+            "Views",
+            "DeviceManager",
+            "DeviceManagerView.xaml");
         var document = System.Xml.Linq.XDocument.Load(path);
         System.Xml.Linq.XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         System.Xml.Linq.XElement factoryReset = document
@@ -170,7 +208,7 @@ public sealed partial class ThemeResourceTests
     public void CanonicalLayoutTokens_AreDocumentedInThemesGuide()
     {
         string solutionRoot = GetSolutionRoot();
-        string controlsPath = Path.Combine(solutionRoot, "DeepDroidChanger", "Resources", "Themes", "Controls.xaml");
+        string controlsPath = Path.Combine(solutionRoot, "DeepDroidChanger", "Resources", "Themes", "DesignTokens.xaml");
         string guide = File.ReadAllText(Path.Combine(solutionRoot, "docs", "THEMES.md"));
         string[] tokenKeys = KeyDefinitionRegex().Matches(File.ReadAllText(controlsPath))
             .Select(match => match.Groups[1].Value)
