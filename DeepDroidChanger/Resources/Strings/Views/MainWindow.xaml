@@ -3,6 +3,8 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <sys:String x:Key="Nav_DeviceManager">Device Manager</sys:String>
+    <sys:String x:Key="Nav_ChangeSingleDevice">Change Single Device</sys:String>
+    <sys:String x:Key="Nav_ChangeMultipleDevice">Change Multiple Device</sys:String>
     <sys:String x:Key="Nav_Settings">Settings</sys:String>
     <sys:String x:Key="Nav_ToggleSidebar">Toggle sidebar</sys:String>
     <sys:String x:Key="Nav_Language">Language</sys:String>

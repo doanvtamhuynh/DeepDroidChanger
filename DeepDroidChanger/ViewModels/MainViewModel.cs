@@ -19,6 +19,8 @@ namespace DeepDroidChanger.ViewModels
         private readonly IThemeService _themeService;
         private readonly ISettingsService _settingsService;
         private bool _isSidebarCollapsed;
+        private bool _isDeviceManagerSubmenuOpen;
+        private bool _isDeviceManagerFlyoutOpen;
         private AppView _activeView;
 
         public MainViewModel(
@@ -79,9 +81,28 @@ namespace DeepDroidChanger.ViewModels
                 if (!SetProperty(ref _isSidebarCollapsed, value))
                     return;
 
+                CloseDeviceManagerMenus();
                 _settings.SidebarCollapsed = value;
                 OnSidebarLayoutChanged();
             }
+        }
+
+        public bool IsDeviceManagerSubmenuOpen
+        {
+            get => _isDeviceManagerSubmenuOpen;
+            private set
+            {
+                if (!SetProperty(ref _isDeviceManagerSubmenuOpen, value))
+                    return;
+
+                OnPropertyChanged(nameof(DeviceManagerChevronIconKind));
+            }
+        }
+
+        public bool IsDeviceManagerFlyoutOpen
+        {
+            get => _isDeviceManagerFlyoutOpen;
+            set => SetProperty(ref _isDeviceManagerFlyoutOpen, value);
         }
 
         public AppView ActiveView
@@ -93,12 +114,17 @@ namespace DeepDroidChanger.ViewModels
                     return;
 
                 OnPropertyChanged(nameof(IsDeviceManagerActive));
+                OnPropertyChanged(nameof(IsChangeSingleDeviceActive));
+                OnPropertyChanged(nameof(IsChangeMultipleDevicesActive));
                 OnPropertyChanged(nameof(IsSettingsActive));
                 NavigationRequested?.Invoke(value);
             }
         }
 
-        public bool IsDeviceManagerActive => ActiveView == AppView.DeviceManager;
+        public bool IsDeviceManagerActive =>
+            ActiveView is AppView.DeviceManager or AppView.ChangeMultipleDevices;
+        public bool IsChangeSingleDeviceActive => ActiveView == AppView.DeviceManager;
+        public bool IsChangeMultipleDevicesActive => ActiveView == AppView.ChangeMultipleDevices;
         public bool IsSettingsActive => ActiveView == AppView.Settings;
         public GridLength SidebarWidth => new(IsSidebarCollapsed ? CollapsedWidth : ExpandedWidth);
         public Thickness HeaderMargin => IsSidebarCollapsed ? new Thickness(0, 16, 0, 8) : new Thickness(14, 16, 10, 8);
@@ -119,6 +145,8 @@ namespace DeepDroidChanger.ViewModels
         public HorizontalAlignment BottomActionsHorizontalAlignment => IsSidebarCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
         public Thickness ThemeButtonMargin => IsSidebarCollapsed ? new Thickness(0, 6, 0, 0) : new Thickness(12, 0, 0, 0);
         public PackIconKind ToggleIconKind => IsSidebarCollapsed ? PackIconKind.ChevronRight : PackIconKind.ChevronLeft;
+        public PackIconKind DeviceManagerChevronIconKind =>
+            IsDeviceManagerSubmenuOpen ? PackIconKind.ChevronUp : PackIconKind.ChevronDown;
         public PackIconKind ThemeIconKind => _themeService.IsDarkTheme(Theme) ? PackIconKind.WeatherNight : PackIconKind.WhiteBalanceSunny;
         public string LanguageFlagSource => Language == "vi"
             ? AssetConstants.Icons.VietnameseFlag
@@ -155,15 +183,50 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand]
-        private void NavigateDeviceManager()
+        private void ToggleDeviceManagerMenu()
+        {
+            if (IsSidebarCollapsed)
+            {
+                IsDeviceManagerSubmenuOpen = false;
+                IsDeviceManagerFlyoutOpen = !IsDeviceManagerFlyoutOpen;
+                return;
+            }
+
+            IsDeviceManagerFlyoutOpen = false;
+            IsDeviceManagerSubmenuOpen = !IsDeviceManagerSubmenuOpen;
+        }
+
+        [RelayCommand]
+        private void NavigateChangeSingleDevice()
         {
             ActiveView = AppView.DeviceManager;
+            CloseFlyoutAfterNavigation();
+        }
+
+        [RelayCommand]
+        private void NavigateChangeMultipleDevices()
+        {
+            ActiveView = AppView.ChangeMultipleDevices;
+            CloseFlyoutAfterNavigation();
         }
 
         [RelayCommand]
         private void NavigateSettings()
         {
+            CloseDeviceManagerMenus();
             ActiveView = AppView.Settings;
+        }
+
+        private void CloseFlyoutAfterNavigation()
+        {
+            if (IsSidebarCollapsed)
+                IsDeviceManagerFlyoutOpen = false;
+        }
+
+        private void CloseDeviceManagerMenus()
+        {
+            IsDeviceManagerSubmenuOpen = false;
+            IsDeviceManagerFlyoutOpen = false;
         }
 
         private void OnSidebarLayoutChanged()

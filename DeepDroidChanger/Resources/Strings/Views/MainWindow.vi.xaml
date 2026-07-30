@@ -3,6 +3,8 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <sys:String x:Key="Nav_DeviceManager">Quản lý thiết bị</sys:String>
+    <sys:String x:Key="Nav_ChangeSingleDevice">Đổi một thiết bị</sys:String>
+    <sys:String x:Key="Nav_ChangeMultipleDevice">Đổi nhiều thiết bị</sys:String>
     <sys:String x:Key="Nav_Settings">Cài đặt</sys:String>
     <sys:String x:Key="Nav_ToggleSidebar">Thu gọn thanh bên</sys:String>
     <sys:String x:Key="Nav_Language">Ngôn ngữ</sys:String>

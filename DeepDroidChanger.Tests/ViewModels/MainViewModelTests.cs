@@ -27,9 +27,6 @@ public sealed class MainViewModelTests
         var navigation = new List<AppView>();
         viewModel.NavigationRequested += navigation.Add;
 
-        viewModel.NavigateDeviceManagerCommand.Execute(null);
-        Assert.IsEmpty(navigation);
-
         viewModel.ToggleSidebarCommand.Execute(null);
         Assert.IsTrue(viewModel.IsSidebarCollapsed);
         Assert.AreEqual(56d, viewModel.SidebarWidth.Value);
@@ -47,11 +44,73 @@ public sealed class MainViewModelTests
         Assert.AreEqual("Light", viewModel.Theme);
         themes.Received(1).ApplyTheme("Light");
 
+        viewModel.NavigateChangeMultipleDevicesCommand.Execute(null);
+        Assert.IsTrue(viewModel.IsDeviceManagerActive);
+        Assert.IsTrue(viewModel.IsChangeMultipleDevicesActive);
+        Assert.IsFalse(viewModel.IsChangeSingleDeviceActive);
         viewModel.NavigateSettingsCommand.Execute(null);
         Assert.IsTrue(viewModel.IsSettingsActive);
-        viewModel.NavigateDeviceManagerCommand.Execute(null);
+        viewModel.NavigateChangeSingleDeviceCommand.Execute(null);
         Assert.IsTrue(viewModel.IsDeviceManagerActive);
-        CollectionAssert.AreEqual(new[] { AppView.Settings, AppView.DeviceManager }, navigation);
+        Assert.IsTrue(viewModel.IsChangeSingleDeviceActive);
+        Assert.IsFalse(viewModel.IsChangeMultipleDevicesActive);
+        CollectionAssert.AreEqual(
+            new[] { AppView.ChangeMultipleDevices, AppView.Settings, AppView.DeviceManager },
+            navigation);
+    }
+
+    [TestMethod]
+    public void DeviceManagerMenus_KeepExpandedSubmenuAndCloseCollapsedFlyout()
+    {
+        ILocalizationService localization = Substitute.For<ILocalizationService>();
+        localization.NormalizeLanguage(Arg.Any<string>()).Returns("en");
+        IThemeService themes = Substitute.For<IThemeService>();
+        themes.NormalizeTheme(Arg.Any<string>()).Returns("Dark");
+        var viewModel = new MainViewModel(
+            new AppSettings { Language = "en", Theme = "Dark" },
+            localization,
+            themes,
+            Substitute.For<ISettingsService>());
+
+        Assert.IsFalse(viewModel.IsDeviceManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDeviceManagerFlyoutOpen);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.ChevronDown, viewModel.DeviceManagerChevronIconKind);
+
+        viewModel.ToggleDeviceManagerMenuCommand.Execute(null);
+
+        Assert.IsTrue(viewModel.IsDeviceManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDeviceManagerFlyoutOpen);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.ChevronUp, viewModel.DeviceManagerChevronIconKind);
+
+        viewModel.NavigateChangeMultipleDevicesCommand.Execute(null);
+
+        Assert.IsTrue(viewModel.IsChangeMultipleDevicesActive);
+        Assert.IsTrue(viewModel.IsDeviceManagerSubmenuOpen);
+
+        viewModel.ToggleSidebarCommand.Execute(null);
+
+        Assert.IsTrue(viewModel.IsSidebarCollapsed);
+        Assert.IsFalse(viewModel.IsDeviceManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDeviceManagerFlyoutOpen);
+
+        viewModel.ToggleDeviceManagerMenuCommand.Execute(null);
+
+        Assert.IsFalse(viewModel.IsDeviceManagerSubmenuOpen);
+        Assert.IsTrue(viewModel.IsDeviceManagerFlyoutOpen);
+
+        viewModel.NavigateChangeSingleDeviceCommand.Execute(null);
+
+        Assert.IsTrue(viewModel.IsChangeSingleDeviceActive);
+        Assert.IsFalse(viewModel.IsDeviceManagerFlyoutOpen);
+
+        viewModel.ToggleDeviceManagerMenuCommand.Execute(null);
+        Assert.IsTrue(viewModel.IsDeviceManagerFlyoutOpen);
+
+        viewModel.NavigateSettingsCommand.Execute(null);
+
+        Assert.IsTrue(viewModel.IsSettingsActive);
+        Assert.IsFalse(viewModel.IsDeviceManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDeviceManagerFlyoutOpen);
     }
 
     [TestMethod]

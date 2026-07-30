@@ -48,6 +48,7 @@ public sealed class DependencyInjectionTests
         AssertLifetime<IDeviceActionGuardService>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainViewModel>(services, ServiceLifetime.Singleton);
         AssertLifetime<DeviceManagerViewModel>(services, ServiceLifetime.Singleton);
+        AssertLifetime<ChangeMultipleDevicesViewModel>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainWindow>(services, ServiceLifetime.Singleton);
         AssertLifetime<ILoginDialogService>(services, ServiceLifetime.Transient);
         AssertLifetime<IDeviceViewerDialogService>(services, ServiceLifetime.Transient);
@@ -75,6 +76,7 @@ public sealed class DependencyInjectionTests
         Assert.IsNotNull(provider.GetRequiredService<IAccountStoreService>());
         Assert.IsNotNull(provider.GetRequiredService<IAuthenticationSessionService>());
         Assert.IsNotNull(provider.GetRequiredService<DeviceManagerViewModel>());
+        Assert.IsNotNull(provider.GetRequiredService<ChangeMultipleDevicesViewModel>());
     }
 
     private static void AssertLifetime<TService>(

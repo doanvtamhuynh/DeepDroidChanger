@@ -18,7 +18,7 @@
             <Setter Property="RowHeight"
                     Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
             <Setter Property="MaxHeight"
-                    Value="364"/>
+                    Value="412"/>
             <Setter Property="GridLinesVisibility"
                     Value="All"/>
             <Setter Property="HorizontalGridLinesBrush"
@@ -284,7 +284,7 @@
             </Setter>
         </Style>
 
-        <Thickness x:Key="DeviceProfilePanelContentMargin">0,10,16,0</Thickness>
+        <Thickness x:Key="DeviceProfilePanelContentMargin">0,0,16,0</Thickness>
 
         <Style x:Key="DeviceManagerCellStretchStyle"
                TargetType="DataGridCell"
@@ -466,17 +466,6 @@
                TargetType="Button"
                BasedOn="{StaticResource DeviceActionButtonStyle}">
             <Setter Property="Margin" Value="8,0,0,0"/>
-        </Style>
-
-        <Style x:Key="DeviceMultipleChangePlaceholderTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource AppLabelTextStyle}">
-            <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
-            <Setter Property="HorizontalAlignment"
-                    Value="Center"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
         </Style>
 
     <Style x:Key="DeviceLoadToolbarStyle" TargetType="Grid">
@@ -912,8 +901,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"
                            MinHeight="220"/>
-            <RowDefinition Height="360"
-                           MinHeight="360"/>
+            <RowDefinition Height="312"
+                           MinHeight="312"/>
         </Grid.RowDefinitions>
         <Grid Grid.Row="0"
               Style="{StaticResource DeviceLoadToolbarStyle}">
@@ -1088,15 +1077,12 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <TabControl Grid.Row="2"
-                    Style="{StaticResource UnderlineTabControlStyle}"
-                    Margin="0,8,0,0"
-                    MinHeight="300">
-            <TabItem Header="{DynamicResource DeviceManager_TabChangeInfoSingle}"
-                     Style="{StaticResource UnderlineTabItemStyle}">
-                <ScrollViewer x:Name="DeviceProfilePanelScrollViewer"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer x:Name="DeviceProfilePanelScrollViewer"
+                      Grid.Row="2"
+                      Margin="0,8,0,0"
+                      MinHeight="300"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
                     <Grid x:Name="DeviceProfilePanelContentGrid"
                           Margin="{StaticResource DeviceProfilePanelContentMargin}"
                           IsEnabled="{Binding CanInteractWithSelectedDevice}"
@@ -1712,17 +1698,7 @@
                         </Grid>
                     </Border>
                     </Grid>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem Header="{DynamicResource DeviceManager_TabChangeInfoMultiple}"
-                     Style="{StaticResource UnderlineTabItemStyle}">
-                <Grid>
-                    <TextBlock Text="{DynamicResource DeviceManager_ChangeInfoMultiplePlaceholder}"
-                               Style="{StaticResource DeviceMultipleChangePlaceholderTextStyle}"/>
-                </Grid>
-            </TabItem>
-        </TabControl>
+        </ScrollViewer>
         </Grid>
     </ScrollViewer>
 </UserControl>

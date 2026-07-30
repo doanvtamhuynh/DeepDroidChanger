@@ -12,6 +12,7 @@ namespace DeepDroidChanger
         private readonly MainViewModel _viewModel;
         private readonly DeviceManagerViewModel _deviceManagerViewModel;
         private readonly DeviceManagerView _deviceManagerView;
+        private readonly ChangeMultipleDevicesView _changeMultipleDevicesView;
         private readonly SettingsView _settingsView;
         private readonly ILogger<MainWindow> _logger;
         private bool _isClosingAfterSave;
@@ -21,6 +22,7 @@ namespace DeepDroidChanger
             MainViewModel viewModel,
             DeviceManagerViewModel deviceManagerViewModel,
             DeviceManagerView deviceManagerView,
+            ChangeMultipleDevicesView changeMultipleDevicesView,
             SettingsView settingsView,
             ILogger<MainWindow> logger)
         {
@@ -29,6 +31,7 @@ namespace DeepDroidChanger
             _viewModel = viewModel;
             _deviceManagerViewModel = deviceManagerViewModel;
             _deviceManagerView = deviceManagerView;
+            _changeMultipleDevicesView = changeMultipleDevicesView;
             _settingsView = settingsView;
             _logger = logger;
 
@@ -54,6 +57,7 @@ namespace DeepDroidChanger
             MainContent.Content = view switch
             {
                 AppView.DeviceManager => _deviceManagerView,
+                AppView.ChangeMultipleDevices => _changeMultipleDevicesView,
                 AppView.Settings => _settingsView,
                 _ => throw new ArgumentOutOfRangeException(nameof(view), view, null)
             };

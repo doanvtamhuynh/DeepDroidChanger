@@ -1,6 +1,7 @@
 <Window x:Class="DeepDroidChanger.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:DeepDroidChanger.Behaviors"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{DynamicResource AppName}"
         WindowState="Maximized"
@@ -138,9 +139,80 @@
             </Setter>
         </Style>
 
-        <Style x:Key="SidebarDeviceManagerTabStyle"
+        <Style x:Key="SidebarDeviceManagerGroupStyle"
                TargetType="Button"
                BasedOn="{StaticResource SidebarTabStyle}">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="SidebarItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{StaticResource Radius.Medium}"
+                                Padding="12,0">
+                            <Grid VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <materialDesign:PackIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                                         Width="20"
+                                                         Height="20"
+                                                         VerticalAlignment="Center"
+                                                         Foreground="{TemplateBinding Foreground}"/>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontFamily="{StaticResource Metric.FontFamily}"
+                                           FontSize="{StaticResource Metric.FontSize.Body}"
+                                           FontWeight="SemiBold"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           Foreground="{TemplateBinding Foreground}"/>
+
+                                <materialDesign:PackIcon Grid.Column="2"
+                                                         Kind="{Binding DataContext.DeviceManagerChevronIconKind, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Width="16"
+                                                         Height="16"
+                                                         Margin="8,0,0,0"
+                                                         VerticalAlignment="Center"
+                                                         Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Foreground="{TemplateBinding Foreground}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="SidebarItemBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource Brush.SurfaceHover}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Brush.Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="SidebarItemBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource Brush.SurfacePressed}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Brush.TextDisabled}"/>
+                                <Setter TargetName="SidebarItemBorder"
+                                        Property="Opacity"
+                                        Value="0.62"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsDeviceManagerActive}"
                              Value="True">
@@ -150,6 +222,340 @@
                             Value="{DynamicResource Brush.Accent}"/>
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarDeviceManagerSubmenuStyle"
+               TargetType="StackPanel">
+            <Setter Property="Visibility"
+                    Value="Collapsed"/>
+            <Setter Property="Margin"
+                    Value="0,0,0,2"/>
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsSidebarCollapsed}"
+                                   Value="False"/>
+                        <Condition Binding="{Binding IsDeviceManagerSubmenuOpen}"
+                                   Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility"
+                            Value="Visible"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarSubmenuButtonStyle"
+               TargetType="Button">
+            <Setter Property="Height"
+                    Value="{StaticResource Metric.ControlHeight}"/>
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Left"/>
+            <Setter Property="Margin"
+                    Value="0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="SubmenuItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{StaticResource Radius.Interactive}"
+                                Padding="38,0,10,0">
+                            <Grid VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <materialDesign:PackIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                                         Width="16"
+                                                         Height="16"
+                                                         VerticalAlignment="Center"
+                                                         Foreground="{TemplateBinding Foreground}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontFamily="{StaticResource Metric.FontFamily}"
+                                           FontSize="{StaticResource Metric.FontSize.Small}"
+                                           FontWeight="SemiBold"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{TemplateBinding Foreground}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="SubmenuItemBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource Brush.SurfaceHover}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Brush.TextPrimary}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed"
+                                     Value="True">
+                                <Setter TargetName="SubmenuItemBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource Brush.SurfacePressed}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Brush.TextDisabled}"/>
+                                <Setter TargetName="SubmenuItemBorder"
+                                        Property="Opacity"
+                                        Value="0.62"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarSingleDeviceSubmenuButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SidebarSubmenuButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChangeSingleDeviceActive}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Brush.SurfaceSelected}"/>
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarMultipleDevicesSubmenuButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SidebarSubmenuButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsChangeMultipleDevicesActive}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Brush.SurfaceSelected}"/>
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarDeviceManagerFlyoutStyle"
+               TargetType="ContextMenu">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextPrimary}"/>
+            <Setter Property="Padding"
+                    Value="{StaticResource Spacing.CardPadding.Compact}"/>
+            <Setter Property="MinWidth"
+                    Value="188"/>
+            <Setter Property="SnapsToDevicePixels"
+                    Value="True"/>
+            <Setter Property="OverridesDefaultStyle"
+                    Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
+                                CornerRadius="{StaticResource Radius.Overlay}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="{StaticResource Metric.Elevation.FloatingBlurRadius}"
+                                                  ShadowDepth="{StaticResource Metric.Elevation.FloatingShadowDepth}"
+                                                  Direction="270"
+                                                  Opacity="{StaticResource Metric.Elevation.FloatingShadowOpacity}"/>
+                            </Border.Effect>
+                            <StackPanel ClipToBounds="False"
+                                        IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarFlyoutMenuItemStyle"
+               TargetType="MenuItem">
+            <Setter Property="FontFamily"
+                    Value="{StaticResource Metric.FontFamily}"/>
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextPrimary}"/>
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="Padding"
+                    Value="{StaticResource Spacing.ItemPadding}"/>
+            <Setter Property="Margin"
+                    Value="0,1"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="FocusVisualStyle"
+                    Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="FlyoutItemBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource Brush.Border}"
+                                BorderThickness="0"
+                                CornerRadius="{StaticResource Radius.Interactive}">
+                            <Grid>
+                                <Border x:Name="HoverOverlay"
+                                        Background="{DynamicResource Brush.SurfaceHover}"
+                                        CornerRadius="{StaticResource Radius.Interactive}"
+                                        Opacity="0"/>
+                                <Border x:Name="PressedOverlay"
+                                        Background="{DynamicResource Brush.SurfacePressed}"
+                                        CornerRadius="{StaticResource Radius.Interactive}"
+                                        Opacity="0"/>
+                                <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                  ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"
+                                                  VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted"
+                                     Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="1"
+                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0"
+                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0"
+                                                             Duration="{StaticResource Metric.Animation.HoverDuration}"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <EventTrigger RoutedEvent="PreviewMouseDown">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PressedOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="{StaticResource Metric.Animation.PressDuration}"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                            <EventTrigger RoutedEvent="PreviewMouseUp">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PressedOverlay"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="{StaticResource Metric.Animation.HoverDuration}"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                            <Trigger Property="IsEnabled"
+                                     Value="False">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Brush.TextDisabled}"/>
+                                <Setter TargetName="FlyoutItemBorder"
+                                        Property="Opacity"
+                                        Value="0.62"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SidebarSingleDeviceFlyoutMenuItemStyle"
+               TargetType="MenuItem"
+               BasedOn="{StaticResource SidebarFlyoutMenuItemStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsChangeSingleDeviceActive, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Brush.SurfaceSelected}"/>
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarMultipleDevicesFlyoutMenuItemStyle"
+               TargetType="MenuItem"
+               BasedOn="{StaticResource SidebarFlyoutMenuItemStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsChangeMultipleDevicesActive, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Brush.SurfaceSelected}"/>
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SidebarFlyoutItemIconStyle"
+               TargetType="materialDesign:PackIcon">
+            <Setter Property="Width"
+                    Value="16"/>
+            <Setter Property="Height"
+                    Value="16"/>
+            <Setter Property="Margin"
+                    Value="0,0,10,0"/>
+            <Setter Property="VerticalAlignment"
+                    Value="Center"/>
+            <Setter Property="Foreground"
+                    Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}"/>
+        </Style>
+
+        <Style x:Key="SidebarFlyoutItemTextStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontFamily"
+                    Value="{StaticResource Metric.FontFamily}"/>
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="VerticalAlignment"
+                    Value="Center"/>
+            <Setter Property="Foreground"
+                    Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=MenuItem}}"/>
         </Style>
 
         <Style x:Key="SidebarSettingsTabStyle"
@@ -303,8 +709,65 @@
                     <Button x:Name="BtnDeviceManager"
                             Tag="Cellphone"
                             Content="{DynamicResource Nav_DeviceManager}"
-                            Command="{Binding NavigateDeviceManagerCommand}"
-                            Style="{StaticResource SidebarDeviceManagerTabStyle}"/>
+                            Command="{Binding ToggleDeviceManagerMenuCommand}"
+                            behaviors:ContextMenuOpenBehavior.IsOpen="{Binding IsDeviceManagerFlyoutOpen, Mode=TwoWay}"
+                            ContextMenuService.Placement="Right"
+                            ContextMenuService.IsEnabled="{Binding IsSidebarCollapsed}"
+                            Style="{StaticResource SidebarDeviceManagerGroupStyle}">
+                        <Button.ContextMenu>
+                            <ContextMenu Placement="Right"
+                                         StaysOpen="False"
+                                         Style="{StaticResource SidebarDeviceManagerFlyoutStyle}">
+                                <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeSingleDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          Style="{StaticResource SidebarSingleDeviceFlyoutMenuItemStyle}">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Kind="Cellphone"
+                                                                     Style="{StaticResource SidebarFlyoutItemIconStyle}"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{DynamicResource Nav_ChangeSingleDevice}"
+                                                       Style="{StaticResource SidebarFlyoutItemTextStyle}"/>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
+
+                                <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeMultipleDevicesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          Style="{StaticResource SidebarMultipleDevicesFlyoutMenuItemStyle}">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Kind="ViewGrid"
+                                                                     Style="{StaticResource SidebarFlyoutItemIconStyle}"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{DynamicResource Nav_ChangeMultipleDevice}"
+                                                       Style="{StaticResource SidebarFlyoutItemTextStyle}"/>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+
+                    <StackPanel x:Name="DeviceManagerSubmenu"
+                                Style="{StaticResource SidebarDeviceManagerSubmenuStyle}">
+                        <Button x:Name="BtnChangeSingleDevice"
+                                Tag="Cellphone"
+                                Content="{DynamicResource Nav_ChangeSingleDevice}"
+                                Command="{Binding NavigateChangeSingleDeviceCommand}"
+                                Style="{StaticResource SidebarSingleDeviceSubmenuButtonStyle}"/>
+                        <Button x:Name="BtnChangeMultipleDevices"
+                                Tag="ViewGrid"
+                                Content="{DynamicResource Nav_ChangeMultipleDevice}"
+                                Command="{Binding NavigateChangeMultipleDevicesCommand}"
+                                Style="{StaticResource SidebarMultipleDevicesSubmenuButtonStyle}"/>
+                    </StackPanel>
 
                     <Button x:Name="BtnSettings"
                             Tag="Cog"

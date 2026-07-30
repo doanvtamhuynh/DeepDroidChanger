@@ -164,9 +164,11 @@ public sealed partial class App : Application
         services.AddTransient<IInstallPackageDialogService, InstallPackageDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<DeviceManagerViewModel>();
+        services.AddSingleton<ChangeMultipleDevicesViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindow>();
         services.AddSingleton<DeviceManagerView>();
+        services.AddSingleton<ChangeMultipleDevicesView>();
         services.AddSingleton<SettingsView>();
 
         services.AddTransient<LoginViewModel>();

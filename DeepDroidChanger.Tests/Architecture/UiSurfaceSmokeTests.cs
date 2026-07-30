@@ -44,6 +44,7 @@ public sealed class UiSurfaceSmokeTests
                         themes.ApplyTheme(theme);
                         MeasureSurface(provider.GetRequiredService<MainWindow>());
                         MeasureSurface(provider.GetRequiredService<DeviceManagerView>());
+                        MeasureSurface(provider.GetRequiredService<ChangeMultipleDevicesView>());
                         MeasureSurface(provider.GetRequiredService<SettingsView>());
                         MeasureDialog<LoginDialog, LoginViewModel>(provider);
                         MeasureDialog<AddDevicesDialog, AddDevicesViewModel>(provider);
@@ -99,21 +100,49 @@ public sealed class UiSurfaceSmokeTests
         var mainContent = Assert.IsInstanceOfType<ContentControl>(mainWindow.FindName("MainContent"));
         Assert.AreSame(provider.GetRequiredService<DeviceManagerView>(), mainContent.Content);
 
+        var deviceManagerButton = Assert.IsInstanceOfType<Button>(mainWindow.FindName("BtnDeviceManager"));
+        Assert.IsNotNull(deviceManagerButton.Command);
+        Assert.IsNotNull(deviceManagerButton.ContextMenu);
+        Assert.AreEqual(PlacementMode.Right, deviceManagerButton.ContextMenu.Placement);
+        Assert.IsFalse(deviceManagerButton.ContextMenu.StaysOpen);
+        Assert.HasCount(2, deviceManagerButton.ContextMenu.Items);
+        System.Windows.Data.Binding? flyoutBinding = System.Windows.Data.BindingOperations.GetBinding(
+            deviceManagerButton,
+            ContextMenuOpenBehavior.IsOpenProperty);
+        Assert.IsNotNull(flyoutBinding);
+        Assert.AreEqual(nameof(MainViewModel.IsDeviceManagerFlyoutOpen), flyoutBinding.Path.Path);
+        Assert.AreEqual(System.Windows.Data.BindingMode.TwoWay, flyoutBinding.Mode);
+        deviceManagerButton.Command.Execute(null);
+        Assert.AreSame(provider.GetRequiredService<DeviceManagerView>(), mainContent.Content);
+        Assert.IsTrue(provider.GetRequiredService<MainViewModel>().IsDeviceManagerSubmenuOpen);
+
+        var multipleDevicesButton = Assert.IsInstanceOfType<Button>(
+            mainWindow.FindName("BtnChangeMultipleDevices"));
+        Assert.IsNotNull(multipleDevicesButton.Command);
+        multipleDevicesButton.Command.Execute(null);
+        Assert.AreSame(provider.GetRequiredService<ChangeMultipleDevicesView>(), mainContent.Content);
+
+        var singleDeviceButton = Assert.IsInstanceOfType<Button>(
+            mainWindow.FindName("BtnChangeSingleDevice"));
+        Assert.IsNotNull(singleDeviceButton.Command);
+        singleDeviceButton.Command.Execute(null);
+        Assert.AreSame(provider.GetRequiredService<DeviceManagerView>(), mainContent.Content);
+
         var settingsButton = Assert.IsInstanceOfType<Button>(mainWindow.FindName("BtnSettings"));
         Assert.IsNotNull(settingsButton.Command);
         settingsButton.Command.Execute(null);
         Assert.AreSame(provider.GetRequiredService<SettingsView>(), mainContent.Content);
-
-        var deviceManagerButton = Assert.IsInstanceOfType<Button>(mainWindow.FindName("BtnDeviceManager"));
-        Assert.IsNotNull(deviceManagerButton.Command);
-        deviceManagerButton.Command.Execute(null);
-        Assert.AreSame(provider.GetRequiredService<DeviceManagerView>(), mainContent.Content);
 
         var toggleButton = Assert.IsInstanceOfType<Button>(mainWindow.FindName("BtnToggle"));
         var sidebarColumn = Assert.IsInstanceOfType<ColumnDefinition>(mainWindow.FindName("SidebarColumn"));
         Assert.IsNotNull(toggleButton.Command);
         toggleButton.Command.Execute(null);
         Assert.AreEqual(56d, sidebarColumn.Width.Value);
+        deviceManagerButton.Command.Execute(null);
+        Assert.IsTrue(provider.GetRequiredService<MainViewModel>().IsDeviceManagerFlyoutOpen);
+        Assert.IsTrue(deviceManagerButton.ContextMenu.IsOpen);
+        deviceManagerButton.SetCurrentValue(ContextMenuOpenBehavior.IsOpenProperty, false);
+        Assert.IsFalse(provider.GetRequiredService<MainViewModel>().IsDeviceManagerFlyoutOpen);
         toggleButton.Command.Execute(null);
         Assert.AreEqual(248d, sidebarColumn.Width.Value);
     }
@@ -272,7 +301,10 @@ public sealed class UiSurfaceSmokeTests
         DeviceManagerView deviceManagerView = provider.GetRequiredService<DeviceManagerView>();
 
         AssertButtonStyleStates(mainWindow, "SidebarTabStyle");
+        AssertButtonStyleStates(mainWindow, "SidebarDeviceManagerGroupStyle");
+        AssertButtonStyleStates(mainWindow, "SidebarSubmenuButtonStyle");
         AssertButtonStyleStates(mainWindow, "BottomIconButtonStyle");
+        AssertMenuItemStyleStates(mainWindow, "SidebarFlyoutMenuItemStyle");
 
         var rowStyle = Assert.IsInstanceOfType<Style>(deviceManagerView.FindResource("DeviceGridRowContextMenuStyle"));
         Assert.IsNotNull(rowStyle.BasedOn, "Device Manager rows must preserve shared hover, selected, and disabled states.");
@@ -360,13 +392,39 @@ public sealed class UiSurfaceSmokeTests
         }
     }
 
+    private static void AssertMenuItemStyleStates(FrameworkElement owner, string resourceKey)
+    {
+        var style = Assert.IsInstanceOfType<Style>(owner.FindResource(resourceKey));
+        Assert.IsTrue(
+            style.Setters.OfType<Setter>().Any(setter => setter.Property == Control.FocusVisualStyleProperty),
+            $"{resourceKey} must define a keyboard focus cue.");
+        var template = Assert.IsInstanceOfType<ControlTemplate>(
+            style.Setters.OfType<Setter>().Single(setter => setter.Property == Control.TemplateProperty).Value);
+        DependencyProperty[] triggerProperties = template.Triggers
+            .OfType<Trigger>()
+            .Select(trigger => trigger.Property)
+            .ToArray();
+        RoutedEvent[] eventTriggers = template.Triggers
+            .OfType<EventTrigger>()
+            .Select(trigger => trigger.RoutedEvent)
+            .ToArray();
+
+        Assert.IsTrue(triggerProperties.Contains(MenuItem.IsHighlightedProperty), $"{resourceKey} is missing hover state.");
+        Assert.IsFalse(
+            triggerProperties.Contains(UIElement.IsKeyboardFocusedProperty),
+            $"{resourceKey} must not draw a persistent focus border for mouse interaction.");
+        Assert.IsTrue(triggerProperties.Contains(UIElement.IsEnabledProperty), $"{resourceKey} is missing disabled state.");
+        Assert.IsTrue(eventTriggers.Contains(UIElement.PreviewMouseDownEvent), $"{resourceKey} is missing pressed state.");
+        Assert.IsTrue(eventTriggers.Contains(UIElement.PreviewMouseUpEvent), $"{resourceKey} is missing released state.");
+    }
+
     private static void VerifyEditorRowsAndDataTemplates(IServiceProvider provider)
     {
         DeviceManagerView deviceManagerView = provider.GetRequiredService<DeviceManagerView>();
         var deviceGrid = Assert.IsInstanceOfType<DataGrid>(deviceManagerView.FindName("DeviceGrid"));
         Assert.AreEqual(48d, deviceGrid.RowHeight);
         Assert.AreEqual(220d, deviceGrid.MinHeight);
-        Assert.AreEqual(364d, deviceGrid.MaxHeight);
+        Assert.AreEqual(412d, deviceGrid.MaxHeight);
         Assert.IsTrue(deviceGrid.CanUserResizeColumns);
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceGrid.HorizontalScrollBarVisibility);
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceGrid.VerticalScrollBarVisibility);
@@ -380,12 +438,14 @@ public sealed class UiSurfaceSmokeTests
         CollectionAssert.AreEquivalent(expectedColumnKeys, columnKeys);
         Assert.AreEqual(columnKeys.Length, columnKeys.Distinct(StringComparer.Ordinal).Count());
         var deviceManagerRootGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceManagerRootGrid"));
-        Assert.AreEqual(new GridLength(360d), deviceManagerRootGrid.RowDefinitions[2].Height);
+        Assert.AreEqual(new GridLength(312d), deviceManagerRootGrid.RowDefinitions[2].Height);
+        Assert.AreEqual(312d, deviceManagerRootGrid.RowDefinitions[2].MinHeight);
         var deviceProfilePanelScrollViewer = Assert.IsInstanceOfType<ScrollViewer>(deviceManagerView.FindName("DeviceProfilePanelScrollViewer"));
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceProfilePanelScrollViewer.VerticalScrollBarVisibility);
         Assert.AreEqual(ScrollBarVisibility.Disabled, deviceProfilePanelScrollViewer.HorizontalScrollBarVisibility);
+        Assert.AreSame(deviceManagerRootGrid, deviceProfilePanelScrollViewer.Parent);
         var deviceProfilePanelContentGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceProfilePanelContentGrid"));
-        Assert.AreEqual(new Thickness(0d, 10d, 16d, 0d), deviceProfilePanelContentGrid.Margin);
+        Assert.AreEqual(new Thickness(0d, 0d, 16d, 0d), deviceProfilePanelContentGrid.Margin);
         System.Windows.Data.Binding? interactionBinding = System.Windows.Data.BindingOperations.GetBinding(
             deviceProfilePanelContentGrid,
             UIElement.IsEnabledProperty);
