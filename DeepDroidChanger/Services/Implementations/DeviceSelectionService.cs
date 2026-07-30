@@ -8,11 +8,10 @@ public sealed class DeviceSelectionService : IDeviceSelectionService
         IReadOnlyList<string> allSerials)
     {
         if (string.IsNullOrWhiteSpace(targetSerial))
-            return visibleSerials.FirstOrDefault();
+            return null;
 
         return visibleSerials.FirstOrDefault(serial => SerialEquals(serial, targetSerial))
-            ?? allSerials.FirstOrDefault(serial => SerialEquals(serial, targetSerial))
-            ?? visibleSerials.FirstOrDefault();
+            ?? allSerials.FirstOrDefault(serial => SerialEquals(serial, targetSerial));
     }
 
     private static bool SerialEquals(string left, string right)

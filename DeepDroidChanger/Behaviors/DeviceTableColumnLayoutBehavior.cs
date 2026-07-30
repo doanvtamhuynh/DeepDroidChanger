@@ -30,7 +30,7 @@ namespace DeepDroidChanger.Behaviors
                 "ColumnRatios",
                 typeof(IReadOnlyDictionary<string, double>),
                 typeof(DeviceTableColumnLayoutBehavior),
-                new PropertyMetadata(null));
+                new PropertyMetadata(null, OnColumnRatiosChanged));
 
         public static readonly DependencyProperty SaveColumnRatiosCommandProperty =
             DependencyProperty.RegisterAttached(
@@ -112,6 +112,14 @@ namespace DeepDroidChanger.Behaviors
             }
         }
 
+        private static void OnColumnRatiosChanged(
+            DependencyObject dependencyObject,
+            DependencyPropertyChangedEventArgs e)
+        {
+            if (dependencyObject is DataGrid dataGrid)
+                GetState(dataGrid)?.ApplySavedRatiosIfLoaded();
+        }
+
         private sealed class DeviceTableColumnLayoutState
         {
             private readonly DataGrid _dataGrid;
@@ -119,6 +127,7 @@ namespace DeepDroidChanger.Behaviors
             private readonly List<DataGridColumn> _subscribedColumns = new();
             private readonly EventHandler _columnWidthChangedHandler;
             private bool _isApplyingSavedRatios;
+            private bool _isLoaded;
 
             public DeviceTableColumnLayoutState(DataGrid dataGrid)
             {
@@ -146,18 +155,27 @@ namespace DeepDroidChanger.Behaviors
             {
                 _dataGrid.Loaded -= OnLoaded;
                 _dataGrid.Unloaded -= OnUnloaded;
+                _isLoaded = false;
                 SavePendingRatios();
                 UnsubscribeColumns();
             }
 
+            public void ApplySavedRatiosIfLoaded()
+            {
+                if (_isLoaded)
+                    ApplySavedRatios();
+            }
+
             private void OnLoaded(object sender, RoutedEventArgs e)
             {
+                _isLoaded = true;
                 ApplySavedRatios();
                 SubscribeColumns();
             }
 
             private void OnUnloaded(object sender, RoutedEventArgs e)
             {
+                _isLoaded = false;
                 SavePendingRatios();
                 UnsubscribeColumns();
             }
@@ -204,7 +222,7 @@ namespace DeepDroidChanger.Behaviors
 
             private void OnColumnWidthChanged(object? sender, EventArgs e)
             {
-                if (_isApplyingSavedRatios || !_dataGrid.IsLoaded)
+                if (_isApplyingSavedRatios || !_isLoaded)
                     return;
 
                 _saveTimer.Stop();
@@ -251,11 +269,11 @@ namespace DeepDroidChanger.Behaviors
             private Dictionary<string, double> GetCurrentRatios()
             {
                 var keyedColumns = GetKeyedColumns()
-                    .Where(column => column.Width > 0)
+                    .Where(column => double.IsFinite(column.Width) && column.Width > 0)
                     .ToList();
 
                 var totalWidth = keyedColumns.Sum(column => column.Width);
-                if (totalWidth < MinimumTotalWidth)
+                if (!double.IsFinite(totalWidth) || totalWidth < MinimumTotalWidth)
                     return CreateDefaultRatios();
 
                 return keyedColumns.ToDictionary(

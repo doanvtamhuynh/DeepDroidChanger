@@ -31,7 +31,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task SelectedDevice_SelectsExactlyOneVisibleRow()
+    public async Task ToggleDeviceSelection_SelectsExactlyOneDeviceAndCanClearSelection()
     {
         var storedDevices = new[]
         {
@@ -47,11 +47,58 @@ public sealed class DeviceManagerViewModelLifecycleTests
         var viewModel = CreateViewModel(deviceList, carriers);
         await viewModel.InitializeAsync(CancellationToken.None);
 
-        viewModel.SelectedDevice = viewModel.Devices[1];
+        DeviceRowViewModel firstDevice = viewModel.Devices[0];
+        DeviceRowViewModel secondDevice = viewModel.Devices[1];
+        viewModel.ToggleDeviceSelectionCommand.Execute(secondDevice);
 
-        Assert.IsFalse(viewModel.Devices[0].IsSelected);
-        Assert.IsTrue(viewModel.Devices[1].IsSelected);
-        Assert.AreSame(viewModel.Devices[1], viewModel.SelectedDevice);
+        Assert.IsFalse(firstDevice.IsSelected);
+        Assert.IsTrue(secondDevice.IsSelected);
+        Assert.AreSame(secondDevice, viewModel.SelectedDevice);
+
+        viewModel.ToggleDeviceSelectionCommand.Execute(secondDevice);
+
+        Assert.IsFalse(firstDevice.IsSelected);
+        Assert.IsFalse(secondDevice.IsSelected);
+        Assert.IsNull(viewModel.SelectedDevice);
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task InitializeAndStatusRefresh_WithoutSavedSelection_RemainsUnselected()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "First", Type = "Phone" },
+            new() { Serial = "B", Name = "Second", Type = "Phone" }
+        ];
+        var snapshot = new DeviceListSnapshot(
+            storedDevices,
+            [new AdbDevice("A", AdbDeviceStatus.Online)]);
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>())
+            .Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(snapshot);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var settings = new AppSettings { SelectedSingleDeviceSerial = string.Empty };
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            settings: settings);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Assert.IsNull(viewModel.SelectedDevice);
+        Assert.IsTrue(viewModel.Devices.All(device => !device.IsSelected));
+        Assert.AreEqual(string.Empty, settings.SelectedSingleDeviceSerial);
+
+        viewModel.ApplyDeviceListSnapshot(snapshot);
+
+        Assert.IsNull(viewModel.SelectedDevice);
+        Assert.IsTrue(viewModel.Devices.All(device => !device.IsSelected));
+        Assert.AreEqual(string.Empty, settings.SelectedSingleDeviceSerial);
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
@@ -968,7 +1015,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     [TestMethod]
     public async Task AdvancedChangeConfig_DefaultModeDisabled_OpensImmediatelyAndPersistsDialogResult()
     {
-        var settings = new AppSettings();
+        var settings = new AppSettings { SelectedSingleDeviceSerial = "A" };
         StoredDeviceConfig[] storedDevices =
         [
             new()
@@ -1749,11 +1796,13 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
+        ISettingsService settingsService = Substitute.For<ISettingsService>();
         var settings = new AppSettings();
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
             deviceConfig: deviceConfig,
+            settingsService: settingsService,
             settings: settings);
         var changedProperties = new List<string?>();
         viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
@@ -1763,13 +1812,14 @@ public sealed class DeviceManagerViewModelLifecycleTests
             ["Process"] = 0.6
         };
 
-        await viewModel.SaveColumnRatiosCommand.ExecuteAsync(ratios);
+        await viewModel.SaveSingleDeviceColumnRatiosCommand.ExecuteAsync(ratios);
 
-        Assert.AreSame(settings.DeviceTableColumnRatios, viewModel.DeviceTableColumnRatios);
-        Assert.AreEqual(0.4, viewModel.DeviceTableColumnRatios["Name"]);
-        Assert.AreEqual(0.6, viewModel.DeviceTableColumnRatios["Process"]);
-        Assert.Contains(nameof(DeviceManagerViewModel.DeviceTableColumnRatios), changedProperties);
-        await deviceConfig.Received(1).SaveSettingsAsync(Arg.Any<CancellationToken>());
+        Assert.AreSame(settings.SingleDeviceTableColumnRatios, viewModel.SingleDeviceTableColumnRatios);
+        Assert.AreEqual(0.4, viewModel.SingleDeviceTableColumnRatios["Name"]);
+        Assert.AreEqual(0.6, viewModel.SingleDeviceTableColumnRatios["Process"]);
+        Assert.Contains(nameof(DeviceManagerViewModel.SingleDeviceTableColumnRatios), changedProperties);
+        await settingsService.Received(1).SaveAsync(settings, Arg.Any<CancellationToken>());
+        await deviceConfig.DidNotReceive().SaveSettingsAsync(Arg.Any<CancellationToken>());
         viewModel.Dispose();
     }
 
@@ -2413,6 +2463,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         IDeviceActionService? deviceAction = null,
         IFakeProxyDialogService? fakeProxyDialog = null,
         IProxyWorkflowService? proxyWorkflowService = null,
+        ISettingsService? settingsService = null,
         AppSettings? settings = null)
     {
         return new DeviceManagerViewModel(
@@ -2443,7 +2494,8 @@ public sealed class DeviceManagerViewModelLifecycleTests
             deviceAction ?? Substitute.For<IDeviceActionService>(),
             deviceChange ?? Substitute.For<IDeviceChangeService>(),
             CreateLocalizationService(),
-            settings ?? new AppSettings(),
+            settingsService ?? Substitute.For<ISettingsService>(),
+            settings ?? new AppSettings { SelectedSingleDeviceSerial = "A" },
             new ImmediateDispatcherService(),
             polling ?? new PollingService(),
             NullLogger<DeviceManagerViewModel>.Instance);
@@ -2453,7 +2505,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
         localization.GetString(Arg.Any<string>())
-            .Returns(callInfo => callInfo.Arg<string>() == "DeviceManager_NewDeviceCount" ? "New: {0}" : callInfo.Arg<string>());
+            .Returns(callInfo => callInfo.Arg<string>() == "ChangeSingleDevice_NewDeviceCount" ? "New: {0}" : callInfo.Arg<string>());
         return localization;
     }
 

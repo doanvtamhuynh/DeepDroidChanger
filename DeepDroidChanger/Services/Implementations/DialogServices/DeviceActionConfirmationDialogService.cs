@@ -21,9 +21,9 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         CancellationToken cancellationToken)
     {
         return ShowConfirmationAsync(
-            "DeviceManager_ConfirmChangeWithoutWipeCaption",
-            "DeviceManager_ConfirmChangeWithoutWipeMessage",
-            "DeviceManager_ConfirmChangeWithoutWipeWarning",
+            "ChangeSingleDevice_ConfirmChangeWithoutWipeCaption",
+            "ChangeSingleDevice_ConfirmChangeWithoutWipeMessage",
+            "ChangeSingleDevice_ConfirmChangeWithoutWipeWarning",
             ConfirmationDialogIcon.ChangeDevice,
             deviceName,
             deviceSerial,
@@ -36,9 +36,9 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         CancellationToken cancellationToken)
     {
         return ShowConfirmationAsync(
-            "DeviceManager_ConfirmWipeWithoutChangeCaption",
-            "DeviceManager_ConfirmWipeWithoutChangeMessage",
-            "DeviceManager_ConfirmWipeWithoutChangeWarning",
+            "ChangeSingleDevice_ConfirmWipeWithoutChangeCaption",
+            "ChangeSingleDevice_ConfirmWipeWithoutChangeMessage",
+            "ChangeSingleDevice_ConfirmWipeWithoutChangeWarning",
             ConfirmationDialogIcon.Wipe,
             deviceName,
             deviceSerial,
@@ -51,9 +51,9 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         CancellationToken cancellationToken)
     {
         return ShowConfirmationAsync(
-            "DeviceManager_ConfirmChangeSimCaption",
-            "DeviceManager_ConfirmChangeSimMessage",
-            "DeviceManager_ConfirmChangeSimWarning",
+            "ChangeSingleDevice_ConfirmChangeSimCaption",
+            "ChangeSingleDevice_ConfirmChangeSimMessage",
+            "ChangeSingleDevice_ConfirmChangeSimWarning",
             ConfirmationDialogIcon.Sim,
             deviceName,
             deviceSerial,

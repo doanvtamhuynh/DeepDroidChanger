@@ -20,6 +20,24 @@
         <Setter Property="Margin" Value="0,0,0,14"/>
     </Style>
 
+    <Style x:Key="AddDevicesSelectAllCheckBoxStyle"
+           TargetType="CheckBox"
+           BasedOn="{StaticResource FormCheckBoxStyle}">
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="AddDevicesSelectAllContainerStyle"
+           TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource Metric.BorderThickness.Uniform}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+        <Setter Property="Padding" Value="{StaticResource Spacing.ButtonPadding}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
     <Style x:Key="AddDevicesGridStyle"
            TargetType="DataGrid"
            BasedOn="{StaticResource MaterialDesignDataGrid}">
@@ -174,10 +192,14 @@
 
         <Grid Grid.Row="0"
               Style="{StaticResource AddDevicesHeaderGridStyle}">
-            <CheckBox HorizontalAlignment="Right"
-                      Content="{DynamicResource AddDevices_SelectAll}"
-                      IsChecked="{Binding SelectAll, Mode=TwoWay}"
-                      Style="{StaticResource FormCheckBoxStyle}"/>
+            <Border x:Name="AddDevicesSelectAllDevicesContainer"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource AddDevicesSelectAllContainerStyle}">
+                <CheckBox x:Name="AddDevicesSelectAllDevicesCheckBox"
+                          Content="{DynamicResource AddDevices_SelectAll}"
+                          IsChecked="{Binding SelectAll, Mode=TwoWay}"
+                          Style="{StaticResource AddDevicesSelectAllCheckBoxStyle}"/>
+            </Border>
         </Grid>
 
         <DataGrid x:Name="AddDevicesGrid"

@@ -32,6 +32,8 @@
 
 <Thickness x:Key="Metric.BorderThickness.Uniform" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">1</Thickness>
 
+<Thickness x:Key="Metric.DataGridColumnHeaderBorderThickness" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">0,0,1,1</Thickness>
+
 <sys:Double x:Key="Metric.Elevation.FloatingBlurRadius" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">28</sys:Double>
 
 <sys:Double x:Key="Metric.Elevation.FloatingShadowDepth" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">10</sys:Double>

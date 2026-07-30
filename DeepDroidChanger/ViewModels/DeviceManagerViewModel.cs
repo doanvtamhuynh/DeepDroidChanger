@@ -42,6 +42,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IDeviceActionService _deviceActionService;
         private readonly IDeviceChangeService _deviceChangeService;
         private readonly ILocalizationService _localizationService;
+        private readonly ISettingsService _settingsService;
         private readonly AppSettings _settings;
         private readonly ILogger<DeviceManagerViewModel> _logger;
         private readonly IUiDispatcherService _uiDispatcher;
@@ -115,6 +116,7 @@ namespace DeepDroidChanger.ViewModels
             IDeviceActionService deviceActionService,
             IDeviceChangeService deviceChangeService,
             ILocalizationService localizationService,
+            ISettingsService settingsService,
             AppSettings settings,
             IUiDispatcherService uiDispatcher,
             IPollingService pollingService,
@@ -147,6 +149,7 @@ namespace DeepDroidChanger.ViewModels
             _deviceActionService = deviceActionService;
             _deviceChangeService = deviceChangeService;
             _localizationService = localizationService;
+            _settingsService = settingsService;
             _settings = settings;
             _deviceChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(new DeviceChangeOptions());
             _useDefaultChangeMode = _deviceChangeOptions.UseDefaultMode;
@@ -161,10 +164,10 @@ namespace DeepDroidChanger.ViewModels
             DeviceInfo.PropertyChanged += OnDeviceInfoPropertyChanged;
             _deviceActionGuardService.BusyStateChanged += OnDeviceBusyStateChanged;
 
-            Brands = ["Random", "Google", "Samsung", "Xiaomi", "OnePlus", "OPPO", "vivo"];
+            Brands = DeviceProfileOptionsHelper.Brands;
             UpdateAndroidVersionOptions("Random", null);
             TypeOptions = ["sargo", "starlte", "tissot", "unknown"];
-            NewDeviceCountText = string.Format(_localizationService.GetString("DeviceManager_NewDeviceCount"), 0);
+            NewDeviceCountText = string.Format(_localizationService.GetString("ChangeSingleDevice_NewDeviceCount"), 0);
 
             SelectedBrand = Brands.FirstOrDefault();
             SelectedAndroidVersion = AndroidVersions.FirstOrDefault();
@@ -178,7 +181,8 @@ namespace DeepDroidChanger.ViewModels
         public ObservableCollection<CarrierCountryOption> Countries { get; }
         public ObservableCollection<CarrierOption> Carriers { get; }
         public IReadOnlyList<string> TypeOptions { get; }
-        public IReadOnlyDictionary<string, double> DeviceTableColumnRatios => _settings.DeviceTableColumnRatios;
+        public IReadOnlyDictionary<string, double> SingleDeviceTableColumnRatios =>
+            _settings.SingleDeviceTableColumnRatios;
         public bool CanInteractWithSelectedDevice => SelectedDevice == null || !IsDeviceBusy(SelectedDevice);
 
         public async Task InitializeAsync(CancellationToken cancellationToken)
@@ -513,6 +517,15 @@ namespace DeepDroidChanger.ViewModels
             {
                 IsLoadingDevices = false;
             }
+        }
+
+        [RelayCommand]
+        private void ToggleDeviceSelection(DeviceRowViewModel? device)
+        {
+            if (device == null)
+                return;
+
+            SelectSingleDevice(ReferenceEquals(SelectedDevice, device) ? null : device);
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
@@ -1953,16 +1966,32 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand]
-        private async Task SaveColumnRatiosAsync(
+        private async Task SaveSingleDeviceColumnRatiosAsync(
             IReadOnlyDictionary<string, double>? ratios,
             CancellationToken cancellationToken)
         {
             if (ratios == null || ratios.Count == 0)
                 return;
 
-            _settings.DeviceTableColumnRatios = new Dictionary<string, double>(ratios, StringComparer.Ordinal);
-            OnPropertyChanged(nameof(DeviceTableColumnRatios));
-            await SaveSettingsAsync(cancellationToken).ConfigureAwait(false);
+            _settings.SingleDeviceTableColumnRatios =
+                new Dictionary<string, double>(ratios, StringComparer.Ordinal);
+            OnPropertyChanged(nameof(SingleDeviceTableColumnRatios));
+            await SaveAppSettingsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task SaveAppSettingsAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _settingsService.SaveAsync(_settings, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save Single Device table layout.");
+            }
         }
 
         private async Task RefreshNewDeviceCountAsync(CancellationToken cancellationToken)
@@ -1983,7 +2012,7 @@ namespace DeepDroidChanger.ViewModels
                 {
                     UpdateDeviceConnectionStatuses(snapshot.ConnectedDevices);
                     NewDeviceCountText = string.Format(
-                        _localizationService.GetString("DeviceManager_NewDeviceCount"),
+                        _localizationService.GetString("ChangeSingleDevice_NewDeviceCount"),
                         newDeviceCount);
                 }).ConfigureAwait(false);
             }
@@ -1996,8 +2025,8 @@ namespace DeepDroidChanger.ViewModels
                 await RunOnUiContextAsync(() =>
                 {
                     NewDeviceCountText = string.Format(
-                        _localizationService.GetString("DeviceManager_NewDeviceCount"),
-                        _localizationService.GetString("DeviceManager_NotAvailable"));
+                        _localizationService.GetString("ChangeSingleDevice_NewDeviceCount"),
+                        _localizationService.GetString("ChangeSingleDevice_NotAvailable"));
                 }).ConfigureAwait(false);
             }
             finally
@@ -2024,7 +2053,7 @@ namespace DeepDroidChanger.ViewModels
         private void RefreshDeviceRows(IReadOnlyList<StoredDeviceConfig> storedDevices, IReadOnlyList<AdbDevice> connectedDevices)
         {
             _isRefreshingRows = true;
-            var targetSerial = SelectedDevice?.Serial ?? _settings.SelectedDeviceSerial;
+            var targetSerial = SelectedDevice?.Serial ?? _settings.SelectedSingleDeviceSerial;
 
             try
             {
@@ -2063,7 +2092,7 @@ namespace DeepDroidChanger.ViewModels
         private void ApplyDeviceFilter()
         {
             _isRefreshingRows = true;
-            var targetSerial = SelectedDevice?.Serial ?? _settings.SelectedDeviceSerial;
+            var targetSerial = SelectedDevice?.Serial ?? _settings.SelectedSingleDeviceSerial;
 
             try
             {
@@ -2132,8 +2161,13 @@ namespace DeepDroidChanger.ViewModels
 
             if (args.PropertyName == nameof(DeviceRowViewModel.IsSelected))
             {
-                if (deviceRow.IsSelected && !_isSynchronizingSelection)
-                    SelectSingleDevice(deviceRow);
+                if (!_isSynchronizingSelection)
+                {
+                    if (deviceRow.IsSelected)
+                        SelectSingleDevice(deviceRow);
+                    else if (ReferenceEquals(_selectedDevice, deviceRow))
+                        SelectSingleDevice(null);
+                }
 
                 return;
             }
@@ -2162,7 +2196,7 @@ namespace DeepDroidChanger.ViewModels
             _isSynchronizingSelection = true;
             try
             {
-                foreach (DeviceRowViewModel device in Devices)
+                foreach (DeviceRowViewModel device in _allDeviceRows)
                     device.IsSelected = ReferenceEquals(device, selectedDevice);
 
                 SetProperty(ref _selectedDevice, selectedDevice, nameof(SelectedDevice));
@@ -2174,7 +2208,7 @@ namespace DeepDroidChanger.ViewModels
 
             if (serialChanged)
             {
-                _settings.SelectedDeviceSerial = selectedSerial;
+                _settings.SelectedSingleDeviceSerial = selectedSerial;
                 TrackSilentSave(SaveSettingsAsync(GetActiveToken()), "Failed to save selected device setting.");
             }
 
@@ -2388,16 +2422,8 @@ namespace DeepDroidChanger.ViewModels
 
         private void UpdateAndroidVersionOptions(string? brand, string? preferredVersion)
         {
-            IReadOnlyList<string> compatibleVersions = brand?.Trim().ToLowerInvariant() switch
-            {
-                "oneplus" => ["Android 13"],
-                "oppo" or "vivo" => ["Android 14"],
-                _ => ["Android 13", "Android 14", "Android 15"]
-            };
-
             AndroidVersions.Clear();
-            AndroidVersions.Add("Random");
-            foreach (string version in compatibleVersions)
+            foreach (string version in DeviceProfileOptionsHelper.GetAndroidVersions(brand))
                 AndroidVersions.Add(version);
 
             SelectedAndroidVersion = FindOption(AndroidVersions, preferredVersion)
@@ -2573,9 +2599,9 @@ namespace DeepDroidChanger.ViewModels
         {
             string resourceKey = status switch
             {
-                AdbDeviceStatus.Online => "DeviceManager_StatusOnline",
-                AdbDeviceStatus.Unauthorized => "DeviceManager_StatusUnauthorized",
-                _ => "DeviceManager_StatusOffline"
+                AdbDeviceStatus.Online => "ChangeSingleDevice_StatusOnline",
+                AdbDeviceStatus.Unauthorized => "ChangeSingleDevice_StatusUnauthorized",
+                _ => "ChangeSingleDevice_StatusOffline"
             };
             return _localizationService.GetString(resourceKey);
         }

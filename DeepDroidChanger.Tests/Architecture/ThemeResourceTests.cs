@@ -178,7 +178,7 @@ public sealed partial class ThemeResourceTests
             .Single(item => item
                 .Descendants(presentation + "TextBlock")
                 .Any(text => ((string?)text.Attribute("Text"))
-                    ?.Contains("DeviceManager_RowMenuFactoryReset", StringComparison.Ordinal) == true));
+                    ?.Contains("ChangeSingleDevice_RowMenuFactoryReset", StringComparison.Ordinal) == true));
 
         Assert.Contains(
             "DeviceActionsContextMenuDangerItemStyle",
@@ -197,7 +197,7 @@ public sealed partial class ThemeResourceTests
             (string?)factoryReset
                 .Descendants(presentation + "TextBlock")
                 .Single(text => ((string?)text.Attribute("Text"))
-                    ?.Contains("DeviceManager_RowMenuFactoryReset", StringComparison.Ordinal) == true)
+                    ?.Contains("ChangeSingleDevice_RowMenuFactoryReset", StringComparison.Ordinal) == true)
                 .Attribute("Style") ?? string.Empty);
         Assert.AreEqual(
             presentation + "Separator",

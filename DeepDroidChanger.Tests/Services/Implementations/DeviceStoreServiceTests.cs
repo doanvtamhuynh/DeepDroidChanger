@@ -209,6 +209,30 @@ public sealed class DeviceStoreServiceTests
             dataPath.Replace('/', Path.DirectorySeparatorChar))));
     }
 
+    [TestMethod]
+    public async Task SaveAsync_ReservedMultipleDevicesSerial_UsesNonConflictingDirectory()
+    {
+        using var fixture = new TestTempDirectory();
+        string path = GetDeviceIndexPath(fixture.Path);
+        var service = CreateService(path);
+
+        await service.SaveAsync(
+            [new StoredDeviceConfig { Serial = "multiple_devices" }],
+            CancellationToken.None);
+
+        using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        string dataPath = document.RootElement[0].GetProperty("dataPath").GetString()!;
+        Assert.AreEqual("DeviceManager/device_multiple_005Fdevices", dataPath);
+        Assert.IsFalse(Directory.Exists(Path.Combine(
+            fixture.Path,
+            "DeviceManager",
+            "multiple_devices")));
+        Assert.IsTrue(Directory.Exists(Path.Combine(
+            fixture.Path,
+            "DeviceManager",
+            "device_multiple_005Fdevices")));
+    }
+
     private static DeviceStoreService CreateService(string path)
     {
         return new DeviceStoreService(path, NullLogger<DeviceStoreService>.Instance);

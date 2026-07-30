@@ -36,23 +36,23 @@ public sealed class DeviceActionConfirmationDialogServiceTests
         Assert.IsTrue(changeSim);
         await confirmationDialog.Received(1).ShowConfirmationAsync(
             Arg.Is<ConfirmationDialogOptions>(options =>
-                options.Caption == "DeviceManager_ConfirmChangeWithoutWipeCaption: Phone - SERIAL"
-                && options.Message == "DeviceManager_ConfirmChangeWithoutWipeMessage"
-                && options.WarningMessage == "DeviceManager_ConfirmChangeWithoutWipeWarning"
+                options.Caption == "ChangeSingleDevice_ConfirmChangeWithoutWipeCaption: Phone - SERIAL"
+                && options.Message == "ChangeSingleDevice_ConfirmChangeWithoutWipeMessage"
+                && options.WarningMessage == "ChangeSingleDevice_ConfirmChangeWithoutWipeWarning"
                 && options.Icon == ConfirmationDialogIcon.ChangeDevice),
             Arg.Any<CancellationToken>());
         await confirmationDialog.Received(1).ShowConfirmationAsync(
             Arg.Is<ConfirmationDialogOptions>(options =>
-                options.Caption == "DeviceManager_ConfirmWipeWithoutChangeCaption: Phone - SERIAL"
-                && options.Message == "DeviceManager_ConfirmWipeWithoutChangeMessage"
-                && options.WarningMessage == "DeviceManager_ConfirmWipeWithoutChangeWarning"
+                options.Caption == "ChangeSingleDevice_ConfirmWipeWithoutChangeCaption: Phone - SERIAL"
+                && options.Message == "ChangeSingleDevice_ConfirmWipeWithoutChangeMessage"
+                && options.WarningMessage == "ChangeSingleDevice_ConfirmWipeWithoutChangeWarning"
                 && options.Icon == ConfirmationDialogIcon.Wipe),
             Arg.Any<CancellationToken>());
         await confirmationDialog.Received(1).ShowConfirmationAsync(
             Arg.Is<ConfirmationDialogOptions>(options =>
-                options.Caption == "DeviceManager_ConfirmChangeSimCaption: Phone - SERIAL"
-                && options.Message == "DeviceManager_ConfirmChangeSimMessage"
-                && options.WarningMessage == "DeviceManager_ConfirmChangeSimWarning"
+                options.Caption == "ChangeSingleDevice_ConfirmChangeSimCaption: Phone - SERIAL"
+                && options.Message == "ChangeSingleDevice_ConfirmChangeSimMessage"
+                && options.WarningMessage == "ChangeSingleDevice_ConfirmChangeSimWarning"
                 && options.Icon == ConfirmationDialogIcon.Sim),
             Arg.Any<CancellationToken>());
     }

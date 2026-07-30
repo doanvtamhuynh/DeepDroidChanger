@@ -61,7 +61,9 @@ namespace DeepDroidChanger.Services
 
                 var json = await File.ReadAllTextAsync(_settingsPath, cancellationToken).ConfigureAwait(false);
                 var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
+                ApplyLegacySettings(json, settings);
                 Normalize(settings);
+                MigrateInitialMultipleDeviceLayout(settings);
                 return settings;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -127,33 +129,123 @@ namespace DeepDroidChanger.Services
         private void Normalize(AppSettings settings)
         {
             settings.Theme = _themeService.NormalizeTheme(settings.Theme);
-            settings.DeviceTableColumnRatios ??= new Dictionary<string, double>();
+            settings.SingleDeviceTableColumnRatios = NormalizeColumnRatios(
+                settings.SingleDeviceTableColumnRatios,
+                selectedRatio: 0.55,
+                processRatio: 1.95);
+            settings.MultipleDeviceTableColumnRatios = NormalizeColumnRatios(
+                settings.MultipleDeviceTableColumnRatios,
+                selectedRatio: 0.55,
+                processRatio: 1.95);
+            settings.SelectedSingleDeviceSerial =
+                settings.SelectedSingleDeviceSerial?.Trim() ?? string.Empty;
+            settings.SelectedMultipleDeviceSerials = (settings.SelectedMultipleDeviceSerials ?? [])
+                .Where(serial => !string.IsNullOrWhiteSpace(serial))
+                .Select(serial => serial.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
-            var validKeys = new HashSet<string>(
-                ["Index", "Selected", "Serial", "Name", "Type", "Active", "Status", "Process"],
-                StringComparer.Ordinal);
-            foreach (var key in settings.DeviceTableColumnRatios.Keys.ToArray())
+        private void ApplyLegacySettings(string json, AppSettings settings)
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty(nameof(AppSettings.SingleDeviceTableColumnRatios), out _)
+                && root.TryGetProperty("DeviceTableColumnRatios", out JsonElement legacyRatios))
             {
-                if (!validKeys.Contains(key) || settings.DeviceTableColumnRatios[key] <= 0)
-                    settings.DeviceTableColumnRatios.Remove(key);
+                settings.SingleDeviceTableColumnRatios =
+                    JsonSerializer.Deserialize<Dictionary<string, double>>(
+                        legacyRatios.GetRawText(),
+                        _jsonOptions) ?? [];
             }
 
-            if (settings.DeviceTableColumnRatios.Count == 0)
+            if (!root.TryGetProperty(nameof(AppSettings.SelectedSingleDeviceSerial), out _)
+                && root.TryGetProperty("SelectedDeviceSerial", out JsonElement legacySerial)
+                && legacySerial.ValueKind == JsonValueKind.String)
             {
-                settings.DeviceTableColumnRatios = new Dictionary<string, double>
-                {
-                    ["Index"] = 0.55,
-                    ["Selected"] = 0.55,
-                    ["Serial"] = 1.05,
-                    ["Name"] = 1.05,
-                    ["Type"] = 0.9,
-                    ["Active"] = 1.05,
-                    ["Status"] = 1.0,
-                    ["Process"] = 1.95
-                };
+                settings.SelectedSingleDeviceSerial = legacySerial.GetString() ?? string.Empty;
+            }
+        }
+
+        private static Dictionary<string, double> NormalizeColumnRatios(
+            Dictionary<string, double>? ratios,
+            double selectedRatio,
+            double processRatio)
+        {
+            var defaults = new Dictionary<string, double>
+            {
+                ["Index"] = 0.55,
+                ["Selected"] = selectedRatio,
+                ["Serial"] = 1.05,
+                ["Name"] = 1.05,
+                ["Type"] = 0.9,
+                ["Active"] = 1.05,
+                ["Status"] = 1.0,
+                ["Process"] = processRatio
+            };
+            if (ratios == null)
+                return defaults;
+
+            foreach (string key in ratios.Keys.ToArray())
+            {
+                double ratio = ratios[key];
+                if (!defaults.ContainsKey(key)
+                    || !double.IsFinite(ratio)
+                    || ratio <= 0)
+                    ratios.Remove(key);
             }
 
-            settings.SelectedDeviceSerial ??= string.Empty;
+            foreach ((string key, double ratio) in defaults)
+                ratios.TryAdd(key, ratio);
+
+            return ratios;
+        }
+
+        private static bool TryGetInitialMultipleDeviceLayoutScale(
+            IReadOnlyDictionary<string, double> ratios,
+            out double scale)
+        {
+            scale = 0;
+            if (ratios.Count != 8
+                || !ratios.TryGetValue("Index", out double indexRatio)
+                || !double.IsFinite(indexRatio)
+                || indexRatio <= 0)
+            {
+                return false;
+            }
+
+            scale = indexRatio / 0.55;
+            return HasScaledRatio(ratios, "Selected", 0.7, scale)
+                   && HasScaledRatio(ratios, "Serial", 1.05, scale)
+                   && HasScaledRatio(ratios, "Name", 1.05, scale)
+                   && HasScaledRatio(ratios, "Type", 0.9, scale)
+                   && HasScaledRatio(ratios, "Active", 1.05, scale)
+                   && HasScaledRatio(ratios, "Status", 1.0, scale)
+                   && HasScaledRatio(ratios, "Process", 1.8, scale);
+        }
+
+        private static void MigrateInitialMultipleDeviceLayout(AppSettings settings)
+        {
+            if (!TryGetInitialMultipleDeviceLayoutScale(
+                    settings.MultipleDeviceTableColumnRatios,
+                    out double scale))
+            {
+                return;
+            }
+
+            settings.MultipleDeviceTableColumnRatios["Selected"] = 0.55 * scale;
+            settings.MultipleDeviceTableColumnRatios["Process"] = 1.95 * scale;
+        }
+
+        private static bool HasScaledRatio(
+            IReadOnlyDictionary<string, double> ratios,
+            string key,
+            double expected,
+            double scale)
+        {
+            return ratios.TryGetValue(key, out double actual)
+                   && double.IsFinite(actual)
+                   && Math.Abs(actual - (expected * scale)) < 0.000001;
         }
     }
 }

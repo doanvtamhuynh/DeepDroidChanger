@@ -425,9 +425,31 @@ public sealed class UiSurfaceSmokeTests
         Assert.AreEqual(48d, deviceGrid.RowHeight);
         Assert.AreEqual(220d, deviceGrid.MinHeight);
         Assert.AreEqual(412d, deviceGrid.MaxHeight);
+        Assert.IsNull(
+            System.Windows.Data.BindingOperations.GetBinding(
+                deviceGrid,
+                DataGrid.SelectedItemProperty),
+            "Clicking a Single Device row must not update SelectedDevice.");
+        System.Windows.Data.Binding? singleColumnRatiosBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                deviceGrid,
+                DeviceTableColumnLayoutBehavior.ColumnRatiosProperty);
+        Assert.IsNotNull(singleColumnRatiosBinding);
+        Assert.AreEqual(
+            nameof(DeviceManagerViewModel.SingleDeviceTableColumnRatios),
+            singleColumnRatiosBinding.Path.Path);
+        System.Windows.Data.Binding? singleSaveColumnRatiosBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                deviceGrid,
+                DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommandProperty);
+        Assert.IsNotNull(singleSaveColumnRatiosBinding);
+        Assert.AreEqual(
+            nameof(DeviceManagerViewModel.SaveSingleDeviceColumnRatiosCommand),
+            singleSaveColumnRatiosBinding.Path.Path);
         Assert.IsTrue(deviceGrid.CanUserResizeColumns);
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceGrid.HorizontalScrollBarVisibility);
         Assert.AreEqual(ScrollBarVisibility.Auto, deviceGrid.VerticalScrollBarVisibility);
+        AssertDeviceTableColumnHeaderSeparators(deviceGrid);
         string[] expectedColumnKeys =
             ["Index", "Selected", "Serial", "Name", "Type", "Active", "Status", "Process"];
 
@@ -437,7 +459,37 @@ public sealed class UiSurfaceSmokeTests
             .ToArray();
         CollectionAssert.AreEquivalent(expectedColumnKeys, columnKeys);
         Assert.AreEqual(columnKeys.Length, columnKeys.Distinct(StringComparer.Ordinal).Count());
+        var singleSelectColumn = Assert.IsInstanceOfType<DataGridTemplateColumn>(
+            deviceGrid.Columns[1]);
+        var singleSelectionButton = Assert.IsInstanceOfType<Button>(
+            singleSelectColumn.CellTemplate.LoadContent());
+        var singleSelectionCheckBox = Assert.IsInstanceOfType<CheckBox>(
+            singleSelectionButton.Content);
+        System.Windows.Data.Binding? singleSelectionCommandBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                singleSelectionButton,
+                ButtonBase.CommandProperty);
+        Assert.IsNotNull(singleSelectionCommandBinding);
+        Assert.AreEqual(
+            $"DataContext.{nameof(DeviceManagerViewModel.ToggleDeviceSelectionCommand)}",
+            singleSelectionCommandBinding.Path.Path);
+        System.Windows.Data.Binding? singleSelectionStateBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                singleSelectionCheckBox,
+                ToggleButton.IsCheckedProperty);
+        Assert.IsNotNull(singleSelectionStateBinding);
+        Assert.AreEqual(
+            nameof(DeviceRowViewModel.IsSelected),
+            singleSelectionStateBinding.Path.Path);
+        Assert.AreEqual(
+            System.Windows.Data.BindingMode.OneWay,
+            singleSelectionStateBinding.Mode);
+        Assert.IsFalse(singleSelectionCheckBox.IsHitTestVisible);
+        Assert.IsFalse(singleSelectionCheckBox.Focusable);
         var deviceManagerRootGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(deviceManagerView.FindName("DeviceManagerRootGrid"));
+        Assert.IsFalse(
+            EnumerateVisualTree(deviceManagerView).Any(element => element is TabControl),
+            "The Single Device form must be placed directly in the view, not inside a TabControl.");
         Assert.AreEqual(new GridLength(312d), deviceManagerRootGrid.RowDefinitions[2].Height);
         Assert.AreEqual(312d, deviceManagerRootGrid.RowDefinitions[2].MinHeight);
         var deviceProfilePanelScrollViewer = Assert.IsInstanceOfType<ScrollViewer>(deviceManagerView.FindName("DeviceProfilePanelScrollViewer"));
@@ -512,6 +564,30 @@ public sealed class UiSurfaceSmokeTests
         AddDevicesDialog addDevicesDialog = provider.GetRequiredService<AddDevicesDialog>();
         var addDevicesGrid = Assert.IsInstanceOfType<System.Windows.Controls.DataGrid>(addDevicesDialog.FindName("AddDevicesGrid"));
         Assert.AreEqual(48d, addDevicesGrid.RowHeight);
+        var addDevicesSelectAllContainer = Assert.IsInstanceOfType<Border>(
+            addDevicesDialog.FindName("AddDevicesSelectAllDevicesContainer"));
+        var addDevicesSelectAllCheckBox = Assert.IsInstanceOfType<CheckBox>(
+            addDevicesDialog.FindName("AddDevicesSelectAllDevicesCheckBox"));
+        Assert.AreSame(addDevicesSelectAllCheckBox, addDevicesSelectAllContainer.Child);
+        Assert.AreEqual(
+            Application.Current.Resources["Brush.SurfaceAlt"],
+            addDevicesSelectAllContainer.Background);
+        Assert.AreEqual(
+            Application.Current.Resources["Brush.Border"],
+            addDevicesSelectAllContainer.BorderBrush);
+        Assert.AreEqual(
+            Application.Current.Resources["Metric.BorderThickness.Uniform"],
+            addDevicesSelectAllContainer.BorderThickness);
+        Assert.AreEqual(
+            Application.Current.Resources["Radius.Medium"],
+            addDevicesSelectAllContainer.CornerRadius);
+        Assert.AreEqual(
+            Application.Current.Resources["Metric.ControlHeight.Comfortable"],
+            addDevicesSelectAllContainer.Height);
+        Assert.AreEqual(
+            Application.Current.Resources["Spacing.ButtonPadding"],
+            addDevicesSelectAllContainer.Padding);
+        Assert.AreEqual("Select all devices", addDevicesSelectAllCheckBox.Content);
 
         var nameTextBox = new System.Windows.Controls.TextBox
         {
@@ -536,6 +612,164 @@ public sealed class UiSurfaceSmokeTests
             "CarrierComboBox",
             new CarrierOption("Viettel", "452", "04"),
             "Viettel (MCC 452 / MNC 04)");
+
+        ChangeMultipleDevicesView multipleView =
+            provider.GetRequiredService<ChangeMultipleDevicesView>();
+        var multipleGrid = Assert.IsInstanceOfType<DataGrid>(
+            multipleView.FindName("MultipleDeviceGrid"));
+        Assert.AreEqual(DataGridSelectionMode.Single, multipleGrid.SelectionMode);
+        Assert.AreEqual(DataGridSelectionUnit.FullRow, multipleGrid.SelectionUnit);
+        Assert.AreEqual(deviceGrid.RowHeight, multipleGrid.RowHeight);
+        Assert.AreEqual(deviceGrid.MinHeight, multipleGrid.MinHeight);
+        Assert.AreEqual(deviceGrid.MaxHeight, multipleGrid.MaxHeight);
+        Assert.AreEqual(deviceGrid.GridLinesVisibility, multipleGrid.GridLinesVisibility);
+        Assert.AreEqual(
+            deviceGrid.HorizontalScrollBarVisibility,
+            multipleGrid.HorizontalScrollBarVisibility);
+        Assert.AreEqual(
+            deviceGrid.VerticalScrollBarVisibility,
+            multipleGrid.VerticalScrollBarVisibility);
+        AssertDeviceTableColumnHeaderSeparators(multipleGrid);
+        System.Windows.Data.Binding? multipleColumnRatiosBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                multipleGrid,
+                DeviceTableColumnLayoutBehavior.ColumnRatiosProperty);
+        Assert.IsNotNull(multipleColumnRatiosBinding);
+        Assert.AreEqual(
+            nameof(ChangeMultipleDevicesViewModel.MultipleDeviceTableColumnRatios),
+            multipleColumnRatiosBinding.Path.Path);
+        System.Windows.Data.Binding? multipleSaveColumnRatiosBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                multipleGrid,
+                DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommandProperty);
+        Assert.IsNotNull(multipleSaveColumnRatiosBinding);
+        Assert.AreEqual(
+            nameof(ChangeMultipleDevicesViewModel.SaveMultipleDeviceColumnRatiosCommand),
+            multipleSaveColumnRatiosBinding.Path.Path);
+        Assert.HasCount(expectedColumnKeys.Length, multipleGrid.Columns);
+        CollectionAssert.AreEqual(
+            expectedColumnKeys,
+            multipleGrid.Columns
+                .Select(DeviceTableColumnLayoutBehavior.GetColumnKey)
+                .ToArray());
+        var selectColumn = Assert.IsInstanceOfType<DataGridTemplateColumn>(
+            multipleGrid.Columns[1]);
+        var selectionButton = Assert.IsInstanceOfType<Button>(
+            selectColumn.CellTemplate.LoadContent());
+        var selectionCheckBox = Assert.IsInstanceOfType<CheckBox>(
+            selectionButton.Content);
+        System.Windows.Data.Binding? toggleSelectionCommandBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                selectionButton,
+                ButtonBase.CommandProperty);
+        Assert.IsNotNull(toggleSelectionCommandBinding);
+        Assert.AreEqual(
+            $"DataContext.{nameof(ChangeMultipleDevicesViewModel.ToggleDeviceSelectionCommand)}",
+            toggleSelectionCommandBinding.Path.Path);
+        System.Windows.Data.Binding? selectionStateBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                selectionCheckBox,
+                ToggleButton.IsCheckedProperty);
+        Assert.IsNotNull(selectionStateBinding);
+        Assert.AreEqual(nameof(DeviceRowViewModel.IsSelected), selectionStateBinding.Path.Path);
+        Assert.AreEqual(System.Windows.Data.BindingMode.OneWay, selectionStateBinding.Mode);
+        Assert.IsFalse(selectionCheckBox.IsHitTestVisible);
+        Assert.IsFalse(selectionCheckBox.Focusable);
+
+        var filterPanel = Assert.IsInstanceOfType<StackPanel>(
+            multipleView.FindName("MultipleDeviceFilterPanel"));
+        var selectAllContainer = Assert.IsInstanceOfType<Border>(
+            multipleView.FindName("MultipleSelectAllDevicesContainer"));
+        var selectAllCheckBox = Assert.IsInstanceOfType<CheckBox>(
+            multipleView.FindName("MultipleSelectAllDevicesCheckBox"));
+        var filterComboBox = Assert.IsInstanceOfType<ComboBox>(
+            multipleView.FindName("MultipleDeviceFilterComboBox"));
+        Assert.AreSame(selectAllCheckBox, selectAllContainer.Child);
+        Assert.IsTrue(
+            filterPanel.Children.IndexOf(selectAllContainer)
+            < filterPanel.Children.IndexOf(filterComboBox));
+        Assert.AreEqual(
+            System.Windows.Application.Current.Resources["Brush.SurfaceAlt"],
+            selectAllContainer.Background);
+        Assert.AreEqual(
+            System.Windows.Application.Current.Resources["Brush.Border"],
+            selectAllContainer.BorderBrush);
+        Assert.AreEqual(
+            System.Windows.Application.Current.Resources["Metric.BorderThickness.Uniform"],
+            selectAllContainer.BorderThickness);
+        Assert.AreEqual(
+            System.Windows.Application.Current.Resources["Radius.Medium"],
+            selectAllContainer.CornerRadius);
+        Assert.AreEqual(
+            filterComboBox.Height,
+            selectAllContainer.Height);
+        Assert.AreEqual(
+            System.Windows.Application.Current.Resources["Metric.ControlHeight.Comfortable"],
+            selectAllContainer.Height);
+        Assert.AreEqual(
+            System.Windows.Application.Current.Resources["Spacing.ButtonPadding"],
+            selectAllContainer.Padding);
+        System.Windows.Data.Binding? selectAllCommandBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                selectAllCheckBox,
+                ButtonBase.CommandProperty);
+        Assert.IsNotNull(selectAllCommandBinding);
+        Assert.AreEqual(
+            nameof(ChangeMultipleDevicesViewModel.ToggleSelectAllDevicesCommand),
+            selectAllCommandBinding.Path.Path);
+
+        var profileScrollViewer = Assert.IsInstanceOfType<ScrollViewer>(
+            multipleView.FindName("MultipleDeviceProfilePanelScrollViewer"));
+        Assert.AreEqual(300d, profileScrollViewer.MinHeight);
+        Assert.AreEqual(ScrollBarVisibility.Auto, profileScrollViewer.VerticalScrollBarVisibility);
+        Assert.AreEqual(
+            ScrollBarVisibility.Disabled,
+            profileScrollViewer.HorizontalScrollBarVisibility);
+        var profileGrid = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(
+            multipleView.FindName("MultipleDeviceProfilePanelContentGrid"));
+        Assert.HasCount(3, profileGrid.ColumnDefinitions);
+        Assert.AreEqual(new GridLength(2.2d, GridUnitType.Star), profileGrid.ColumnDefinitions[0].Width);
+        Assert.AreEqual(new GridLength(1.35d, GridUnitType.Star), profileGrid.ColumnDefinitions[1].Width);
+        Assert.AreEqual(new GridLength(1.45d, GridUnitType.Star), profileGrid.ColumnDefinitions[2].Width);
+        Assert.IsInstanceOfType<Border>(
+            multipleView.FindName("MultipleDeviceInfoPanel"));
+        var deviceInfoForm = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(
+            multipleView.FindName("MultipleDeviceInfoFormGrid"));
+        Assert.HasCount(6, deviceInfoForm.RowDefinitions);
+        Assert.IsFalse(
+            Assert.IsInstanceOfType<Button>(
+                multipleView.FindName("MultipleViewAllDeviceInfoButton")).IsEnabled);
+        Assert.IsInstanceOfType<Border>(
+            multipleView.FindName("BatchChangeConfigurationPanel"));
+        var configurationForm = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(
+            multipleView.FindName("BatchChangeConfigurationFormGrid"));
+        Assert.HasCount(7, configurationForm.RowDefinitions);
+        var multipleModelTextBox = Assert.IsInstanceOfType<TextBox>(
+            multipleView.FindName("MultipleModelTextBox"));
+        Assert.AreEqual(2, System.Windows.Controls.Grid.GetRow(multipleModelTextBox));
+        System.Windows.Data.Binding? multipleModelBinding =
+            System.Windows.Data.BindingOperations.GetBinding(
+                multipleModelTextBox,
+                TextBox.TextProperty);
+        Assert.IsNotNull(multipleModelBinding);
+        Assert.AreEqual(
+            nameof(ChangeMultipleDevicesViewModel.SelectedModel),
+            multipleModelBinding.Path.Path);
+        CheckBox[] batchConfigurationCheckBoxes =
+            configurationForm.Children.OfType<CheckBox>().ToArray();
+        Assert.HasCount(2, batchConfigurationCheckBoxes);
+        Assert.IsFalse(batchConfigurationCheckBoxes.Any(checkBox =>
+            System.Windows.Data.BindingOperations
+                .GetBinding(checkBox, ToggleButton.IsCheckedProperty)?
+                .Path.Path == nameof(ChangeMultipleDevicesViewModel.UseIntegritySecurityPatch)));
+        Assert.IsInstanceOfType<Border>(
+            multipleView.FindName("MultipleDeviceActionsPanel"));
+        var actionsContent = Assert.IsInstanceOfType<System.Windows.Controls.Grid>(
+            multipleView.FindName("MultipleDeviceActionsContent"));
+        Assert.IsEmpty(actionsContent.Children);
+        Assert.IsFalse(
+            EnumerateVisualTree(actionsContent).Any(element => element is Button),
+            "The Multiple Device Actions card must remain empty in this release.");
 
         RandomDeviceInfoDialog randomDeviceInfoDialog = provider.GetRequiredService<RandomDeviceInfoDialog>();
         var randomDeviceInfoFields = Assert.IsInstanceOfType<ItemsControl>(randomDeviceInfoDialog.FindName("RandomDeviceInfoFields"));
@@ -672,6 +906,119 @@ public sealed class UiSurfaceSmokeTests
             for (int index = 0; index < childCount; index++)
                 pending.Enqueue(System.Windows.Media.VisualTreeHelper.GetChild(current, index));
         }
+    }
+
+    private static IEnumerable<DependencyObject> EnumerateVisualTree(DependencyObject root)
+    {
+        var pending = new Queue<DependencyObject>();
+        pending.Enqueue(root);
+        while (pending.Count > 0)
+        {
+            DependencyObject current = pending.Dequeue();
+            yield return current;
+
+            int childCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(current);
+            for (int index = 0; index < childCount; index++)
+                pending.Enqueue(System.Windows.Media.VisualTreeHelper.GetChild(current, index));
+        }
+    }
+
+    private static void AssertDeviceTableColumnHeaderSeparators(DataGrid dataGrid)
+    {
+        Assert.AreEqual(DataGridGridLinesVisibility.All, dataGrid.GridLinesVisibility);
+        Assert.AreEqual(
+            Application.Current.Resources["Brush.Border"],
+            dataGrid.VerticalGridLinesBrush);
+
+        var expectedStyle = Assert.IsInstanceOfType<Style>(
+            Application.Current.FindResource("DeviceTableColumnHeaderStyle"));
+        Assert.AreSame(expectedStyle, dataGrid.ColumnHeaderStyle);
+
+        Setter borderThicknessSetter = expectedStyle.Setters
+            .OfType<Setter>()
+            .Single(setter => setter.Property == Control.BorderThicknessProperty);
+        Assert.AreEqual(
+            Application.Current.Resources["Metric.DataGridColumnHeaderBorderThickness"],
+            borderThicknessSetter.Value);
+        Assert.IsTrue(
+            expectedStyle.Setters
+                .OfType<Setter>()
+                .Any(setter =>
+                    setter.Property == DataGridColumnHeader.SeparatorVisibilityProperty
+                    && Equals(setter.Value, Visibility.Visible)));
+        Assert.IsTrue(
+            expectedStyle.Setters
+                .OfType<Setter>()
+                .Any(setter => setter.Property == Control.FocusVisualStyleProperty),
+            "Device table headers must preserve a visible keyboard focus cue.");
+
+        DependencyProperty[] triggerProperties = expectedStyle.Triggers
+            .OfType<Trigger>()
+            .Select(trigger => trigger.Property)
+            .ToArray();
+        Assert.IsTrue(triggerProperties.Contains(UIElement.IsMouseOverProperty));
+        Assert.IsTrue(triggerProperties.Contains(ButtonBase.IsPressedProperty));
+        Assert.IsTrue(triggerProperties.Contains(UIElement.IsEnabledProperty));
+
+        AssertRenderedColumnHeaderSeparator(expectedStyle);
+    }
+
+    private static void AssertRenderedColumnHeaderSeparator(Style headerStyle)
+    {
+        const int width = 120;
+        const int height = 44;
+        var header = new DataGridColumnHeader
+        {
+            Width = width,
+            Height = height,
+            Content = "Header",
+            Style = headerStyle
+        };
+        var renderSize = new Size(width, height);
+        header.Measure(renderSize);
+        header.Arrange(new Rect(renderSize));
+        header.ApplyTemplate();
+        header.UpdateLayout();
+
+        Assert.AreEqual(
+            Application.Current.Resources["Brush.Border"],
+            header.SeparatorBrush);
+        Assert.AreEqual(Visibility.Visible, header.SeparatorVisibility);
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            width,
+            height,
+            96,
+            96,
+            System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(header);
+        var pixels = new byte[width * height * 4];
+        bitmap.CopyPixels(pixels, width * 4, 0);
+
+        var borderBrush = Assert.IsInstanceOfType<System.Windows.Media.SolidColorBrush>(
+            Application.Current.Resources["Brush.Border"]);
+        System.Windows.Media.Color expected = borderBrush.Color;
+        int matchingPixels = 0;
+        for (int y = 2; y < height - 2; y++)
+        {
+            for (int x = width - 3; x < width; x++)
+            {
+                int offset = ((y * width) + x) * 4;
+                if (pixels[offset] == expected.B
+                    && pixels[offset + 1] == expected.G
+                    && pixels[offset + 2] == expected.R
+                    && pixels[offset + 3] == expected.A)
+                {
+                    matchingPixels++;
+                    break;
+                }
+            }
+        }
+
+        Assert.IsGreaterThanOrEqualTo(
+            height / 2,
+            matchingPixels,
+            "The active DataGridColumnHeader template did not render its right separator.");
     }
 
     private static double GetLayoutDimension(double requested, double minimum, double fallback)

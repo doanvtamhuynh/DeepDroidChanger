@@ -1,5 +1,834 @@
 <UserControl x:Class="DeepDroidChanger.Views.ChangeMultipleDevicesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid/>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:DeepDroidChanger.Behaviors"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             Background="Transparent">
+    <UserControl.Resources>
+        <Thickness x:Key="MultipleDeviceProfilePanelContentMargin">0,0,16,0</Thickness>
+
+        <Style x:Key="MultipleDeviceGridStyle"
+               TargetType="DataGrid"
+               BasedOn="{StaticResource FlatDataGridStyle}">
+            <Setter Property="MinHeight" Value="220"/>
+            <Setter Property="RowHeight"
+                    Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
+            <Setter Property="MaxHeight" Value="412"/>
+            <Setter Property="GridLinesVisibility" Value="All"/>
+            <Setter Property="HorizontalGridLinesBrush"
+                    Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="VerticalGridLinesBrush"
+                    Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="ColumnHeaderStyle"
+                    Value="{StaticResource DeviceTableColumnHeaderStyle}"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceCellStretchStyle"
+               TargetType="DataGridCell"
+               BasedOn="{StaticResource {x:Type DataGridCell}}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSelectionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSectionBorderStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.SurfaceAlt}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="BorderThickness"
+                    Value="{StaticResource Metric.BorderThickness.Uniform}"/>
+            <Setter Property="CornerRadius"
+                    Value="{StaticResource Radius.Medium}"/>
+            <Setter Property="Padding" Value="14,12"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceInfoSectionBorderStyle"
+               TargetType="Border"
+               BasedOn="{StaticResource MultipleDeviceSectionBorderStyle}">
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceActionSectionBorderStyle"
+               TargetType="Border"
+               BasedOn="{StaticResource MultipleDeviceSectionBorderStyle}">
+            <Setter Property="Padding" Value="10,8"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSectionHeaderGridStyle"
+               TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSectionIconStyle"
+               TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSectionTitleTextStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontFamily"
+                    Value="{StaticResource Metric.FontFamily}"/>
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceInfoFormGridStyle"
+               TargetType="Grid">
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceFormLabelStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource AppLabelTextStyle}">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceFormSecondaryLabelStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource MultipleDeviceFormLabelStyle}">
+            <Setter Property="Margin" Value="10,0,8,0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource FlatTextBoxStyle}">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="materialDesign:HintAssist.Foreground"
+                    Value="{DynamicResource Brush.TextDisabled}"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceComboBoxItemStyle"
+               TargetType="ComboBoxItem"
+               BasedOn="{StaticResource FlatComboBoxItemStyle}">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceComboBoxStyle"
+               TargetType="ComboBox"
+               BasedOn="{StaticResource FlatComboBoxStyle}">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="ItemContainerStyle"
+                    Value="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Margin" Value="0,0,5,4"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius"
+                    Value="{StaticResource Radius.Medium}"/>
+            <Setter Property="materialDesign:RippleAssist.Feedback"
+                    Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="materialDesign:RippleAssist.RippleOnTop"
+                    Value="True"/>
+            <Setter Property="materialDesign:ElevationAssist.Elevation"
+                    Value="Dp1"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceActionButtonTextStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontFamily"
+                    Value="{StaticResource Metric.FontFamily}"/>
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Small}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceInfoDetailsButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource MultipleDeviceActionButtonStyle}">
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceLoadToolbarStyle"
+               TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,14"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceLoadButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="16,0,16,0"/>
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius"
+                    Value="{StaticResource Radius.ExtraSmall}"/>
+            <Setter Property="materialDesign:RippleAssist.Feedback"
+                    Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="materialDesign:RippleAssist.RippleOnTop"
+                    Value="True"/>
+            <Setter Property="materialDesign:ElevationAssist.Elevation"
+                    Value="Dp2"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceLoadButtonContentStyle"
+               TargetType="StackPanel">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceLoadCountTextStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceFilterLabelStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontSize"
+                    Value="{StaticResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceFilterComboBoxStyle"
+               TargetType="ComboBox"
+               BasedOn="{StaticResource FlatComboBoxStyle}">
+            <Setter Property="Width" Value="156"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="ItemContainerStyle"
+                    Value="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSelectAllCheckBoxStyle"
+               TargetType="CheckBox"
+               BasedOn="{StaticResource FormCheckBoxStyle}">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="MultipleDeviceSelectAllContainerStyle"
+               TargetType="Border">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.SurfaceAlt}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="BorderThickness"
+                    Value="{StaticResource Metric.BorderThickness.Uniform}"/>
+            <Setter Property="CornerRadius"
+                    Value="{StaticResource Radius.Medium}"/>
+            <Setter Property="Height"
+                    Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+            <Setter Property="Padding"
+                    Value="{StaticResource Spacing.ButtonPadding}"/>
+            <Setter Property="Margin" Value="0,0,18,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Grid x:Name="MultipleDevicesRootGrid"
+              Style="{StaticResource PageRootGridStyle}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*" MinHeight="220"/>
+                <RowDefinition Height="312" MinHeight="312"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0"
+                  Style="{StaticResource MultipleDeviceLoadToolbarStyle}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="MultipleAddDevicesButton"
+                        Grid.Column="0"
+                        Command="{Binding AddNewDevicesCommand}"
+                        ToolTip="{DynamicResource ChangeMultipleDevices_AddDevices}"
+                        Style="{StaticResource MultipleDeviceLoadButtonStyle}">
+                    <StackPanel Style="{StaticResource MultipleDeviceLoadButtonContentStyle}">
+                        <materialDesign:PackIcon Kind="Plus"
+                                                 Style="{StaticResource PrimaryButtonIconStyle}"/>
+                        <TextBlock Text="{DynamicResource ChangeMultipleDevices_AddDevices}"
+                                   Style="{StaticResource PrimaryButtonTextStyle}"/>
+                    </StackPanel>
+                </Button>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding NewDeviceCountText}"
+                           Style="{StaticResource MultipleDeviceLoadCountTextStyle}"/>
+
+                <StackPanel x:Name="MultipleDeviceFilterPanel"
+                            Grid.Column="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Border x:Name="MultipleSelectAllDevicesContainer"
+                            Style="{StaticResource MultipleDeviceSelectAllContainerStyle}">
+                        <CheckBox x:Name="MultipleSelectAllDevicesCheckBox"
+                                  Content="{DynamicResource ChangeMultipleDevices_SelectAllDevices}"
+                                  IsChecked="{Binding AllDevicesSelectionState, Mode=OneWay}"
+                                  Command="{Binding ToggleSelectAllDevicesCommand}"
+                                  ToolTip="{DynamicResource ChangeMultipleDevices_SelectAllTooltip}"
+                                  Style="{StaticResource MultipleDeviceSelectAllCheckBoxStyle}"/>
+                    </Border>
+                    <TextBlock Text="{DynamicResource ChangeMultipleDevices_FilterLabel}"
+                               Style="{StaticResource MultipleDeviceFilterLabelStyle}"/>
+                    <ComboBox x:Name="MultipleDeviceFilterComboBox"
+                              SelectedValue="{Binding SelectedDeviceFilter, Mode=TwoWay}"
+                              SelectedValuePath="Tag"
+                              Style="{StaticResource MultipleDeviceFilterComboBoxStyle}">
+                        <ComboBoxItem Tag="All"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterAll}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                        <ComboBoxItem Tag="Online"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterOnline}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                        <ComboBoxItem Tag="Offline"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterOffline}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                        <ComboBoxItem Tag="Active"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterActive}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                        <ComboBoxItem Tag="Inactive"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterInactive}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                    </ComboBox>
+                </StackPanel>
+            </Grid>
+
+            <DataGrid x:Name="MultipleDeviceGrid"
+                      Grid.Row="1"
+                      ItemsSource="{Binding Devices}"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      behaviors:DeviceTableColumnLayoutBehavior.PersistColumnRatios="True"
+                      behaviors:DeviceTableColumnLayoutBehavior.ColumnRatios="{Binding MultipleDeviceTableColumnRatios}"
+                      behaviors:DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommand="{Binding SaveMultipleDeviceColumnRatiosCommand}"
+                      Style="{StaticResource MultipleDeviceGridStyle}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Binding="{Binding Index}"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Index"
+                                        Width="0.55*"
+                                        MinWidth="72"
+                                        IsReadOnly="True"
+                                        ElementStyle="{StaticResource DataGridCenterCellTextStyle}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnIndex}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Selected"
+                                            Width="0.55*"
+                                            MinWidth="72"
+                                            CellStyle="{StaticResource MultipleDeviceCellStretchStyle}">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnSelected}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_ColumnSelected}"
+                                        Style="{StaticResource MultipleDeviceSelectionButtonStyle}">
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                              IsHitTestVisible="False"
+                                              Focusable="False"
+                                              Style="{StaticResource DataGridCheckBoxStyle}"/>
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Binding="{Binding Serial}"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Serial"
+                                        Width="1.05*"
+                                        MinWidth="110"
+                                        IsReadOnly="True"
+                                        ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnSerial}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Name"
+                                            Width="1.05*"
+                                            MinWidth="110"
+                                            CellStyle="{StaticResource MultipleDeviceCellStretchStyle}">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnName}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding CanEdit}"
+                                         Style="{StaticResource InlineDataGridTextBoxStyle}"
+                                         materialDesign:HintAssist.Hint="{DynamicResource Shared_DeviceNameHint}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Type"
+                                            Width="0.9*"
+                                            MinWidth="90"
+                                            CellStyle="{StaticResource MultipleDeviceCellStretchStyle}">
+                        <DataGridTemplateColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnType}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ComboBox ItemsSource="{Binding DataContext.TypeOptions, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          IsEnabled="{Binding CanEdit}"
+                                          Style="{StaticResource InlineDataGridComboBoxStyle}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Binding="{Binding Active}"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Active"
+                                        Width="1.05*"
+                                        MinWidth="110"
+                                        IsReadOnly="True"
+                                        ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnActive}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Status}"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Status"
+                                        Width="1*"
+                                        MinWidth="100"
+                                        IsReadOnly="True"
+                                        ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnStatus}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Binding="{Binding Process}"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Process"
+                                        Width="1.95*"
+                                        MinWidth="150"
+                                        IsReadOnly="True"
+                                        ElementStyle="{StaticResource DataGridWrappingCellTextStyle}">
+                        <DataGridTextColumn.Header>
+                            <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnProcess}"
+                                       Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <ScrollViewer x:Name="MultipleDeviceProfilePanelScrollViewer"
+                          Grid.Row="2"
+                          Margin="0,8,0,0"
+                          MinHeight="300"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <Grid x:Name="MultipleDeviceProfilePanelContentGrid"
+                      Margin="{StaticResource MultipleDeviceProfilePanelContentMargin}"
+                      MinHeight="260">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2.2*"/>
+                        <ColumnDefinition Width="1.35*"/>
+                        <ColumnDefinition Width="1.45*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border x:Name="MultipleDeviceInfoPanel"
+                            Grid.Column="0"
+                            Style="{StaticResource MultipleDeviceInfoSectionBorderStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Style="{StaticResource MultipleDeviceSectionHeaderGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="CellphoneCog"
+                                                         Style="{StaticResource MultipleDeviceSectionIconStyle}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{DynamicResource ChangeMultipleDevices_DeviceInfoHeader}"
+                                           Style="{StaticResource MultipleDeviceSectionTitleTextStyle}"/>
+                                <Button x:Name="MultipleViewAllDeviceInfoButton"
+                                        Grid.Column="2"
+                                        IsEnabled="False"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionViewAllDeviceInfo}"
+                                        Style="{StaticResource MultipleDeviceInfoDetailsButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                                 Style="{StaticResource PrimaryButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeMultipleDevices_ActionViewAllDeviceInfo}"
+                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                            </Grid>
+
+                            <Grid x:Name="MultipleDeviceInfoFormGrid"
+                                  Grid.Row="1"
+                                  Style="{StaticResource MultipleDeviceInfoFormGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldName}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox x:Name="MultipleDeviceInfoNameTextBox"
+                                         Grid.Row="0"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="0"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldImei}"
+                                           Style="{StaticResource MultipleDeviceFormSecondaryLabelStyle}"/>
+                                <TextBox x:Name="MultipleDeviceInfoImeiTextBox"
+                                         Grid.Row="0"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Imei, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="1"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldHardware}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox Grid.Row="1"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Hardware, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldOperator}"
+                                           Style="{StaticResource MultipleDeviceFormSecondaryLabelStyle}"/>
+                                <TextBox Grid.Row="1"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Operator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldFingerprint}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox Grid.Row="2"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Fingerprint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldPhoneNumber}"
+                                           Style="{StaticResource MultipleDeviceFormSecondaryLabelStyle}"/>
+                                <TextBox Grid.Row="2"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.PhoneNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="3"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldOsVersion}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox Grid.Row="3"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.AndroidVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="3"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldIccid}"
+                                           Style="{StaticResource MultipleDeviceFormSecondaryLabelStyle}"/>
+                                <TextBox Grid.Row="3"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Iccid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="4"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldBrand}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox Grid.Row="4"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Brand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="4"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldImsi}"
+                                           Style="{StaticResource MultipleDeviceFormSecondaryLabelStyle}"/>
+                                <TextBox Grid.Row="4"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Imsi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="5"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldSerial}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox Grid.Row="5"
+                                         Grid.Column="1"
+                                         Text="{Binding DeviceInfo.Serial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                                <TextBlock Grid.Row="5"
+                                           Grid.Column="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldMac}"
+                                           Style="{StaticResource MultipleDeviceFormSecondaryLabelStyle}"/>
+                                <TextBox Grid.Row="5"
+                                         Grid.Column="3"
+                                         Text="{Binding DeviceInfo.Mac, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="BatchChangeConfigurationPanel"
+                            Grid.Column="1"
+                            Style="{StaticResource MultipleDeviceInfoSectionBorderStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Style="{StaticResource MultipleDeviceSectionHeaderGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="TuneVariant"
+                                                         Style="{StaticResource MultipleDeviceSectionIconStyle}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{DynamicResource ChangeMultipleDevices_ChangeConfigurationHeader}"
+                                           Style="{StaticResource MultipleDeviceSectionTitleTextStyle}"/>
+                                <Button x:Name="MultipleAdvancedChangeConfigButton"
+                                        Grid.Column="2"
+                                        Command="{Binding OpenAdvancedChangeConfigCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_AdvancedConfigTooltip}"
+                                        Style="{StaticResource MultipleDeviceInfoDetailsButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Tune"
+                                                                 Style="{StaticResource PrimaryButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeMultipleDevices_AdvancedConfig}"
+                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                            </Grid>
+
+                            <Grid x:Name="BatchChangeConfigurationFormGrid"
+                                  Grid.Row="1"
+                                  Style="{StaticResource MultipleDeviceInfoFormGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldBrand}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <ComboBox x:Name="MultipleBrandComboBox"
+                                          Grid.Row="0"
+                                          Grid.Column="1"
+                                          ItemsSource="{Binding Brands}"
+                                          SelectedItem="{Binding SelectedBrand, Mode=TwoWay}"
+                                          Style="{StaticResource MultipleDeviceComboBoxStyle}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldAndroidVersion}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <ComboBox x:Name="MultipleAndroidVersionComboBox"
+                                          Grid.Row="1"
+                                          Grid.Column="1"
+                                          ItemsSource="{Binding AndroidVersions}"
+                                          SelectedItem="{Binding SelectedAndroidVersion, Mode=TwoWay}"
+                                          Style="{StaticResource MultipleDeviceComboBoxStyle}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="2"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldModel}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <TextBox x:Name="MultipleModelTextBox"
+                                         Grid.Row="2"
+                                         Grid.Column="1"
+                                         Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
+
+                                <TextBlock Grid.Row="3"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldCountry}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <ComboBox x:Name="MultipleCountryComboBox"
+                                          Grid.Row="3"
+                                          Grid.Column="1"
+                                          ItemsSource="{Binding Countries}"
+                                          SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
+                                          Style="{StaticResource MultipleDeviceComboBoxStyle}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="4"
+                                           Text="{DynamicResource ChangeMultipleDevices_FieldCarrier}"
+                                           Style="{StaticResource MultipleDeviceFormLabelStyle}"/>
+                                <ComboBox x:Name="MultipleCarrierComboBox"
+                                          Grid.Row="4"
+                                          Grid.Column="1"
+                                          ItemsSource="{Binding Carriers}"
+                                          SelectedItem="{Binding SelectedCarrier, Mode=TwoWay}"
+                                          Style="{StaticResource MultipleDeviceComboBoxStyle}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <CheckBox Grid.Row="5"
+                                          Grid.ColumnSpan="2"
+                                          Content="{DynamicResource ChangeMultipleDevices_OptionChangeSim}"
+                                          IsChecked="{Binding IsChangeSimEnabled, Mode=TwoWay}"
+                                          Style="{StaticResource FormCheckBoxStyle}"/>
+                                <CheckBox x:Name="MultipleUseDefaultChangeModeCheckBox"
+                                          Grid.Row="6"
+                                          Grid.ColumnSpan="2"
+                                          Content="{DynamicResource ChangeMultipleDevices_OptionDefaultMode}"
+                                          IsChecked="{Binding UseDefaultChangeMode, Mode=TwoWay}"
+                                          Style="{StaticResource FormCheckBoxStyle}"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="MultipleDeviceActionsPanel"
+                            Grid.Column="2"
+                            Style="{StaticResource MultipleDeviceActionSectionBorderStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Style="{StaticResource MultipleDeviceSectionHeaderGridStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="Cog"
+                                                         Style="{StaticResource MultipleDeviceSectionIconStyle}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{DynamicResource ChangeMultipleDevices_ActionsHeader}"
+                                           Style="{StaticResource MultipleDeviceSectionTitleTextStyle}"/>
+                            </Grid>
+
+                            <Grid x:Name="MultipleDeviceActionsContent"
+                                  Grid.Row="1"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -4,7 +4,7 @@
 
     <sys:String x:Key="AddDevices_WindowTitle">Thêm thiết bị</sys:String>
     <sys:String x:Key="AddDevices_LoadFailed">Không thể làm mới danh sách thiết bị đang kết nối.</sys:String>
-    <sys:String x:Key="AddDevices_SelectAll">Chọn tất cả</sys:String>
+    <sys:String x:Key="AddDevices_SelectAll">Chọn tất cả thiết bị</sys:String>
     <sys:String x:Key="AddDevices_ColumnSelectDevice">Chọn thiết bị</sys:String>
     <sys:String x:Key="AddDevices_ColumnSerial">Serial</sys:String>
     <sys:String x:Key="AddDevices_ColumnType">Loại</sys:String>

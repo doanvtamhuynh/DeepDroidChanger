@@ -3,7 +3,8 @@
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Views/App.vi.xaml" />
         <ResourceDictionary Source="Views/MainWindow.vi.xaml" />
-        <ResourceDictionary Source="Views/DeviceManager.vi.xaml" />
+        <ResourceDictionary Source="Views/ChangeSingleDevice.vi.xaml" />
+        <ResourceDictionary Source="Views/ChangeMultipleDevices.vi.xaml" />
         <ResourceDictionary Source="Views/AddDevices.vi.xaml" />
         <ResourceDictionary Source="Views/Settings.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeTimezone.vi.xaml" />

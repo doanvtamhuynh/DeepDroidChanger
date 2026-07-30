@@ -431,6 +431,10 @@ public sealed class DeviceStoreService : IDeviceStoreService
 
     private static string CreateSafeSerialDirectoryName(string serial)
     {
+        bool usesReservedDirectoryName = string.Equals(
+            serial.Trim(),
+            AssetConstants.RuntimeData.MultipleDevicesDirectoryName,
+            StringComparison.OrdinalIgnoreCase);
         var builder = new StringBuilder(serial.Length);
         foreach (char character in serial)
         {
@@ -449,7 +453,10 @@ public sealed class DeviceStoreService : IDeviceStoreService
             }
         }
 
-        return builder.ToString();
+        string directoryName = builder.ToString();
+        return usesReservedDirectoryName
+            ? string.Concat("device_", directoryName)
+            : directoryName;
     }
 
     private void DeleteDeviceDirectory(string serial)

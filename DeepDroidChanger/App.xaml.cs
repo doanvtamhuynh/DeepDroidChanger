@@ -142,6 +142,7 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceListService, DeviceListService>();
         services.AddSingleton<IDeviceSelectionService, DeviceSelectionService>();
         services.AddSingleton<IDeviceConfigService, DeviceConfigService>();
+        services.AddSingleton<IMultipleDeviceConfigService, MultipleDeviceConfigService>();
         services.AddSingleton<IRandomDeviceService, RandomDeviceService>();
         services.AddSingleton<IDeviceActionGuardService, DeviceActionGuardService>();
         services.AddSingleton<IDeviceActionService, DeviceActionService>();
@@ -201,7 +202,9 @@ public sealed partial class App : Application
         target.Language = source.Language;
         target.Theme = source.Theme;
         target.SidebarCollapsed = source.SidebarCollapsed;
-        target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
-        target.SelectedDeviceSerial = source.SelectedDeviceSerial;
+        target.SingleDeviceTableColumnRatios = source.SingleDeviceTableColumnRatios;
+        target.MultipleDeviceTableColumnRatios = source.MultipleDeviceTableColumnRatios;
+        target.SelectedSingleDeviceSerial = source.SelectedSingleDeviceSerial;
+        target.SelectedMultipleDeviceSerials = source.SelectedMultipleDeviceSerials;
     }
 }

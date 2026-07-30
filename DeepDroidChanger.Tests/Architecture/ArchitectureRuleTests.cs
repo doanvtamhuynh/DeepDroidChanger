@@ -15,8 +15,30 @@ public sealed class ArchitectureRuleTests
         string canonicalViewCodeBehind = string.Concat(canonicalView, ".cs");
         string canonicalViewModel = Path.Combine(projectRoot, "ViewModels", "DeviceManagerViewModel.cs");
         string obsoleteFeatureTheme = Path.Combine(projectRoot, "Resources", "Themes", "DeviceManager.xaml");
-        string canonicalStrings = Path.Combine(projectRoot, "Resources", "Strings", "Views", "DeviceManager.xaml");
-        string canonicalVietnameseStrings = Path.Combine(projectRoot, "Resources", "Strings", "Views", "DeviceManager.vi.xaml");
+        string canonicalStrings = Path.Combine(
+            projectRoot,
+            "Resources",
+            "Strings",
+            "Views",
+            "ChangeSingleDevice.xaml");
+        string canonicalVietnameseStrings = Path.Combine(
+            projectRoot,
+            "Resources",
+            "Strings",
+            "Views",
+            "ChangeSingleDevice.vi.xaml");
+        string obsoleteStrings = Path.Combine(
+            projectRoot,
+            "Resources",
+            "Strings",
+            "Views",
+            "DeviceManager.xaml");
+        string obsoleteVietnameseStrings = Path.Combine(
+            projectRoot,
+            "Resources",
+            "Strings",
+            "Views",
+            "DeviceManager.vi.xaml");
         string canonicalTests = Path.Combine(
             solutionRoot,
             "DeepDroidChanger.Tests",
@@ -29,29 +51,31 @@ public sealed class ArchitectureRuleTests
         Assert.IsFalse(File.Exists(obsoleteFeatureTheme));
         Assert.IsTrue(File.Exists(canonicalStrings));
         Assert.IsTrue(File.Exists(canonicalVietnameseStrings));
+        Assert.IsFalse(File.Exists(obsoleteStrings));
+        Assert.IsFalse(File.Exists(obsoleteVietnameseStrings));
         Assert.IsTrue(File.Exists(canonicalTests));
         Assert.IsFalse(Directory.Exists(Path.Combine(projectRoot, "Views", "Devices")));
         Assert.IsFalse(File.Exists(Path.Combine(projectRoot, "ViewModels", "DevicesViewModel.cs")));
         Assert.IsFalse(File.Exists(Path.Combine(projectRoot, "Resources", "Themes", "Devices.xaml")));
 
-        AssertResourceKeysUsePrefix(canonicalStrings, "DeviceManager_");
-        AssertResourceKeysUsePrefix(canonicalVietnameseStrings, "DeviceManager_");
+        AssertResourceKeysUsePrefix(canonicalStrings, "ChangeSingleDevice_");
+        AssertResourceKeysUsePrefix(canonicalVietnameseStrings, "ChangeSingleDevice_");
         AssertLocalizedResourceKeysMatch(canonicalStrings, canonicalVietnameseStrings);
         AssertLocalizedResourceKeysMatch(
             Path.Combine(projectRoot, "Resources", "Strings", "Views", "RandomDeviceInfo.xaml"),
             Path.Combine(projectRoot, "Resources", "Strings", "Views", "RandomDeviceInfo.vi.xaml"));
         string englishStrings = File.ReadAllText(canonicalStrings);
         string vietnameseStrings = File.ReadAllText(canonicalVietnameseStrings);
-        StringAssert.Contains(englishStrings, "DeviceManager_FieldOsVersion\">OS Version");
-        StringAssert.Contains(vietnameseStrings, "DeviceManager_FieldOsVersion\">Phiên bản OS");
+        StringAssert.Contains(englishStrings, "ChangeSingleDevice_FieldOsVersion\">OS Version");
+        StringAssert.Contains(vietnameseStrings, "ChangeSingleDevice_FieldOsVersion\">Phiên bản OS");
         StringAssert.Contains(
             englishStrings,
-            "DeviceManager_OptionDefaultChangeMode\">Change and Wipe default");
+            "ChangeSingleDevice_OptionDefaultChangeMode\">Change and Wipe default");
         StringAssert.Contains(
             vietnameseStrings,
-            "DeviceManager_OptionDefaultChangeMode\">Đổi và Wipe mặc định");
-        Assert.DoesNotContain("DeviceManager_FieldAndroidVersion", englishStrings, StringComparison.Ordinal);
-        Assert.DoesNotContain("DeviceManager_FieldAndroidVersion", vietnameseStrings, StringComparison.Ordinal);
+            "ChangeSingleDevice_OptionDefaultChangeMode\">Đổi và Wipe mặc định");
+        Assert.DoesNotContain("ChangeSingleDevice_FieldAndroidVersion", englishStrings, StringComparison.Ordinal);
+        Assert.DoesNotContain("ChangeSingleDevice_FieldAndroidVersion", vietnameseStrings, StringComparison.Ordinal);
         Assert.DoesNotContain(">Android Version<", englishStrings, StringComparison.Ordinal);
         Assert.DoesNotContain(">Phiên bản Android<", vietnameseStrings, StringComparison.Ordinal);
         AssertResourceKeysUsePrefix(

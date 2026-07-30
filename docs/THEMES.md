@@ -125,6 +125,7 @@ Named text styles (Resources/Themes/TextBlockControl.xaml):
   Metric.ToolbarMinHeight    40   standard toolbar
   Metric.BorderThickness     1    default border width
   Metric.BorderThickness.Uniform 1 uniform Thickness resource
+  Metric.DataGridColumnHeaderBorderThickness 0,0,1,1 right/bottom header separators
   Metric.Elevation.FloatingBlurRadius     28
   Metric.Elevation.FloatingShadowDepth    10
   Metric.Elevation.FloatingShadowOpacity  0.24

@@ -140,8 +140,8 @@ public sealed class MainViewModelTests
         {
             Language = "en",
             Theme = "Dark",
-            SelectedDeviceSerial = "SERIAL",
-            DeviceTableColumnRatios = new Dictionary<string, double>
+            SelectedSingleDeviceSerial = "SERIAL",
+            SingleDeviceTableColumnRatios = new Dictionary<string, double>
             {
                 ["Name"] = 0.75,
                 ["Status"] = 0.25
@@ -159,7 +159,7 @@ public sealed class MainViewModelTests
 
         await settingsService.Received(1).SaveAsync(settings, CancellationToken.None);
         await settingsService.DidNotReceiveWithAnyArgs().LoadAsync(default);
-        Assert.AreEqual("SERIAL", settings.SelectedDeviceSerial);
-        Assert.AreEqual(0.75, settings.DeviceTableColumnRatios["Name"]);
+        Assert.AreEqual("SERIAL", settings.SelectedSingleDeviceSerial);
+        Assert.AreEqual(0.75, settings.SingleDeviceTableColumnRatios["Name"]);
     }
 }
