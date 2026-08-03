@@ -30,6 +30,53 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
             cancellationToken);
     }
 
+    public async Task<bool> ConfirmMultipleAsync(
+        MultipleDeviceBatchAction action,
+        int deviceCount,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deviceCount);
+        (string captionKey, string messageKey, string warningKey, ConfirmationDialogIcon icon) = action switch
+        {
+            MultipleDeviceBatchAction.ChangeAndWipe => (
+                "ChangeMultipleDevices_ConfirmChangeAndWipeCaption",
+                "ChangeMultipleDevices_ConfirmChangeAndWipeMessage",
+                "ChangeMultipleDevices_ConfirmChangeAndWipeWarning",
+                ConfirmationDialogIcon.ChangeDevice),
+            MultipleDeviceBatchAction.ChangeWithoutWipe => (
+                "ChangeMultipleDevices_ConfirmChangeWithoutWipeCaption",
+                "ChangeMultipleDevices_ConfirmChangeWithoutWipeMessage",
+                "ChangeMultipleDevices_ConfirmChangeWithoutWipeWarning",
+                ConfirmationDialogIcon.ChangeDevice),
+            MultipleDeviceBatchAction.WipeWithoutChange => (
+                "ChangeMultipleDevices_ConfirmWipeWithoutChangeCaption",
+                "ChangeMultipleDevices_ConfirmWipeWithoutChangeMessage",
+                "ChangeMultipleDevices_ConfirmWipeWithoutChangeWarning",
+                ConfirmationDialogIcon.Wipe),
+            MultipleDeviceBatchAction.ChangeSim => (
+                "ChangeMultipleDevices_ConfirmChangeSimCaption",
+                "ChangeMultipleDevices_ConfirmChangeSimMessage",
+                "ChangeMultipleDevices_ConfirmChangeSimWarning",
+                ConfirmationDialogIcon.Sim),
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
+        };
+
+        cancellationToken.ThrowIfCancellationRequested();
+        bool confirmed = await _confirmationDialogService
+            .ShowConfirmationAsync(
+                new ConfirmationDialogOptions
+                {
+                    Caption = string.Format(_localizationService.GetString(captionKey), deviceCount),
+                    Message = string.Format(_localizationService.GetString(messageKey), deviceCount),
+                    WarningMessage = _localizationService.GetString(warningKey),
+                    Icon = icon
+                },
+                cancellationToken)
+            .ConfigureAwait(true);
+        cancellationToken.ThrowIfCancellationRequested();
+        return confirmed;
+    }
+
     public Task<bool> ConfirmWipeWithoutChangeAsync(
         string deviceName,
         string deviceSerial,

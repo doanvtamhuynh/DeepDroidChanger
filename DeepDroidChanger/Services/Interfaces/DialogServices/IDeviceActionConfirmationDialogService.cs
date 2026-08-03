@@ -1,7 +1,14 @@
+using DeepDroidChanger.Models;
+
 namespace DeepDroidChanger.Services;
 
 public interface IDeviceActionConfirmationDialogService
 {
+    Task<bool> ConfirmMultipleAsync(
+        MultipleDeviceBatchAction action,
+        int deviceCount,
+        CancellationToken cancellationToken);
+
     Task<bool> ConfirmChangeWithoutWipeAsync(
         string deviceName,
         string deviceSerial,

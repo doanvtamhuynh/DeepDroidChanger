@@ -189,6 +189,14 @@
             <Setter Property="Margin" Value="8,0,0,0"/>
         </Style>
 
+        <Style x:Key="MultipleDeviceInfoSelectorStyle"
+               TargetType="ComboBox"
+               BasedOn="{StaticResource MultipleDeviceComboBoxStyle}">
+            <Setter Property="Margin" Value="8,0,4,0"/>
+            <Setter Property="Padding" Value="{StaticResource Spacing.ButtonPadding}"/>
+            <Setter Property="MaxDropDownHeight" Value="260"/>
+        </Style>
+
         <Style x:Key="MultipleDeviceLoadToolbarStyle"
                TargetType="Grid">
             <Setter Property="Margin" Value="0,0,0,14"/>
@@ -397,6 +405,7 @@
                             <DataTemplate>
                                 <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                         CommandParameter="{Binding}"
+                                        IsEnabled="{Binding CanEdit}"
                                         AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_ColumnSelected}"
                                         Style="{StaticResource MultipleDeviceSelectionButtonStyle}">
                                     <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
@@ -540,6 +549,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="180"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="CellphoneCog"
@@ -547,9 +557,25 @@
                                 <TextBlock Grid.Column="1"
                                            Text="{DynamicResource ChangeMultipleDevices_DeviceInfoHeader}"
                                            Style="{StaticResource MultipleDeviceSectionTitleTextStyle}"/>
+                                <ComboBox Grid.Column="2"
+                                          ItemsSource="{Binding SelectedDevices}"
+                                          SelectedItem="{Binding SelectedInfoDevice, Mode=TwoWay}"
+                                          AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_InfoDeviceSelectorName}"
+                                          ToolTip="{DynamicResource ChangeMultipleDevices_InfoDeviceSelectorHint}"
+                                          Style="{StaticResource MultipleDeviceInfoSelectorStyle}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                <Run Text=" - "/>
+                                                <Run Text="{Binding Serial, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                                 <Button x:Name="MultipleViewAllDeviceInfoButton"
-                                        Grid.Column="2"
-                                        IsEnabled="False"
+                                        Grid.Column="3"
+                                        Command="{Binding ViewRandomDeviceInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionViewAllDeviceInfo}"
                                         Style="{StaticResource MultipleDeviceInfoDetailsButtonStyle}">
                                     <Grid>
@@ -568,6 +594,7 @@
 
                             <Grid x:Name="MultipleDeviceInfoFormGrid"
                                   Grid.Row="1"
+                                  IsEnabled="{Binding CanInteractWithSelectedInfoDevice}"
                                   Style="{StaticResource MultipleDeviceInfoFormGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -851,7 +878,84 @@
                             </Grid>
 
                             <Grid x:Name="MultipleDeviceActionsContent"
-                                  Grid.Row="1"/>
+                                  Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Button Grid.Row="0"
+                                        Grid.Column="0"
+                                        Command="{Binding RandomSelectedDevicesCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomSelectedTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Cellphone" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomSelected}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="0"
+                                        Grid.Column="1"
+                                        Command="{Binding ChangeSelectedDevicesCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeAndWipeTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="CellphoneCog" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeAndWipe}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="1"
+                                        Grid.Column="0"
+                                        Command="{Binding WipeSelectedDevicesWithoutChangeCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionWipeWithoutChangeTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="DeleteSweep" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionWipeWithoutChange}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="1"
+                                        Grid.Column="1"
+                                        Command="{Binding ChangeSelectedDevicesWithoutWipeCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeWithoutWipeTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="CellphoneText" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeWithoutWipe}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="2"
+                                        Grid.Column="0"
+                                        Command="{Binding RandomSelectedSimsCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomSimTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomSim}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="2"
+                                        Grid.Column="1"
+                                        Command="{Binding ChangeSelectedSimsCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeSimTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeSim}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>

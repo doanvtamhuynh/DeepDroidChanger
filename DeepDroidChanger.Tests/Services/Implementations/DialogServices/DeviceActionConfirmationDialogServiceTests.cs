@@ -18,6 +18,13 @@ public sealed class DeviceActionConfirmationDialogServiceTests
         localization.GetString(Arg.Any<string>()).Returns(callInfo =>
         {
             string key = callInfo.Arg<string>();
+            if (key.StartsWith("ChangeMultipleDevices_", StringComparison.Ordinal)
+                && (key.EndsWith("Caption", StringComparison.Ordinal)
+                    || key.EndsWith("Message", StringComparison.Ordinal)))
+            {
+                return $"{key}: {{0}}";
+            }
+
             return key.EndsWith("Caption", StringComparison.Ordinal)
                 ? $"{key}: {{0}} - {{1}}"
                 : key;
@@ -30,15 +37,25 @@ public sealed class DeviceActionConfirmationDialogServiceTests
             "Phone", "SERIAL", CancellationToken.None);
         bool changeSim = await service.ConfirmChangeSimAsync(
             "Phone", "SERIAL", CancellationToken.None);
+        bool multipleChange = await service.ConfirmMultipleAsync(
+            MultipleDeviceBatchAction.ChangeAndWipe, 3, CancellationToken.None);
 
         Assert.IsTrue(changeWithoutWipe);
         Assert.IsTrue(wipeWithoutChange);
         Assert.IsTrue(changeSim);
+        Assert.IsTrue(multipleChange);
         await confirmationDialog.Received(1).ShowConfirmationAsync(
             Arg.Is<ConfirmationDialogOptions>(options =>
                 options.Caption == "ChangeSingleDevice_ConfirmChangeWithoutWipeCaption: Phone - SERIAL"
                 && options.Message == "ChangeSingleDevice_ConfirmChangeWithoutWipeMessage"
                 && options.WarningMessage == "ChangeSingleDevice_ConfirmChangeWithoutWipeWarning"
+                && options.Icon == ConfirmationDialogIcon.ChangeDevice),
+            Arg.Any<CancellationToken>());
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "ChangeMultipleDevices_ConfirmChangeAndWipeCaption: 3"
+                && options.Message == "ChangeMultipleDevices_ConfirmChangeAndWipeMessage: 3"
+                && options.WarningMessage == "ChangeMultipleDevices_ConfirmChangeAndWipeWarning"
                 && options.Icon == ConfirmationDialogIcon.ChangeDevice),
             Arg.Any<CancellationToken>());
         await confirmationDialog.Received(1).ShowConfirmationAsync(

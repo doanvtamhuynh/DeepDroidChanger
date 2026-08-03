@@ -60,6 +60,21 @@ public sealed partial class ThemeResourceTests
     }
 
     [TestMethod]
+    public void MultipleDeviceInfoSelector_ReadOnlyDisplayBindingsAreOneWay()
+    {
+        string path = Path.Combine(
+            GetSolutionRoot(),
+            "DeepDroidChanger",
+            "Views",
+            "ChangeMultipleDevices",
+            "ChangeMultipleDevicesView.xaml");
+        string xaml = File.ReadAllText(path);
+
+        StringAssert.Contains(xaml, "<Run Text=\"{Binding Name, Mode=OneWay}\"/>");
+        StringAssert.Contains(xaml, "<Run Text=\"{Binding Serial, Mode=OneWay}\"/>");
+    }
+
+    [TestMethod]
     public void ThemeFolder_ContainsOnlyCanonicalThemeAndControlDictionaries()
     {
         string themesRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger", "Resources", "Themes");
