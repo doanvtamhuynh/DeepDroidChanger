@@ -1,194 +1,85 @@
-THEMES.md - DeepDroidChanger UI Theme Rules
+# UI Theme and Visual-System Rules
 
-This file defines the mandatory visual design system: colors,
-typography, spacing, radius, and control states. It is the single
-source of truth for Resources/Themes/. Never hardcode a color, font
-size, or corner radius in a View; always reference an existing
-Brush.*, Metric.*, Spacing.*, or Radius.* key defined here.
+## 1. Research and source of truth
 
-1. FILES
+Before editing XAML or visual resources, locate the active themes, semantic
+tokens, shared styles, local resources, merge/load order, and runtime theme
+switching mechanism. The current repository is the source of truth for concrete
+resource names and values.
 
-Resources/Themes/
-  Theme.Light.xaml   Color.* and Brush.* tokens for light mode
-  Theme.Dark.xaml    Color.* and Brush.* tokens for dark mode
-  DesignTokens.xaml  Metric.*, Spacing.*, and Radius.* tokens
-  Controls.xaml      ordered aggregator for all control dictionaries
-  *Control.xaml      implicit and named reusable styles grouped by target
-                     control type, e.g. ButtonControl.xaml,
-                     ComboBoxControl.xaml, and DataGridControl.xaml
-  ThemeManager.cs    AppTheme enum (Light, Dark) and
-                     ThemeManager.Apply(theme) to swap Theme.Light/
-                     Dark.xaml in Application.Resources.MergedDictionaries
-                     at runtime.
+Do not create new tokens, dictionaries, styles, or theme managers until existing
+resources and ownership have been inspected.
 
-Load order in App.xaml matters: color file first, MaterialDesign defaults,
-Controls.xaml, then localization strings. Feature-specific resources are
-declared directly in their owning Window or UserControl.
+## 2. Semantic visual rules
 
-  <ResourceDictionary.MergedDictionaries>
-    <ResourceDictionary Source="Resources/Themes/Theme.Light.xaml"/>
-    <ResourceDictionary Source="Resources/Themes/Controls.xaml"/>
-    <ResourceDictionary Source="Resources/Strings/Strings.xaml"/>
-  </ResourceDictionary.MergedDictionaries>
+Do not hardcode theme-sensitive colors, brushes, typography, spacing, radii,
+borders, shadows, dimensions, or animation values when an existing semantic
+token or style represents the role.
 
-Controls.xaml must merge DesignTokens.xaml first, followed by control
-dictionaries in dependency order. Every control dictionary that references a
-Metric.*, Spacing.*, or Radius.* token with StaticResource must also merge
-DesignTokens.xaml directly. Do not rely on a sibling dictionary in
-Controls.xaml for StaticResource lookup. Any other reusable control-dictionary
-dependency must likewise be merged directly after DesignTokens.xaml; for
-example, CheckBoxControl.xaml merges Control.xaml for AppFocusVisualStyle.
+Every theme-sensitive role must resolve in every supported theme. Preserve
+contrast, hierarchy, runtime theme switching, and dynamic resource behavior.
+Keep resources at the narrowest appropriate scope:
 
-2. COLOR TOKENS (Brush.* - use DynamicResource, not StaticResource,
-   so runtime theme switch works)
+- one-view use: local resource;
+- proven multi-view use: shared style/resource;
+- application-wide meaning: shared semantic token.
 
-Surfaces
-  Brush.WindowBackground   whole window background
-  Brush.Surface            control/card background
-  Brush.SurfaceAlt         secondary background, header, alt row
-  Brush.SurfaceHover       mouse hover state
-  Brush.SurfacePressed     mouse pressed state
-  Brush.SurfaceSelected    selected item background
+Do not promote a local style based on speculative reuse or rely on accidental
+resource load order.
 
-Text
-  Brush.TextPrimary        main text
-  Brush.TextSecondary      secondary/description text
-  Brush.TextDisabled       disabled text
+## 3. Typography, layout, and states
 
-Borders
-  Brush.Border             default border
-  Brush.BorderStrong       stronger border (e.g. hover outline)
-  Brush.Focus              keyboard focus outline (2px)
+Use the existing font family, type scale, spacing, sizing, radius, border,
+elevation, and motion systems. Add a value only when no existing semantic role
+fits and ownership is clear.
 
-Actions
-  Brush.Accent             primary action color
-  Brush.AccentHover
-  Brush.AccentPressed
-  Brush.AccentForeground   text/icon color on top of Accent
+Interactive controls must expose relevant states:
 
-Status
-  Brush.Success
-  Brush.Warning
-  Brush.Danger
-  Brush.DangerHover
-  Brush.DangerPressed
-  Brush.Overlay            modal backdrop overlay
+- normal;
+- hover;
+- pressed/active;
+- selected/checked;
+- keyboard focus;
+- disabled;
+- validation error when applicable.
 
-Confirmation dialog
-  Brush.BadgeInfoBackground question-mark/action badge surface
-  Brush.BadgeInfoForeground question-mark/action badge glyph
+Reuse existing state tokens and named styles. Preserve keyboard navigation,
+visible focus, readable disabled content, validation feedback, and distinctions
+that do not rely only on color when practical.
 
-Device viewer
-  Brush.DeviceViewerStream stream canvas background
-  Brush.DeviceViewerBody   device frame/body
-  Brush.DeviceViewerScreen disconnected screen placeholder
-  Brush.DeviceViewerGlyph  placeholder glyph
+Visual changes must tolerate localization, text growth, supported window sizes,
+and high-DPI scaling. Avoid fixed dimensions that unnecessarily truncate
+content.
 
-Light mode reference values: WindowBackground #F6F8FB, Surface
-#FFFFFF, TextPrimary #172033, TextSecondary #526176, Border #CBD5E1,
-Accent #2563EB, Success #15803D, Warning #B45309, Danger #DC2626,
-BadgeInfoBackground #EFF6FF, BadgeInfoForeground #2563EB.
+## 4. Screen changes
 
-Dark mode reference values: WindowBackground #0F172A, Surface
-#172033, TextPrimary #F8FAFC, TextSecondary #CBD5E1, Border #3B4A60,
-Accent #3B82F6, Success #4ADE80, Warning #FBBF24, Danger #F87171,
-BadgeInfoBackground #1B2A4A, BadgeInfoForeground #3B82F6.
+For a new or redesigned screen:
 
-Do not invent a new color outside this palette without updating both
-Theme.Light.xaml and Theme.Dark.xaml together, so every new color has
-a matching pair in both modes.
+1. identify information hierarchy and primary actions;
+2. reuse existing semantic tokens and styles;
+3. keep feature-specific resources local;
+4. promote only proven reusable patterns;
+5. cover relevant interaction and validation states;
+6. inspect all supported themes;
+7. consider keyboard use, localization, resizing, and DPI;
+8. avoid unrelated global-style changes.
 
-3. TYPOGRAPHY
+Do not pre-create resource dictionaries or keys from a fixed template.
 
-Font family: Metric.FontFamily (Segoe UI Variable, Segoe UI), app-wide default.
-Default weight: SemiBold, for readability (never Regular by default).
+## 5. Validation
 
-  Metric.FontSize.Micro      11   compact metadata
-  Metric.FontSize.Small      12   captions, hints
-  Metric.FontSize.Body       14   default text, inputs, buttons
-  Metric.FontSize.Subtitle   16   section subtitle
-  Metric.FontSize.SectionTitle 18 section heading
-  Metric.FontSize.Title      20   page/section title, Bold weight
-  Metric.FontSize.Display    24   dialog/page display title
+Validate or inspect, as applicable:
 
-Named text styles (Resources/Themes/TextBlockControl.xaml):
-  TitleTextStyle       FontSize Title, Bold
-  SubtitleTextStyle     FontSize Subtitle, Bold
-  SecondaryTextStyle    Brush.TextSecondary, SemiBold
+- supported themes and theme switching;
+- normal and interactive states;
+- keyboard focus and accessibility;
+- disabled and validation states;
+- contrast and typography hierarchy;
+- localization expansion, resizing, and DPI;
+- resource lookup and unrelated global regressions.
 
-4. SPACING AND SHAPE
-
-  Metric.ControlHeight       38   default input/button height
-  Metric.ControlHeight.Comfortable 40 comfortable inputs
-  Metric.DataGridRowHeight   40   standard data row
-  Metric.DataGridEditorRowHeight 48 data row containing inline input controls
-  Metric.ToolbarMinHeight    40   standard toolbar
-  Metric.BorderThickness     1    default border width
-  Metric.BorderThickness.Uniform 1 uniform Thickness resource
-  Metric.DataGridColumnHeaderBorderThickness 0,0,1,1 right/bottom header separators
-  Metric.Elevation.FloatingBlurRadius     28
-  Metric.Elevation.FloatingShadowDepth    10
-  Metric.Elevation.FloatingShadowOpacity  0.24
-  Metric.Elevation.DialogBlurRadius       36
-  Metric.Elevation.DialogShadowDepth      12
-  Metric.Elevation.DialogShadowOpacity    0.28
-  Metric.Animation.HoverDuration          0:0:0.17
-  Metric.Animation.PressDuration          0:0:0.08
-  Metric.Animation.EaseOut                CubicEase/EaseOut
-  Metric.ConfirmationDialog.*             dialog-specific dimensions
-  Spacing.ControlPadding     12,8
-  Spacing.InputPadding       12,7
-  Spacing.ItemPadding        12,9
-  Spacing.PageMargin         16
-  Spacing.CardPadding        16
-  Spacing.CardPadding.Compact 12,10
-  Spacing.ButtonPadding      16,8
-  Spacing.ConfirmationDialog.* dialog-specific layout spacing
-
-  Radius.Small    6    small controls, tags
-  Radius.ExtraSmall 5  compact surfaces that must preserve a 5px radius
-  Radius.Medium   8    buttons, inputs, default
-  Radius.Large    12   cards, panels, dialogs
-  Radius.Circle   999  circular or pill-shaped elements
-  Radius.Interactive 7 shared interactive surface
-  Radius.Overlay  10 floating overlays
-  Radius.TopMedium 8,8,0,0 top-rounded section header
-  Radius.TopLeftMedium 8,0,0,0 top-left accent strip
-
-5. CONTROL STATES (mandatory for every interactive control)
-
-Every interactive control (Button, TextBox, ComboBox, CheckBox,
-RadioButton, DataGrid row, ListBox item, etc) must define these
-states using the Brush.* tokens above, not new colors:
-
-  Normal      Brush.Surface / Brush.Border
-  Hover       Brush.SurfaceHover
-  Pressed     Brush.SurfacePressed
-  Selected    Brush.SurfaceSelected
-  Focus       2px Brush.Focus outline (use AppFocusVisualStyle)
-  Disabled    reduced opacity, Brush.TextDisabled
-  Validation error   Brush.Danger border + error text below the field
-
-Named button styles: PrimaryButtonStyle (Brush.Accent), DangerButtonStyle
-(Brush.Danger), default Button style for neutral actions.
-
-6. DARK MODE RULE
-
-Every screen must work in both Light and Dark without any code change
-other than ThemeManager.Apply(theme). This means:
-  - Never set a hardcoded Color/Brush in a View; always reference a
-    Brush.* DynamicResource.
-  - Test new screens in both themes before considering a feature done.
-
-7. WHEN ADDING A NEW SCREEN
-
-  7.1. Reuse existing named styles exposed by Controls.xaml first
-     (PrimaryButtonStyle, CardBorderStyle, TitleTextStyle, etc).
-  7.2. Put a truly reusable pattern in the matching
-     Resources/Themes/<ControlName>Control.xaml. Put a pattern used by only
-     one screen directly in that view's Resources. Never create a
-     Resources/Themes/<Feature>.xaml dictionary.
-  7.3. Any new color must be added to both Theme.Light.xaml and
-     Theme.Dark.xaml with matching key names.
-  7.4. Verify all 4 states (hover, pressed, selected/focus, disabled)
-     are present for any new interactive control.
+UI validation may be performed through safe inspection, manual checks,
+screenshots, or existing UI-test tooling. Do not add UI tests to
+`DeepDroidChanger.Test`; that project is reserved for non-UI function and logic
+tests. New persistent UI-test code requires an established separate location or
+explicit user approval.

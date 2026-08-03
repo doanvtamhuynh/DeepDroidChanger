@@ -1,83 +1,69 @@
-GIT.md - DeepDroidChanger Git Workflow Rules
+# Git Workflow Rules
 
-This file defines mandatory git rules for any AI agent or developer
-working in this repository. If a task requires an action not covered
-or conflicting with a rule here, stop and ask instead of guessing.
+## 1. Inspect and preserve
 
-1. NO DESTRUCTIVE OR REMOTE ACTIONS WITHOUT EXPLICIT REQUEST
+Before any write-capable Git action, inspect status, relevant staged and
+unstaged diffs, untracked files, active branch, and repository conventions.
+Preserve unrelated user work. Never overwrite, discard, stage, or include it in
+the current task.
 
-Do not commit, push, rebase, reset, or rewrite history unless the
-user explicitly requests it in the current task. Preparing changes
-and staging them is fine; finalizing history-changing actions is not,
-unless asked.
+## 2. Permission boundaries
 
-2. COMMIT MESSAGE FORMAT (Conventional Commits)
+Do not commit, push, force-push, rebase, reset, clean, rewrite history, delete
+branches/tags, change remotes, publish releases, or perform another destructive
+or remote action unless the user explicitly requests it in the current task.
+Implementation permission is not Git-history or remote permission.
 
-Use one of these prefixes for every commit:
-  feat:      new feature or capability
-  fix:       bug fix
-  refactor:  code change that is not a fix or a feature
-  docs:      documentation only (README, docs/*.md, comments)
-  test:      adding or updating tests only
-  chore:     tooling, dependencies, config, build scripts, formatting
+When an authorized action may destroy work or affect collaborators, state the
+exact action and risk before execution when the request is not sufficiently
+specific.
 
-Example: feat: add DeviceManagerViewModel with refresh command
+## 3. Scope and changes
 
-3. BRANCH NAMING
+- Touch only files required by the task.
+- Do not reformat, reorganize, revert, or resolve unrelated work.
+- Preserve tracked-file history when moving content.
+- Keep broad formatting and generated output separate from functional changes.
+- Do not commit generated output unless the repository intentionally tracks it
+  and the task requires it.
 
-  feature/<short-description>
-  fix/<short-description>
-  refactor/<short-description>
-  chore/<short-description>
+## 4. Commits and branches
 
-Use lowercase, hyphen-separated short-description (e.g.
-feature/device-manager-list).
+Create commits or branches only when requested. Follow the repository's current
+conventions after inspecting history and contributing documentation.
 
-4. ONE LOGICAL CHANGE PER COMMIT
+A commit should contain one coherent, independently reviewable change. When the
+repository uses Conventional Commits, choose the type from the actual outcome,
+for example `feat`, `fix`, `refactor`, `docs`, `test`, or `chore`. Do not invent
+scopes or issue references.
 
-Each commit must represent a single logical change. Do not bundle
-unrelated changes (e.g. a new feature plus an unrelated bug fix) into
-one commit.
+Follow the existing branch naming convention. Do not switch branches when doing
+so could hide, conflict with, or carry uncommitted work without protection.
 
-5. DO NOT MIX FORMATTING WITH FUNCTIONAL CHANGES
+## 5. Sensitive and local data
 
-If a change includes both broad formatting/reformatting and actual
-logic changes, split them into separate commits: one chore:/refactor:
-commit for formatting only, one feat:/fix: commit for the functional
-change.
+Never commit secrets, credentials, tokens, private keys, local environment
+files, authentication captures, caches, IDE state, build output, temporary
+extraction directories, local test artifacts, or runtime application data unless
+that artifact is intentionally versioned and explicitly required.
 
-6. NEVER COMMIT THE FOLLOWING
+Before changing ignore rules, resolve the full path, identify ownership and
+behavior, inspect existing coverage, use the narrowest safe pattern, and verify
+that legitimate source remains trackable.
 
-  - Temporary extraction folders (e.g. unzip scratch folders, /tmp
-    working directories)
-  - User settings or runtime device data generated under
-    `bin/<Configuration>/net10.0-windows/AppSettings/` or
-    `bin/<Configuration>/net10.0-windows/DeviceManager/` (see docs/DESIGN.md
-    section 7; `bin/` already excludes both from source control)
-  - Secrets, API keys, tokens, connection strings, .env files
-  - bin/, obj/, .vs/, *.user (already covered by .gitignore; verify
-    before committing if unsure)
+## 6. Staging and conflicts
 
-Do not interpret the runtime-data rule as permission to ignore every path
-named `Settings`. The application's Settings feature (Views, ViewModels,
-services, models, strings, and themes) is normal source and must remain
-trackable. Never add a broad `Settings/` pattern to `.gitignore`; distinguish
-paths by their full location as defined in docs/DESIGN.md section 7.
+Stage only when it supports the requested workflow. Prefer explicit paths or
+interactive review, and inspect the staged diff before a requested commit.
 
-7. CHECK BEFORE EDITING
+Do not resolve conflicts by choosing one side wholesale unless ownership is
+unambiguous. Escalate conflicts involving product behavior, security, data, or
+public semantics.
 
-Run git status and git diff before starting any edit to detect
-unrelated or uncommitted changes already present in the working tree.
-Do not assume a clean working tree.
+## 7. Reporting
 
-8. DO NOT OVERWRITE USER CHANGES OUTSIDE TASK SCOPE
+Report commands executed, files intentionally changed, files left untouched,
+staged/unstaged state when relevant, authorized commits/branches, remote actions
+not performed, and remaining conflicts or risks.
 
-Only touch files relevant to the current task. If git status shows
-unrelated modified files, leave them untouched and mention them to
-the user rather than reverting or overwriting them.
-
-9. USE git mv FOR FILE/FOLDER MOVES
-
-When renaming or moving a tracked file or folder, use git mv instead
-of a plain filesystem move, so git history correctly tracks the
-rename.
+Never claim changes were committed, pushed, merged, or clean unless verified.

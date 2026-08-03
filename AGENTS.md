@@ -1,25 +1,41 @@
-AGENTS.md - Entry point for AI agents
+# AGENTS.md
 
-Read docs/DESIGN.md before creating, editing, or moving any file in this
-project. It defines the mandatory architecture and folder structure rules:
-MVVM layering, folder responsibilities (Views, ViewModels, Services, Models,
-Resources, Assets, Converters, Behaviors, Constants), naming conventions,
-service registration pattern, test structure, and the checklist for adding
-a new feature.
+Entry point for every AI agent working in this repository.
 
-Read docs/THEMES.md before writing or editing any XAML that involves
-color, typography, spacing, corner radius, or control states (hover,
-pressed, selected, focus, disabled, validation error). It defines the
-full Light/Dark color palette (Brush.* tokens), typography scale,
-spacing/radius tokens, and the mandatory state rules for every
-interactive control.
+## Required reading
 
-Read docs/GIT.md before running any git command (commit, branch,
-push, rebase, reset, move/rename files) or when the task involves
-version control in any way. It defines commit message format
-(Conventional Commits), branch naming, one-change-per-commit rule,
-what must never be committed, and when destructive/remote actions
-require explicit user request.
+Read only the documents relevant to the task:
+- `docs/DESIGN.md` — before creating, editing, moving, renaming, or deleting
+  project files.
+- `docs/THEMES.md` — before changing XAML, styles, colors, typography, spacing,
+  radii, themes, or interactive control states.
+- `docs/GIT.md` — before any Git or version-control action.
 
-If a planned change does not match a rule in docs/DESIGN.md,
-docs/THEMES.md, or docs/GIT.md, stop and ask instead of guessing.
+Explicit safety, permission, build, dependency, and Git restrictions always
+apply. If rules conflict, follow the user's current explicit instruction first,
+then this file, then the relevant document under `docs/`.
+
+## Research first
+
+Before proposing or changing code:
+
+1. Inspect the current repository, relevant implementation, neighboring
+   patterns, public contracts, composition mechanism, resources, tests, and
+   working-tree state.
+2. Use concrete names and paths only after discovering them in the repository or
+   receiving them from the user.
+3. Treat documentation examples as illustrative unless explicitly marked as an
+   invariant.
+4. Extend an existing coherent pattern before creating a parallel abstraction.
+5. Create only the files and layers required for the requested behavior.
+6. Make the smallest safe change and preserve unrelated user work.
+
+When documentation and repository reality differ, verify whether the repository
+pattern is current and intentional. Preserve all explicit safety restrictions,
+follow the current coherent implementation pattern, report the discrepancy, and
+update documentation only when requested.
+
+Do not stop because an example file or path is absent. Research the intended
+boundary and continue safely. Ask only when unresolved ambiguity would
+materially affect behavior, compatibility, security, data, dependencies,
+architecture, or scope.
