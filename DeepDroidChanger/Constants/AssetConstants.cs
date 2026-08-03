@@ -33,9 +33,11 @@ public static class AssetConstants
     {
         public const string AppSettingsDirectoryName = "AppSettings";
         public const string AppSettingsFileName = "app_settings.json";
-        public const string DeviceManagerDirectoryName = "DeviceManager";
+        public const string LegacyDeviceManagerDirectoryName = "DeviceManager";
+        public const string ChangeSingleDeviceDirectoryName = "ChangeSingleDevice";
+        public const string ChangeMultipleDevicesDirectoryName = "ChangeMultipleDevices";
         public const string DevicesFileName = "devices.json";
-        public const string MultipleDevicesDirectoryName = "multiple_devices";
+        public const string LegacyMultipleDevicesDirectoryName = "multiple_devices";
         public const string MultipleDeviceChangeConfigFileName = "change_config.json";
         public const string RandomConfigFileName = "random_config.json";
         public const string ChangeOptionsConfigFileName = "change_options_config.json";

@@ -21,14 +21,14 @@ public sealed class DeviceStoreService : IDeviceStoreService
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly ILogger<DeviceStoreService> _logger;
     private readonly string _applicationRootDirectory;
-    private readonly string _deviceManagerDirectory;
+    private readonly string _changeSingleDeviceDirectory;
     private readonly string _devicesPath;
 
     public DeviceStoreService(ILogger<DeviceStoreService> logger)
         : this(
             Path.Combine(
                 AppContext.BaseDirectory,
-                AssetConstants.RuntimeData.DeviceManagerDirectoryName,
+                AssetConstants.RuntimeData.ChangeSingleDeviceDirectoryName,
                 AssetConstants.RuntimeData.DevicesFileName),
             logger)
     {
@@ -37,20 +37,20 @@ public sealed class DeviceStoreService : IDeviceStoreService
     internal DeviceStoreService(string devicesPath, ILogger<DeviceStoreService> logger)
     {
         _devicesPath = Path.GetFullPath(devicesPath);
-        _deviceManagerDirectory = Path.GetDirectoryName(_devicesPath)
+        _changeSingleDeviceDirectory = Path.GetDirectoryName(_devicesPath)
             ?? throw new ArgumentException("Device store path must include a directory.", nameof(devicesPath));
         _applicationRootDirectory = string.Equals(
-            Path.GetFileName(_deviceManagerDirectory),
-            AssetConstants.RuntimeData.DeviceManagerDirectoryName,
+            Path.GetFileName(_changeSingleDeviceDirectory),
+            AssetConstants.RuntimeData.ChangeSingleDeviceDirectoryName,
             StringComparison.OrdinalIgnoreCase)
-            ? Path.GetDirectoryName(_deviceManagerDirectory) ?? _deviceManagerDirectory
-            : _deviceManagerDirectory;
+            ? Path.GetDirectoryName(_changeSingleDeviceDirectory) ?? _changeSingleDeviceDirectory
+            : _changeSingleDeviceDirectory;
         _logger = logger;
     }
 
     public async Task<IReadOnlyList<StoredDeviceConfig>> LoadAsync(CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(_deviceManagerDirectory);
+        Directory.CreateDirectory(_changeSingleDeviceDirectory);
         await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -77,7 +77,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(devices);
-        Directory.CreateDirectory(_deviceManagerDirectory);
+        Directory.CreateDirectory(_changeSingleDeviceDirectory);
         await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -97,7 +97,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         ArgumentNullException.ThrowIfNull(update);
-        Directory.CreateDirectory(_deviceManagerDirectory);
+        Directory.CreateDirectory(_changeSingleDeviceDirectory);
         await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -124,7 +124,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(devices);
-        Directory.CreateDirectory(_deviceManagerDirectory);
+        Directory.CreateDirectory(_changeSingleDeviceDirectory);
         await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -145,7 +145,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
     public async Task<bool> RemoveAsync(string serial, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
-        Directory.CreateDirectory(_deviceManagerDirectory);
+        Directory.CreateDirectory(_changeSingleDeviceDirectory);
         await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -426,15 +426,11 @@ public sealed class DeviceStoreService : IDeviceStoreService
 
     private string GetDeviceDirectory(string serial)
     {
-        return Path.Combine(_deviceManagerDirectory, CreateSafeSerialDirectoryName(serial));
+        return Path.Combine(_changeSingleDeviceDirectory, CreateSafeSerialDirectoryName(serial));
     }
 
     private static string CreateSafeSerialDirectoryName(string serial)
     {
-        bool usesReservedDirectoryName = string.Equals(
-            serial.Trim(),
-            AssetConstants.RuntimeData.MultipleDevicesDirectoryName,
-            StringComparison.OrdinalIgnoreCase);
         var builder = new StringBuilder(serial.Length);
         foreach (char character in serial)
         {
@@ -453,10 +449,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
             }
         }
 
-        string directoryName = builder.ToString();
-        return usesReservedDirectoryName
-            ? string.Concat("device_", directoryName)
-            : directoryName;
+        return builder.ToString();
     }
 
     private void DeleteDeviceDirectory(string serial)

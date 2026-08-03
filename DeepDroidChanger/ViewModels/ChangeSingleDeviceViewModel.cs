@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.ViewModels
 {
-    public sealed partial class DeviceManagerViewModel : ObservableObject, IDisposable
+    public sealed partial class ChangeSingleDeviceViewModel : ObservableObject, IDisposable
     {
         private const int NewDevicePollSeconds = 3;
         private const int DeviceNameSaveDebounceMilliseconds = 300;
@@ -44,7 +44,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly ILocalizationService _localizationService;
         private readonly ISettingsService _settingsService;
         private readonly AppSettings _settings;
-        private readonly ILogger<DeviceManagerViewModel> _logger;
+        private readonly ILogger<ChangeSingleDeviceViewModel> _logger;
         private readonly IUiDispatcherService _uiDispatcher;
         private readonly IPollingService _pollingService;
         private readonly SemaphoreSlim _deviceRefreshLock = new(1, 1);
@@ -90,7 +90,7 @@ namespace DeepDroidChanger.ViewModels
         [ObservableProperty]
         private string _deviceSearchText = string.Empty;
 
-        public DeviceManagerViewModel(
+        public ChangeSingleDeviceViewModel(
             IAddDevicesDialogService addDevicesDialogService,
             ICarrierDataService carrierDataService,
             IChangeTimezoneDialogService changeTimezoneDialogService,
@@ -122,7 +122,7 @@ namespace DeepDroidChanger.ViewModels
             AppSettings settings,
             IUiDispatcherService uiDispatcher,
             IPollingService pollingService,
-            ILogger<DeviceManagerViewModel> logger)
+            ILogger<ChangeSingleDeviceViewModel> logger)
         {
             _addDevicesDialogService = addDevicesDialogService;
             _carrierDataService = carrierDataService;
@@ -183,8 +183,8 @@ namespace DeepDroidChanger.ViewModels
         public ObservableCollection<CarrierCountryOption> Countries { get; }
         public ObservableCollection<CarrierOption> Carriers { get; }
         public IReadOnlyList<string> TypeOptions { get; }
-        public IReadOnlyDictionary<string, double> SingleDeviceTableColumnRatios =>
-            _settings.SingleDeviceTableColumnRatios;
+        public IReadOnlyDictionary<string, double> DeviceTableColumnRatios =>
+            _settings.DeviceTableColumnRatios;
         public bool CanInteractWithSelectedDevice => SelectedDevice == null || !IsDeviceBusy(SelectedDevice);
 
         public async Task InitializeAsync(CancellationToken cancellationToken)
@@ -1980,9 +1980,9 @@ namespace DeepDroidChanger.ViewModels
             if (ratios == null || ratios.Count == 0)
                 return;
 
-            _settings.SingleDeviceTableColumnRatios =
-                new Dictionary<string, double>(ratios, StringComparer.Ordinal);
-            OnPropertyChanged(nameof(SingleDeviceTableColumnRatios));
+            _settings.ReplaceDeviceTableColumnRatios(ratios);
+
+            OnPropertyChanged(nameof(DeviceTableColumnRatios));
             await SaveAppSettingsAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -2175,9 +2175,7 @@ namespace DeepDroidChanger.ViewModels
             return search.Length == 0
                 || device.Serial.Contains(search, StringComparison.OrdinalIgnoreCase)
                 || device.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || device.Type.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || device.Status.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || device.Process.Contains(search, StringComparison.OrdinalIgnoreCase);
+                || device.Type.Contains(search, StringComparison.OrdinalIgnoreCase);
         }
 
         private void ReapplySearchIfActive()
@@ -2219,10 +2217,7 @@ namespace DeepDroidChanger.ViewModels
                 return;
             }
 
-            if (args.PropertyName == nameof(DeviceRowViewModel.Status)
-                || args.PropertyName == nameof(DeviceRowViewModel.Process))
-                ReapplySearchIfActive();
-            else if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
+            if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
                 ApplyDeviceFilter();
         }
 

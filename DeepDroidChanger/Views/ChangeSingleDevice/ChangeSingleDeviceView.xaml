@@ -1,5 +1,5 @@
 
-<UserControl x:Class="DeepDroidChanger.Views.DeviceManagerView"
+<UserControl x:Class="DeepDroidChanger.Views.ChangeSingleDeviceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
@@ -10,7 +10,7 @@
 
     <UserControl.Resources>
 
-        <Style x:Key="DeviceManagerGridStyle"
+        <Style x:Key="ChangeSingleDeviceGridStyle"
                TargetType="DataGrid"
                BasedOn="{StaticResource FlatDataGridStyle}">
             <Setter Property="MinHeight"
@@ -32,7 +32,7 @@
             <Setter Property="CellStyle"
                     Value="{StaticResource DeviceTableCellStyle}"/>
             <Setter Property="HorizontalScrollBarVisibility"
-                    Value="Auto"/>
+                    Value="Disabled"/>
             <Setter Property="VerticalScrollBarVisibility"
                     Value="Auto"/>
             <Setter Property="RowStyle"
@@ -244,26 +244,6 @@
 
                         <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.FactoryResetCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  IsEnabled="{Binding PlacementTarget.DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="Restore"
-                                                             Style="{DynamicResource DeviceActionsContextMenuDangerButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource ChangeSingleDevice_RowMenuFactoryReset}"
-                                               Style="{DynamicResource DeviceActionsContextMenuDangerButtonTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
-
                         <MenuItem Command="{Binding PlacementTarget.Tag.DeleteDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
@@ -292,7 +272,7 @@
 
         <Thickness x:Key="DeviceProfilePanelContentMargin">0,0,16,0</Thickness>
 
-        <Style x:Key="DeviceManagerCellStretchStyle"
+        <Style x:Key="ChangeSingleDeviceCellStretchStyle"
                TargetType="DataGridCell"
                BasedOn="{StaticResource DeviceTableCellStyle}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -300,7 +280,7 @@
             <Setter Property="Padding" Value="0"/>
         </Style>
 
-        <Style x:Key="DeviceManagerSelectionButtonStyle"
+        <Style x:Key="ChangeSingleDeviceSelectionButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="MinHeight" Value="0"/>
@@ -914,9 +894,8 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
-        <Grid x:Name="DeviceManagerRootGrid"
+    <Grid>
+        <Grid x:Name="ChangeSingleDeviceRootGrid"
               Style="{StaticResource PageRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -990,9 +969,9 @@
                   SelectionUnit="FullRow"
                   PreviewMouseRightButtonDown="OnDeviceGridPreviewMouseRightButtonDown"
                   behaviors:DeviceTableColumnLayoutBehavior.PersistColumnRatios="True"
-                  behaviors:DeviceTableColumnLayoutBehavior.ColumnRatios="{Binding SingleDeviceTableColumnRatios}"
+                  behaviors:DeviceTableColumnLayoutBehavior.ColumnRatios="{Binding DeviceTableColumnRatios}"
                   behaviors:DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommand="{Binding SaveSingleDeviceColumnRatiosCommand}"
-                  Style="{StaticResource DeviceManagerGridStyle}">
+                  Style="{StaticResource ChangeSingleDeviceGridStyle}">
             <DataGrid.Columns>
                 <DataGridTextColumn Binding="{Binding Index}"
                                     behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Index"
@@ -1008,7 +987,7 @@
                 <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Selected"
                                         Width="0.55*"
                                         MinWidth="72"
-                                        CellStyle="{StaticResource DeviceManagerCellStretchStyle}">
+                                        CellStyle="{StaticResource ChangeSingleDeviceCellStretchStyle}">
                     <DataGridTemplateColumn.Header>
                         <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnSelected}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
@@ -1018,7 +997,7 @@
                             <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                     CommandParameter="{Binding}"
                                     AutomationProperties.Name="{DynamicResource ChangeSingleDevice_ColumnSelected}"
-                                    Style="{StaticResource DeviceManagerSelectionButtonStyle}">
+                                    Style="{StaticResource ChangeSingleDeviceSelectionButtonStyle}">
                                 <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
                                           IsHitTestVisible="False"
                                           Focusable="False"
@@ -1041,7 +1020,7 @@
                 <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Name"
                                         Width="1.05*"
                                         MinWidth="110"
-                                        CellStyle="{StaticResource DeviceManagerCellStretchStyle}">
+                                        CellStyle="{StaticResource ChangeSingleDeviceCellStretchStyle}">
                     <DataGridTemplateColumn.Header>
                         <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnName}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
@@ -1058,7 +1037,7 @@
                 <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Type"
                                         Width="0.9*"
                                         MinWidth="90"
-                                        CellStyle="{StaticResource DeviceManagerCellStretchStyle}">
+                                        CellStyle="{StaticResource ChangeSingleDeviceCellStretchStyle}">
                     <DataGridTemplateColumn.Header>
                         <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnType}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
@@ -1750,5 +1729,5 @@
                     </Grid>
         </ScrollViewer>
         </Grid>
-    </ScrollViewer>
+    </Grid>
 </UserControl>

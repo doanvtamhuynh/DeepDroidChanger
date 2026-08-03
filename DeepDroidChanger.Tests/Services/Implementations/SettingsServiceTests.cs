@@ -92,7 +92,7 @@ public sealed class SettingsServiceTests
     }
 
     [TestMethod]
-    public async Task LoadAsync_LegacySingleDeviceKeys_MigratesWithoutOverwritingMultipleState()
+    public async Task LoadAsync_SplitColumnRatios_PrefersTheExistingSharedLayout()
     {
         using var fixture = new TestTempDirectory();
         string path = Path.Combine(fixture.Path, "app_settings.json");
@@ -133,21 +133,20 @@ public sealed class SettingsServiceTests
         AppSettings settings = await service.LoadAsync(CancellationToken.None);
 
         Assert.AreEqual("LEGACY_SINGLE", settings.SelectedSingleDeviceSerial);
-        Assert.AreEqual(0.7, settings.SingleDeviceTableColumnRatios["Name"]);
-        Assert.AreEqual(1.4, settings.MultipleDeviceTableColumnRatios["Name"]);
+        Assert.AreEqual(0.7, settings.DeviceTableColumnRatios["Name"]);
         CollectionAssert.AreEqual(new[] { "A", "B" }, settings.SelectedMultipleDeviceSerials);
 
         await service.SaveAsync(settings, CancellationToken.None);
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
         Assert.IsFalse(document.RootElement.TryGetProperty("SelectedDeviceSerial", out _));
-        Assert.IsFalse(document.RootElement.TryGetProperty("DeviceTableColumnRatios", out _));
+        Assert.IsTrue(document.RootElement.TryGetProperty("DeviceTableColumnRatios", out _));
         Assert.IsTrue(document.RootElement.TryGetProperty("SelectedSingleDeviceSerial", out _));
-        Assert.IsTrue(document.RootElement.TryGetProperty("SingleDeviceTableColumnRatios", out _));
-        Assert.IsTrue(document.RootElement.TryGetProperty("MultipleDeviceTableColumnRatios", out _));
+        Assert.IsFalse(document.RootElement.TryGetProperty("SingleDeviceTableColumnRatios", out _));
+        Assert.IsFalse(document.RootElement.TryGetProperty("MultipleDeviceTableColumnRatios", out _));
     }
 
     [TestMethod]
-    public async Task LoadAsync_InitialMultipleLayoutRatios_MigratesToSingleDeviceProportions()
+    public async Task LoadAsync_LegacyMultipleColumnRatios_UsesTheSameSharedLayout()
     {
         using var fixture = new TestTempDirectory();
         string path = Path.Combine(fixture.Path, "app_settings.json");
@@ -173,18 +172,12 @@ public sealed class SettingsServiceTests
 
         AppSettings settings = await service.LoadAsync(CancellationToken.None);
 
-        Assert.AreEqual(0.55, settings.MultipleDeviceTableColumnRatios["Selected"]);
-        Assert.AreEqual(1.95, settings.MultipleDeviceTableColumnRatios["Process"]);
-        Assert.AreEqual(
-            settings.SingleDeviceTableColumnRatios["Selected"],
-            settings.MultipleDeviceTableColumnRatios["Selected"]);
-        Assert.AreEqual(
-            settings.SingleDeviceTableColumnRatios["Process"],
-            settings.MultipleDeviceTableColumnRatios["Process"]);
+        Assert.AreEqual(0.7, settings.DeviceTableColumnRatios["Selected"]);
+        Assert.AreEqual(1.8, settings.DeviceTableColumnRatios["Process"]);
     }
 
     [TestMethod]
-    public async Task LoadAsync_NormalizedInitialMultipleLayoutRatios_MigratesWithoutChangingScale()
+    public async Task LoadAsync_NormalizedLegacyMultipleColumnRatios_PreservesTheStoredScale()
     {
         using var fixture = new TestTempDirectory();
         string path = Path.Combine(fixture.Path, "app_settings.json");
@@ -212,13 +205,13 @@ public sealed class SettingsServiceTests
 
         AppSettings settings = await service.LoadAsync(CancellationToken.None);
 
-        Assert.AreEqual(0.55 / oldTotal, settings.MultipleDeviceTableColumnRatios["Selected"], 0.000001);
-        Assert.AreEqual(1.95 / oldTotal, settings.MultipleDeviceTableColumnRatios["Process"], 0.000001);
-        Assert.AreEqual(1.0, settings.MultipleDeviceTableColumnRatios.Values.Sum(), 0.000001);
+        Assert.AreEqual(0.7 / oldTotal, settings.DeviceTableColumnRatios["Selected"], 0.000001);
+        Assert.AreEqual(1.8 / oldTotal, settings.DeviceTableColumnRatios["Process"], 0.000001);
+        Assert.AreEqual(1.0, settings.DeviceTableColumnRatios.Values.Sum(), 0.000001);
     }
 
     [TestMethod]
-    public async Task SaveAsync_PartialOrInvalidColumnRatios_RepairsEachLayoutIndependently()
+    public async Task SaveAsync_PartialOrInvalidColumnRatios_RepairsTheSharedLayout()
     {
         using var fixture = new TestTempDirectory();
         string path = Path.Combine(fixture.Path, "app_settings.json");
@@ -227,14 +220,11 @@ public sealed class SettingsServiceTests
         var service = new SettingsService(path, themes, NullLogger<SettingsService>.Instance);
         var settings = new AppSettings
         {
-            SingleDeviceTableColumnRatios = new Dictionary<string, double>
+            DeviceTableColumnRatios = new Dictionary<string, double>
             {
                 ["Name"] = 0.4,
                 ["Process"] = double.NaN,
-                ["Unknown"] = 2
-            },
-            MultipleDeviceTableColumnRatios = new Dictionary<string, double>
-            {
+                ["Unknown"] = 2,
                 ["Selected"] = 0.25,
                 ["Status"] = double.PositiveInfinity
             }
@@ -242,19 +232,16 @@ public sealed class SettingsServiceTests
 
         await service.SaveAsync(settings, CancellationToken.None);
 
-        Assert.HasCount(8, settings.SingleDeviceTableColumnRatios);
-        Assert.HasCount(8, settings.MultipleDeviceTableColumnRatios);
-        Assert.AreEqual(0.4, settings.SingleDeviceTableColumnRatios["Name"]);
-        Assert.AreEqual(1.95, settings.SingleDeviceTableColumnRatios["Process"]);
-        Assert.IsFalse(settings.SingleDeviceTableColumnRatios.ContainsKey("Unknown"));
-        Assert.AreEqual(0.25, settings.MultipleDeviceTableColumnRatios["Selected"]);
-        Assert.AreEqual(1.0, settings.MultipleDeviceTableColumnRatios["Status"]);
-        Assert.IsTrue(settings.SingleDeviceTableColumnRatios.Values.All(double.IsFinite));
-        Assert.IsTrue(settings.MultipleDeviceTableColumnRatios.Values.All(double.IsFinite));
+        Assert.HasCount(8, settings.DeviceTableColumnRatios);
+        Assert.AreEqual(0.4, settings.DeviceTableColumnRatios["Name"]);
+        Assert.AreEqual(1.95, settings.DeviceTableColumnRatios["Process"]);
+        Assert.IsFalse(settings.DeviceTableColumnRatios.ContainsKey("Unknown"));
+        Assert.AreEqual(0.25, settings.DeviceTableColumnRatios["Selected"]);
+        Assert.AreEqual(1.0, settings.DeviceTableColumnRatios["Status"]);
+        Assert.IsTrue(settings.DeviceTableColumnRatios.Values.All(double.IsFinite));
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        Assert.IsTrue(document.RootElement.TryGetProperty("SingleDeviceTableColumnRatios", out _));
-        Assert.IsTrue(document.RootElement.TryGetProperty("MultipleDeviceTableColumnRatios", out _));
+        Assert.IsTrue(document.RootElement.TryGetProperty("DeviceTableColumnRatios", out _));
     }
 
 }

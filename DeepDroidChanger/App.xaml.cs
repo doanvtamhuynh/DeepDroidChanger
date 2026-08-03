@@ -29,6 +29,8 @@ public sealed partial class App : Application
         {
             await _host.StartAsync().ConfigureAwait(true);
 
+            _host.Services.GetRequiredService<IRuntimeDataMigrationService>().Migrate();
+
             AppSettings loadedSettings = await _host.Services
                 .GetRequiredService<ISettingsService>()
                 .LoadAsync(CancellationToken.None)
@@ -113,6 +115,7 @@ public sealed partial class App : Application
         services.AddSingleton<IFileSystemService, FileSystemService>();
 
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IRuntimeDataMigrationService, RuntimeDataMigrationService>();
         services.AddSingleton<IDeviceStoreService, DeviceStoreService>();
         services.AddSingleton<ICarrierDataService, CarrierDataService>();
         services.AddSingleton<ITimezoneDataService, TimezoneDataService>();
@@ -164,11 +167,11 @@ public sealed partial class App : Application
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
         services.AddTransient<IInstallPackageDialogService, InstallPackageDialogService>();
         services.AddSingleton<MainViewModel>();
-        services.AddSingleton<DeviceManagerViewModel>();
+        services.AddSingleton<ChangeSingleDeviceViewModel>();
         services.AddSingleton<ChangeMultipleDevicesViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindow>();
-        services.AddSingleton<DeviceManagerView>();
+        services.AddSingleton<ChangeSingleDeviceView>();
         services.AddSingleton<ChangeMultipleDevicesView>();
         services.AddSingleton<SettingsView>();
 
@@ -202,8 +205,7 @@ public sealed partial class App : Application
         target.Language = source.Language;
         target.Theme = source.Theme;
         target.SidebarCollapsed = source.SidebarCollapsed;
-        target.SingleDeviceTableColumnRatios = source.SingleDeviceTableColumnRatios;
-        target.MultipleDeviceTableColumnRatios = source.MultipleDeviceTableColumnRatios;
+        target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
         target.SelectedSingleDeviceSerial = source.SelectedSingleDeviceSerial;
         target.SelectedMultipleDeviceSerials = source.SelectedMultipleDeviceSerials;
     }

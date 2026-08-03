@@ -96,7 +96,7 @@ public sealed class DeviceStoreServiceTests
         Assert.IsFalse(restored.ProxyChangeLocationByIp);
         Assert.IsTrue(restored.ProxyChangeTimezoneByIp);
 
-        AssertIndexContainsOnlyIdentityAndDataPath(path, "DeviceManager/SERIAL");
+        AssertIndexContainsOnlyIdentityAndDataPath(path, "ChangeSingleDevice/SERIAL");
         string deviceDirectory = GetDeviceDirectory(fixture.Path, "SERIAL");
         AssertAllDeviceFilesExist(deviceDirectory);
         using JsonDocument randomConfig = JsonDocument.Parse(
@@ -202,7 +202,7 @@ public sealed class DeviceStoreServiceTests
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
         string dataPath = document.RootElement[0].GetProperty("dataPath").GetString()!;
-        Assert.StartsWith("DeviceManager/", dataPath, StringComparison.Ordinal);
+        Assert.StartsWith("ChangeSingleDevice/", dataPath, StringComparison.Ordinal);
         Assert.DoesNotContain(":", dataPath, StringComparison.Ordinal);
         Assert.IsTrue(Directory.Exists(Path.Combine(
             fixture.Path,
@@ -210,7 +210,7 @@ public sealed class DeviceStoreServiceTests
     }
 
     [TestMethod]
-    public async Task SaveAsync_ReservedMultipleDevicesSerial_UsesNonConflictingDirectory()
+    public async Task SaveAsync_SerialWithLegacyMultipleDevicesName_UsesSafeDirectory()
     {
         using var fixture = new TestTempDirectory();
         string path = GetDeviceIndexPath(fixture.Path);
@@ -222,15 +222,15 @@ public sealed class DeviceStoreServiceTests
 
         using JsonDocument document = JsonDocument.Parse(await File.ReadAllTextAsync(path));
         string dataPath = document.RootElement[0].GetProperty("dataPath").GetString()!;
-        Assert.AreEqual("DeviceManager/device_multiple_005Fdevices", dataPath);
+        Assert.AreEqual("ChangeSingleDevice/multiple_005Fdevices", dataPath);
         Assert.IsFalse(Directory.Exists(Path.Combine(
             fixture.Path,
-            "DeviceManager",
+            "ChangeSingleDevice",
             "multiple_devices")));
         Assert.IsTrue(Directory.Exists(Path.Combine(
             fixture.Path,
-            "DeviceManager",
-            "device_multiple_005Fdevices")));
+            "ChangeSingleDevice",
+            "multiple_005Fdevices")));
     }
 
     private static DeviceStoreService CreateService(string path)
@@ -242,7 +242,7 @@ public sealed class DeviceStoreServiceTests
     {
         return Path.Combine(
             rootPath,
-            AssetConstants.RuntimeData.DeviceManagerDirectoryName,
+            AssetConstants.RuntimeData.ChangeSingleDeviceDirectoryName,
             AssetConstants.RuntimeData.DevicesFileName);
     }
 
@@ -250,7 +250,7 @@ public sealed class DeviceStoreServiceTests
     {
         return Path.Combine(
             rootPath,
-            AssetConstants.RuntimeData.DeviceManagerDirectoryName,
+            AssetConstants.RuntimeData.ChangeSingleDeviceDirectoryName,
             serial);
     }
 

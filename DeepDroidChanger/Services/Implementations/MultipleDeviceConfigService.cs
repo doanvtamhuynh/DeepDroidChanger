@@ -27,8 +27,7 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
         : this(
             Path.Combine(
                 AppContext.BaseDirectory,
-                AssetConstants.RuntimeData.DeviceManagerDirectoryName,
-                AssetConstants.RuntimeData.MultipleDevicesDirectoryName),
+                AssetConstants.RuntimeData.ChangeMultipleDevicesDirectoryName),
             logger)
     {
     }

@@ -26,7 +26,7 @@
                     Value="{StaticResource DeviceTableCellStyle}"/>
             <Setter Property="RowStyle"
                     Value="{StaticResource DeviceTableRowStyle}"/>
-            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
 
@@ -283,8 +283,7 @@
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled">
+    <Grid>
         <Grid x:Name="MultipleDevicesRootGrid"
               Style="{StaticResource PageRootGridStyle}">
             <Grid.RowDefinitions>
@@ -370,7 +369,7 @@
                       SelectionMode="Single"
                       SelectionUnit="FullRow"
                       behaviors:DeviceTableColumnLayoutBehavior.PersistColumnRatios="True"
-                      behaviors:DeviceTableColumnLayoutBehavior.ColumnRatios="{Binding MultipleDeviceTableColumnRatios}"
+                      behaviors:DeviceTableColumnLayoutBehavior.ColumnRatios="{Binding DeviceTableColumnRatios}"
                       behaviors:DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommand="{Binding SaveMultipleDeviceColumnRatiosCommand}"
                       Style="{StaticResource MultipleDeviceGridStyle}">
                 <DataGrid.Columns>
@@ -856,7 +855,7 @@
                         </Grid>
                     </Border>
                 </Grid>
-            </ScrollViewer>
-        </Grid>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
+    </Grid>
 </UserControl>

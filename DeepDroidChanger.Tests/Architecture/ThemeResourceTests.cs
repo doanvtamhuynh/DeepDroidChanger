@@ -162,48 +162,6 @@ public sealed partial class ThemeResourceTests
         Assert.IsEmpty(aliases, $"Non-canonical brush resource aliases found: {string.Join(", ", aliases)}");
     }
 
-    [TestMethod]
-    public void FactoryResetMenuItem_UsesGuardedDangerPresentation()
-    {
-        string path = Path.Combine(
-            GetSolutionRoot(),
-            "DeepDroidChanger",
-            "Views",
-            "DeviceManager",
-            "DeviceManagerView.xaml");
-        var document = System.Xml.Linq.XDocument.Load(path);
-        System.Xml.Linq.XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-        System.Xml.Linq.XElement factoryReset = document
-            .Descendants(presentation + "MenuItem")
-            .Single(item => item
-                .Descendants(presentation + "TextBlock")
-                .Any(text => ((string?)text.Attribute("Text"))
-                    ?.Contains("ChangeSingleDevice_RowMenuFactoryReset", StringComparison.Ordinal) == true));
-
-        Assert.Contains(
-            "DeviceActionsContextMenuDangerItemStyle",
-            (string?)factoryReset.Attribute("Style") ?? string.Empty);
-        Assert.Contains(
-            "CanEdit",
-            (string?)factoryReset.Attribute("IsEnabled") ?? string.Empty);
-        Assert.Contains(
-            "DeviceActionsContextMenuDangerButtonIconStyle",
-            (string?)factoryReset
-                .Descendants()
-                .Single(element => element.Name.LocalName == "PackIcon")
-                .Attribute("Style") ?? string.Empty);
-        Assert.Contains(
-            "DeviceActionsContextMenuDangerButtonTextStyle",
-            (string?)factoryReset
-                .Descendants(presentation + "TextBlock")
-                .Single(text => ((string?)text.Attribute("Text"))
-                    ?.Contains("ChangeSingleDevice_RowMenuFactoryReset", StringComparison.Ordinal) == true)
-                .Attribute("Style") ?? string.Empty);
-        Assert.AreEqual(
-            presentation + "Separator",
-            factoryReset.ElementsBeforeSelf().Last().Name);
-    }
-
     private static string GetSolutionRoot()
     {
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));

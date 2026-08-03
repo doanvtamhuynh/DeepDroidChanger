@@ -258,10 +258,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
     }
 
     [TestMethod]
-    public async Task SaveMultipleDeviceColumnRatios_UpdatesOnlyMultipleLayout()
+    public async Task SaveMultipleDeviceColumnRatios_UpdatesSharedLayoutInPlace()
     {
         var settings = new AppSettings();
-        Dictionary<string, double> singleBefore = settings.SingleDeviceTableColumnRatios;
+        Dictionary<string, double> sharedBefore = settings.DeviceTableColumnRatios;
         TestContext context = CreateContext(CreateSnapshot([], []), settings);
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         var ratios = new Dictionary<string, double>
@@ -272,18 +272,16 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         await viewModel.SaveMultipleDeviceColumnRatiosCommand.ExecuteAsync(ratios);
 
-        Assert.AreSame(singleBefore, settings.SingleDeviceTableColumnRatios);
-        Assert.AreSame(
-            settings.MultipleDeviceTableColumnRatios,
-            viewModel.MultipleDeviceTableColumnRatios);
-        Assert.AreEqual(0.4, viewModel.MultipleDeviceTableColumnRatios["Name"]);
+        Assert.AreSame(sharedBefore, settings.DeviceTableColumnRatios);
+        Assert.AreSame(settings.DeviceTableColumnRatios, viewModel.DeviceTableColumnRatios);
+        Assert.AreEqual(0.4, viewModel.DeviceTableColumnRatios["Name"]);
         await context.SettingsService.Received(1).SaveAsync(
             settings,
             Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
-    public async Task DeviceSearchText_MatchesAllSearchFieldsCombinesWithFilterAndPreservesSelectionsOnRefresh()
+    public async Task DeviceSearchText_MatchesSerialNameAndTypeOnly()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -298,12 +296,17 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InitializeAsync(CancellationToken.None);
         viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH").Process = "Process-Match";
 
-        foreach (string search in new[] { "serial-match", "NAME-match", "type-MATCH", "statusonline", "process-match" })
+        foreach (string search in new[] { "serial-match", "NAME-match", "type-MATCH" })
         {
             viewModel.DeviceSearchText = search;
             Assert.HasCount(1, viewModel.Devices, search);
             Assert.AreEqual("SERIAL-MATCH", viewModel.Devices[0].Serial, search);
         }
+
+        viewModel.DeviceSearchText = "statusonline";
+        Assert.IsEmpty(viewModel.Devices);
+        viewModel.DeviceSearchText = "process-match";
+        Assert.IsEmpty(viewModel.Devices);
 
         viewModel.SelectedDeviceFilter = "Online";
         viewModel.DeviceSearchText = "name-match";
@@ -320,10 +323,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
         viewModel.DeviceSearchText = string.Empty;
         DeviceRowViewModel matchingRow = viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH");
         DeviceRowViewModel hiddenRow = viewModel.Devices.Single(device => device.Serial == "OTHER");
-        viewModel.DeviceSearchText = "process-match";
-        matchingRow.Process = "Changed";
+        viewModel.DeviceSearchText = "name-match";
+        matchingRow.Name = "Changed";
         Assert.IsEmpty(viewModel.Devices);
-        hiddenRow.Process = "Process-Match";
+        hiddenRow.Name = "Name-Match";
         Assert.HasCount(1, viewModel.Devices);
         Assert.AreSame(hiddenRow, viewModel.Devices[0]);
 

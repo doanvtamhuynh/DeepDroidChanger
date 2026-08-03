@@ -63,7 +63,6 @@ namespace DeepDroidChanger.Services
                 var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
                 ApplyLegacySettings(json, settings);
                 Normalize(settings);
-                MigrateInitialMultipleDeviceLayout(settings);
                 return settings;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -129,12 +128,8 @@ namespace DeepDroidChanger.Services
         private void Normalize(AppSettings settings)
         {
             settings.Theme = _themeService.NormalizeTheme(settings.Theme);
-            settings.SingleDeviceTableColumnRatios = NormalizeColumnRatios(
-                settings.SingleDeviceTableColumnRatios,
-                selectedRatio: 0.55,
-                processRatio: 1.95);
-            settings.MultipleDeviceTableColumnRatios = NormalizeColumnRatios(
-                settings.MultipleDeviceTableColumnRatios,
+            settings.DeviceTableColumnRatios = NormalizeColumnRatios(
+                settings.DeviceTableColumnRatios,
                 selectedRatio: 0.55,
                 processRatio: 1.95);
             settings.SelectedSingleDeviceSerial =
@@ -150,10 +145,11 @@ namespace DeepDroidChanger.Services
         {
             using JsonDocument document = JsonDocument.Parse(json);
             JsonElement root = document.RootElement;
-            if (!root.TryGetProperty(nameof(AppSettings.SingleDeviceTableColumnRatios), out _)
-                && root.TryGetProperty("DeviceTableColumnRatios", out JsonElement legacyRatios))
+            if (!root.TryGetProperty(nameof(AppSettings.DeviceTableColumnRatios), out _)
+                && (root.TryGetProperty("SingleDeviceTableColumnRatios", out JsonElement legacyRatios)
+                    || root.TryGetProperty("MultipleDeviceTableColumnRatios", out legacyRatios)))
             {
-                settings.SingleDeviceTableColumnRatios =
+                settings.DeviceTableColumnRatios =
                     JsonSerializer.Deserialize<Dictionary<string, double>>(
                         legacyRatios.GetRawText(),
                         _jsonOptions) ?? [];
@@ -201,51 +197,5 @@ namespace DeepDroidChanger.Services
             return ratios;
         }
 
-        private static bool TryGetInitialMultipleDeviceLayoutScale(
-            IReadOnlyDictionary<string, double> ratios,
-            out double scale)
-        {
-            scale = 0;
-            if (ratios.Count != 8
-                || !ratios.TryGetValue("Index", out double indexRatio)
-                || !double.IsFinite(indexRatio)
-                || indexRatio <= 0)
-            {
-                return false;
-            }
-
-            scale = indexRatio / 0.55;
-            return HasScaledRatio(ratios, "Selected", 0.7, scale)
-                   && HasScaledRatio(ratios, "Serial", 1.05, scale)
-                   && HasScaledRatio(ratios, "Name", 1.05, scale)
-                   && HasScaledRatio(ratios, "Type", 0.9, scale)
-                   && HasScaledRatio(ratios, "Active", 1.05, scale)
-                   && HasScaledRatio(ratios, "Status", 1.0, scale)
-                   && HasScaledRatio(ratios, "Process", 1.8, scale);
-        }
-
-        private static void MigrateInitialMultipleDeviceLayout(AppSettings settings)
-        {
-            if (!TryGetInitialMultipleDeviceLayoutScale(
-                    settings.MultipleDeviceTableColumnRatios,
-                    out double scale))
-            {
-                return;
-            }
-
-            settings.MultipleDeviceTableColumnRatios["Selected"] = 0.55 * scale;
-            settings.MultipleDeviceTableColumnRatios["Process"] = 1.95 * scale;
-        }
-
-        private static bool HasScaledRatio(
-            IReadOnlyDictionary<string, double> ratios,
-            string key,
-            double expected,
-            double scale)
-        {
-            return ratios.TryGetValue(key, out double actual)
-                   && double.IsFinite(actual)
-                   && Math.Abs(actual - (expected * scale)) < 0.000001;
-        }
     }
 }

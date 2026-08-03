@@ -10,8 +10,9 @@ namespace DeepDroidChanger
     public sealed partial class MainWindow : Window
     {
         private readonly MainViewModel _viewModel;
-        private readonly DeviceManagerViewModel _deviceManagerViewModel;
-        private readonly DeviceManagerView _deviceManagerView;
+        private readonly ChangeSingleDeviceViewModel _changeSingleDeviceViewModel;
+        private readonly ChangeMultipleDevicesViewModel _changeMultipleDevicesViewModel;
+        private readonly ChangeSingleDeviceView _changeSingleDeviceView;
         private readonly ChangeMultipleDevicesView _changeMultipleDevicesView;
         private readonly SettingsView _settingsView;
         private readonly ILogger<MainWindow> _logger;
@@ -20,8 +21,9 @@ namespace DeepDroidChanger
 
         public MainWindow(
             MainViewModel viewModel,
-            DeviceManagerViewModel deviceManagerViewModel,
-            DeviceManagerView deviceManagerView,
+            ChangeSingleDeviceViewModel changeSingleDeviceViewModel,
+            ChangeMultipleDevicesViewModel changeMultipleDevicesViewModel,
+            ChangeSingleDeviceView changeSingleDeviceView,
             ChangeMultipleDevicesView changeMultipleDevicesView,
             SettingsView settingsView,
             ILogger<MainWindow> logger)
@@ -29,8 +31,9 @@ namespace DeepDroidChanger
             InitializeComponent();
 
             _viewModel = viewModel;
-            _deviceManagerViewModel = deviceManagerViewModel;
-            _deviceManagerView = deviceManagerView;
+            _changeSingleDeviceViewModel = changeSingleDeviceViewModel;
+            _changeMultipleDevicesViewModel = changeMultipleDevicesViewModel;
+            _changeSingleDeviceView = changeSingleDeviceView;
             _changeMultipleDevicesView = changeMultipleDevicesView;
             _settingsView = settingsView;
             _logger = logger;
@@ -56,7 +59,7 @@ namespace DeepDroidChanger
         {
             MainContent.Content = view switch
             {
-                AppView.DeviceManager => _deviceManagerView,
+                AppView.ChangeSingleDevice => _changeSingleDeviceView,
                 AppView.ChangeMultipleDevices => _changeMultipleDevicesView,
                 AppView.Settings => _settingsView,
                 _ => throw new ArgumentOutOfRangeException(nameof(view), view, null)
@@ -74,14 +77,14 @@ namespace DeepDroidChanger
 
             _isCloseCleanupInProgress = true;
 
-            try
-            {
-                await _deviceManagerViewModel.DeactivateAsync().ConfigureAwait(true);
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to stop device polling while closing the application.");
-            }
+            await DeactivateViewModelAsync(
+                    _changeSingleDeviceViewModel.DeactivateAsync,
+                    "Single Device")
+                .ConfigureAwait(true);
+            await DeactivateViewModelAsync(
+                    _changeMultipleDevicesViewModel.DeactivateAsync,
+                    "Multiple Devices")
+                .ConfigureAwait(true);
 
             try
             {
@@ -97,6 +100,18 @@ namespace DeepDroidChanger
                 _isClosingAfterSave = true;
                 _isCloseCleanupInProgress = false;
                 Close();
+            }
+        }
+
+        private async Task DeactivateViewModelAsync(Func<Task> deactivateAsync, string viewName)
+        {
+            try
+            {
+                await deactivateAsync().ConfigureAwait(true);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to deactivate {ViewName} while closing the application.", viewName);
             }
         }
     }

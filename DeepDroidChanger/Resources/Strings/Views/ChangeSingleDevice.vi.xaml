@@ -65,7 +65,6 @@
     <sys:String x:Key="ChangeSingleDevice_RowMenuDeleteDevice">Xóa thiết bị</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuRebootDevice">Reboot thiết bị</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuDeviceInfo">Thông tin thiết bị</sys:String>
-    <sys:String x:Key="ChangeSingleDevice_RowMenuFactoryReset">Khôi phục cài đặt gốc</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuCopySerial">Sao chép Serial</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuDisableGms">Tắt GMS</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuEnableGms">Bật GMS</sys:String>

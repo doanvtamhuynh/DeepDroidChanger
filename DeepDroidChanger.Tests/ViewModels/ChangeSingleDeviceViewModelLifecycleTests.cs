@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DeepDroidChanger.Tests.ViewModels;
 
 [TestClass]
-public sealed class DeviceManagerViewModelLifecycleTests
+public sealed class ChangeSingleDeviceViewModelLifecycleTests
 {
     [TestMethod]
     public async Task InitializeDeactivateInitialize_RestartsPollingLifecycleSafely()
@@ -1711,11 +1711,11 @@ public sealed class DeviceManagerViewModelLifecycleTests
         Dictionary<string, bool> busyContextMenuStates = GetContextMenuActionStates(viewModel);
         Assert.IsTrue(
             busyContextMenuStates
-                .Where(pair => pair.Key != nameof(DeviceManagerViewModel.DeleteDeviceCommand))
+                .Where(pair => pair.Key != nameof(ChangeSingleDeviceViewModel.DeleteDeviceCommand))
                 .All(pair => pair.Value),
             CreateActionStateMessage(busyContextMenuStates));
         Assert.IsFalse(
-            busyContextMenuStates[nameof(DeviceManagerViewModel.DeleteDeviceCommand)],
+            busyContextMenuStates[nameof(ChangeSingleDeviceViewModel.DeleteDeviceCommand)],
             CreateActionStateMessage(busyContextMenuStates));
         await viewModel.RebootDeviceCommand.ExecuteAsync(deviceA);
         await deviceAction.Received(1).RebootAsync("A", Arg.Any<CancellationToken>());
@@ -1814,10 +1814,10 @@ public sealed class DeviceManagerViewModelLifecycleTests
 
         await viewModel.SaveSingleDeviceColumnRatiosCommand.ExecuteAsync(ratios);
 
-        Assert.AreSame(settings.SingleDeviceTableColumnRatios, viewModel.SingleDeviceTableColumnRatios);
-        Assert.AreEqual(0.4, viewModel.SingleDeviceTableColumnRatios["Name"]);
-        Assert.AreEqual(0.6, viewModel.SingleDeviceTableColumnRatios["Process"]);
-        Assert.Contains(nameof(DeviceManagerViewModel.SingleDeviceTableColumnRatios), changedProperties);
+        Assert.AreSame(settings.DeviceTableColumnRatios, viewModel.DeviceTableColumnRatios);
+        Assert.AreEqual(0.4, viewModel.DeviceTableColumnRatios["Name"]);
+        Assert.AreEqual(0.6, viewModel.DeviceTableColumnRatios["Process"]);
+        Assert.Contains(nameof(ChangeSingleDeviceViewModel.DeviceTableColumnRatios), changedProperties);
         await settingsService.Received(1).SaveAsync(settings, Arg.Any<CancellationToken>());
         await deviceConfig.DidNotReceive().SaveSettingsAsync(Arg.Any<CancellationToken>());
         viewModel.Dispose();
@@ -2046,38 +2046,38 @@ public sealed class DeviceManagerViewModelLifecycleTests
         viewModel.Dispose();
     }
 
-    private static Dictionary<string, bool> GetGuardedActionStates(DeviceManagerViewModel viewModel)
+    private static Dictionary<string, bool> GetGuardedActionStates(ChangeSingleDeviceViewModel viewModel)
     {
         return new Dictionary<string, bool>
         {
-            [nameof(DeviceManagerViewModel.ChangeDeviceCommand)] = viewModel.ChangeDeviceCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.ChangeWithoutWipeCommand)] = viewModel.ChangeWithoutWipeCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.WipeWithoutChangeCommand)] = viewModel.WipeWithoutChangeCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.OpenAdvancedChangeConfigCommand)] = viewModel.OpenAdvancedChangeConfigCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.RandomChangeAndWipeDeviceCommand)] = viewModel.RandomChangeAndWipeDeviceCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.ChangeSimCommand)] = viewModel.ChangeSimCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.ChangeLocationCommand)] = viewModel.ChangeLocationCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.ChangeTimezoneCommand)] = viewModel.ChangeTimezoneCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.UpdateIntegrityCommand)] = viewModel.UpdateIntegrityCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.InstallApkCommand)] = viewModel.InstallApkCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.FakeProxyCommand)] = viewModel.FakeProxyCommand.CanExecute(null),
-            [nameof(DeviceManagerViewModel.StopFakeProxyCommand)] = viewModel.StopFakeProxyCommand.CanExecute(null)
+            [nameof(ChangeSingleDeviceViewModel.ChangeDeviceCommand)] = viewModel.ChangeDeviceCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.ChangeWithoutWipeCommand)] = viewModel.ChangeWithoutWipeCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.WipeWithoutChangeCommand)] = viewModel.WipeWithoutChangeCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.OpenAdvancedChangeConfigCommand)] = viewModel.OpenAdvancedChangeConfigCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.RandomChangeAndWipeDeviceCommand)] = viewModel.RandomChangeAndWipeDeviceCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.ChangeSimCommand)] = viewModel.ChangeSimCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.ChangeLocationCommand)] = viewModel.ChangeLocationCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.ChangeTimezoneCommand)] = viewModel.ChangeTimezoneCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.UpdateIntegrityCommand)] = viewModel.UpdateIntegrityCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.InstallApkCommand)] = viewModel.InstallApkCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.FakeProxyCommand)] = viewModel.FakeProxyCommand.CanExecute(null),
+            [nameof(ChangeSingleDeviceViewModel.StopFakeProxyCommand)] = viewModel.StopFakeProxyCommand.CanExecute(null)
         };
     }
 
-    private static Dictionary<string, bool> GetContextMenuActionStates(DeviceManagerViewModel viewModel)
+    private static Dictionary<string, bool> GetContextMenuActionStates(ChangeSingleDeviceViewModel viewModel)
     {
         DeviceRowViewModel? targetDevice = viewModel.SelectedDevice;
         return new Dictionary<string, bool>
         {
-            [nameof(DeviceManagerViewModel.ViewDeviceCommand)] = viewModel.ViewDeviceCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.ViewDeviceInfoCommand)] = viewModel.ViewDeviceInfoCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.CopySerialCommand)] = viewModel.CopySerialCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.ToggleGmsCommand)] = viewModel.ToggleGmsCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.TogglePlayStoreCommand)] = viewModel.TogglePlayStoreCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.ToggleWifiCommand)] = viewModel.ToggleWifiCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.RebootDeviceCommand)] = viewModel.RebootDeviceCommand.CanExecute(targetDevice),
-            [nameof(DeviceManagerViewModel.DeleteDeviceCommand)] = viewModel.DeleteDeviceCommand.CanExecute(targetDevice)
+            [nameof(ChangeSingleDeviceViewModel.ViewDeviceCommand)] = viewModel.ViewDeviceCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.ViewDeviceInfoCommand)] = viewModel.ViewDeviceInfoCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.CopySerialCommand)] = viewModel.CopySerialCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.ToggleGmsCommand)] = viewModel.ToggleGmsCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.TogglePlayStoreCommand)] = viewModel.TogglePlayStoreCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.ToggleWifiCommand)] = viewModel.ToggleWifiCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.RebootDeviceCommand)] = viewModel.RebootDeviceCommand.CanExecute(targetDevice),
+            [nameof(ChangeSingleDeviceViewModel.DeleteDeviceCommand)] = viewModel.DeleteDeviceCommand.CanExecute(targetDevice)
         };
     }
 
@@ -2446,7 +2446,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task DeviceSearchText_MatchesAllSearchFieldsCombinesWithFilterAndPreservesSelectionOnRefresh()
+    public async Task DeviceSearchText_MatchesSerialNameAndTypeOnly()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -2469,12 +2469,17 @@ public sealed class DeviceManagerViewModelLifecycleTests
         await viewModel.InitializeAsync(CancellationToken.None);
         viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH").Process = "Process-Match";
 
-        foreach (string search in new[] { "serial-match", "NAME-match", "type-MATCH", "statusonline", "process-match" })
+        foreach (string search in new[] { "serial-match", "NAME-match", "type-MATCH" })
         {
             viewModel.DeviceSearchText = search;
             Assert.HasCount(1, viewModel.Devices, search);
             Assert.AreEqual("SERIAL-MATCH", viewModel.Devices[0].Serial, search);
         }
+
+        viewModel.DeviceSearchText = "statusonline";
+        Assert.IsEmpty(viewModel.Devices);
+        viewModel.DeviceSearchText = "process-match";
+        Assert.IsEmpty(viewModel.Devices);
 
         viewModel.SelectedDeviceFilter = "Online";
         viewModel.DeviceSearchText = "name-match";
@@ -2509,7 +2514,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         viewModel.Dispose();
     }
 
-    private static DeviceManagerViewModel CreateViewModel(
+    private static ChangeSingleDeviceViewModel CreateViewModel(
         IDeviceListService deviceList,
         ICarrierDataService carriers,
         IDeviceConfigService? deviceConfig = null,
@@ -2530,7 +2535,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
         ISettingsService? settingsService = null,
         AppSettings? settings = null)
     {
-        return new DeviceManagerViewModel(
+        return new ChangeSingleDeviceViewModel(
             Substitute.For<IAddDevicesDialogService>(),
             carriers,
             Substitute.For<IChangeTimezoneDialogService>(),
@@ -2562,7 +2567,7 @@ public sealed class DeviceManagerViewModelLifecycleTests
             settings ?? new AppSettings { SelectedSingleDeviceSerial = "A" },
             new ImmediateDispatcherService(),
             polling ?? new PollingService(),
-            NullLogger<DeviceManagerViewModel>.Instance);
+            NullLogger<ChangeSingleDeviceViewModel>.Instance);
     }
 
     private static ILocalizationService CreateLocalizationService()

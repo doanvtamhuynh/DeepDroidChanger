@@ -141,8 +141,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     public ObservableCollection<string> AndroidVersions { get; }
     public IReadOnlyList<string> Brands { get; }
     public IReadOnlyList<string> TypeOptions { get; }
-    public IReadOnlyDictionary<string, double> MultipleDeviceTableColumnRatios =>
-        _settings.MultipleDeviceTableColumnRatios;
+    public IReadOnlyDictionary<string, double> DeviceTableColumnRatios =>
+        _settings.DeviceTableColumnRatios;
 
     public bool? AllDevicesSelectionState
     {
@@ -358,9 +358,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         if (ratios == null || ratios.Count == 0)
             return;
 
-        _settings.MultipleDeviceTableColumnRatios =
-            new Dictionary<string, double>(ratios, StringComparer.Ordinal);
-        OnPropertyChanged(nameof(MultipleDeviceTableColumnRatios));
+        _settings.ReplaceDeviceTableColumnRatios(ratios);
+
+        OnPropertyChanged(nameof(DeviceTableColumnRatios));
         await SaveSettingsAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -567,9 +567,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return search.Length == 0
             || device.Serial.Contains(search, StringComparison.OrdinalIgnoreCase)
             || device.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || device.Type.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || device.Status.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || device.Process.Contains(search, StringComparison.OrdinalIgnoreCase);
+            || device.Type.Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private void ReapplySearchIfActive()
@@ -612,10 +610,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             return;
         }
 
-        if (args.PropertyName == nameof(DeviceRowViewModel.Status)
-            || args.PropertyName == nameof(DeviceRowViewModel.Process))
-            ReapplySearchIfActive();
-        else if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
+        if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
             ApplyDeviceFilter();
     }
 

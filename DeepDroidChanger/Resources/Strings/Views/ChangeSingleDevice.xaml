@@ -65,7 +65,6 @@
     <sys:String x:Key="ChangeSingleDevice_RowMenuDeleteDevice">Delete Device</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuRebootDevice">Reboot Device</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuDeviceInfo">Device Info</sys:String>
-    <sys:String x:Key="ChangeSingleDevice_RowMenuFactoryReset">Factory Reset</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuCopySerial">Copy Serial</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuDisableGms">Disable GMS</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuEnableGms">Enable GMS</sys:String>

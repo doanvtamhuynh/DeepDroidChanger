@@ -164,7 +164,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations
         public async Task SaveDeviceProfileAsync_DoesNotOverwriteNewerDialogConfigFromStaleCache()
         {
             using var fixture = new TestTempDirectory();
-            string path = Path.Combine(fixture.Path, "DeviceManager", "devices.json");
+            string path = Path.Combine(fixture.Path, "ChangeSingleDevice", "devices.json");
             var store = new DeviceStoreService(path, NullLogger<DeviceStoreService>.Instance);
             await store.SaveAsync(
                 [new StoredDeviceConfig

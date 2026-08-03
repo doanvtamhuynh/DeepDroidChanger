@@ -14,7 +14,7 @@ public sealed class MultipleDeviceConfigServiceTests
     public async Task LoadAsync_MissingFiles_CreatesDedicatedDirectoryAndDefaults()
     {
         using var fixture = new TestTempDirectory();
-        string directory = Path.Combine(fixture.Path, "DeviceManager", "multiple_devices");
+        string directory = Path.Combine(fixture.Path, "ChangeMultipleDevices");
         var service = CreateService(directory);
 
         MultipleDeviceConfiguration configuration =

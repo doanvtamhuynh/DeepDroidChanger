@@ -7,8 +7,8 @@
         WindowState="Maximized"
         WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
-        MinWidth="980"
-        MinHeight="640"
+        MinWidth="1280"
+        MinHeight="720"
         Background="{DynamicResource Brush.WindowBackground}"
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{StaticResource Metric.FontFamily}">
@@ -139,7 +139,7 @@
             </Setter>
         </Style>
 
-        <Style x:Key="SidebarDeviceManagerGroupStyle"
+        <Style x:Key="SidebarChangeDevicesGroupStyle"
                TargetType="Button"
                BasedOn="{StaticResource SidebarTabStyle}">
             <Setter Property="Background"
@@ -177,7 +177,7 @@
                                            Foreground="{TemplateBinding Foreground}"/>
 
                                 <materialDesign:PackIcon Grid.Column="2"
-                                                         Kind="{Binding DataContext.DeviceManagerChevronIconKind, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Kind="{Binding DataContext.ChangeDevicesChevronIconKind, RelativeSource={RelativeSource AncestorType=Window}}"
                                                          Width="16"
                                                          Height="16"
                                                          Margin="8,0,0,0"
@@ -214,7 +214,7 @@
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsDeviceManagerActive}"
+                <DataTrigger Binding="{Binding IsChangeDevicesActive}"
                              Value="True">
                     <Setter Property="Background"
                             Value="{DynamicResource Brush.SurfaceSelected}"/>
@@ -224,7 +224,7 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="SidebarDeviceManagerSubmenuStyle"
+        <Style x:Key="SidebarChangeDevicesSubmenuStyle"
                TargetType="StackPanel">
             <Setter Property="Visibility"
                     Value="Collapsed"/>
@@ -235,7 +235,7 @@
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsSidebarCollapsed}"
                                    Value="False"/>
-                        <Condition Binding="{Binding IsDeviceManagerSubmenuOpen}"
+                        <Condition Binding="{Binding IsChangeDevicesSubmenuOpen}"
                                    Value="True"/>
                     </MultiDataTrigger.Conditions>
                     <Setter Property="Visibility"
@@ -348,7 +348,7 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="SidebarDeviceManagerFlyoutStyle"
+        <Style x:Key="SidebarChangeDevicesFlyoutStyle"
                TargetType="ContextMenu">
             <Setter Property="Background"
                     Value="{DynamicResource Brush.Surface}"/>
@@ -706,18 +706,18 @@
 
                 <StackPanel DockPanel.Dock="Top"
                             Margin="6,6,6,0">
-                    <Button x:Name="BtnDeviceManager"
+                    <Button x:Name="BtnChangeDevices"
                             Tag="Cellphone"
-                            Content="{DynamicResource Nav_DeviceManager}"
-                            Command="{Binding ToggleDeviceManagerMenuCommand}"
-                            behaviors:ContextMenuOpenBehavior.IsOpen="{Binding IsDeviceManagerFlyoutOpen, Mode=TwoWay}"
+                            Content="{DynamicResource Nav_ChangeDevices}"
+                            Command="{Binding ToggleChangeDevicesMenuCommand}"
+                            behaviors:ContextMenuOpenBehavior.IsOpen="{Binding IsChangeDevicesFlyoutOpen, Mode=TwoWay}"
                             ContextMenuService.Placement="Right"
                             ContextMenuService.IsEnabled="{Binding IsSidebarCollapsed}"
-                            Style="{StaticResource SidebarDeviceManagerGroupStyle}">
+                            Style="{StaticResource SidebarChangeDevicesGroupStyle}">
                         <Button.ContextMenu>
                             <ContextMenu Placement="Right"
                                          StaysOpen="False"
-                                         Style="{StaticResource SidebarDeviceManagerFlyoutStyle}">
+                                         Style="{StaticResource SidebarChangeDevicesFlyoutStyle}">
                                 <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeSingleDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           Style="{StaticResource SidebarSingleDeviceFlyoutMenuItemStyle}">
                                     <MenuItem.Header>
@@ -755,8 +755,8 @@
                         </Button.ContextMenu>
                     </Button>
 
-                    <StackPanel x:Name="DeviceManagerSubmenu"
-                                Style="{StaticResource SidebarDeviceManagerSubmenuStyle}">
+                    <StackPanel x:Name="ChangeDevicesSubmenu"
+                                Style="{StaticResource SidebarChangeDevicesSubmenuStyle}">
                         <Button x:Name="BtnChangeSingleDevice"
                                 Tag="Cellphone"
                                 Content="{DynamicResource Nav_ChangeSingleDevice}"

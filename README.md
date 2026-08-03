@@ -13,7 +13,7 @@ DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đ
 - Ghi nhớ tài khoản theo lựa chọn; mật khẩu được bảo vệ bằng Windows DPAPI `CurrentUser`.
 - Token phiên chỉ tồn tại trong bộ nhớ, không được ghi xuống cấu hình.
 - Sidebar có thể thu gọn; hỗ trợ Light/Dark, tiếng Anh/tiếng Việt và Per-Monitor DPI.
-- Điều hướng giữa Device Manager và Settings.
+- Điều hướng giữa Change Devices và Settings.
 
 ### Quản lý thiết bị
 
@@ -162,7 +162,8 @@ Test suite dùng fake/mock cho Cognito, HTTP API và ADB. Việc xác nhận tư
 
 Trong tài liệu này, **thư mục ứng dụng** là thư mục đang chứa
 `DeepDroidChanger.exe`. Ứng dụng lấy đường dẫn này từ
-`AppContext.BaseDirectory`, sau đó tạo `AppSettings/` và `DeviceManager/` trực
+`AppContext.BaseDirectory`, sau đó tạo `AppSettings/`, `ChangeSingleDevice/` và
+`ChangeMultipleDevices/` trực
 tiếp bên trong. Vì vậy khi chạy bản Debug vừa build, cấu trúc thực tế là:
 
 ```text
@@ -171,15 +172,18 @@ DeepDroidChanger/bin/Debug/net10.0-windows/
 ├── AppSettings/
 │   ├── app_settings.json
 │   └── account.json
-└── DeviceManager/
+├── ChangeSingleDevice/
     ├── devices.json
-    └── <serial>/
+│   └── <serial>/
         ├── random_config.json
         ├── change_options_config.json
         ├── update_integrity_config.json
         ├── location_config.json
         ├── timezone_config.json
-        └── proxy_config.json
+│       └── proxy_config.json
+└── ChangeMultipleDevices/
+    ├── change_config.json
+    └── change_options_config.json
 ```
 
 Nếu executable được publish hoặc chuyển sang thư mục khác, hai thư mục dữ liệu
@@ -190,20 +194,22 @@ các file runtime này.
 | Tệp | Nội dung |
 | --- | --- |
 | `AppSettings/app_settings.json` | Theme, ngôn ngữ, sidebar, thiết bị đang chọn, tỉ lệ cột và cấu hình action |
-| `DeviceManager/devices.json` | Index thiết bị, chỉ gồm serial, name, type và dataPath |
-| `DeviceManager/<serial>/random_config.json` | Brand, Android version, quốc gia, nhà mạng, tùy chọn random SIM và Integrity security patch |
-| `DeviceManager/<serial>/change_options_config.json` | Tùy chọn Change Device và cleanup package |
-| `DeviceManager/<serial>/update_integrity_config.json` | Cấu hình dialog Update Integrity |
-| `DeviceManager/<serial>/location_config.json` | Cấu hình dialog Change Location |
-| `DeviceManager/<serial>/timezone_config.json` | Cấu hình dialog Change Timezone |
-| `DeviceManager/<serial>/proxy_config.json` | Cấu hình dialog Fake Proxy |
+| `ChangeSingleDevice/devices.json` | Index thiết bị, chỉ gồm serial, name, type và dataPath |
+| `ChangeSingleDevice/<serial>/random_config.json` | Brand, Android version, quốc gia, nhà mạng, tùy chọn random SIM và Integrity security patch |
+| `ChangeSingleDevice/<serial>/change_options_config.json` | Tùy chọn Change Device và cleanup package |
+| `ChangeSingleDevice/<serial>/update_integrity_config.json` | Cấu hình dialog Update Integrity |
+| `ChangeSingleDevice/<serial>/location_config.json` | Cấu hình dialog Change Location |
+| `ChangeSingleDevice/<serial>/timezone_config.json` | Cấu hình dialog Change Timezone |
+| `ChangeSingleDevice/<serial>/proxy_config.json` | Cấu hình dialog Fake Proxy |
+| `ChangeMultipleDevices/change_config.json` | Cấu hình thay đổi áp dụng cho nhiều thiết bị |
+| `ChangeMultipleDevices/change_options_config.json` | Tùy chọn Change Device cho nhiều thiết bị |
 | `AppSettings/account.json` | Username và mật khẩu đã mã hóa khi bật Remember account |
 
 Thời điểm persistence được giữ theo hành vi của ứng dụng:
 
 - Add/Delete Device ghi index và tạo/xóa thư mục thiết bị ngay khi thao tác hoàn tất.
 - Name được tự lưu sau debounce 300 ms; Type được lưu ngay. Các edit còn chờ
-  được flush khi rời Device Manager.
+  được flush khi rời Change Single Device.
 - Brand, Android version, country, carrier và Change SIM được tự lưu sau
   debounce 300 ms vào `random_config.json`. Device profile đầy đủ vừa random
   chỉ tồn tại trong phiên chạy để thực hiện Change Device, không được ghi vào

@@ -6,13 +6,13 @@ using System.Windows.Media;
 
 namespace DeepDroidChanger.Views
 {
-    public sealed partial class DeviceManagerView : UserControl
+    public sealed partial class ChangeSingleDeviceView : UserControl
     {
-        private readonly DeviceManagerViewModel _viewModel;
+        private readonly ChangeSingleDeviceViewModel _viewModel;
         private CancellationTokenSource? _viewCancellation;
         private bool _isActive;
 
-        public DeviceManagerView(DeviceManagerViewModel viewModel)
+        public ChangeSingleDeviceView(ChangeSingleDeviceViewModel viewModel)
         {
             _viewModel = viewModel;
             InitializeComponent();

@@ -7,13 +7,13 @@ namespace DeepDroidChanger.Tests.Architecture;
 public sealed class ArchitectureRuleTests
 {
     [TestMethod]
-    public void DeviceManagerFeature_UsesCanonicalStructureAndResourceOwnership()
+    public void ChangeSingleDeviceFeature_UsesCanonicalStructureAndResourceOwnership()
     {
         string projectRoot = GetProjectRoot();
         string solutionRoot = GetSolutionRoot();
-        string canonicalView = Path.Combine(projectRoot, "Views", "DeviceManager", "DeviceManagerView.xaml");
+        string canonicalView = Path.Combine(projectRoot, "Views", "ChangeSingleDevice", "ChangeSingleDeviceView.xaml");
         string canonicalViewCodeBehind = string.Concat(canonicalView, ".cs");
-        string canonicalViewModel = Path.Combine(projectRoot, "ViewModels", "DeviceManagerViewModel.cs");
+        string canonicalViewModel = Path.Combine(projectRoot, "ViewModels", "ChangeSingleDeviceViewModel.cs");
         string obsoleteFeatureTheme = Path.Combine(projectRoot, "Resources", "Themes", "DeviceManager.xaml");
         string canonicalStrings = Path.Combine(
             projectRoot,
@@ -43,17 +43,24 @@ public sealed class ArchitectureRuleTests
             solutionRoot,
             "DeepDroidChanger.Tests",
             "ViewModels",
-            "DeviceManagerViewModelLifecycleTests.cs");
+            "ChangeSingleDeviceViewModelLifecycleTests.cs");
 
         Assert.IsTrue(File.Exists(canonicalView));
         Assert.IsTrue(File.Exists(canonicalViewCodeBehind));
         Assert.IsTrue(File.Exists(canonicalViewModel));
+        Assert.IsFalse(Directory.Exists(Path.Combine(projectRoot, "Views", "DeviceManager")));
+        Assert.IsFalse(File.Exists(Path.Combine(projectRoot, "ViewModels", "DeviceManagerViewModel.cs")));
         Assert.IsFalse(File.Exists(obsoleteFeatureTheme));
         Assert.IsTrue(File.Exists(canonicalStrings));
         Assert.IsTrue(File.Exists(canonicalVietnameseStrings));
         Assert.IsFalse(File.Exists(obsoleteStrings));
         Assert.IsFalse(File.Exists(obsoleteVietnameseStrings));
         Assert.IsTrue(File.Exists(canonicalTests));
+        Assert.IsFalse(File.Exists(Path.Combine(
+            solutionRoot,
+            "DeepDroidChanger.Tests",
+            "ViewModels",
+            "DeviceManagerViewModelLifecycleTests.cs")));
         Assert.IsFalse(Directory.Exists(Path.Combine(projectRoot, "Views", "Devices")));
         Assert.IsFalse(File.Exists(Path.Combine(projectRoot, "ViewModels", "DevicesViewModel.cs")));
         Assert.IsFalse(File.Exists(Path.Combine(projectRoot, "Resources", "Themes", "Devices.xaml")));
@@ -85,23 +92,23 @@ public sealed class ArchitectureRuleTests
             Path.Combine(projectRoot, "Resources", "Strings", "Views", "AddDevices.vi.xaml"),
             "AddDevices_");
 
-        string deviceManagerView = File.ReadAllText(canonicalView);
-        Assert.Contains("<UserControl.Resources>", deviceManagerView, StringComparison.Ordinal);
-        Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", deviceManagerView, StringComparison.Ordinal);
-        Assert.Contains("DataGridCheckBoxStyle", deviceManagerView, StringComparison.Ordinal);
-        int copySerialIndex = deviceManagerView.IndexOf(
+        string changeSingleDeviceView = File.ReadAllText(canonicalView);
+        Assert.Contains("<UserControl.Resources>", changeSingleDeviceView, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", changeSingleDeviceView, StringComparison.Ordinal);
+        Assert.Contains("DataGridCheckBoxStyle", changeSingleDeviceView, StringComparison.Ordinal);
+        int copySerialIndex = changeSingleDeviceView.IndexOf(
             "Command=\"{Binding PlacementTarget.Tag.CopySerialCommand",
             StringComparison.Ordinal);
-        int toggleGmsIndex = deviceManagerView.IndexOf(
+        int toggleGmsIndex = changeSingleDeviceView.IndexOf(
             "Command=\"{Binding PlacementTarget.Tag.ToggleGmsCommand",
             StringComparison.Ordinal);
-        int togglePlayStoreIndex = deviceManagerView.IndexOf(
+        int togglePlayStoreIndex = changeSingleDeviceView.IndexOf(
             "Command=\"{Binding PlacementTarget.Tag.TogglePlayStoreCommand",
             StringComparison.Ordinal);
-        int toggleWifiIndex = deviceManagerView.IndexOf(
+        int toggleWifiIndex = changeSingleDeviceView.IndexOf(
             "Command=\"{Binding PlacementTarget.Tag.ToggleWifiCommand",
             StringComparison.Ordinal);
-        int rebootIndex = deviceManagerView.IndexOf(
+        int rebootIndex = changeSingleDeviceView.IndexOf(
             "Command=\"{Binding PlacementTarget.Tag.RebootDeviceCommand",
             StringComparison.Ordinal);
         Assert.IsTrue(
@@ -112,34 +119,34 @@ public sealed class ArchitectureRuleTests
             "Google package and Wi-Fi actions must appear below Copy Serial and above Reboot Device.");
         Assert.Contains(
             "Handler=\"OnDeviceRowContextMenuOpening\"",
-            deviceManagerView,
+            changeSingleDeviceView,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.IsGmsDisabled",
-            deviceManagerView,
+            changeSingleDeviceView,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.IsPlayStoreDisabled",
-            deviceManagerView,
+            changeSingleDeviceView,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.IsWifiEnabled",
-            deviceManagerView,
+            changeSingleDeviceView,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.CanToggleContextMenuActions",
-            deviceManagerView,
+            changeSingleDeviceView,
             StringComparison.Ordinal);
-        string deviceManagerViewCodeBehind = File.ReadAllText(canonicalViewCodeBehind);
+        string changeSingleDeviceViewCodeBehind = File.ReadAllText(canonicalViewCodeBehind);
         Assert.Contains(
             "RefreshContextMenuStateCommand",
-            deviceManagerViewCodeBehind,
+            changeSingleDeviceViewCodeBehind,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
             "StaticResource AddDevice",
-            deviceManagerView,
+            changeSingleDeviceView,
             StringComparison.Ordinal,
-            "DeviceManagerView must not depend on AddDevices-owned styles.");
+            "ChangeSingleDeviceView must not depend on AddDevices-owned styles.");
     }
 
     [TestMethod]

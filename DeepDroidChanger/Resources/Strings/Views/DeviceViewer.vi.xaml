@@ -1,11 +1,11 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
-    <system:String x:Key="DeviceViewer_WindowTitleFormat">Trình quản lý thiết bị - {0} ({1})</system:String>
+    <system:String x:Key="DeviceViewer_WindowTitleFormat">Thay đổi thiết bị đơn lẻ - {0} ({1})</system:String>
     <system:String x:Key="DeviceViewer_StatusChecking">Đang kiểm tra...</system:String>
     <system:String x:Key="DeviceViewer_StatusConnected">Đã kết nối</system:String>
     <system:String x:Key="DeviceViewer_StatusDisconnected">Mất kết nối</system:String>
-    <system:String x:Key="DeviceViewerManagerTitle">Quản lý thiết bị</system:String>
+    <system:String x:Key="DeviceViewerManagerTitle">Thay đổi thiết bị đơn lẻ</system:String>
     <system:String x:Key="DeviceViewerDeviceSeparator"> - </system:String>
     <system:String x:Key="DeviceViewerBack">Quay lại</system:String>
     <system:String x:Key="DeviceViewerHome">Màn hình chính</system:String>
