@@ -21,12 +21,16 @@
                     Value="412"/>
             <Setter Property="GridLinesVisibility"
                     Value="All"/>
+            <Setter Property="AlternationCount"
+                    Value="2"/>
             <Setter Property="HorizontalGridLinesBrush"
                     Value="{DynamicResource Brush.Border}"/>
             <Setter Property="VerticalGridLinesBrush"
                     Value="{DynamicResource Brush.Border}"/>
             <Setter Property="ColumnHeaderStyle"
                     Value="{StaticResource DeviceTableColumnHeaderStyle}"/>
+            <Setter Property="CellStyle"
+                    Value="{StaticResource DeviceTableCellStyle}"/>
             <Setter Property="HorizontalScrollBarVisibility"
                     Value="Auto"/>
             <Setter Property="VerticalScrollBarVisibility"
@@ -95,7 +99,7 @@
 
         <Style x:Key="DeviceGridRowContextMenuStyle"
                TargetType="DataGridRow"
-               BasedOn="{StaticResource {x:Type DataGridRow}}">
+               BasedOn="{StaticResource DeviceTableRowStyle}">
             <EventSetter Event="ContextMenuOpening"
                          Handler="OnDeviceRowContextMenuOpening"/>
             <Setter Property="FocusVisualStyle"
@@ -290,10 +294,9 @@
 
         <Style x:Key="DeviceManagerCellStretchStyle"
                TargetType="DataGridCell"
-               BasedOn="{StaticResource {x:Type DataGridCell}}">
+               BasedOn="{StaticResource DeviceTableCellStyle}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
         </Style>
 
@@ -532,6 +535,11 @@
                 Value="Left"/>
         <Setter Property="ItemContainerStyle"
                 Value="{StaticResource DeviceComboBoxItemStyle}"/>
+    </Style>
+    <Style x:Key="DeviceSearchTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DialogSearchTextBoxStyle}">
+        <Setter Property="MaxWidth" Value="340"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="Margin" Value="14,0,14,0"/>
     </Style>
 
     <Thickness x:Key="DeviceActionsContextMenuPadding">6</Thickness>
@@ -923,6 +931,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0"
@@ -941,7 +950,13 @@
                        Text="{Binding NewDeviceCountText}"
                        Style="{StaticResource DeviceLoadCountTextStyle}"/>
 
-            <StackPanel Grid.Column="2"
+            <TextBox Grid.Column="2"
+                     Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="{DynamicResource ChangeSingleDevice_DeviceSearchName}"
+                     materialDesign:HintAssist.Hint="{DynamicResource ChangeSingleDevice_DeviceSearchHint}"
+                     Style="{StaticResource DeviceSearchTextBoxStyle}"/>
+
+            <StackPanel Grid.Column="3"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center">
@@ -1064,28 +1079,40 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Binding="{Binding Active}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Active"
-                                    Width="1.05*"
-                                    MinWidth="110"
-                                    IsReadOnly="True"
-                                    ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
-                    <DataGridTextColumn.Header>
+                <DataGridTemplateColumn SortMemberPath="Active"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Active"
+                                        Width="1.05*"
+                                        MinWidth="110"
+                                        IsReadOnly="True">
+                    <DataGridTemplateColumn.Header>
                         <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnActive}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn Binding="{Binding Status}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Status"
-                                    Width="1*"
-                                    MinWidth="100"
-                                    IsReadOnly="True"
-                                    ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
-                    <DataGridTextColumn.Header>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource DeviceTableActiveBadgeStyle}">
+                                <TextBlock Text="{Binding Active}" Style="{StaticResource DeviceTableBadgeTextStyle}" />
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn SortMemberPath="Status"
+                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Status"
+                                        Width="1*"
+                                        MinWidth="100"
+                                        IsReadOnly="True">
+                    <DataGridTemplateColumn.Header>
                         <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnStatus}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource DeviceTableStatusBadgeStyle}">
+                                <TextBlock Text="{Binding Status}" Style="{StaticResource DeviceTableBadgeTextStyle}" />
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Binding="{Binding Process}"
                                     behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Process"
                                     Width="1.95*"

@@ -87,6 +87,8 @@ namespace DeepDroidChanger.ViewModels
         private readonly List<DeviceRowViewModel> _allDeviceRows = new();
         [ObservableProperty]
         private string _selectedDeviceFilter = string.Empty;
+        [ObservableProperty]
+        private string _deviceSearchText = string.Empty;
 
         public DeviceManagerViewModel(
             IAddDevicesDialogService addDevicesDialogService,
@@ -258,6 +260,11 @@ namespace DeepDroidChanger.ViewModels
         }
 
         partial void OnSelectedDeviceFilterChanged(string value)
+        {
+            ApplyDeviceFilter();
+        }
+
+        partial void OnDeviceSearchTextChanged(string value)
         {
             ApplyDeviceFilter();
         }
@@ -2039,12 +2046,21 @@ namespace DeepDroidChanger.ViewModels
         {
             var connectedBySerial = connectedDevices.ToDictionary(device => device.Serial, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var device in _allDeviceRows)
+            var wasRefreshingRows = _isRefreshingRows;
+            _isRefreshingRows = true;
+            try
             {
-                device.ConnectionStatus = connectedBySerial.TryGetValue(device.Serial, out var connectedDevice)
-                    ? connectedDevice.Status
-                    : AdbDeviceStatus.Offline;
-                device.Status = GetConnectionStatusText(device.ConnectionStatus);
+                foreach (var device in _allDeviceRows)
+                {
+                    device.ConnectionStatus = connectedBySerial.TryGetValue(device.Serial, out var connectedDevice)
+                        ? connectedDevice.Status
+                        : AdbDeviceStatus.Offline;
+                    device.Status = GetConnectionStatusText(device.ConnectionStatus);
+                }
+            }
+            finally
+            {
+                _isRefreshingRows = wasRefreshingRows;
             }
 
             ApplyDeviceFilter();
@@ -2144,7 +2160,7 @@ namespace DeepDroidChanger.ViewModels
 
         private bool MatchesDeviceFilter(DeviceRowViewModel device)
         {
-            return SelectedDeviceFilter switch
+            var matchesFilter = SelectedDeviceFilter switch
             {
                 "Online" => device.ConnectionStatus == AdbDeviceStatus.Online,
                 "Offline" => device.ConnectionStatus != AdbDeviceStatus.Online,
@@ -2152,6 +2168,22 @@ namespace DeepDroidChanger.ViewModels
                 "Inactive" => string.Equals(device.Active, "Inactive", StringComparison.OrdinalIgnoreCase),
                 _ => true
             };
+            if (!matchesFilter)
+                return false;
+
+            var search = DeviceSearchText.Trim();
+            return search.Length == 0
+                || device.Serial.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || device.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || device.Type.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || device.Status.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || device.Process.Contains(search, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ReapplySearchIfActive()
+        {
+            if (!string.IsNullOrWhiteSpace(DeviceSearchText))
+                ApplyDeviceFilter();
         }
 
         private void OnDeviceRowPropertyChanged(object? sender, PropertyChangedEventArgs args)
@@ -2175,6 +2207,7 @@ namespace DeepDroidChanger.ViewModels
             if (args.PropertyName == nameof(DeviceRowViewModel.Name))
             {
                 QueueDeviceRowEdit(deviceRow);
+                ReapplySearchIfActive();
                 return;
             }
 
@@ -2182,7 +2215,15 @@ namespace DeepDroidChanger.ViewModels
             {
                 CancelPendingDeviceEdit(deviceRow.Serial);
                 TrackSilentSave(SaveDeviceRowEditAsync(deviceRow, GetActiveToken()), "Failed to save device row edit.");
+                ReapplySearchIfActive();
+                return;
             }
+
+            if (args.PropertyName == nameof(DeviceRowViewModel.Status)
+                || args.PropertyName == nameof(DeviceRowViewModel.Process))
+                ReapplySearchIfActive();
+            else if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
+                ApplyDeviceFilter();
         }
 
         private void SelectSingleDevice(DeviceRowViewModel? selectedDevice)

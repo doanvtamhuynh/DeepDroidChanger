@@ -282,6 +282,63 @@ public sealed class ChangeMultipleDevicesViewModelTests
             Arg.Any<CancellationToken>());
     }
 
+    [TestMethod]
+    public async Task DeviceSearchText_MatchesAllSearchFieldsCombinesWithFilterAndPreservesSelectionsOnRefresh()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "SERIAL-MATCH", Name = "Name-Match", Type = "Type-Match" },
+            new() { Serial = "OTHER", Name = "Other device", Type = "Other type" }
+        ];
+        var settings = new AppSettings();
+        TestContext context = CreateContext(
+            CreateSnapshot(storedDevices, [new AdbDevice("SERIAL-MATCH", AdbDeviceStatus.Online)]),
+            settings);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH").Process = "Process-Match";
+
+        foreach (string search in new[] { "serial-match", "NAME-match", "type-MATCH", "statusonline", "process-match" })
+        {
+            viewModel.DeviceSearchText = search;
+            Assert.HasCount(1, viewModel.Devices, search);
+            Assert.AreEqual("SERIAL-MATCH", viewModel.Devices[0].Serial, search);
+        }
+
+        viewModel.SelectedDeviceFilter = "Online";
+        viewModel.DeviceSearchText = "name-match";
+        Assert.HasCount(1, viewModel.Devices);
+        viewModel.SelectedDeviceFilter = "Offline";
+        Assert.IsEmpty(viewModel.Devices);
+        viewModel.DeviceSearchText = "other";
+        Assert.HasCount(1, viewModel.Devices);
+        Assert.AreEqual("OTHER", viewModel.Devices[0].Serial);
+        viewModel.DeviceSearchText = "  ";
+        Assert.HasCount(1, viewModel.Devices);
+
+        viewModel.SelectedDeviceFilter = "All";
+        viewModel.DeviceSearchText = string.Empty;
+        DeviceRowViewModel matchingRow = viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH");
+        DeviceRowViewModel hiddenRow = viewModel.Devices.Single(device => device.Serial == "OTHER");
+        viewModel.DeviceSearchText = "process-match";
+        matchingRow.Process = "Changed";
+        Assert.IsEmpty(viewModel.Devices);
+        hiddenRow.Process = "Process-Match";
+        Assert.HasCount(1, viewModel.Devices);
+        Assert.AreSame(hiddenRow, viewModel.Devices[0]);
+
+        viewModel.DeviceSearchText = string.Empty;
+        viewModel.ToggleDeviceSelectionCommand.Execute(
+            matchingRow);
+        CollectionAssert.AreEqual(new[] { "SERIAL-MATCH" }, settings.SelectedMultipleDeviceSerials);
+        viewModel.ApplyDeviceListSnapshot(
+            CreateSnapshot(storedDevices, [new AdbDevice("SERIAL-MATCH", AdbDeviceStatus.Online)]));
+        Assert.IsTrue(viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH").IsSelected);
+        CollectionAssert.AreEqual(new[] { "SERIAL-MATCH" }, settings.SelectedMultipleDeviceSerials);
+
+        await viewModel.DeactivateAsync();
+    }
+
     private static TestContext CreateContext(
         DeviceListSnapshot snapshot,
         AppSettings? settings = null,

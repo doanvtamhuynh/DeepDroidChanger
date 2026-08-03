@@ -39,40 +39,4 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="UnderlineTabControlStyle" TargetType="TabControl" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
-        <Setter Property="BorderThickness" Value="0,1,0,0" />
-        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-        <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style x:Key="UnderlineTabItemStyle" TargetType="TabItem" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="18,11" />
-        <Setter Property="Margin" Value="0,0,4,0" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="TabItem">
-                    <Grid Background="{TemplateBinding Background}">
-                        <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" />
-                        <Border x:Name="SelectedLine" Height="2" Background="Transparent" VerticalAlignment="Bottom" />
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-                            <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="SelectedLine" Property="Background" Value="{DynamicResource Brush.Accent}" />
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-                            <Setter Property="FontWeight" Value="SemiBold" />
-                            <Setter Property="Panel.ZIndex" Value="1" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
 </ResourceDictionary>

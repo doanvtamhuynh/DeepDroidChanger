@@ -15,22 +15,26 @@
                     Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
             <Setter Property="MaxHeight" Value="412"/>
             <Setter Property="GridLinesVisibility" Value="All"/>
+            <Setter Property="AlternationCount" Value="2"/>
             <Setter Property="HorizontalGridLinesBrush"
                     Value="{DynamicResource Brush.Border}"/>
             <Setter Property="VerticalGridLinesBrush"
                     Value="{DynamicResource Brush.Border}"/>
             <Setter Property="ColumnHeaderStyle"
                     Value="{StaticResource DeviceTableColumnHeaderStyle}"/>
+            <Setter Property="CellStyle"
+                    Value="{StaticResource DeviceTableCellStyle}"/>
+            <Setter Property="RowStyle"
+                    Value="{StaticResource DeviceTableRowStyle}"/>
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
 
         <Style x:Key="MultipleDeviceCellStretchStyle"
                TargetType="DataGridCell"
-               BasedOn="{StaticResource {x:Type DataGridCell}}">
+               BasedOn="{StaticResource DeviceTableCellStyle}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
         </Style>
 
@@ -247,6 +251,11 @@
             <Setter Property="ItemContainerStyle"
                     Value="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
         </Style>
+        <Style x:Key="MultipleDeviceSearchTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DialogSearchTextBoxStyle}">
+            <Setter Property="MaxWidth" Value="340"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="14,0,14,0"/>
+        </Style>
 
         <Style x:Key="MultipleDeviceSelectAllCheckBoxStyle"
                TargetType="CheckBox"
@@ -290,6 +299,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <Button x:Name="MultipleAddDevicesButton"
@@ -309,8 +319,14 @@
                            Text="{Binding NewDeviceCountText}"
                            Style="{StaticResource MultipleDeviceLoadCountTextStyle}"/>
 
+                <TextBox Grid.Column="2"
+                         Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_DeviceSearchName}"
+                         materialDesign:HintAssist.Hint="{DynamicResource ChangeMultipleDevices_DeviceSearchHint}"
+                         Style="{StaticResource MultipleDeviceSearchTextBoxStyle}"/>
+
                 <StackPanel x:Name="MultipleDeviceFilterPanel"
-                            Grid.Column="2"
+                            Grid.Column="3"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
@@ -447,29 +463,41 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Binding="{Binding Active}"
-                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Active"
-                                        Width="1.05*"
-                                        MinWidth="110"
-                                        IsReadOnly="True"
-                                        ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
-                        <DataGridTextColumn.Header>
+                    <DataGridTemplateColumn SortMemberPath="Active"
+                                            behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Active"
+                                            Width="1.05*"
+                                            MinWidth="110"
+                                            IsReadOnly="True">
+                        <DataGridTemplateColumn.Header>
                             <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnActive}"
                                        Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
-                        </DataGridTextColumn.Header>
-                    </DataGridTextColumn>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource DeviceTableActiveBadgeStyle}">
+                                    <TextBlock Text="{Binding Active}" Style="{StaticResource DeviceTableBadgeTextStyle}" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Binding="{Binding Status}"
-                                        behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Status"
-                                        Width="1*"
-                                        MinWidth="100"
-                                        IsReadOnly="True"
-                                        ElementStyle="{StaticResource DataGridLeftCellTextStyle}">
-                        <DataGridTextColumn.Header>
+                    <DataGridTemplateColumn SortMemberPath="Status"
+                                            behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Status"
+                                            Width="1*"
+                                            MinWidth="100"
+                                            IsReadOnly="True">
+                        <DataGridTemplateColumn.Header>
                             <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnStatus}"
                                        Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
-                        </DataGridTextColumn.Header>
-                    </DataGridTextColumn>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource DeviceTableStatusBadgeStyle}">
+                                    <TextBlock Text="{Binding Status}" Style="{StaticResource DeviceTableBadgeTextStyle}" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
 
                     <DataGridTextColumn Binding="{Binding Process}"
                                         behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Process"

@@ -2445,6 +2445,70 @@ public sealed class DeviceManagerViewModelLifecycleTests
         viewModel.Dispose();
     }
 
+    [TestMethod]
+    public async Task DeviceSearchText_MatchesAllSearchFieldsCombinesWithFilterAndPreservesSelectionOnRefresh()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "SERIAL-MATCH", Name = "Name-Match", Type = "Type-Match" },
+            new() { Serial = "OTHER", Name = "Other device", Type = "Other type" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        DeviceListSnapshot snapshot = new(
+            storedDevices,
+            [new AdbDevice("SERIAL-MATCH", AdbDeviceStatus.Online)]);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(snapshot);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var settings = new AppSettings { SelectedSingleDeviceSerial = string.Empty };
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            settings: settings);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH").Process = "Process-Match";
+
+        foreach (string search in new[] { "serial-match", "NAME-match", "type-MATCH", "statusonline", "process-match" })
+        {
+            viewModel.DeviceSearchText = search;
+            Assert.HasCount(1, viewModel.Devices, search);
+            Assert.AreEqual("SERIAL-MATCH", viewModel.Devices[0].Serial, search);
+        }
+
+        viewModel.SelectedDeviceFilter = "Online";
+        viewModel.DeviceSearchText = "name-match";
+        Assert.HasCount(1, viewModel.Devices);
+        viewModel.SelectedDeviceFilter = "Offline";
+        Assert.IsEmpty(viewModel.Devices);
+        viewModel.DeviceSearchText = "other";
+        Assert.HasCount(1, viewModel.Devices);
+        Assert.AreEqual("OTHER", viewModel.Devices[0].Serial);
+        viewModel.DeviceSearchText = "  ";
+        Assert.HasCount(1, viewModel.Devices);
+
+        viewModel.SelectedDeviceFilter = "All";
+        viewModel.DeviceSearchText = string.Empty;
+        DeviceRowViewModel matchingRow = viewModel.Devices.Single(device => device.Serial == "SERIAL-MATCH");
+        DeviceRowViewModel hiddenRow = viewModel.Devices.Single(device => device.Serial == "OTHER");
+        viewModel.DeviceSearchText = "name-match";
+        matchingRow.Name = "Renamed";
+        Assert.IsEmpty(viewModel.Devices);
+        hiddenRow.Name = "Name-Match";
+        Assert.HasCount(1, viewModel.Devices);
+        Assert.AreSame(hiddenRow, viewModel.Devices[0]);
+
+        viewModel.DeviceSearchText = string.Empty;
+        viewModel.SelectedDevice = matchingRow;
+        Assert.AreEqual("SERIAL-MATCH", settings.SelectedSingleDeviceSerial);
+        viewModel.ApplyDeviceListSnapshot(snapshot);
+        Assert.AreEqual("SERIAL-MATCH", viewModel.SelectedDevice?.Serial);
+        Assert.AreEqual("SERIAL-MATCH", settings.SelectedSingleDeviceSerial);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
     private static DeviceManagerViewModel CreateViewModel(
         IDeviceListService deviceList,
         ICarrierDataService carriers,

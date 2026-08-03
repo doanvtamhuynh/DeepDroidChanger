@@ -33,6 +33,14 @@
     <Color x:Key="Color.DeviceViewerGlyph">#F8FAFC</Color>
     <Color x:Key="Color.BadgeInfoBackground">#EFF6FF</Color>
     <Color x:Key="Color.BadgeInfoForeground">#2563EB</Color>
+    <Color x:Key="Color.DeviceStatusPositiveForeground">#1F9D55</Color>
+    <Color x:Key="Color.DeviceStatusPositiveBackground">#E7F8EF</Color>
+    <Color x:Key="Color.DeviceStatusNegativeForeground">#C53B3B</Color>
+    <Color x:Key="Color.DeviceStatusNegativeBackground">#FDECEC</Color>
+    <Color x:Key="Color.DeviceStatusWarningForeground">#C77000</Color>
+    <Color x:Key="Color.DeviceStatusWarningBackground">#FFF3E2</Color>
+    <Color x:Key="Color.DeviceStatusInfoForeground">#3B82F6</Color>
+    <Color x:Key="Color.DeviceStatusInfoBackground">#EAF3FF</Color>
 
     <SolidColorBrush x:Key="Brush.WindowBackground" Color="{StaticResource Color.WindowBackground}"/>
     <SolidColorBrush x:Key="Brush.Surface" Color="{StaticResource Color.Surface}"/>
@@ -66,5 +74,13 @@
     <SolidColorBrush x:Key="Brush.DeviceViewerGlyph" Color="{StaticResource Color.DeviceViewerGlyph}"/>
     <SolidColorBrush x:Key="Brush.BadgeInfoBackground" Color="{StaticResource Color.BadgeInfoBackground}"/>
     <SolidColorBrush x:Key="Brush.BadgeInfoForeground" Color="{StaticResource Color.BadgeInfoForeground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusPositiveForeground" Color="{StaticResource Color.DeviceStatusPositiveForeground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusPositiveBackground" Color="{StaticResource Color.DeviceStatusPositiveBackground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusNegativeForeground" Color="{StaticResource Color.DeviceStatusNegativeForeground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusNegativeBackground" Color="{StaticResource Color.DeviceStatusNegativeBackground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusWarningForeground" Color="{StaticResource Color.DeviceStatusWarningForeground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusWarningBackground" Color="{StaticResource Color.DeviceStatusWarningBackground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusInfoForeground" Color="{StaticResource Color.DeviceStatusInfoForeground}"/>
+    <SolidColorBrush x:Key="Brush.DeviceStatusInfoBackground" Color="{StaticResource Color.DeviceStatusInfoBackground}"/>
 
 </ResourceDictionary>

@@ -10,6 +10,7 @@ public sealed class DeviceRowViewModel : ObservableObject
     private string _type;
     private string _status;
     private string _process;
+    private AdbDeviceStatus _connectionStatus;
     private bool _isActionBusy;
     private bool _isGmsDisabled;
     private bool _isPlayStoreDisabled;
@@ -33,7 +34,7 @@ public sealed class DeviceRowViewModel : ObservableObject
         _name = name;
         _type = type;
         Active = active;
-        ConnectionStatus = connectionStatus;
+        _connectionStatus = connectionStatus;
         _status = status;
         _process = process;
     }
@@ -41,7 +42,11 @@ public sealed class DeviceRowViewModel : ObservableObject
     public int Index { get; }
     public string Serial { get; }
     public string Active { get; }
-    public AdbDeviceStatus ConnectionStatus { get; set; }
+    public AdbDeviceStatus ConnectionStatus
+    {
+        get => _connectionStatus;
+        set => SetProperty(ref _connectionStatus, value);
+    }
 
     public string Name
     {

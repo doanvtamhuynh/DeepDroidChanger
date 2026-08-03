@@ -1,8 +1,9 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime" xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime" xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" xmlns:models="clr-namespace:DeepDroidChanger.Models">
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="DesignTokens.xaml" />
         <ResourceDictionary Source="Control.xaml" />
     </ResourceDictionary.MergedDictionaries>
+    <Thickness x:Key="DataGridBodyBorderThickness">1,1,1,1</Thickness>
     <Style TargetType="{x:Type DataGrid}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
@@ -26,7 +27,7 @@
         <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
-        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="BorderThickness" Value="{StaticResource DataGridBodyBorderThickness}" />
         <Setter Property="Padding" Value="12,8" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -118,18 +119,95 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="DeviceTableColumnHeaderStyle" TargetType="DataGridColumnHeader" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+    <Style x:Key="DeviceTableColumnHeaderStyle"
+           TargetType="DataGridColumnHeader"
+           BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}"
+           xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+           xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
-        <Setter Property="BorderThickness" Value="{StaticResource Metric.DataGridColumnHeaderBorderThickness}" />
-        <Setter Property="SeparatorBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}" />
+        <Setter Property="BorderThickness" Value="{StaticResource DataGridBodyBorderThickness}" />
+        <Setter Property="SeparatorBrush" Value="{DynamicResource Brush.BorderStrong}" />
         <Setter Property="SeparatorVisibility" Value="Visible" />
         <Setter Property="Padding" Value="10,0" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type DataGridColumnHeader}">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"/>
+                        <Border Height="1"
+                                VerticalAlignment="Bottom"
+                                Background="{DynamicResource Brush.BorderStrong}"
+                                IsHitTestVisible="False"/>
+                        <Border Width="2"
+                                HorizontalAlignment="Right"
+                                Background="{DynamicResource Brush.BorderStrong}"
+                                IsHitTestVisible="False"/>
+                        <Grid Margin="{TemplateBinding Padding}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentStringFormat="{TemplateBinding ContentStringFormat}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True"/>
+                            <TextBlock x:Name="SortGlyph"
+                                       Grid.Column="1"
+                                       Margin="6,0,4,0"
+                                       FontSize="10"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       VerticalAlignment="Center"
+                                       Visibility="Collapsed"/>
+                        </Grid>
+                        <Thumb x:Name="PART_LeftHeaderGripper"
+                               Width="8"
+                               HorizontalAlignment="Left"
+                               Background="Transparent"
+                               Cursor="SizeWE"
+                               Focusable="False">
+                            <Thumb.Template>
+                                <ControlTemplate TargetType="Thumb">
+                                    <Border Background="Transparent"/>
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                        <Thumb x:Name="PART_RightHeaderGripper"
+                               Width="8"
+                               HorizontalAlignment="Right"
+                               Background="Transparent"
+                               Cursor="SizeWE"
+                               Focusable="False">
+                            <Thumb.Template>
+                                <ControlTemplate TargetType="Thumb">
+                                    <Border Background="Transparent"/>
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="SortDirection" Value="Ascending">
+                            <Setter TargetName="SortGlyph" Property="Text" Value="▲"/>
+                            <Setter TargetName="SortGlyph" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="SortDirection" Value="Descending">
+                            <Setter TargetName="SortGlyph" Property="Text" Value="▼"/>
+                            <Setter TargetName="SortGlyph" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
@@ -143,11 +221,91 @@
             </Trigger>
         </Style.Triggers>
     </Style>
+    <Style x:Key="DeviceTableCellStyle" TargetType="DataGridCell" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="BorderThickness" Value="{StaticResource DataGridBodyBorderThickness}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Padding" Value="{StaticResource Spacing.ItemPadding}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}" />
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="DeviceTableRowStyle" TargetType="DataGridRow" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="BorderThickness" Value="{StaticResource DataGridBodyBorderThickness}" />
+        <Style.Triggers>
+            <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
+            </Trigger>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}" />
+                <Setter Property="Opacity" Value="0.65" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="DeviceTableBadgeStyle" TargetType="Border" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusInfoBackground}" />
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.ExtraSmall}" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusInfoForeground}" />
+        <Setter Property="TextElement.FontWeight" Value="SemiBold" />
+    </Style>
+    <Style x:Key="DeviceTableActiveBadgeStyle" TargetType="Border" BasedOn="{StaticResource DeviceTableBadgeStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusNegativeBackground}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusNegativeForeground}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Active}" Value="Active">
+                <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusPositiveBackground}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusPositiveForeground}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="DeviceTableBadgeTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="Foreground" Value="{Binding RelativeSource={RelativeSource AncestorType=Border}, Path=(TextElement.Foreground)}" />
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="TextAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="DeviceTableStatusBadgeStyle" TargetType="Border" BasedOn="{StaticResource DeviceTableBadgeStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding ConnectionStatus}" Value="{x:Static models:AdbDeviceStatus.Online}">
+                <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusPositiveBackground}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusPositiveForeground}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding ConnectionStatus}" Value="{x:Static models:AdbDeviceStatus.Offline}">
+                <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusNegativeBackground}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusNegativeForeground}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding ConnectionStatus}" Value="{x:Static models:AdbDeviceStatus.Unauthorized}">
+                <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusWarningBackground}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusWarningForeground}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
     <Style x:Key="DataGridColumnHeaderTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Center" />
     </Style>

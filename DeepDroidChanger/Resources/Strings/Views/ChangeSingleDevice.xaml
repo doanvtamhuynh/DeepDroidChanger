@@ -74,6 +74,8 @@
     <sys:String x:Key="ChangeSingleDevice_RowMenuDisableWifi">Disable Wi-Fi</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuEnableWifi">Enable Wi-Fi</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterLabel">Filter:</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_DeviceSearchHint">Search devices...</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_DeviceSearchName">Search devices</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterAll">All</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterOnline">Online</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterOffline">Offline</sys:String>

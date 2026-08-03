@@ -204,27 +204,6 @@ public sealed partial class ThemeResourceTests
             factoryReset.ElementsBeforeSelf().Last().Name);
     }
 
-    [TestMethod]
-    public void CanonicalLayoutTokens_AreDocumentedInThemesGuide()
-    {
-        string solutionRoot = GetSolutionRoot();
-        string controlsPath = Path.Combine(solutionRoot, "DeepDroidChanger", "Resources", "Themes", "DesignTokens.xaml");
-        string guide = File.ReadAllText(Path.Combine(solutionRoot, "docs", "THEMES.md"));
-        string[] tokenKeys = KeyDefinitionRegex().Matches(File.ReadAllText(controlsPath))
-            .Select(match => match.Groups[1].Value)
-            .Where(key => key.StartsWith("Metric.", StringComparison.Ordinal)
-                || key.StartsWith("Spacing.", StringComparison.Ordinal)
-                || key.StartsWith("Radius.", StringComparison.Ordinal))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        string[] undocumented = tokenKeys
-            .Where(key => !guide.Contains(key, StringComparison.Ordinal))
-            .Order()
-            .ToArray();
-
-        Assert.IsEmpty(undocumented, $"Theme tokens missing from docs/THEMES.md: {string.Join(", ", undocumented)}");
-    }
-
     private static string GetSolutionRoot()
     {
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));

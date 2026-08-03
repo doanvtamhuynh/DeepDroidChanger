@@ -60,6 +60,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private string _selectedDeviceFilter = "All";
 
     [ObservableProperty]
+    private string _deviceSearchText = string.Empty;
+
+    [ObservableProperty]
     private string? _selectedBrand;
 
     [ObservableProperty]
@@ -549,7 +552,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private bool MatchesDeviceFilter(DeviceRowViewModel device)
     {
-        return SelectedDeviceFilter switch
+        var matchesFilter = SelectedDeviceFilter switch
         {
             "Online" => device.ConnectionStatus == AdbDeviceStatus.Online,
             "Offline" => device.ConnectionStatus != AdbDeviceStatus.Online,
@@ -557,6 +560,27 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             "Inactive" => string.Equals(device.Active, "Inactive", StringComparison.OrdinalIgnoreCase),
             _ => true
         };
+        if (!matchesFilter)
+            return false;
+
+        var search = DeviceSearchText.Trim();
+        return search.Length == 0
+            || device.Serial.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || device.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || device.Type.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || device.Status.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || device.Process.Contains(search, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ReapplySearchIfActive()
+    {
+        if (!string.IsNullOrWhiteSpace(DeviceSearchText))
+            ApplyDeviceFilter();
+    }
+
+    partial void OnDeviceSearchTextChanged(string value)
+    {
+        ApplyDeviceFilter();
     }
 
     private void OnDeviceRowPropertyChanged(object? sender, PropertyChangedEventArgs args)
@@ -574,6 +598,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         if (args.PropertyName == nameof(DeviceRowViewModel.Name))
         {
             QueueDeviceRowEdit(deviceRow);
+            ReapplySearchIfActive();
             return;
         }
 
@@ -583,7 +608,15 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             TrackSilentSave(
                 SaveDeviceRowEditAsync(deviceRow, GetActiveToken()),
                 "Failed to save Multiple Device row edit.");
+            ReapplySearchIfActive();
+            return;
         }
+
+        if (args.PropertyName == nameof(DeviceRowViewModel.Status)
+            || args.PropertyName == nameof(DeviceRowViewModel.Process))
+            ReapplySearchIfActive();
+        else if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
+            ApplyDeviceFilter();
     }
 
     private void SynchronizeSelectedDeviceSettings()
@@ -660,13 +693,22 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         var connectedBySerial = connectedDevices.ToDictionary(
             device => device.Serial,
             StringComparer.OrdinalIgnoreCase);
-        foreach (DeviceRowViewModel device in _allDeviceRows)
+        var wasRefreshingRows = _isRefreshingRows;
+        _isRefreshingRows = true;
+        try
         {
-            device.ConnectionStatus =
-                connectedBySerial.TryGetValue(device.Serial, out AdbDevice? connectedDevice)
-                    ? connectedDevice.Status
-                    : AdbDeviceStatus.Offline;
-            device.Status = GetConnectionStatusText(device.ConnectionStatus);
+            foreach (DeviceRowViewModel device in _allDeviceRows)
+            {
+                device.ConnectionStatus =
+                    connectedBySerial.TryGetValue(device.Serial, out AdbDevice? connectedDevice)
+                        ? connectedDevice.Status
+                        : AdbDeviceStatus.Offline;
+                device.Status = GetConnectionStatusText(device.ConnectionStatus);
+            }
+        }
+        finally
+        {
+            _isRefreshingRows = wasRefreshingRows;
         }
 
         ApplyDeviceFilter();

@@ -5,6 +5,8 @@
     <sys:String x:Key="ChangeMultipleDevices_NewDeviceCount">Thiết bị mới: {0}</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_NotAvailable">Không có</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterLabel">Lọc:</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_DeviceSearchHint">Tìm kiếm thiết bị...</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_DeviceSearchName">Tìm kiếm thiết bị</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterAll">Tất cả</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterOnline">Online</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterOffline">Offline</sys:String>

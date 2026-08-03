@@ -5,7 +5,7 @@
     <sys:String x:Key="AddDevices_WindowTitle">Add Devices</sys:String>
     <sys:String x:Key="AddDevices_LoadFailed">Unable to refresh connected devices.</sys:String>
     <sys:String x:Key="AddDevices_SelectAll">Select all devices</sys:String>
-    <sys:String x:Key="AddDevices_ColumnSelectDevice">Select devices</sys:String>
+    <sys:String x:Key="AddDevices_ColumnSelectDevice">Select</sys:String>
     <sys:String x:Key="AddDevices_ColumnSerial">Serial</sys:String>
     <sys:String x:Key="AddDevices_ColumnType">Type</sys:String>
     <sys:String x:Key="AddDevices_ColumnName">Name</sys:String>
