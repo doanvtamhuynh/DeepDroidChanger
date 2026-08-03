@@ -134,6 +134,53 @@ namespace DeepDroidChanger.Tests.Services.Implementations
         }
 
         [TestMethod]
+        public async Task EnsureStreamAsync_CurrentGeneration_DoesNotHideNewSessionBeforeItIsSynchronized()
+        {
+            IDeviceViewerStreamService streamService = Substitute.For<IDeviceViewerStreamService>();
+            IAdbCommandService commandService = Substitute.For<IAdbCommandService>();
+            commandService.RunAdbAsync("SERIAL", "get-state", Arg.Any<CancellationToken>())
+                .Returns(new CommandResult(0, "device", string.Empty));
+            commandService.RunAdbAsync("SERIAL", "shell wm size", Arg.Any<CancellationToken>())
+                .Returns(new CommandResult(0, "Physical size: 1080x2400", string.Empty));
+            IDeviceViewerStreamSession newSession = Substitute.For<IDeviceViewerStreamSession>();
+            streamService.StartAsync(
+                    "SERIAL",
+                    new IntPtr(1),
+                    Arg.Any<DeviceViewerStreamBounds>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(newSession);
+            var coordinator = new DeviceViewerCoordinatorService(
+                streamService,
+                commandService,
+                NullLogger<DeviceViewerCoordinatorService>.Instance);
+            IDeviceViewerStreamSession? publishedSession = null;
+            var nativeWindowSyncRequested = false;
+
+            var context = new DeviceViewerStartContext(
+                "SERIAL",
+                new SemaphoreSlim(1, 1),
+                CancellationToken.None,
+                () => publishedSession,
+                value => publishedSession = value,
+                (_, _) => Task.CompletedTask,
+                () => nativeWindowSyncRequested = true,
+                1,
+                _ => true,
+                () => Task.CompletedTask,
+                () => Task.CompletedTask,
+                _ => Task.FromResult(new DeviceViewerStreamBounds(0, 0, 100, 200)),
+                () => Task.FromResult(new IntPtr(1)),
+                () => Task.CompletedTask,
+                () => Task.CompletedTask);
+
+            await coordinator.EnsureStreamAsync(context);
+
+            Assert.AreSame(newSession, publishedSession);
+            Assert.IsTrue(nativeWindowSyncRequested);
+            newSession.DidNotReceive().SetVisible(false);
+        }
+
+        [TestMethod]
         public async Task QueryDeviceAspectRatioAsync_InvalidOutput_ReturnsDeterministicFallback()
         {
             IAdbCommandService commandService = Substitute.For<IAdbCommandService>();

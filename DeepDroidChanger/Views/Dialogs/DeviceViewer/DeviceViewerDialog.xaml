@@ -9,9 +9,9 @@
         xmlns:viewModels="clr-namespace:DeepDroidChanger.ViewModels"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Width="820"
+        Width="893"
         Height="700"
-        MinWidth="760"
+        MinWidth="833"
         MinHeight="640"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
@@ -412,7 +412,7 @@
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="242"/>
+                    <ColumnDefinition Width="315"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0" Background="{DynamicResource Brush.WindowBackground}">

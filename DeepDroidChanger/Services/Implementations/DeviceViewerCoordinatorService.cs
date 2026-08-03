@@ -142,10 +142,9 @@ namespace DeepDroidChanger.Services
                     .StartAsync(context.Serial, ownerHwnd, startBounds, context.CancellationToken)
                     .ConfigureAwait(true);
 
-                newSession.SetVisible(false);
-
                 if (!context.IsCurrentSession(context.Generation))
                 {
+                    newSession.SetVisible(false);
                     await newSession.StopAsync(CancellationToken.None).ConfigureAwait(true);
                     newSession.Dispose();
                     return;

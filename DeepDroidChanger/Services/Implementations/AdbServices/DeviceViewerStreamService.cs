@@ -21,8 +21,6 @@ namespace DeepDroidChanger.Services
         private const int SW_SHOWNA = 8;
         private const uint SWP_NOZORDER = 0x0004;
         private const uint SWP_NOACTIVATE = 0x0010;
-        private const uint SWP_SHOWWINDOW = 0x0040;
-        private const uint SWP_HIDEWINDOW = 0x0080;
         private static readonly IntPtr HwndTop = IntPtr.Zero;
         private readonly ConcurrentDictionary<string, DeviceViewerStreamSession> _activeStreamSessions = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _serialLocks = new(StringComparer.OrdinalIgnoreCase);
@@ -104,7 +102,7 @@ namespace DeepDroidChanger.Services
                 RedirectStandardError = true
             };
 
-            AddScrcpyArguments(startInfo, serial, windowTitle);
+            AddScrcpyArguments(startInfo, serial, windowTitle, bounds);
 
             _logger.LogDebug(
                 "Starting external scrcpy for {Serial}.",
@@ -137,7 +135,6 @@ namespace DeepDroidChanger.Services
 
                 var session = new DeviceViewerStreamSession(serial, process, streamHwnd, _logger, RemoveActiveSession);
                 session.UpdateBounds(bounds);
-                session.SetVisible(false);
                 return session;
             }
             catch
@@ -147,7 +144,11 @@ namespace DeepDroidChanger.Services
             }
         }
 
-        private static void AddScrcpyArguments(ProcessStartInfo startInfo, string serial, string windowTitle)
+        private static void AddScrcpyArguments(
+            ProcessStartInfo startInfo,
+            string serial,
+            string windowTitle,
+            DeviceViewerStreamBounds bounds)
         {
             startInfo.ArgumentList.Add("--serial");
             startInfo.ArgumentList.Add(serial);
@@ -155,6 +156,14 @@ namespace DeepDroidChanger.Services
             startInfo.ArgumentList.Add(windowTitle);
             startInfo.ArgumentList.Add("--window-borderless");
             startInfo.ArgumentList.Add("--no-audio");
+            startInfo.ArgumentList.Add("--window-x");
+            startInfo.ArgumentList.Add(bounds.X.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add("--window-y");
+            startInfo.ArgumentList.Add(bounds.Y.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add("--window-width");
+            startInfo.ArgumentList.Add(bounds.Width.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add("--window-height");
+            startInfo.ArgumentList.Add(bounds.Height.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
         private async Task<IntPtr> FindStreamWindowAsync(
@@ -400,7 +409,7 @@ namespace DeepDroidChanger.Services
                     return;
                 }
 
-                var flags = SWP_NOZORDER | SWP_NOACTIVATE | (_isVisible ? SWP_SHOWWINDOW : SWP_HIDEWINDOW);
+                var flags = SWP_NOZORDER | SWP_NOACTIVATE;
                 if (!SetWindowPos(_hwnd, HwndTop, bounds.X, bounds.Y, bounds.Width, bounds.Height, flags))
                 {
                     _logger.LogWarning(
