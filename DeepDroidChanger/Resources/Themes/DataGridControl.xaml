@@ -336,6 +336,16 @@
         <Setter Property="TextTrimming" Value="None" />
         <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
     </Style>
+    <Style x:Key="DeviceTableProcessTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DataGridWrappingCellTextStyle}">
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding ProcessState}" Value="{x:Static models:DeviceProcessState.Succeeded}">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Success}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding ProcessState}" Value="{x:Static models:DeviceProcessState.Failed}">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
     <Style x:Key="DataGridCenterCellTextStyle" TargetType="TextBlock" BasedOn="{StaticResource DataGridCellTextStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Center" />

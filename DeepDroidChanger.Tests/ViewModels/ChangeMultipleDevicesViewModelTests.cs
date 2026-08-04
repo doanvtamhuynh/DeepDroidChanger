@@ -22,6 +22,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 []));
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
+        Assert.IsTrue(viewModel.Devices.All(device => device.Process == "Log_Ready"));
         using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
 
         viewModel.ToggleSelectAllDevicesCommand.Execute(null);
@@ -441,8 +442,21 @@ public sealed class ChangeMultipleDevicesViewModelTests
         using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
         await viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
 
+        viewModel.ApplyDeviceListSnapshot(CreateSnapshot(
+            [
+                new StoredDeviceConfig { Serial = "A", Name = "Alpha" },
+                new StoredDeviceConfig { Serial = "B", Name = "Beta" }
+            ],
+            []));
+
         Assert.AreEqual("Log_ActionAlreadyInProgress", viewModel.Devices.Single(device => device.Serial == "A").Process);
         Assert.AreEqual("Log_RandomDeviceSuccess", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        Assert.AreEqual(
+            DeviceProcessState.Failed,
+            viewModel.Devices.Single(device => device.Serial == "A").ProcessState);
+        Assert.AreEqual(
+            DeviceProcessState.Succeeded,
+            viewModel.Devices.Single(device => device.Serial == "B").ProcessState);
         Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
 
         await viewModel.DeactivateAsync();

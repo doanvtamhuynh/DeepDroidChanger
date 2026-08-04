@@ -5,7 +5,7 @@
     <sys:String x:Key="ChangeMultipleDevices_NewDeviceCount">Thiết bị mới: {0}</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_NotAvailable">Không có</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterLabel">Lọc:</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_FilterTooltip">Lọc danh sách thiết bị đang hiển thị theo trạng thái mà không thay đổi dữ liệu thiết bị.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_FilterTooltip">Lọc thiết bị đang hiển thị theo trạng thái; không đổi dữ liệu thiết bị.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_DeviceSearchHint">Tìm kiếm thiết bị...</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_DeviceSearchName">Tìm kiếm thiết bị</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterAll">Tất cả</sys:String>
@@ -29,17 +29,17 @@
     <sys:String x:Key="ChangeMultipleDevices_InfoDeviceSelectorHint">Chọn thiết bị đã tick</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionViewAllDeviceInfo">View All Info</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelected">Tạo thiết bị random</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelectedTooltip">Tạo thông tin random cho các thiết bị đã chọn</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelectedTooltip">Tạo ngẫu nhiên thông tin thiết bị cho các thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipe">Đổi &amp; Wipe thiết bị</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipeTooltip">Đổi thông tin và wipe các thiết bị đã chọn</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipeTooltip">Đổi thông tin các thiết bị đã chọn và wipe dữ liệu ứng dụng.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChange">Wipe không đổi thông tin</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChangeTooltip">Wipe các thiết bị đã chọn nhưng không đổi thông tin</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChangeTooltip">Wipe dữ liệu ứng dụng của các thiết bị đã chọn nhưng không đổi thông tin.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipe">Đổi thông tin không wipe</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipeTooltip">Đổi thông tin các thiết bị đã chọn nhưng không wipe dữ liệu</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipeTooltip">Đổi thông tin các thiết bị đã chọn nhưng không wipe dữ liệu ứng dụng.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSim">Random SIM</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSimTooltip">Tạo thông tin SIM cho các thiết bị đã chọn</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSimTooltip">Tạo ngẫu nhiên thông tin SIM cho các thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeSim">Đổi SIM</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeSimTooltip">Áp dụng thông tin SIM đã tạo cho các thiết bị đã chọn</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeSimTooltip">Áp dụng thông tin SIM đã tạo cho các thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeCaption">Đổi &amp; Wipe {0} thiết bị?</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeMessage">Thao tác sẽ đổi thông tin và wipe dữ liệu của {0} thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeWarning">Thiết bị sẽ khởi động lại và dữ liệu ứng dụng sẽ bị xóa.</sys:String>
@@ -71,9 +71,8 @@
     <sys:String x:Key="ChangeMultipleDevices_OptionChangeSim">Đổi SIM</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_OptionDefaultMode">Đổi và Wipe mặc định</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_AdvancedConfig">Advanced Config</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_AdvancedConfigTooltip">Chọn ít nhất một thiết bị online và tắt chế độ mặc định để cấu hình tùy chọn nâng cao.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_AdvancedConfigTooltip">Chọn ít nhất một thiết bị online và tắt chế độ mặc định để cấu hình nâng cao.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOnline">Online</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusUnauthorized">Chưa cấp quyền</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_LogReady">Sẵn sàng</sys:String>
 </ResourceDictionary>

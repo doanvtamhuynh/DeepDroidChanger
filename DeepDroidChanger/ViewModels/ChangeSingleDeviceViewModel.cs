@@ -361,7 +361,9 @@ namespace DeepDroidChanger.ViewModels
             var message = formatArguments.Length == 0
                 ? template
                 : string.Format(template, formatArguments);
-            device.Process = message;
+            DeviceRowViewModel currentDevice = _allDeviceRows.FirstOrDefault(
+                row => SerialEquals(row.Serial, device.Serial)) ?? device;
+            currentDevice.SetProcess(message, resourceKey);
             _logger.LogInformation("Device {Serial} action: {Message}", device.Serial, message);
         }
 
@@ -1980,7 +1982,7 @@ namespace DeepDroidChanger.ViewModels
             if (ratios == null || ratios.Count == 0)
                 return;
 
-            _settings.ReplaceDeviceTableColumnRatios(ratios);
+            DeviceTableColumnRatioHelper.Replace(_settings.DeviceTableColumnRatios, ratios);
 
             OnPropertyChanged(nameof(DeviceTableColumnRatios));
             await SaveAppSettingsAsync(cancellationToken).ConfigureAwait(false);
@@ -2070,6 +2072,10 @@ namespace DeepDroidChanger.ViewModels
         {
             _isRefreshingRows = true;
             var targetSerial = SelectedDevice?.Serial ?? _settings.SelectedSingleDeviceSerial;
+            var processBySerial = new Dictionary<string, (string Message, DeviceProcessState State)>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var device in _allDeviceRows)
+                processBySerial[device.Serial] = (device.Process, device.ProcessState);
 
             try
             {
@@ -2085,6 +2091,9 @@ namespace DeepDroidChanger.ViewModels
                     var storedDevice = storedDevices[index];
                     connectedBySerial.TryGetValue(storedDevice.Serial, out var connectedDevice);
                     var deviceRow = CreateDeviceRow(index + 1, storedDevice, connectedDevice);
+                    if (processBySerial.TryGetValue(deviceRow.Serial, out var previousProcess))
+                        deviceRow.RestoreProcess(previousProcess.Message, previousProcess.State);
+
                     deviceRow.PropertyChanged += OnDeviceRowPropertyChanged;
                     _allDeviceRows.Add(deviceRow);
                 }

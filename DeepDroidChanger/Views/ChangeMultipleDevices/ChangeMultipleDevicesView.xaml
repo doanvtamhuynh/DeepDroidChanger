@@ -518,7 +518,7 @@
                                         Width="1.95*"
                                         MinWidth="150"
                                         IsReadOnly="True"
-                                        ElementStyle="{StaticResource DataGridWrappingCellTextStyle}">
+                                        ElementStyle="{StaticResource DeviceTableProcessTextStyle}">
                         <DataGridTextColumn.Header>
                             <TextBlock Text="{DynamicResource ChangeMultipleDevices_ColumnProcess}"
                                        Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
@@ -555,7 +555,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="210"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="CellphoneCog"

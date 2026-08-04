@@ -1854,7 +1854,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
         await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
-        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Failed, viewModel.Devices[0].ProcessState);
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
@@ -1931,6 +1932,14 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
                 && options.ChangeAndroidId),
             Arg.Any<IProgress<DeviceChangeStage>>(),
             Arg.Any<CancellationToken>());
+
+        viewModel.ApplyDeviceListSnapshot(new DeviceListSnapshot(
+            storedDevices,
+            []));
+
+        Assert.AreEqual("Log_ChangeDeviceSuccess", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, viewModel.Devices[0].ProcessState);
+        Assert.AreEqual(AdbDeviceStatus.Offline, viewModel.Devices[0].ConnectionStatus);
 
         await viewModel.DeactivateAsync();
         viewModel.Dispose();

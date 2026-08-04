@@ -1103,7 +1103,7 @@
                                     Width="1.95*"
                                     MinWidth="150"
                                     IsReadOnly="True"
-                                    ElementStyle="{StaticResource DataGridWrappingCellTextStyle}">
+                                    ElementStyle="{StaticResource DeviceTableProcessTextStyle}">
                     <DataGridTextColumn.Header>
                         <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnProcess}"
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
@@ -1330,7 +1330,7 @@
                                 <Button x:Name="AdvancedChangeConfigButton"
                                         Grid.Column="2"
                                         Command="{Binding OpenAdvancedChangeConfigCommand}"
-                                        ToolTip="{DynamicResource Shared_TooltipAction}"
+                                        ToolTip="{DynamicResource ChangeSingleDevice_AdvancedConfigTooltip}"
                                         Style="{StaticResource DeviceInfoDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1497,7 +1497,7 @@
                                     Grid.Row="0"
                                     Grid.Column="0"
                                     Command="{Binding RandomDeviceCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomDeviceTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1518,7 +1518,7 @@
                                     Grid.Row="1"
                                     Grid.Column="1"
                                     Command="{Binding ChangeWithoutWipeCommand}"
-                                    ToolTip="{DynamicResource ChangeSingleDevice_ConfirmChangeWithoutWipeMessage}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeWithoutWipeTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
 
@@ -1540,7 +1540,7 @@
                                     Grid.Row="0"
                                     Grid.Column="1"
                                     Command="{Binding ChangeDeviceCommand}"
-                                    ToolTip="{DynamicResource ChangeDeviceConfirmation_Message}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeDeviceTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1561,7 +1561,7 @@
                                     Grid.Row="1"
                                     Grid.Column="0"
                                     Command="{Binding WipeWithoutChangeCommand}"
-                                    ToolTip="{DynamicResource ChangeSingleDevice_ConfirmWipeWithoutChangeMessage}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionWipeWithoutChangeTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1581,7 +1581,7 @@
                             <Button Grid.Row="3"
                                     Grid.Column="0"
                                     Command="{Binding RandomChangeAndWipeDeviceCommand}"
-                                    ToolTip="{DynamicResource ChangeDeviceConfirmation_Message}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomChangeAndWipeTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1602,7 +1602,7 @@
                                     Grid.Row="2"
                                     Grid.Column="0"
                                     Command="{Binding RandomSimCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomSimTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1623,7 +1623,7 @@
                                     Grid.Row="2"
                                     Grid.Column="1"
                                     Command="{Binding ChangeSimCommand}"
-                                    ToolTip="{DynamicResource ChangeSingleDevice_ConfirmChangeSimMessage}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeSimTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>

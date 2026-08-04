@@ -876,7 +876,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         if (ratios == null || ratios.Count == 0)
             return;
 
-        _settings.ReplaceDeviceTableColumnRatios(ratios);
+        DeviceTableColumnRatioHelper.Replace(_settings.DeviceTableColumnRatios, ratios);
 
         OnPropertyChanged(nameof(DeviceTableColumnRatios));
         await SaveSettingsAsync(cancellationToken).ConfigureAwait(false);
@@ -1012,6 +1012,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         var connectedBySerial = connectedDevices.ToDictionary(
             device => device.Serial,
             StringComparer.OrdinalIgnoreCase);
+        var processBySerial = new Dictionary<string, (string Message, DeviceProcessState State)>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (DeviceRowViewModel device in _allDeviceRows)
+            processBySerial[device.Serial] = (device.Process, device.ProcessState);
 
         _isRefreshingRows = true;
         try
@@ -1029,7 +1033,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     storedDevice,
                     connectedDevice,
                     GetConnectionStatusText(connectedDevice?.Status ?? AdbDeviceStatus.Offline),
-                    _localizationService.GetString("ChangeMultipleDevices_LogReady"));
+                    _localizationService.GetString("Log_Ready"));
+                if (processBySerial.TryGetValue(row.Serial, out var previousProcess))
+                    row.RestoreProcess(previousProcess.Message, previousProcess.State);
+
                 row.IsSelected = selectedSerials.Contains(row.Serial);
                 row.IsActionBusy = _deviceActionGuardService.IsBusy(row.Serial);
                 row.PropertyChanged += OnDeviceRowPropertyChanged;
@@ -1200,7 +1207,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private void SetDeviceLog(DeviceRowViewModel device, string resourceKey)
     {
         string message = GetLogText(resourceKey);
-        device.Process = message;
+        DeviceRowViewModel currentDevice = _allDeviceRows.FirstOrDefault(
+            row => SerialEquals(row.Serial, device.Serial)) ?? device;
+        currentDevice.SetProcess(message, resourceKey);
         _logger.LogInformation("Multiple Device {Serial} action: {Message}", device.Serial, message);
     }
 

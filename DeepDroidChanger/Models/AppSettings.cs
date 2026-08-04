@@ -19,14 +19,5 @@ namespace DeepDroidChanger.Models
         public string SelectedSingleDeviceSerial { get; set; } = string.Empty;
         public List<string> SelectedMultipleDeviceSerials { get; set; } = [];
 
-        public void ReplaceDeviceTableColumnRatios(IReadOnlyDictionary<string, double> ratios)
-        {
-            ArgumentNullException.ThrowIfNull(ratios);
-
-            Dictionary<string, double> copiedRatios = new(ratios, StringComparer.Ordinal);
-            DeviceTableColumnRatios.Clear();
-            foreach ((string key, double value) in copiedRatios)
-                DeviceTableColumnRatios[key] = value;
-        }
     }
 }
