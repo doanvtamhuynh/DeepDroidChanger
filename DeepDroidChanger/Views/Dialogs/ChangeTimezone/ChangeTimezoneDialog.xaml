@@ -77,6 +77,7 @@
 
                 <RadioButton Grid.Row="0"
                              IsChecked="{Binding IsDataMode, Mode=TwoWay}"
+                             ToolTip="{DynamicResource Shared_TooltipOption}"
                              Style="{StaticResource CardRadioButtonStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="ClockOutline"
@@ -91,6 +92,7 @@
 
                 <RadioButton Grid.Row="1"
                              IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
+                             ToolTip="{DynamicResource Shared_TooltipOption}"
                              Style="{StaticResource CardRadioButtonStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="Web"
@@ -114,6 +116,7 @@
 
             <TextBox Grid.Row="0"
                      Text="{Binding TimezoneSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="{DynamicResource Shared_TooltipSearch}"
                      Style="{StaticResource DialogSearchTextBoxStyle}"
                      materialDesign:HintAssist.Hint="{DynamicResource ChangeTimezone_SearchHint}"
                      IsEnabled="{Binding IsDataMode}"/>
@@ -122,6 +125,7 @@
                       Grid.Row="1"
                       ItemsSource="{Binding FilteredCountries}"
                       SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
+                      ToolTip="{DynamicResource Shared_TooltipSelection}"
                       IsDropDownOpen="{Binding IsCountryDropDownOpen, Mode=TwoWay}"
                       Style="{StaticResource ChangeTimezoneComboBoxStyle}"
                       IsEnabled="{Binding IsDataMode}"
@@ -137,6 +141,7 @@
                       Grid.Row="2"
                       ItemsSource="{Binding CountryTimezones}"
                       SelectedItem="{Binding SelectedTimezone, Mode=TwoWay}"
+                      ToolTip="{DynamicResource Shared_TooltipSelection}"
                       Style="{StaticResource ChangeTimezoneComboBoxStyle}"
                       IsEnabled="{Binding IsDataMode}"
                       MaxDropDownHeight="220">
@@ -162,6 +167,7 @@
 
             <Button Grid.Column="1"
                     Command="{Binding SaveCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>

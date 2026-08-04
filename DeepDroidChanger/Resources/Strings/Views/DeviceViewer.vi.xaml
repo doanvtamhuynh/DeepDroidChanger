@@ -23,6 +23,5 @@
     <system:String x:Key="DeviceViewerShellCommandHint">Nhập lệnh shell...</system:String>
     <system:String x:Key="DeviceViewerLoadingStream">Đang khởi động scrcpy...</system:String>
     <system:String x:Key="DeviceViewerStreamError">Không thể khởi động scrcpy.</system:String>
-    <system:String x:Key="DeviceViewerDisconnectedAlt">Thiết bị mất kết nối. Đang chờ kết nối lại...</system:String>
     <system:String x:Key="DeviceViewerDeviceControls">ĐIỀU KHIỂN THIẾT BỊ</system:String>
 </ResourceDictionary>

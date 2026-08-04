@@ -90,6 +90,7 @@
 
                 <RadioButton Grid.Row="0"
                              IsChecked="{Binding IsConfigMode, Mode=TwoWay}"
+                             ToolTip="{DynamicResource Shared_TooltipOption}"
                              Style="{StaticResource CardRadioButtonStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="SquareEditOutline"
@@ -104,6 +105,7 @@
 
                 <RadioButton Grid.Row="1"
                              IsChecked="{Binding IsDeviceIpMode, Mode=TwoWay}"
+                             ToolTip="{DynamicResource Shared_TooltipOption}"
                              Style="{StaticResource CardRadioButtonStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialDesign:PackIcon Kind="Web"
@@ -127,6 +129,7 @@
 
             <TextBox Grid.Row="0"
                      Text="{Binding LocationSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="{DynamicResource Shared_TooltipSearch}"
                      Style="{StaticResource DialogSearchTextBoxStyle}"
                      materialDesign:HintAssist.Hint="{DynamicResource ChangeLocation_CountrySearchHint}"
                      IsEnabled="{Binding IsConfigMode}"/>
@@ -135,6 +138,7 @@
                       Grid.Row="1"
                       ItemsSource="{Binding FilteredCountries}"
                       SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
+                      ToolTip="{DynamicResource Shared_TooltipSelection}"
                       IsDropDownOpen="{Binding IsCountryDropDownOpen, Mode=TwoWay}"
                       DropDownClosed="CountryComboBox_DropDownClosed"
                       Style="{StaticResource DialogFormComboBoxStyle}"
@@ -151,6 +155,7 @@
                       Grid.Row="2"
                       ItemsSource="{Binding CountryLocations}"
                       SelectedItem="{Binding SelectedLocation, Mode=TwoWay}"
+                      ToolTip="{DynamicResource Shared_TooltipSelection}"
                       DropDownClosed="LocationComboBox_DropDownClosed"
                       Style="{StaticResource DialogFormComboBoxStyle}"
                       IsEnabled="{Binding IsConfigMode}"
@@ -182,6 +187,7 @@
                        IsEnabled="{Binding IsConfigMode}"/>
             <TextBox Grid.Row="1" Grid.Column="0"
                      Text="{Binding Latitude, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="{DynamicResource Shared_TooltipTextInput}"
                      Style="{StaticResource ChangeLocationTextBoxStyle}"
                      IsEnabled="{Binding IsConfigMode}"/>
             <TextBlock Grid.Row="2" Grid.Column="0"
@@ -194,6 +200,7 @@
                        IsEnabled="{Binding IsConfigMode}"/>
             <TextBox Grid.Row="1" Grid.Column="2"
                      Text="{Binding Longitude, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="{DynamicResource Shared_TooltipTextInput}"
                      Style="{StaticResource ChangeLocationTextBoxStyle}"
                      IsEnabled="{Binding IsConfigMode}"/>
             <TextBlock Grid.Row="2" Grid.Column="2"
@@ -215,6 +222,7 @@
 
             <Button Grid.Column="1"
                     Command="{Binding SaveCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>

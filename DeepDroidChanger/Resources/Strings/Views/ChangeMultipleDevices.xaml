@@ -5,6 +5,7 @@
     <sys:String x:Key="ChangeMultipleDevices_NewDeviceCount">New devices: {0}</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_NotAvailable">N/A</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterLabel">Filter:</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_FilterTooltip">Filter the displayed device list by status without changing any device data.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_DeviceSearchHint">Search devices...</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_DeviceSearchName">Search devices</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterAll">All</sys:String>
@@ -20,7 +21,6 @@
     <sys:String x:Key="ChangeMultipleDevices_ColumnActive">Active</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ColumnStatus">Status</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ColumnProcess">Process</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_SelectAllTooltip">Select or clear all devices</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_SelectAllDevices">Select all devices</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ChangeConfigurationHeader">Device Configuration</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionsHeader">Multiple Device Actions</sys:String>

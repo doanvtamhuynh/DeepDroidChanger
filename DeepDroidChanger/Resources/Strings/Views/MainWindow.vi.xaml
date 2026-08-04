@@ -6,7 +6,14 @@
     <sys:String x:Key="Nav_ChangeSingleDevice">Đổi một thiết bị</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDevice">Đổi nhiều thiết bị</sys:String>
     <sys:String x:Key="Nav_Settings">Cài đặt</sys:String>
-    <sys:String x:Key="Nav_ToggleSidebar">Thu gọn thanh bên</sys:String>
-    <sys:String x:Key="Nav_Language">Ngôn ngữ</sys:String>
-    <sys:String x:Key="Nav_Theme">Giao diện</sys:String>
+    <sys:String x:Key="Nav_ToggleSidebar">Mở rộng hoặc thu gọn thanh bên</sys:String>
+    <sys:String x:Key="Nav_Language">Chuyển ngôn ngữ</sys:String>
+    <sys:String x:Key="Nav_Theme">Chuyển giao diện</sys:String>
+    <sys:String x:Key="Nav_ChangeDevicesTooltip">Mở khu vực đổi thiết bị để chọn thao tác cho một hoặc nhiều thiết bị.</sys:String>
+    <sys:String x:Key="Nav_ChangeSingleDeviceTooltip">Mở khu vực cấu hình và đổi cho một thiết bị đang chọn.</sys:String>
+    <sys:String x:Key="Nav_ChangeMultipleDeviceTooltip">Mở khu vực áp dụng thao tác cho nhiều thiết bị đã chọn.</sys:String>
+    <sys:String x:Key="Nav_SettingsTooltip">Mở cài đặt và tùy chọn của ứng dụng.</sys:String>
+    <sys:String x:Key="Nav_ToggleSidebarTooltip">Mở rộng hoặc thu gọn thanh điều hướng mà không thay đổi khu vực đang làm việc.</sys:String>
+    <sys:String x:Key="Nav_LanguageTooltip">Chuyển ngôn ngữ ứng dụng giữa các bản địa hóa hiện có.</sys:String>
+    <sys:String x:Key="Nav_ThemeTooltip">Chuyển giao diện màu của ứng dụng.</sys:String>
 </ResourceDictionary>

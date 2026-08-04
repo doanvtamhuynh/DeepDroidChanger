@@ -144,6 +144,7 @@
                                            Style="{StaticResource RandomDeviceInfoFieldTextStyle}"/>
                                 <TextBox Grid.Row="1"
                                          Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource RandomDeviceInfoInputStyle}"/>
                             </Grid>
                         </Border>
@@ -156,6 +157,7 @@
               Style="{StaticResource RandomDeviceInfoActionGridStyle}">
             <Button x:Name="UpdateRandomDeviceInfoButton"
                     Command="{Binding UpdateCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource RandomDeviceInfoUpdateButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>

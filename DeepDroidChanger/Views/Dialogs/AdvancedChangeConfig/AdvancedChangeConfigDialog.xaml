@@ -98,26 +98,32 @@
                              Margin="0,8,0,0">
                     <CheckBox x:Name="ChangeAndroidIdCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeAndroidId}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ChangeAndroidId, Mode=TwoWay}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ChangeMacAddressCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeMac}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ChangeMacAddress, Mode=TwoWay}"
                               Margin="0,4"/>
                     <CheckBox x:Name="UseIntegritySecurityPatchCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_UseIntegritySecurityPatch}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"
                               Margin="0,4"/>
                     <CheckBox x:Name="UpdateIntegrityCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_UpdateIntegrity}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding UpdateIntegrity, Mode=TwoWay}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ChangeTimezoneCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeTimezone}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ChangeTimezone, Mode=TwoWay}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ChangeLocationCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeLocation}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ChangeLocation, Mode=TwoWay}"
                               Margin="0,4"/>
                 </UniformGrid>
@@ -150,6 +156,7 @@
                               Grid.Row="0"
                               Grid.Column="0"
                               Content="{DynamicResource AdvancedChangeConfig_ClearAllPackages}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ClearAllPackages, Mode=TwoWay}"
                               Margin="0,4,0,4"/>
 
@@ -157,6 +164,7 @@
                               Grid.Row="0"
                               Grid.Column="2"
                               Content="{DynamicResource AdvancedChangeConfig_ClearGooglePackages}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ClearGooglePackages, Mode=TwoWay}"
                               IsEnabled="{Binding IsSelectiveWipeEnabled}"
                               Margin="0,4,0,4"/>
@@ -165,6 +173,7 @@
                               Grid.Row="1"
                               Grid.Column="0"
                               Content="{DynamicResource AdvancedChangeConfig_ClearGoogleAccounts}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ClearGoogleAccounts, Mode=TwoWay}"
                               Margin="0,4,0,4"/>
 
@@ -172,6 +181,7 @@
                               Grid.Row="1"
                               Grid.Column="2"
                               Content="{DynamicResource AdvancedChangeConfig_ClearSelectedPackages}"
+                              ToolTip="{DynamicResource Shared_TooltipOption}"
                               IsChecked="{Binding ClearSelectedPackages, Mode=TwoWay}"
                               IsEnabled="{Binding IsSelectiveWipeEnabled}"
                               Margin="0,4,0,4"/>
@@ -200,6 +210,7 @@
                     </Grid.ColumnDefinitions>
                     <Button x:Name="LoadPackagesButton"
                             Command="{Binding LoadPackagesCommand}"
+                            ToolTip="{DynamicResource Shared_TooltipAction}"
                             Style="{StaticResource AdvancedChangeConfigPrimaryButtonStyle}">
                         <StackPanel Orientation="Horizontal">
 
@@ -220,6 +231,7 @@
                               Width="190"
                               ItemsSource="{Binding PackageScopes}"
                               SelectedItem="{Binding SelectedPackageScope, Mode=TwoWay}"
+                              ToolTip="{DynamicResource Shared_TooltipSelection}"
                               DisplayMemberPath="DisplayName"
                               Style="{StaticResource FlatComboBoxStyle}"/>
                     <ProgressBar Grid.Column="3"
@@ -250,6 +262,7 @@
                                  Grid.Row="1"
                                  ItemsSource="{Binding AvailablePackages}"
                                  SelectedItem="{Binding SelectedAvailablePackage, Mode=TwoWay}"
+                                 ToolTip="{DynamicResource Shared_TooltipList}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                  Margin="0,8,0,0"/>
                     </Grid>
@@ -260,25 +273,29 @@
                         <Button x:Name="AddSelectedPackageButton"
                                 Command="{Binding AddSelectedPackageCommand}"
                                 Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
-                                ToolTip="{DynamicResource AdvancedChangeConfig_AddSelectedPackage}">
+                                ToolTip="{DynamicResource Shared_TooltipAction}"
+                                ToolTipService.ShowOnDisabled="True">
                             <materialDesign:PackIcon Kind="ChevronRight"/>
                         </Button>
                         <Button x:Name="RemoveSelectedPackageButton"
                                 Command="{Binding RemoveSelectedPackageCommand}"
                                 Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
-                                ToolTip="{DynamicResource AdvancedChangeConfig_RemoveSelectedPackage}">
+                                ToolTip="{DynamicResource Shared_TooltipAction}"
+                                ToolTipService.ShowOnDisabled="True">
                             <materialDesign:PackIcon Kind="ChevronLeft"/>
                         </Button>
                         <Button x:Name="AddAllPackagesButton"
                                 Command="{Binding AddAllPackagesCommand}"
                                 Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
-                                ToolTip="{DynamicResource AdvancedChangeConfig_AddAllPackages}">
+                                ToolTip="{DynamicResource Shared_TooltipAction}"
+                                ToolTipService.ShowOnDisabled="True">
                             <materialDesign:PackIcon Kind="ChevronDoubleRight"/>
                         </Button>
                         <Button x:Name="RemoveAllPackagesButton"
                                 Command="{Binding RemoveAllPackagesCommand}"
                                 Style="{StaticResource AdvancedChangeConfigTransferButtonStyle}"
-                                ToolTip="{DynamicResource AdvancedChangeConfig_RemoveAllPackages}">
+                                ToolTip="{DynamicResource Shared_TooltipAction}"
+                                ToolTipService.ShowOnDisabled="True">
                             <materialDesign:PackIcon Kind="ChevronDoubleLeft"/>
                         </Button>
                     </StackPanel>
@@ -294,6 +311,7 @@
                                  Grid.Row="1"
                                  ItemsSource="{Binding SelectedPackages}"
                                  SelectedItem="{Binding SelectedWipePackage, Mode=TwoWay}"
+                                 ToolTip="{DynamicResource Shared_TooltipList}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                  Margin="0,8,0,0"/>
                     </Grid>
@@ -320,6 +338,7 @@
             <Button x:Name="SaveAdvancedConfigButton"
                     Grid.Column="1"
                     Command="{Binding ConfirmCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipConfirm}"
                     Style="{StaticResource AdvancedChangeConfigPrimaryButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ContentSaveOutline"

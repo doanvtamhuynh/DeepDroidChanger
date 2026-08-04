@@ -6,4 +6,18 @@
     <sys:String x:Key="AppVersion">1.0.0</sys:String>
     <sys:String x:Key="Shared_DeviceNameHint">Enter name...</sys:String>
     <sys:String x:Key="Version">Version</sys:String>
+    <sys:String x:Key="Shared_TooltipSearch">Filter the displayed list as you type; this does not change any device data.</sys:String>
+    <sys:String x:Key="Shared_TooltipSelectRow">Select or clear this device for the current operation.</sys:String>
+    <sys:String x:Key="Shared_TooltipDeviceName">Enter a local display name for this device; it does not rename the Android device.</sys:String>
+    <sys:String x:Key="Shared_TooltipDeviceType">Choose the device type used to organize this entry.</sys:String>
+    <sys:String x:Key="Shared_TooltipDeviceField">Edit this generated device value. It is applied only when a device-change action runs.</sys:String>
+    <sys:String x:Key="Shared_TooltipProfileSelection">Choose the value that will be used by the next device-change action.</sys:String>
+    <sys:String x:Key="Shared_TooltipOption">Enable or disable this option. It affects the next operation and does not apply immediately.</sys:String>
+    <sys:String x:Key="Shared_TooltipAction">Run the labeled action with the current selection and configuration. Review the form first, because some actions change data or restart a device.</sys:String>
+    <sys:String x:Key="Shared_TooltipBrowseFile">Choose a local file to use when the update starts.</sys:String>
+    <sys:String x:Key="Shared_TooltipTextInput">Enter or edit the value used by this form. Save or apply the form to use it.</sys:String>
+    <sys:String x:Key="Shared_TooltipSelection">Choose an available value for this form. The choice is used when you apply it.</sys:String>
+    <sys:String x:Key="Shared_TooltipConfirm">Confirm and run the operation shown in this dialog.</sys:String>
+    <sys:String x:Key="Shared_TooltipCancel">Close this dialog without applying the pending operation.</sys:String>
+    <sys:String x:Key="Shared_TooltipList">Select an item to use with the actions in this dialog.</sys:String>
 </ResourceDictionary>

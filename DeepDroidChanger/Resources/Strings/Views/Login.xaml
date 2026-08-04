@@ -8,6 +8,7 @@
     <sys:String x:Key="Login_PasswordLabel">Password</sys:String>
     <sys:String x:Key="Login_UsernameHint">Enter your username or email</sys:String>
     <sys:String x:Key="Login_PasswordHint">Password</sys:String>
+    <sys:String x:Key="Login_TogglePasswordVisibility">Show or hide the password while you enter it. Hide it again before leaving this screen.</sys:String>
     <sys:String x:Key="Login_RememberAccount">Remember login information</sys:String>
     <sys:String x:Key="Login_SignInButton">Login</sys:String>
     <sys:String x:Key="Login_SigningIn">Signing in...</sys:String>

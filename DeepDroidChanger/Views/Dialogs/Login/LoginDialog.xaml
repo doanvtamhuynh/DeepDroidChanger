@@ -424,6 +424,7 @@
                       Style="{StaticResource LoginInputHostGridStyle}">
                     <TextBox Text="{Binding Username, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Tag="{DynamicResource Login_UsernameHint}"
+                             ToolTip="{DynamicResource Shared_TooltipTextInput}"
                              Style="{StaticResource LoginTextBoxStyle}"/>
                     <materialDesign:PackIcon Kind="AccountOutline"
                                              Style="{StaticResource LoginInputLeadingIconStyle}"/>
@@ -438,9 +439,11 @@
                     <PasswordBox x:Name="LoginPasswordBox"
                                  PasswordChanged="OnPasswordChanged"
                                  Tag="{DynamicResource Login_PasswordHint}"
+                                 ToolTip="{DynamicResource Shared_TooltipTextInput}"
                                  Style="{StaticResource LoginPasswordBoxStyle}"/>
                     <TextBox x:Name="LoginPasswordTextBox"
                              TextChanged="OnPasswordTextBoxChanged"
+                             ToolTip="{DynamicResource Shared_TooltipTextInput}"
                              Style="{StaticResource LoginPasswordTextBoxStyle}"
                              Visibility="Collapsed"/>
 
@@ -448,6 +451,7 @@
                                              Style="{StaticResource LoginInputLeadingIconStyle}"/>
 
                     <Button Style="{StaticResource LoginPasswordRevealButtonStyle}"
+                            ToolTip="{DynamicResource Login_TogglePasswordVisibility}"
                             Click="OnRevealPasswordClick">
                         <materialDesign:PackIcon x:Name="RevealIcon"
                                                  Kind="EyeOutline"
@@ -458,6 +462,7 @@
                 <CheckBox Grid.Row="7"
                           Content="{DynamicResource Login_RememberAccount}"
                           IsChecked="{Binding RememberAccount, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
                           Style="{StaticResource LoginCheckBoxStyle}"/>
 
                 <TextBlock Grid.Row="8"
@@ -466,6 +471,7 @@
 
                 <Button Grid.Row="9"
                         Command="{Binding SignInCommand}"
+                        ToolTip="{DynamicResource Shared_TooltipAction}"
                         Style="{StaticResource LoginPrimaryButtonStyle}">
                     <Grid Style="{StaticResource LoginButtonContentGridStyle}">
                         <Grid.ColumnDefinitions>

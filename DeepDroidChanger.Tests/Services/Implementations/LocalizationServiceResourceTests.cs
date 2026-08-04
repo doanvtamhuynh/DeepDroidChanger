@@ -25,6 +25,36 @@ public sealed class LocalizationServiceResourceTests
     }
 
     [TestMethod]
+    public void InteractiveControls_DefineTooltips()
+    {
+        string projectRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
+        string[] files = Directory.GetFiles(Path.Combine(projectRoot, "Views"), "*.xaml", SearchOption.AllDirectories)
+            .Append(Path.Combine(projectRoot, "MainWindow.xaml"))
+            .ToArray();
+        HashSet<string> controlNames =
+        [
+            "Button",
+            "ComboBox",
+            "TextBox",
+            "CheckBox",
+            "RadioButton",
+            "PasswordBox",
+            "ListBox"
+        ];
+        string[] violations = files
+            .SelectMany(path => XDocument.Load(path)
+                .Descendants()
+                .Where(element => controlNames.Contains(element.Name.LocalName))
+                .Where(element => element.Attribute("ToolTip") == null)
+                .Select(element => $"{Path.GetRelativePath(projectRoot, path)}:{element.Name.LocalName}"))
+            .ToArray();
+
+        Assert.IsEmpty(
+            violations,
+            $"Interactive controls without ToolTip: {string.Join(", ", violations)}");
+    }
+
+    [TestMethod]
     public void EnglishAndVietnameseDictionaries_ExposeTheSameNonEmptyKeys()
     {
         string stringsDirectory = Path.Combine(

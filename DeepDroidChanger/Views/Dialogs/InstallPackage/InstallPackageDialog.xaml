@@ -251,6 +251,7 @@
                     <StackPanel Style="{StaticResource InstallPackageOptionsStackStyle}">
                         <CheckBox Content="{DynamicResource InstallPackage_GrantPermissions}"
                                   IsChecked="{Binding GrantPermissions, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
                                   Style="{StaticResource InstallPackageCheckBoxStyle}"/>
                     </StackPanel>
                 </Border>
@@ -259,6 +260,7 @@
                     <StackPanel Style="{StaticResource InstallPackageOptionsStackStyle}">
                         <CheckBox Content="{DynamicResource InstallPackage_AllowDowngrade}"
                                   IsChecked="{Binding AllowDowngrade, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
                                   Style="{StaticResource InstallPackageCheckBoxStyle}"/>
                     </StackPanel>
                 </Border>
@@ -326,6 +328,7 @@
         <WrapPanel Grid.Row="4"
                    Style="{StaticResource InstallPackageActionWrapPanelStyle}">
             <Button Command="{Binding AddFilesCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource InstallPackageButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Plus"
@@ -335,6 +338,7 @@
                 </StackPanel>
             </Button>
             <Button Command="{Binding RemoveSelectedPackageCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource InstallPackageButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Delete"
@@ -344,6 +348,7 @@
                 </StackPanel>
             </Button>
             <Button Command="{Binding CancelCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipCancel}"
                     Style="{StaticResource InstallPackageCancelButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Close"
@@ -353,6 +358,7 @@
                 </StackPanel>
             </Button>
             <Button Command="{Binding StartInstallCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource InstallPackageStartButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Play"
@@ -362,6 +368,7 @@
                 </StackPanel>
             </Button>
             <Button Command="{Binding CloseCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipCancel}"
                     Style="{StaticResource InstallPackageCloseButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Check"

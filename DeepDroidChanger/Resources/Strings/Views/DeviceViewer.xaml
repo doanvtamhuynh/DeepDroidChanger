@@ -23,6 +23,5 @@
     <system:String x:Key="DeviceViewerShellCommandHint">Enter shell command...</system:String>
     <system:String x:Key="DeviceViewerLoadingStream">Starting scrcpy stream...</system:String>
     <system:String x:Key="DeviceViewerStreamError">Scrcpy stream failed to start.</system:String>
-    <system:String x:Key="DeviceViewerDisconnectedAlt">Device disconnected. Waiting to reconnect...</system:String>
     <system:String x:Key="DeviceViewerDeviceControls">DEVICE CONTROLS</system:String>
 </ResourceDictionary>

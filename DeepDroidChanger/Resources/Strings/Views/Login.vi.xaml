@@ -8,6 +8,7 @@
     <sys:String x:Key="Login_PasswordLabel">Mật khẩu</sys:String>
     <sys:String x:Key="Login_UsernameHint">Nhập tên đăng nhập hoặc email</sys:String>
     <sys:String x:Key="Login_PasswordHint">Mật khẩu</sys:String>
+    <sys:String x:Key="Login_TogglePasswordVisibility">Hiện hoặc ẩn mật khẩu khi đang nhập. Hãy ẩn lại trước khi rời khỏi màn hình này.</sys:String>
     <sys:String x:Key="Login_RememberAccount">Lưu thông tin đăng nhập</sys:String>
     <sys:String x:Key="Login_SignInButton">Đăng nhập</sys:String>
     <sys:String x:Key="Login_SigningIn">Đang đăng nhập...</sys:String>

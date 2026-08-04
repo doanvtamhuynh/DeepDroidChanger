@@ -73,6 +73,7 @@
     <sys:String x:Key="ChangeSingleDevice_RowMenuDisableWifi">Tắt Wi-Fi</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuEnableWifi">Bật Wi-Fi</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterLabel">Lọc:</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_FilterTooltip">Lọc danh sách thiết bị đang hiển thị theo trạng thái mà không thay đổi dữ liệu thiết bị.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceSearchHint">Tìm kiếm thiết bị...</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceSearchName">Tìm kiếm thiết bị</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterAll">Tất cả</sys:String>

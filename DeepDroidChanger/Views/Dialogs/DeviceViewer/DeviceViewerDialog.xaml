@@ -470,8 +470,7 @@
                                 </Grid>
 
                                 <Grid IsHitTestVisible="False"
-                                      Style="{StaticResource DeviceViewerDisconnectedOverlayStyle}"
-                                      ToolTip="{DynamicResource DeviceViewerDisconnectedAlt}">
+                                      Style="{StaticResource DeviceViewerDisconnectedOverlayStyle}">
                                     <Viewbox Width="100" Height="200"
                                              HorizontalAlignment="Center"
                                              VerticalAlignment="Center"
@@ -503,7 +502,9 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
-                        <Button Style="{StaticResource DeviceViewerNavButtonStyle}" Command="{Binding RecentCommand}">
+                        <Button Style="{StaticResource DeviceViewerNavButtonStyle}"
+                                Command="{Binding RecentCommand}"
+                                ToolTip="{DynamicResource Shared_TooltipAction}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ViewGrid"
                                                          Style="{StaticResource DeviceViewerButtonIconStyle}"
@@ -512,7 +513,9 @@
                                            Style="{StaticResource DeviceViewerButtonTextStyle}"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource DeviceViewerNavButtonStyle}" Command="{Binding HomeCommand}">
+                        <Button Style="{StaticResource DeviceViewerNavButtonStyle}"
+                                Command="{Binding HomeCommand}"
+                                ToolTip="{DynamicResource Shared_TooltipAction}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Home"
                                                          Style="{StaticResource DeviceViewerButtonIconStyle}"
@@ -521,7 +524,9 @@
                                            Style="{StaticResource DeviceViewerButtonTextStyle}"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource DeviceViewerNavButtonStyle}" Command="{Binding BackCommand}">
+                        <Button Style="{StaticResource DeviceViewerNavButtonStyle}"
+                                Command="{Binding BackCommand}"
+                                ToolTip="{DynamicResource Shared_TooltipAction}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ArrowLeft"
                                                          Style="{StaticResource DeviceViewerButtonIconStyle}"
@@ -568,6 +573,7 @@
                                              AcceptsReturn="True"
                                              TextWrapping="Wrap"
                                              Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             ToolTip="{DynamicResource Shared_TooltipTextInput}"
                                              Style="{StaticResource DeviceViewerInputStyle}"
                                              materialDesign:HintAssist.Hint="{DynamicResource DeviceViewerInputTextHint}"/>
                                     <Grid Margin="0,6,0,0">
@@ -578,7 +584,8 @@
                                         </Grid.RowDefinitions>
                                         <Button Grid.Row="0"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding SendInputTextCommand}">
+                                                Command="{Binding SendInputTextCommand}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Send"
                                                                          Style="{StaticResource DeviceViewerButtonIconStyle}"
@@ -589,7 +596,8 @@
                                         </Button>
                                         <Button Grid.Row="2"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding EnterCommand}">
+                                                Command="{Binding EnterCommand}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="KeyboardReturn"
                                                                          Style="{StaticResource DeviceViewerButtonIconStyle}"
@@ -613,6 +621,7 @@
                                              AcceptsReturn="True"
                                              TextWrapping="Wrap"
                                              Text="{Binding ShellCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             ToolTip="{DynamicResource Shared_TooltipTextInput}"
                                              Style="{StaticResource DeviceViewerInputStyle}"
                                              materialDesign:HintAssist.Hint="{DynamicResource DeviceViewerShellCommandHint}"/>
                                     <Grid Margin="0,6,0,0">
@@ -621,7 +630,8 @@
                                         </Grid.ColumnDefinitions>
                                         <Button Grid.Column="0"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding RunShellCommandCommand}">
+                                                Command="{Binding RunShellCommandCommand}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Send"
                                                                          Style="{StaticResource DeviceViewerButtonIconStyle}"
@@ -646,7 +656,7 @@
                                     <UniformGrid Columns="2" Margin="0,6,0,0">
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
                                                 Command="{Binding VolumeDownCommand}"
-                                                ToolTip="{DynamicResource DeviceViewerVolumeDown}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="0,0,4,6">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="VolumeMinus"
@@ -658,7 +668,7 @@
                                         </Button>
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
                                                 Command="{Binding VolumeUpCommand}"
-                                                ToolTip="{DynamicResource DeviceViewerVolumeUp}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="4,0,0,6">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="VolumePlus"
@@ -670,7 +680,7 @@
                                         </Button>
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
                                                 Command="{Binding ScreenshotCommand}"
-                                                ToolTip="{DynamicResource DeviceViewerScreenshot}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="0,0,4,6">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Camera"
@@ -682,7 +692,7 @@
                                         </Button>
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
                                                 Command="{Binding PowerCommand}"
-                                                ToolTip="{DynamicResource DeviceViewerPower}"
+                                                ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="4,0,0,0">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Power"

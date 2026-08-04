@@ -181,6 +181,7 @@
                         VerticalAlignment="Top"
                         HorizontalAlignment="Right"
                         Command="{Binding CancelCommand}"
+                        ToolTip="{DynamicResource Shared_TooltipCancel}"
                         Style="{StaticResource ConfirmationDialogCloseButtonStyle}">
                     <materialDesign:PackIcon Kind="Close"
                                              Width="{StaticResource Metric.ConfirmationDialog.CloseGlyphSize}"
@@ -201,11 +202,13 @@
                             Margin="{StaticResource Spacing.ConfirmationDialog.ButtonGap}"
                             Command="{Binding CancelCommand}"
                             Content="{Binding CancelButtonText}"
+                            ToolTip="{DynamicResource Shared_TooltipCancel}"
                             IsCancel="True"
                             IsDefault="True"/>
                     <Button x:Name="YesButton"
                             MinWidth="{StaticResource Metric.ConfirmationDialog.ButtonWidth}"
                             Command="{Binding ConfirmCommand}"
+                            ToolTip="{DynamicResource Shared_TooltipConfirm}"
                             Style="{StaticResource PrimaryButtonStyle}">
                         <TextBlock x:Name="YesButtonText"
                                    Text="{Binding ConfirmButtonText}"

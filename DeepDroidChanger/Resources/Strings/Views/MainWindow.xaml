@@ -6,7 +6,14 @@
     <sys:String x:Key="Nav_ChangeSingleDevice">Change Single Device</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDevice">Change Multiple Device</sys:String>
     <sys:String x:Key="Nav_Settings">Settings</sys:String>
-    <sys:String x:Key="Nav_ToggleSidebar">Toggle sidebar</sys:String>
-    <sys:String x:Key="Nav_Language">Language</sys:String>
-    <sys:String x:Key="Nav_Theme">Theme</sys:String>
+    <sys:String x:Key="Nav_ToggleSidebar">Expand or collapse sidebar</sys:String>
+    <sys:String x:Key="Nav_Language">Switch language</sys:String>
+    <sys:String x:Key="Nav_Theme">Switch theme</sys:String>
+    <sys:String x:Key="Nav_ChangeDevicesTooltip">Open the device-change workspace and choose single-device or batch work.</sys:String>
+    <sys:String x:Key="Nav_ChangeSingleDeviceTooltip">Open the workspace for configuring and changing one selected device.</sys:String>
+    <sys:String x:Key="Nav_ChangeMultipleDeviceTooltip">Open the workspace for applying actions to several selected devices.</sys:String>
+    <sys:String x:Key="Nav_SettingsTooltip">Open application settings and preferences.</sys:String>
+    <sys:String x:Key="Nav_ToggleSidebarTooltip">Expand or collapse the navigation sidebar without changing the current workspace.</sys:String>
+    <sys:String x:Key="Nav_LanguageTooltip">Switch the application language between the available localizations.</sys:String>
+    <sys:String x:Key="Nav_ThemeTooltip">Switch the application color theme.</sys:String>
 </ResourceDictionary>

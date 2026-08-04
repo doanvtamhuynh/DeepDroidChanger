@@ -676,7 +676,7 @@
                             VerticalAlignment="Center"
                             Command="{Binding ToggleSidebarCommand}"
                             Style="{StaticResource BottomIconButtonStyle}"
-                            ToolTip="{DynamicResource Nav_ToggleSidebar}">
+                             ToolTip="{DynamicResource Nav_ToggleSidebarTooltip}">
                         <materialDesign:PackIcon Kind="{Binding ToggleIconKind}"
                                                  Style="{StaticResource ShellToggleIconStyle}"/>
                     </Button>
@@ -711,14 +711,16 @@
                             Content="{DynamicResource Nav_ChangeDevices}"
                             Command="{Binding ToggleChangeDevicesMenuCommand}"
                             behaviors:ContextMenuOpenBehavior.IsOpen="{Binding IsChangeDevicesFlyoutOpen, Mode=TwoWay}"
-                            ContextMenuService.Placement="Right"
-                            ContextMenuService.IsEnabled="{Binding IsSidebarCollapsed}"
-                            Style="{StaticResource SidebarChangeDevicesGroupStyle}">
+                             ContextMenuService.Placement="Right"
+                             ContextMenuService.IsEnabled="{Binding IsSidebarCollapsed}"
+                             ToolTip="{DynamicResource Nav_ChangeDevicesTooltip}"
+                             Style="{StaticResource SidebarChangeDevicesGroupStyle}">
                         <Button.ContextMenu>
                             <ContextMenu Placement="Right"
                                          StaysOpen="False"
                                          Style="{StaticResource SidebarChangeDevicesFlyoutStyle}">
                                 <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeSingleDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          ToolTip="{DynamicResource Nav_ChangeSingleDeviceTooltip}"
                                           Style="{StaticResource SidebarSingleDeviceFlyoutMenuItemStyle}">
                                     <MenuItem.Header>
                                         <Grid>
@@ -736,6 +738,7 @@
                                 </MenuItem>
 
                                 <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeMultipleDevicesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
                                           Style="{StaticResource SidebarMultipleDevicesFlyoutMenuItemStyle}">
                                     <MenuItem.Header>
                                         <Grid>
@@ -761,11 +764,13 @@
                                 Tag="Cellphone"
                                 Content="{DynamicResource Nav_ChangeSingleDevice}"
                                 Command="{Binding NavigateChangeSingleDeviceCommand}"
+                                ToolTip="{DynamicResource Nav_ChangeSingleDeviceTooltip}"
                                 Style="{StaticResource SidebarSingleDeviceSubmenuButtonStyle}"/>
                         <Button x:Name="BtnChangeMultipleDevices"
                                 Tag="ViewGrid"
                                 Content="{DynamicResource Nav_ChangeMultipleDevice}"
                                 Command="{Binding NavigateChangeMultipleDevicesCommand}"
+                                ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
                                 Style="{StaticResource SidebarMultipleDevicesSubmenuButtonStyle}"/>
                     </StackPanel>
 
@@ -773,6 +778,7 @@
                             Tag="Cog"
                             Content="{DynamicResource Nav_Settings}"
                             Command="{Binding NavigateSettingsCommand}"
+                            ToolTip="{DynamicResource Nav_SettingsTooltip}"
                             Style="{StaticResource SidebarSettingsTabStyle}"/>
                 </StackPanel>
 
@@ -791,7 +797,7 @@
                             <Button x:Name="BtnLanguage"
                                     Style="{StaticResource BottomIconButtonStyle}"
                                     Command="{Binding ToggleLanguageCommand}"
-                                    ToolTip="{DynamicResource Nav_Language}">
+                                    ToolTip="{DynamicResource Nav_LanguageTooltip}">
                                 <Image x:Name="ImgLanguage"
                                        Width="20"
                                        Height="20"
@@ -803,7 +809,7 @@
                                     Style="{StaticResource BottomIconButtonStyle}"
                                     Margin="{Binding ThemeButtonMargin}"
                                     Command="{Binding ToggleThemeCommand}"
-                                    ToolTip="{DynamicResource Nav_Theme}">
+                                    ToolTip="{DynamicResource Nav_ThemeTooltip}">
                                 <materialDesign:PackIcon x:Name="IconTheme"
                                                          Kind="{Binding ThemeIconKind}"
                                                          Style="{StaticResource ShellBottomIconStyle}"/>

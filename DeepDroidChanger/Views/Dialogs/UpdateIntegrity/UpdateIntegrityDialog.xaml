@@ -107,6 +107,7 @@
                   Style="{StaticResource DialogOptionGroupBoxStyle}">
             <CheckBox Content="{DynamicResource UpdateIntegrity_SourceServer}"
                       IsChecked="{Binding UpdateIntegrityFromServer, Mode=TwoWay}"
+                      ToolTip="{DynamicResource Shared_TooltipOption}"
                       Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
         </GroupBox>
 
@@ -121,10 +122,12 @@
                 <CheckBox Grid.Row="0"
                           Content="{DynamicResource UpdateIntegrity_TargetIntegrity}"
                           IsChecked="{Binding UpdateIntegrityEnabled, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
                           Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
                 <CheckBox Grid.Row="1"
                           Content="{DynamicResource UpdateIntegrity_TargetKeybox}"
                           IsChecked="{Binding UpdateKeyboxEnabled, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
                           Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
             </Grid>
         </GroupBox>
@@ -148,12 +151,13 @@
 
                     <TextBox Grid.Row="1" Grid.Column="0"
                              Text="{Binding UpdateIntegrityFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{DynamicResource Shared_TooltipTextInput}"
                              Style="{StaticResource UpdateIntegrityTextBoxStyle}"
                              IsEnabled="{Binding IsIntegrityFilePickerEnabled}"/>
                     <Button Grid.Row="1" Grid.Column="1"
                             Command="{Binding BrowseIntegrityFileCommand}"
+                            ToolTip="{DynamicResource Shared_TooltipBrowseFile}"
                             Style="{StaticResource UpdateIntegrityBrowseButtonStyle}"
-                            ToolTip="{DynamicResource UpdateIntegrity_BrowseButton}"
                             IsEnabled="{Binding IsIntegrityFilePickerEnabled}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="FolderOpenOutline"
@@ -180,12 +184,13 @@
                                Style="{StaticResource DialogInputLabelStyle}"/>
                     <TextBox Grid.Row="1" Grid.Column="0"
                              Text="{Binding UpdateKeyboxFile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{DynamicResource Shared_TooltipTextInput}"
                              Style="{StaticResource UpdateIntegrityTextBoxStyle}"
                              IsEnabled="{Binding IsKeyboxFilePickerEnabled}"/>
                     <Button Grid.Row="1" Grid.Column="1"
                             Command="{Binding BrowseKeyboxFileCommand}"
+                            ToolTip="{DynamicResource Shared_TooltipBrowseFile}"
                             Style="{StaticResource UpdateIntegrityBrowseButtonStyle}"
-                            ToolTip="{DynamicResource UpdateIntegrity_BrowseButton}"
                             IsEnabled="{Binding IsKeyboxFilePickerEnabled}">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="FolderOpenOutline"
@@ -207,6 +212,7 @@
 
             <Button Grid.Column="1"
                     Command="{Binding UpdateCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>

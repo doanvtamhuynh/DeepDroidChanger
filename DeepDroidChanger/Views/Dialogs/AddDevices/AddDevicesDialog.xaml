@@ -116,10 +116,11 @@
             <Border x:Name="AddDevicesSelectAllDevicesContainer"
                     HorizontalAlignment="Right"
                     Style="{StaticResource AddDevicesSelectAllContainerStyle}">
-                <CheckBox x:Name="AddDevicesSelectAllDevicesCheckBox"
-                          Content="{DynamicResource AddDevices_SelectAll}"
-                          IsChecked="{Binding SelectAll, Mode=TwoWay}"
-                          Style="{StaticResource AddDevicesSelectAllCheckBoxStyle}"/>
+        <CheckBox x:Name="AddDevicesSelectAllDevicesCheckBox"
+                  Content="{DynamicResource AddDevices_SelectAll}"
+                  IsChecked="{Binding SelectAll, Mode=TwoWay}"
+                  ToolTip="{DynamicResource Shared_TooltipSelectRow}"
+                  Style="{StaticResource AddDevicesSelectAllCheckBoxStyle}"/>
             </Border>
         </Grid>
 
@@ -140,10 +141,12 @@
                             <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                     CommandParameter="{Binding}"
                                     AutomationProperties.Name="{DynamicResource AddDevices_ColumnSelectDevice}"
+                                    ToolTip="{DynamicResource Shared_TooltipSelectRow}"
                                     Style="{StaticResource AddDevicesSelectionButtonStyle}">
                                 <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
                                           IsHitTestVisible="False"
                                           Focusable="False"
+                                          ToolTip="{DynamicResource Shared_TooltipSelectRow}"
                                           Style="{StaticResource DataGridCheckBoxStyle}"/>
                             </Button>
                         </DataTemplate>
@@ -170,6 +173,7 @@
                         <DataTemplate>
                             <ComboBox ItemsSource="{Binding DataContext.TypeOptions, RelativeSource={RelativeSource AncestorType=Window}}"
                                       SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ToolTip="{DynamicResource Shared_TooltipDeviceType}"
                                       Style="{StaticResource InlineDataGridComboBoxStyle}">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
@@ -190,6 +194,7 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="{DynamicResource Shared_TooltipDeviceName}"
                                      Style="{StaticResource InlineDataGridTextBoxStyle}"
                                      materialDesign:HintAssist.Hint="{DynamicResource Shared_DeviceNameHint}"/>
                         </DataTemplate>
@@ -207,6 +212,7 @@
 
             <Button Grid.Column="1"
                     Command="{Binding AddCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
                     Style="{StaticResource AddDevicesActionButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>

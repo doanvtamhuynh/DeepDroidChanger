@@ -312,7 +312,7 @@
                 <Button x:Name="MultipleAddDevicesButton"
                         Grid.Column="0"
                         Command="{Binding AddNewDevicesCommand}"
-                        ToolTip="{DynamicResource ChangeMultipleDevices_AddDevices}"
+                        ToolTip="{DynamicResource Shared_TooltipAction}"
                         Style="{StaticResource MultipleDeviceLoadButtonStyle}">
                     <StackPanel Style="{StaticResource MultipleDeviceLoadButtonContentStyle}">
                         <materialDesign:PackIcon Kind="Plus"
@@ -328,6 +328,7 @@
 
                 <TextBox Grid.Column="2"
                          Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="{DynamicResource Shared_TooltipSearch}"
                          AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_DeviceSearchName}"
                          materialDesign:HintAssist.Hint="{DynamicResource ChangeMultipleDevices_DeviceSearchHint}"
                          Style="{StaticResource MultipleDeviceSearchTextBoxStyle}"/>
@@ -343,7 +344,7 @@
                                   Content="{DynamicResource ChangeMultipleDevices_SelectAllDevices}"
                                   IsChecked="{Binding AllDevicesSelectionState, Mode=OneWay}"
                                   Command="{Binding ToggleSelectAllDevicesCommand}"
-                                  ToolTip="{DynamicResource ChangeMultipleDevices_SelectAllTooltip}"
+                                  ToolTip="{DynamicResource Shared_TooltipSelectRow}"
                                   Style="{StaticResource MultipleDeviceSelectAllCheckBoxStyle}"/>
                     </Border>
                     <TextBlock Text="{DynamicResource ChangeMultipleDevices_FilterLabel}"
@@ -351,6 +352,7 @@
                     <ComboBox x:Name="MultipleDeviceFilterComboBox"
                               SelectedValue="{Binding SelectedDeviceFilter, Mode=TwoWay}"
                               SelectedValuePath="Tag"
+                              ToolTip="{DynamicResource ChangeMultipleDevices_FilterTooltip}"
                               Style="{StaticResource MultipleDeviceFilterComboBoxStyle}">
                         <ComboBoxItem Tag="All"
                                       Content="{DynamicResource ChangeMultipleDevices_FilterAll}"
@@ -407,10 +409,12 @@
                                         CommandParameter="{Binding}"
                                         IsEnabled="{Binding CanEdit}"
                                         AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_ColumnSelected}"
+                                        ToolTip="{DynamicResource Shared_TooltipSelectRow}"
                                         Style="{StaticResource MultipleDeviceSelectionButtonStyle}">
                                     <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
                                               IsHitTestVisible="False"
                                               Focusable="False"
+                                              ToolTip="{DynamicResource Shared_TooltipSelectRow}"
                                               Style="{StaticResource DataGridCheckBoxStyle}"/>
                                 </Button>
                             </DataTemplate>
@@ -441,6 +445,7 @@
                             <DataTemplate>
                                 <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          IsEnabled="{Binding CanEdit}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceName}"
                                          Style="{StaticResource InlineDataGridTextBoxStyle}"
                                          materialDesign:HintAssist.Hint="{DynamicResource Shared_DeviceNameHint}"/>
                             </DataTemplate>
@@ -460,6 +465,7 @@
                                 <ComboBox ItemsSource="{Binding DataContext.TypeOptions, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                           SelectedItem="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           IsEnabled="{Binding CanEdit}"
+                                          ToolTip="{DynamicResource Shared_TooltipDeviceType}"
                                           Style="{StaticResource InlineDataGridComboBoxStyle}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -561,7 +567,7 @@
                                           ItemsSource="{Binding SelectedDevices}"
                                           SelectedItem="{Binding SelectedInfoDevice, Mode=TwoWay}"
                                           AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_InfoDeviceSelectorName}"
-                                          ToolTip="{DynamicResource ChangeMultipleDevices_InfoDeviceSelectorHint}"
+                                          ToolTip="{DynamicResource Shared_TooltipSelection}"
                                           Style="{StaticResource MultipleDeviceInfoSelectorStyle}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -576,7 +582,7 @@
                                 <Button x:Name="MultipleViewAllDeviceInfoButton"
                                         Grid.Column="3"
                                         Command="{Binding ViewRandomDeviceInfoCommand}"
-                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionViewAllDeviceInfo}"
+                                        ToolTip="{DynamicResource Shared_TooltipAction}"
                                         Style="{StaticResource MultipleDeviceInfoDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -618,6 +624,7 @@
                                          Grid.Row="0"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="0"
                                            Grid.Column="2"
@@ -627,6 +634,7 @@
                                          Grid.Row="0"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.Imei, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="1"
@@ -635,6 +643,7 @@
                                 <TextBox Grid.Row="1"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.Hardware, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="1"
                                            Grid.Column="2"
@@ -643,6 +652,7 @@
                                 <TextBox Grid.Row="1"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.Operator, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="2"
@@ -651,6 +661,7 @@
                                 <TextBox Grid.Row="2"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.Fingerprint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="2"
                                            Grid.Column="2"
@@ -659,6 +670,7 @@
                                 <TextBox Grid.Row="2"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.PhoneNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="3"
@@ -667,6 +679,7 @@
                                 <TextBox Grid.Row="3"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.AndroidVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="3"
                                            Grid.Column="2"
@@ -675,6 +688,7 @@
                                 <TextBox Grid.Row="3"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.Iccid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="4"
@@ -683,6 +697,7 @@
                                 <TextBox Grid.Row="4"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.Brand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="4"
                                            Grid.Column="2"
@@ -691,6 +706,7 @@
                                 <TextBox Grid.Row="4"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.Imsi, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="5"
@@ -699,6 +715,7 @@
                                 <TextBox Grid.Row="5"
                                          Grid.Column="1"
                                          Text="{Binding DeviceInfo.Serial, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                                 <TextBlock Grid.Row="5"
                                            Grid.Column="2"
@@ -707,6 +724,7 @@
                                 <TextBox Grid.Row="5"
                                          Grid.Column="3"
                                          Text="{Binding DeviceInfo.Mac, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
                             </Grid>
                         </Grid>
@@ -736,6 +754,7 @@
                                         Grid.Column="2"
                                         Command="{Binding OpenAdvancedChangeConfigCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_AdvancedConfigTooltip}"
+                                        ToolTipService.ShowOnDisabled="True"
                                         Style="{StaticResource MultipleDeviceInfoDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -776,6 +795,7 @@
                                           Grid.Column="1"
                                           ItemsSource="{Binding Brands}"
                                           SelectedItem="{Binding SelectedBrand, Mode=TwoWay}"
+                                          ToolTip="{DynamicResource Shared_TooltipProfileSelection}"
                                           Style="{StaticResource MultipleDeviceComboBoxStyle}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -792,6 +812,7 @@
                                           Grid.Column="1"
                                           ItemsSource="{Binding AndroidVersions}"
                                           SelectedItem="{Binding SelectedAndroidVersion, Mode=TwoWay}"
+                                          ToolTip="{DynamicResource Shared_TooltipProfileSelection}"
                                           Style="{StaticResource MultipleDeviceComboBoxStyle}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -807,6 +828,7 @@
                                          Grid.Row="2"
                                          Grid.Column="1"
                                          Text="{Binding SelectedModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{DynamicResource Shared_TooltipDeviceField}"
                                          Style="{StaticResource MultipleDeviceTextBoxStyle}"/>
 
                                 <TextBlock Grid.Row="3"
@@ -817,6 +839,7 @@
                                           Grid.Column="1"
                                           ItemsSource="{Binding Countries}"
                                           SelectedItem="{Binding SelectedCountry, Mode=TwoWay}"
+                                          ToolTip="{DynamicResource Shared_TooltipProfileSelection}"
                                           Style="{StaticResource MultipleDeviceComboBoxStyle}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -833,6 +856,7 @@
                                           Grid.Column="1"
                                           ItemsSource="{Binding Carriers}"
                                           SelectedItem="{Binding SelectedCarrier, Mode=TwoWay}"
+                                          ToolTip="{DynamicResource Shared_TooltipProfileSelection}"
                                           Style="{StaticResource MultipleDeviceComboBoxStyle}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
@@ -845,12 +869,14 @@
                                           Grid.ColumnSpan="2"
                                           Content="{DynamicResource ChangeMultipleDevices_OptionChangeSim}"
                                           IsChecked="{Binding IsChangeSimEnabled, Mode=TwoWay}"
+                                          ToolTip="{DynamicResource Shared_TooltipOption}"
                                           Style="{StaticResource FormCheckBoxStyle}"/>
                                 <CheckBox x:Name="MultipleUseDefaultChangeModeCheckBox"
                                           Grid.Row="6"
                                           Grid.ColumnSpan="2"
                                           Content="{DynamicResource ChangeMultipleDevices_OptionDefaultMode}"
                                           IsChecked="{Binding UseDefaultChangeMode, Mode=TwoWay}"
+                                          ToolTip="{DynamicResource Shared_TooltipOption}"
                                           Style="{StaticResource FormCheckBoxStyle}"/>
                             </Grid>
                         </Grid>

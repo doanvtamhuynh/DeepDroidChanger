@@ -6,4 +6,18 @@
     <sys:String x:Key="AppVersion">1.0.0</sys:String>
     <sys:String x:Key="Shared_DeviceNameHint">Nhập tên...</sys:String>
     <sys:String x:Key="Version">Phiên bản</sys:String>
+    <sys:String x:Key="Shared_TooltipSearch">Lọc danh sách đang hiển thị khi nhập; thao tác này không thay đổi dữ liệu thiết bị.</sys:String>
+    <sys:String x:Key="Shared_TooltipSelectRow">Chọn hoặc bỏ chọn thiết bị này cho thao tác hiện tại.</sys:String>
+    <sys:String x:Key="Shared_TooltipDeviceName">Nhập tên hiển thị cục bộ cho thiết bị; thao tác này không đổi tên Android.</sys:String>
+    <sys:String x:Key="Shared_TooltipDeviceType">Chọn loại thiết bị dùng để sắp xếp mục này.</sys:String>
+    <sys:String x:Key="Shared_TooltipDeviceField">Chỉnh sửa giá trị thiết bị đã tạo. Giá trị chỉ được áp dụng khi chạy thao tác đổi thiết bị.</sys:String>
+    <sys:String x:Key="Shared_TooltipProfileSelection">Chọn giá trị sẽ được dùng trong lần đổi thiết bị tiếp theo.</sys:String>
+    <sys:String x:Key="Shared_TooltipOption">Bật hoặc tắt tùy chọn này. Tùy chọn ảnh hưởng đến thao tác tiếp theo và không áp dụng ngay lập tức.</sys:String>
+    <sys:String x:Key="Shared_TooltipAction">Chạy thao tác có nhãn này với lựa chọn và cấu hình hiện tại. Hãy kiểm tra biểu mẫu trước vì một số thao tác thay đổi dữ liệu hoặc khởi động lại thiết bị.</sys:String>
+    <sys:String x:Key="Shared_TooltipBrowseFile">Chọn tệp cục bộ sẽ được dùng khi bắt đầu cập nhật.</sys:String>
+    <sys:String x:Key="Shared_TooltipTextInput">Nhập hoặc sửa giá trị dùng cho biểu mẫu này. Lưu hoặc áp dụng biểu mẫu để sử dụng giá trị.</sys:String>
+    <sys:String x:Key="Shared_TooltipSelection">Chọn một giá trị có sẵn cho biểu mẫu. Lựa chọn được dùng khi bạn áp dụng.</sys:String>
+    <sys:String x:Key="Shared_TooltipConfirm">Xác nhận và chạy thao tác hiển thị trong hộp thoại này.</sys:String>
+    <sys:String x:Key="Shared_TooltipCancel">Đóng hộp thoại mà không áp dụng thao tác đang chờ.</sys:String>
+    <sys:String x:Key="Shared_TooltipList">Chọn một mục để dùng với các nút thao tác trong hộp thoại này.</sys:String>
 </ResourceDictionary>
