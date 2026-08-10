@@ -174,7 +174,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             CreateDeleteDirectoryContentsCommand(DropBoxDirectoryPath),
             "sync"
         ];
-        await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
+        _ = await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Deleted post-reboot DropBox files while preserving its directory on {Serial}.", serial);
     }
 
@@ -188,7 +188,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             CreateRemoveFileCommand(SsaidFilePattern),
             "sync"
         ];
-        await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
+        _ = await RunCleanupCommandsAsync(serial, commands, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Deleted stored SSAID files on {Serial} so Android can regenerate them.", serial);
     }
 
@@ -328,17 +328,23 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             preserveSsaid,
             clearAllPackages,
             resetSharedIdentityState);
-        await RunCleanupCommandsAsync(serial, cleanupCommands, cancellationToken).ConfigureAwait(false);
+        (int failedCommandCount, int timedOutCommandCount) = await RunCleanupCommandsAsync(
+                serial,
+                cleanupCommands,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         _logger.LogWarning(
-            "Cleared device data on {Serial}. Packages: {PackageCount}; deep package file cleanup: {DeepPackageFileCleanup}; clear all packages: {ClearAllPackages}; clear Google accounts: {ClearGoogleAccounts}; reset shared identity state: {ResetSharedIdentityState}; preserve SSAID: {PreserveSsaid}.",
+            "Cleared device data on {Serial}. Packages: {PackageCount}; deep package file cleanup: {DeepPackageFileCleanup}; clear all packages: {ClearAllPackages}; clear Google accounts: {ClearGoogleAccounts}; reset shared identity state: {ResetSharedIdentityState}; preserve SSAID: {PreserveSsaid}; cleanup command failures: {CleanupCommandFailures}; cleanup command timeouts: {CleanupCommandTimeouts}.",
             serial,
             packagesToClear.Count,
             useDeepPackageWipe,
             clearAllPackages,
             clearGoogleAccounts,
             resetSharedIdentityState,
-            preserveSsaid);
+            preserveSsaid,
+            failedCommandCount,
+            timedOutCommandCount);
     }
 
     private static void AddAccountCleanupCommands(List<string> commands)
@@ -412,26 +418,89 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
             .ToArray();
     }
 
-    private async Task RunCleanupCommandsAsync(
+    private async Task<(int FailedCount, int TimedOutCount)> RunCleanupCommandsAsync(
         string serial,
         IReadOnlyList<string> commands,
         CancellationToken cancellationToken)
     {
-        foreach (string command in commands)
+        int failedCount = 0;
+        int timedOutCount = 0;
+        for (int index = 0; index < commands.Count; index++)
         {
+            string command = commands[index];
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutSource.CancelAfter(CleanupCommandTimeout);
             try
             {
-                _ = await _adb
+                CommandResult result = await _adb
                     .RunAdbShellScriptAsync(serial, command, timeoutSource.Token)
                     .ConfigureAwait(false);
+                if (result.ExitCode == 0)
+                    continue;
+
+                failedCount++;
+                _logger.LogWarning(
+                    "Cleanup operation failed on {Serial}. Operation: {CleanupOperation}; CommandIndex: {CommandIndex}; CommandCount: {CommandCount}; ExitCode: {ExitCode}; ErrorLength: {ErrorLength}.",
+                    serial,
+                    GetCleanupOperation(command),
+                    index + 1,
+                    commands.Count,
+                    result.ExitCode,
+                    result.StandardError.Length);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                // Match AccountCreator's ignored "PROCESS TIMEOUT" result and continue.
+                if (cancellationToken.IsCancellationRequested)
+                    throw;
+
+                timedOutCount++;
+                _logger.LogWarning(
+                    "Cleanup operation timed out on {Serial}. Operation: {CleanupOperation}; CommandIndex: {CommandIndex}; CommandCount: {CommandCount}; TimeoutSeconds: {TimeoutSeconds}.",
+                    serial,
+                    GetCleanupOperation(command),
+                    index + 1,
+                    commands.Count,
+                    CleanupCommandTimeout.TotalSeconds);
+            }
+            catch (Exception exception)
+            {
+                failedCount++;
+                _logger.LogWarning(
+                    exception,
+                    "Cleanup operation threw an exception on {Serial}. Operation: {CleanupOperation}; CommandIndex: {CommandIndex}; CommandCount: {CommandCount}; ExceptionType: {ExceptionType}.",
+                    serial,
+                    GetCleanupOperation(command),
+                    index + 1,
+                    commands.Count,
+                    exception.GetType().Name);
             }
         }
+
+        return (failedCount, timedOutCount);
+    }
+
+    private static string GetCleanupOperation(string command)
+    {
+        if (command.StartsWith("cmd activity force-stop-all", StringComparison.Ordinal))
+            return "force-stop-all";
+        if (command.StartsWith("am force-stop ", StringComparison.Ordinal))
+            return "force-stop-package";
+        if (command.StartsWith("pm clear ", StringComparison.Ordinal))
+            return "clear-package";
+        if (command.StartsWith("rm -f ", StringComparison.Ordinal))
+            return "remove-file";
+        if (command.StartsWith("find ", StringComparison.Ordinal))
+            return "delete-directory-contents";
+        if (command.StartsWith("pm reset-permissions", StringComparison.Ordinal))
+            return "reset-permissions";
+        if (command.StartsWith("cmd appops reset", StringComparison.Ordinal))
+            return "reset-appops";
+        if (command.StartsWith("pm trim-caches", StringComparison.Ordinal))
+            return "trim-caches";
+        if (string.Equals(command, "sync", StringComparison.Ordinal))
+            return "sync";
+
+        return "unknown";
     }
 
     private static string NormalizePackageName(string packageName)

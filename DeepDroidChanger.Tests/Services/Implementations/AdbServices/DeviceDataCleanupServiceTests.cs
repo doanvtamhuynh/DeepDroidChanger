@@ -1,5 +1,7 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
+using DeepDroidChanger.Tests.Fakes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -104,6 +106,41 @@ public sealed class DeviceDataCleanupServiceTests
         Assert.Contains("pm reset-permissions", commands);
         Assert.Contains("cmd appops reset --user 0", commands);
         Assert.Contains("pm trim-caches 999G", commands);
+    }
+
+    [TestMethod]
+    public async Task CleanAsync_ForceStopAllFailure_LogsForceStopAllOperation()
+    {
+        const string forceStopAllCommand = "cmd activity force-stop-all >/dev/null 2>&1";
+        IDevicePackageService packages = Substitute.For<IDevicePackageService>();
+        packages.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns([]);
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        adb.RunAdbShellScriptAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+                string.Equals(callInfo.ArgAt<string>(1), forceStopAllCommand, StringComparison.Ordinal)
+                    ? new CommandResult(1, string.Empty, "force-stop failed")
+                    : new CommandResult(0, string.Empty, string.Empty));
+        var logger = new TestLogger<DeviceDataCleanupService>();
+        var service = CreateService(packages, adb, logger);
+
+        await service.CleanAsync(
+            "SERIAL",
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ClearAllPackages = true,
+                ClearGoogleAccounts = false
+            },
+            CancellationToken.None);
+
+        Assert.IsTrue(logger.Messages.Any(message =>
+            message.Contains("Operation: force-stop-all", StringComparison.Ordinal)));
+        Assert.IsFalse(logger.Messages.Any(message =>
+            message.Contains("Operation: unknown", StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -467,10 +504,11 @@ public sealed class DeviceDataCleanupServiceTests
     }
 
     [TestMethod]
-    public async Task CleanAsync_CommandFailure_IgnoresResultAndRunsEveryCommandOnce()
+    public async Task CleanAsync_CommandFailure_LogsWarningAndRunsEveryCommandOnce()
     {
         IDevicePackageService packages = Substitute.For<IDevicePackageService>();
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        var logger = new TestLogger<DeviceDataCleanupService>();
         string failingCommand = DeviceDataCleanupService.CreateDeleteDirectoryContentsCommand(
             DeviceDataCleanupService.IdentityDirectoryPaths[1]);
         adb.RunAdbShellScriptAsync(
@@ -481,7 +519,7 @@ public sealed class DeviceDataCleanupServiceTests
                 string.Equals(callInfo.ArgAt<string>(1), failingCommand, StringComparison.Ordinal)
                     ? new CommandResult(1, string.Empty, "permission denied")
                     : new CommandResult(0, string.Empty, string.Empty));
-        var service = CreateService(packages, adb);
+        var service = CreateService(packages, adb, logger);
 
         await service.CleanAsync(
             "SERIAL",
@@ -505,15 +543,55 @@ public sealed class DeviceDataCleanupServiceTests
             "SERIAL",
             "id -u",
             Arg.Any<CancellationToken>());
+        Assert.IsTrue(logger.Messages.Any(message =>
+            message.Contains("Cleanup operation failed", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(logger.Messages.Any(message => message.Contains(failingCommand, StringComparison.Ordinal)));
     }
 
     [TestMethod]
-    public async Task CleanAsync_CommandTimeoutAfterSixtySeconds_ContinuesWithoutRetry()
+    public async Task CleanAsync_CommandException_LogsWarningAndContinues()
+    {
+        IDevicePackageService packages = Substitute.For<IDevicePackageService>();
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        var logger = new TestLogger<DeviceDataCleanupService>();
+        string throwingCommand = DeviceDataCleanupService.CreateDeleteDirectoryContentsCommand(
+            DeviceDataCleanupService.IdentityDirectoryPaths[1]);
+        adb.RunAdbShellScriptAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+                string.Equals(callInfo.ArgAt<string>(1), throwingCommand, StringComparison.Ordinal)
+                    ? throw new InvalidOperationException("adb unavailable")
+                    : new CommandResult(0, string.Empty, string.Empty));
+        var service = CreateService(packages, adb, logger);
+
+        await service.CleanAsync(
+            "SERIAL",
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ClearAllPackages = false,
+                ClearGoogleAccounts = false
+            },
+            CancellationToken.None);
+
+        IReadOnlyList<string> commands = GetCleanupCommands(adb);
+        AssertCommandOccursOnce(commands, throwingCommand);
+        Assert.AreEqual("sync", commands[^1]);
+        Assert.IsTrue(logger.Messages.Any(message =>
+            message.Contains("Cleanup operation threw an exception", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(logger.Messages.Any(message => message.Contains(throwingCommand, StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task CleanAsync_CommandTimeoutAfterSixtySeconds_LogsWarningAndContinuesWithoutRetry()
     {
         Assert.AreEqual(TimeSpan.FromSeconds(60), DeviceDataCleanupService.CleanupCommandTimeout);
 
         IDevicePackageService packages = Substitute.For<IDevicePackageService>();
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        var logger = new TestLogger<DeviceDataCleanupService>();
         string timedOutCommand = DeviceDataCleanupService.CreateDeleteDirectoryContentsCommand(
             DeviceDataCleanupService.IdentityDirectoryPaths[0]);
         adb.RunAdbShellScriptAsync(
@@ -532,7 +610,7 @@ public sealed class DeviceDataCleanupServiceTests
 
                 return new CommandResult(0, string.Empty, string.Empty);
             });
-        var service = CreateService(packages, adb);
+        var service = CreateService(packages, adb, logger);
 
         await service.CleanAsync(
             "SERIAL",
@@ -547,6 +625,9 @@ public sealed class DeviceDataCleanupServiceTests
         IReadOnlyList<string> commands = GetCleanupCommands(adb);
         AssertCommandOccursOnce(commands, timedOutCommand);
         Assert.AreEqual("sync", commands[^1]);
+        Assert.IsTrue(logger.Messages.Any(message =>
+            message.Contains("Cleanup operation timed out", StringComparison.OrdinalIgnoreCase)));
+        Assert.IsFalse(logger.Messages.Any(message => message.Contains(timedOutCommand, StringComparison.Ordinal)));
     }
 
     [TestMethod]
@@ -583,12 +664,13 @@ public sealed class DeviceDataCleanupServiceTests
 
     private static DeviceDataCleanupService CreateService(
         IDevicePackageService packages,
-        IAdbCommandService? adb = null)
+        IAdbCommandService? adb = null,
+        ILogger<DeviceDataCleanupService>? logger = null)
     {
         return new DeviceDataCleanupService(
             packages,
             adb ?? CreateSuccessfulAdb(),
-            NullLogger<DeviceDataCleanupService>.Instance);
+            logger ?? NullLogger<DeviceDataCleanupService>.Instance);
     }
 
     private static IAdbCommandService CreateSuccessfulAdb()

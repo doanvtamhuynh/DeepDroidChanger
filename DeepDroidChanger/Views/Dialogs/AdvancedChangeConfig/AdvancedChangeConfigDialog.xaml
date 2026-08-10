@@ -108,7 +108,7 @@
                               Margin="0,4"/>
                     <CheckBox x:Name="UseIntegritySecurityPatchCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_UseIntegritySecurityPatch}"
-                              ToolTip="{DynamicResource Shared_TooltipOption}"
+                              ToolTip="{DynamicResource AdvancedChangeConfig_UseIntegritySecurityPatchDescription}"
                               IsChecked="{Binding UseIntegritySecurityPatch, Mode=TwoWay}"
                               Margin="0,4"/>
                     <CheckBox x:Name="UpdateIntegrityCheckBox"

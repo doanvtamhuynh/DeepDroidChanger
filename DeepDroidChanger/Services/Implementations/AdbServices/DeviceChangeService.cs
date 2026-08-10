@@ -582,63 +582,143 @@ public sealed class DeviceChangeService : IDeviceChangeService
         bool changeTimezone,
         CancellationToken cancellationToken)
     {
-        if ((!changeLocation && !changeTimezone) || _locationDataService == null)
+        if (!changeLocation && !changeTimezone)
             return;
 
+        if (_locationDataService == null)
+        {
+            _logger.LogWarning(
+                "Location and timezone changes were requested for {Serial}, but location data service is unavailable.",
+                serial);
+            return;
+        }
+
+        IReadOnlyList<LocationOption> locations;
         try
         {
-            var locations = await _locationDataService.GetLocationsAsync(cancellationToken).ConfigureAwait(false);
-            if (locations.Count == 0)
-                return;
+            locations = await _locationDataService
+                .GetLocationsAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Failed to load location data while applying advanced location/timezone options for {Serial}.",
+                serial);
+            return;
+        }
 
-            string countryIso = profile.SimOperatorCountry;
-            IReadOnlyList<LocationOption> countryLocations = string.IsNullOrWhiteSpace(countryIso)
-                ? Array.Empty<LocationOption>()
-                : locations.Where(loc => string.Equals(loc.CountryCode, countryIso, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (locations is not { Count: > 0 })
+        {
+            _logger.LogWarning(
+                "Location/timezone changes were requested for {Serial}, but no location data is available.",
+                serial);
+            return;
+        }
 
-            var targetLocations = countryLocations.Count > 0 ? countryLocations : locations;
-            IRandomService random = _randomService ?? new RandomService();
+        string countryIso = profile.SimOperatorCountry;
+        IReadOnlyList<LocationOption> countryLocations = string.IsNullOrWhiteSpace(countryIso)
+            ? Array.Empty<LocationOption>()
+            : locations
+                .Where(loc => string.Equals(loc.CountryCode, countryIso, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-            if (changeLocation && _locationService != null)
+        IReadOnlyList<LocationOption> targetLocations = countryLocations.Count > 0
+            ? countryLocations
+            : locations;
+        IRandomService random = _randomService ?? new RandomService();
+
+        if (changeLocation)
+        {
+            if (_locationService == null)
             {
-                LocationOption selectedLocation = random.PickRandom(targetLocations);
-                string latitude = LocationCoordinateRandomizer.RandomizeLatitude(
-                    selectedLocation.Latitude,
-                    random);
-                string longitude = LocationCoordinateRandomizer.RandomizeLongitude(
-                    selectedLocation.Longitude,
-                    random);
-
-                await _locationService.ApplyLocationAsync(
-                        serial,
-                        latitude,
-                        longitude,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                _logger.LogWarning(
+                    "Location change was requested for {Serial}, but location service is unavailable.",
+                    serial);
             }
-
-            if (changeTimezone && _timezoneService != null)
+            else
             {
-                var countryTimezones = targetLocations
-                    .Select(loc => loc.Timezone)
-                    .Where(tz => !string.IsNullOrWhiteSpace(tz))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                try
+                {
+                    LocationOption? selectedLocation = random.PickRandom(targetLocations);
+                    if (selectedLocation == null)
+                        throw new InvalidOperationException("Location selection returned no value.");
 
-                string selectedTimezone = countryTimezones.Count > 0
-                    ? random.PickRandom(countryTimezones)
-                    : random.PickRandom(targetLocations).Timezone;
+                    string latitude = LocationCoordinateRandomizer.RandomizeLatitude(
+                        selectedLocation.Latitude,
+                        random);
+                    string longitude = LocationCoordinateRandomizer.RandomizeLongitude(
+                        selectedLocation.Longitude,
+                        random);
 
-                await _timezoneService.ApplyTimezoneAsync(
-                        serial,
-                        selectedTimezone,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                    await _locationService.ApplyLocationAsync(
+                            serial,
+                            latitude,
+                            longitude,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Failed to apply advanced location for {Serial}; continuing with remaining profile changes.",
+                        serial);
+                }
             }
         }
-        catch (Exception ex)
+
+        if (changeTimezone)
         {
-            _logger.LogWarning(ex, "Failed to apply location or timezone during change device for {Serial}.", serial);
+            if (_timezoneService == null)
+            {
+                _logger.LogWarning(
+                    "Timezone change was requested for {Serial}, but timezone service is unavailable.",
+                    serial);
+            }
+            else
+            {
+                try
+                {
+                    List<string> countryTimezones = targetLocations
+                        .Select(loc => loc.Timezone)
+                        .Where(tz => !string.IsNullOrWhiteSpace(tz))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    string selectedTimezone = countryTimezones.Count > 0
+                        ? random.PickRandom(countryTimezones)
+                        : random.PickRandom(targetLocations).Timezone;
+                    if (string.IsNullOrWhiteSpace(selectedTimezone))
+                        throw new InvalidOperationException("Timezone selection returned no value.");
+
+                    await _timezoneService.ApplyTimezoneAsync(
+                            serial,
+                            selectedTimezone,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Failed to apply advanced timezone for {Serial}; continuing with remaining profile changes.",
+                        serial);
+                }
+            }
         }
     }
 

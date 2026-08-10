@@ -1,6 +1,8 @@
 using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
+using DeepDroidChanger.Tests.Fakes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -893,7 +895,8 @@ public sealed partial class DeviceChangeServiceTests
         IDeviceLocationService? locationService = null,
         IDeviceTimezoneService? timezoneService = null,
         ILocationDataService? locationDataService = null,
-        IRandomService? randomService = null)
+        IRandomService? randomService = null,
+        ILogger<DeviceChangeService>? logger = null)
     {
         return new DeviceChangeService(
             adb,
@@ -903,7 +906,7 @@ public sealed partial class DeviceChangeServiceTests
             timezoneService,
             locationDataService,
             randomService,
-            NullLogger<DeviceChangeService>.Instance);
+            logger ?? NullLogger<DeviceChangeService>.Instance);
     }
 
     private static DeviceInfoApiDevice CreateProfile()
@@ -986,6 +989,8 @@ public sealed partial class DeviceChangeServiceTests
             new LocationOption("vn", "Viet Nam", "Hanoi", "Asia/Ho_Chi_Minh", "UTC+7", 21.0300, 105.8690)
         };
         locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<LocationOption>>(testLocations));
+        randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocations[0]);
+        randomService.PickRandom(Arg.Any<IReadOnlyList<string>>()).Returns("Asia/Ho_Chi_Minh");
 
         DeviceChangeService service = CreateService(
             adb,
@@ -1008,6 +1013,111 @@ public sealed partial class DeviceChangeServiceTests
 
         await locationService.Received(1).ApplyLocationAsync("SERIAL", "21.0123", "105.8456", Arg.Any<CancellationToken>());
         await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "Asia/Ho_Chi_Minh", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_LocationFailure_ContinuesWithTimezoneAndLogsWarning()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
+        IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
+        ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+        IRandomService randomService = Substitute.For<IRandomService>();
+        var logger = new TestLogger<DeviceChangeService>();
+        var testLocation = new LocationOption(
+            "vn",
+            "Viet Nam",
+            "Hanoi",
+            "Asia/Ho_Chi_Minh",
+            "UTC+7",
+            21.0300,
+            105.8690);
+        locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<LocationOption>>([testLocation]));
+        randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocation);
+        randomService.PickRandom(Arg.Any<IReadOnlyList<string>>()).Returns("Asia/Ho_Chi_Minh");
+        locationService.ApplyLocationAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("location failed")));
+        DeviceChangeService service = CreateService(
+            adb,
+            locationService: locationService,
+            timezoneService: timezoneService,
+            locationDataService: locationDataService,
+            randomService: randomService,
+            logger: logger);
+
+        DeviceInfoApiDevice profile = CreateProfile();
+        profile.SimOperatorCountry = "vn";
+        await service.ChangeAsync(
+            "SERIAL",
+            profile,
+            changeSim: true,
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeLocation = true,
+                ChangeTimezone = true
+            },
+            progress: null,
+            CancellationToken.None);
+
+        await timezoneService.Received(1).ApplyTimezoneAsync(
+            "SERIAL",
+            "Asia/Ho_Chi_Minh",
+            Arg.Any<CancellationToken>());
+        Assert.IsTrue(logger.Messages.Any(message =>
+            message.Contains("advanced location", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [TestMethod]
+    public async Task ChangeAsync_LocationCancellation_PropagatesCancellation()
+    {
+        IAdbCommandService adb = CreateRootedAdb();
+        IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
+        ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+        IRandomService randomService = Substitute.For<IRandomService>();
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+        var testLocation = new LocationOption(
+            "vn",
+            "Viet Nam",
+            "Hanoi",
+            "Asia/Ho_Chi_Minh",
+            "UTC+7",
+            21.0300,
+            105.8690);
+        locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<LocationOption>>([testLocation]));
+        randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocation);
+        locationService.ApplyLocationAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromCanceled(cancellationSource.Token));
+        DeviceChangeService service = CreateService(
+            adb,
+            locationService: locationService,
+            locationDataService: locationDataService,
+            randomService: randomService);
+
+        DeviceInfoApiDevice profile = CreateProfile();
+        profile.SimOperatorCountry = "vn";
+        await Assert.ThrowsAsync<OperationCanceledException>(() => service.ChangeAsync(
+            "SERIAL",
+            profile,
+            changeSim: true,
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeLocation = true
+            },
+            progress: null,
+            CancellationToken.None));
     }
 
     [TestMethod]

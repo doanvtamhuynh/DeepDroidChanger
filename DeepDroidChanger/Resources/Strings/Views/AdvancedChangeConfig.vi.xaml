@@ -7,12 +7,13 @@
     <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Đổi Android ID</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Đổi MAC</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatch">Sử dụng bản vá Integrity</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatchDescription">Áp dụng khi tạo profile Random tiếp theo; profile đã random sẵn sẽ không bị thay đổi.</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UpdateIntegrity">Cập nhật Integrity</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeTimezone">Đổi Timezone</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeLocation">Đổi Location</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_WipeSectionTitle">Cấu hình Wipe</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipe">Dùng xóa sâu cho package</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipeDescription">Sau "pm clear", dùng "rm -rf" xóa dữ liệu ứng dụng và hồ sơ ART của package.</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipeDescription">Sau "pm clear", xóa tệp còn sót trong sáu vùng dữ liệu ứng dụng, media và hồ sơ ART nhưng giữ nguyên thư mục.</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ClearAllPackages">Xóa dữ liệu tất cả package</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ClearGoogleAccounts">Xóa dữ liệu tài khoản Google</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ClearGooglePackages">Xóa dữ liệu package Google</sys:String>

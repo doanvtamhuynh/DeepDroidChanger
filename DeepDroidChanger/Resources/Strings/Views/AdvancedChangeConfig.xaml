@@ -7,12 +7,13 @@
     <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Change Android ID</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Change Wi-Fi/Bluetooth MAC</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatch">Use Integrity security patch</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatchDescription">Applies when the next Random profile is generated; an existing prepared profile is unchanged.</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UpdateIntegrity">Update integrity</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeTimezone">Change timezone</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeLocation">Change location</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_WipeSectionTitle">Wipe configuration</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipe">Use deep wipe for packages</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipeDescription">After "pm clear", remove the package's eight app-data and ART-profile paths with "rm -rf".</sys:String>
+    <sys:String x:Key="AdvancedChangeConfig_UseDeepPackageWipeDescription">After "pm clear", delete leftover files from six app-data, media, and ART-profile paths while preserving their directories.</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ClearAllPackages">Clear all package data</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ClearGoogleAccounts">Clear Google account data</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ClearGooglePackages">Clear Google package data</sys:String>
