@@ -22,4 +22,16 @@ public sealed class LocationDataServiceTests
         Assert.IsFalse(string.IsNullOrWhiteSpace(first.CountryName));
         Assert.IsNotNull(first.LocationDisplayText);
     }
+
+    [TestMethod]
+    public async Task GetTimezonesAsync_BundledCatalog_ReturnsExpectedEntries()
+    {
+        var service = new LocationDataService(NullLogger<LocationDataService>.Instance);
+
+        IReadOnlyList<TimezoneOption> timezones =
+            await service.GetTimezonesAsync(CancellationToken.None);
+
+        Assert.HasCount(416, timezones);
+        Assert.IsTrue(timezones.Any(option => option.Timezone == "Asia/Ho_Chi_Minh"));
+    }
 }

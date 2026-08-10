@@ -118,7 +118,6 @@ public sealed partial class App : Application
         services.AddSingleton<IRuntimeDataMigrationService, RuntimeDataMigrationService>();
         services.AddSingleton<IDeviceStoreService, DeviceStoreService>();
         services.AddSingleton<ICarrierDataService, CarrierDataService>();
-        services.AddSingleton<ITimezoneDataService, TimezoneDataService>();
         services.AddSingleton<ILocationDataService, LocationDataService>();
         services.AddDeepDroidAuthentication();
         services.AddSingleton<IDeviceRandomApiService, DeviceRandomApiService>();
@@ -143,7 +142,6 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceRandomProfileService, DeviceRandomProfileService>();
         services.AddSingleton<ISimProfileService, SimProfileService>();
         services.AddSingleton<IDeviceListService, DeviceListService>();
-        services.AddSingleton<IDeviceSelectionService, DeviceSelectionService>();
         services.AddSingleton<IDeviceConfigService, DeviceConfigService>();
         services.AddSingleton<IMultipleDeviceConfigService, MultipleDeviceConfigService>();
         services.AddSingleton<IRandomDeviceService, RandomDeviceService>();
@@ -157,8 +155,6 @@ public sealed partial class App : Application
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();
         services.AddTransient<IChangeTimezoneDialogService, ChangeTimezoneDialogService>();
         services.AddTransient<IConfirmationDialogService, ConfirmationDialogService>();
-        services.AddTransient<IDeleteDeviceConfirmationDialogService, DeleteDeviceConfirmationDialogService>();
-        services.AddTransient<IChangeDeviceConfirmationDialogService, ChangeDeviceConfirmationDialogService>();
         services.AddTransient<IDeviceActionConfirmationDialogService, DeviceActionConfirmationDialogService>();
         services.AddTransient<IAdvancedChangeConfigDialogService, AdvancedChangeConfigDialogService>();
         services.AddTransient<IRandomDeviceInfoDialogService, RandomDeviceInfoDialogService>();

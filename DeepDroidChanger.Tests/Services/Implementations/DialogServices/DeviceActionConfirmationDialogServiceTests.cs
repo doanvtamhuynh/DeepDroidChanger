@@ -73,4 +73,82 @@ public sealed class DeviceActionConfirmationDialogServiceTests
                 && options.Icon == ConfirmationDialogIcon.Sim),
             Arg.Any<CancellationToken>());
     }
+
+    [TestMethod]
+    public async Task ConfirmDeleteAndChangeAndWipe_UseExistingLocalizedOptions()
+    {
+        IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
+        confirmationDialog.ShowConfirmationAsync(
+                Arg.Any<ConfirmationDialogOptions>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        ILocalizationService localization = Substitute.For<ILocalizationService>();
+        localization.GetString(Arg.Any<string>()).Returns(callInfo =>
+        {
+            string key = callInfo.Arg<string>();
+            return key is "DeleteDeviceConfirmation_Caption" or "ChangeDeviceConfirmation_Caption"
+                ? $"{key}: {{0}} - {{1}}"
+                : key;
+        });
+        var service = new DeviceActionConfirmationDialogService(confirmationDialog, localization);
+
+        bool deleteConfirmed = await service.ConfirmDeleteDeviceAsync(
+            "Offline phone", "SERIAL", CancellationToken.None);
+        bool changeConfirmed = await service.ConfirmChangeAndWipeAsync(
+            "Phone", "SERIAL", new DeviceChangeOptions { UseDefaultMode = true }, CancellationToken.None);
+
+        Assert.IsTrue(deleteConfirmed);
+        Assert.IsTrue(changeConfirmed);
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "DeleteDeviceConfirmation_Caption: Offline phone - SERIAL"
+                && options.Message == "DeleteDeviceConfirmation_Message"
+                && options.WarningMessage == "DeleteDeviceConfirmation_Warning"
+                && options.Icon == ConfirmationDialogIcon.Delete),
+            Arg.Any<CancellationToken>());
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "ChangeDeviceConfirmation_Caption: Phone - SERIAL"
+                && options.Message == "ChangeDeviceConfirmation_Message"
+                && options.WarningMessage == "ChangeDeviceConfirmation_Warning"
+                && options.Icon == ConfirmationDialogIcon.ChangeDevice),
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ConfirmChangeAndWipe_AdvancedOptions_DoNotExposeCleanupDetails()
+    {
+        IConfirmationDialogService confirmationDialog = Substitute.For<IConfirmationDialogService>();
+        confirmationDialog.ShowConfirmationAsync(
+                Arg.Any<ConfirmationDialogOptions>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        ILocalizationService localization = Substitute.For<ILocalizationService>();
+        localization.GetString(Arg.Any<string>()).Returns(callInfo =>
+            callInfo.Arg<string>() == "ChangeDeviceConfirmation_Caption"
+                ? "Confirm Change Device: {0} - {1}"
+                : callInfo.Arg<string>());
+        var service = new DeviceActionConfirmationDialogService(confirmationDialog, localization);
+
+        bool confirmed = await service.ConfirmChangeAndWipeAsync(
+            "Phone",
+            "SERIAL",
+            new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeAndroidId = true,
+                ChangeMacAddress = true,
+                ClearSelectedPackages = true,
+                SelectedPackages = ["com.example.app"],
+                UseRmRfForPackageCleanup = true
+            },
+            CancellationToken.None);
+
+        Assert.IsFalse(confirmed);
+        await confirmationDialog.Received(1).ShowConfirmationAsync(
+            Arg.Is<ConfirmationDialogOptions>(options =>
+                options.Caption == "Confirm Change Device: Phone - SERIAL"
+                && options.Message == "ChangeDeviceConfirmation_Message"
+                && options.WarningMessage == "ChangeDeviceConfirmation_Warning"
+                && options.Icon == ConfirmationDialogIcon.ChangeDevice),
+            Arg.Any<CancellationToken>());
+    }
 }

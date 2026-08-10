@@ -21,7 +21,7 @@ public sealed class ChangeTimezoneViewModelTests
                 cancellation.Cancel();
                 throw new OperationCanceledException(cancellation.Token);
             });
-        var viewModel = CreateViewModel(store, Substitute.For<ITimezoneDataService>());
+        var viewModel = CreateViewModel(store, Substitute.For<ILocationDataService>());
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             () => viewModel.InitializeAsync(cancellation.Token));
@@ -32,7 +32,7 @@ public sealed class ChangeTimezoneViewModelTests
     {
         var config = new StoredDeviceConfig { Serial = "ABC" };
         IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(config);
-        ITimezoneDataService timezones = Substitute.For<ITimezoneDataService>();
+        ILocationDataService timezones = Substitute.For<ILocationDataService>();
         var option = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
         timezones.GetTimezonesAsync(Arg.Any<CancellationToken>()).Returns([option]);
         var viewModel = CreateViewModel(store, timezones);
@@ -54,7 +54,7 @@ public sealed class ChangeTimezoneViewModelTests
             TimezoneMode = ChangeTimezoneMode.Data.ToString(),
             Timezone = "Asia/Ho_Chi_Minh",
         });
-        ITimezoneDataService timezones = Substitute.For<ITimezoneDataService>();
+        ILocationDataService timezones = Substitute.For<ILocationDataService>();
         var vietnam = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
         var unitedStates = new TimezoneOption("US", "United States", "America/New_York", "-05:00");
         timezones.GetTimezonesAsync(Arg.Any<CancellationToken>()).Returns([vietnam, unitedStates]);
@@ -72,7 +72,7 @@ public sealed class ChangeTimezoneViewModelTests
     public async Task SelectingUnitedStates_PopulatesOnlyUsTimezonesAndDefaultsToNewYork()
     {
         IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(new StoredDeviceConfig { Serial = "ABC" });
-        ITimezoneDataService timezones = Substitute.For<ITimezoneDataService>();
+        ILocationDataService timezones = Substitute.For<ILocationDataService>();
         var vietnam = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
         var usNewYork = new TimezoneOption("US", "United States", "America/New_York", "-04:00");
         var usHonolulu = new TimezoneOption("US", "United States", "Pacific/Honolulu", "-10:00");
@@ -91,7 +91,7 @@ public sealed class ChangeTimezoneViewModelTests
 
     private static ChangeTimezoneViewModel CreateViewModel(
         IDeviceStoreService store,
-        ITimezoneDataService timezones)
+        ILocationDataService timezones)
     {
         return new ChangeTimezoneViewModel(
             timezones,

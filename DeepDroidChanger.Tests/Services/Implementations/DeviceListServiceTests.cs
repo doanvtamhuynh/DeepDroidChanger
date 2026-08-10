@@ -121,5 +121,40 @@ namespace DeepDroidChanger.Tests.Services.Implementations
 
             Assert.AreEqual(1, count);
         }
+
+        [TestMethod]
+        public void FindSelectionSerial_RestoresHiddenMatchingSerial()
+        {
+            var service = new DeviceListService(
+                Substitute.For<IAdbDeviceService>(),
+                Substitute.For<IDeviceStoreService>());
+
+            string? selected = service.FindSelectionSerial(
+                "target",
+                ["VISIBLE"],
+                ["VISIBLE", "TARGET"]);
+
+            Assert.AreEqual("TARGET", selected);
+        }
+
+        [TestMethod]
+        public void FindSelectionSerial_WithoutOrMissingTarget_DoesNotSelectFirstVisibleDevice()
+        {
+            var service = new DeviceListService(
+                Substitute.For<IAdbDeviceService>(),
+                Substitute.For<IDeviceStoreService>());
+
+            string? noTarget = service.FindSelectionSerial(
+                string.Empty,
+                ["FIRST", "SECOND"],
+                ["FIRST", "SECOND"]);
+            string? missingTarget = service.FindSelectionSerial(
+                "MISSING",
+                ["FIRST", "SECOND"],
+                ["FIRST", "SECOND"]);
+
+            Assert.IsNull(noTarget);
+            Assert.IsNull(missingTarget);
+        }
     }
 }

@@ -15,6 +15,38 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         _localizationService = localizationService;
     }
 
+    public Task<bool> ConfirmDeleteDeviceAsync(
+        string deviceName,
+        string deviceSerial,
+        CancellationToken cancellationToken)
+    {
+        return ShowConfirmationAsync(
+            "DeleteDeviceConfirmation_Caption",
+            "DeleteDeviceConfirmation_Message",
+            "DeleteDeviceConfirmation_Warning",
+            ConfirmationDialogIcon.Delete,
+            deviceName,
+            deviceSerial,
+            cancellationToken);
+    }
+
+    public Task<bool> ConfirmChangeAndWipeAsync(
+        string deviceName,
+        string deviceSerial,
+        DeviceChangeOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return ShowConfirmationAsync(
+            "ChangeDeviceConfirmation_Caption",
+            "ChangeDeviceConfirmation_Message",
+            "ChangeDeviceConfirmation_Warning",
+            ConfirmationDialogIcon.ChangeDevice,
+            deviceName,
+            deviceSerial,
+            cancellationToken);
+    }
+
     public Task<bool> ConfirmChangeWithoutWipeAsync(
         string deviceName,
         string deviceSerial,

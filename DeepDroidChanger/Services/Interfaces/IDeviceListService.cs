@@ -24,4 +24,9 @@ public interface IDeviceListService
     int CountNewDevices(
         IReadOnlyList<StoredDeviceConfig> storedDevices,
         IReadOnlyList<AdbDevice> connectedDevices);
+
+    string? FindSelectionSerial(
+        string? targetSerial,
+        IReadOnlyList<string> visibleSerials,
+        IReadOnlyList<string> allSerials);
 }

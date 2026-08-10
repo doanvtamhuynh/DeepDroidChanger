@@ -18,6 +18,7 @@ namespace DeepDroidChanger.Services
 
         private readonly ILogger<LocationDataService> _logger;
         private IReadOnlyList<LocationOption>? _locations;
+        private IReadOnlyList<TimezoneOption>? _timezones;
 
         public LocationDataService(ILogger<LocationDataService> logger)
         {
@@ -29,6 +30,23 @@ namespace DeepDroidChanger.Services
             cancellationToken.ThrowIfCancellationRequested();
             _locations ??= LoadLocations(cancellationToken);
             return Task.FromResult(_locations);
+        }
+
+        public Task<IReadOnlyList<TimezoneOption>> GetTimezonesAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _locations ??= LoadLocations(cancellationToken);
+            _timezones ??= _locations
+                .Where(location => location.Timezone.Length > 0)
+                .Select(location => new TimezoneOption(
+                    location.CountryCode,
+                    location.CountryName,
+                    location.Timezone,
+                    location.GmtOffset))
+                .OrderBy(option => option.CountryName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(option => option.Timezone, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return Task.FromResult(_timezones);
         }
 
         private IReadOnlyList<LocationOption> LoadLocations(CancellationToken cancellationToken)

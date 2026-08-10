@@ -28,13 +28,10 @@ namespace DeepDroidChanger.ViewModels
         private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IInstallPackageDialogService _installPackageDialogService;
         private readonly IDeviceViewerDialogService _deviceViewerDialogService;
-        private readonly IDeleteDeviceConfirmationDialogService _deleteDeviceConfirmationDialogService;
-        private readonly IChangeDeviceConfirmationDialogService _changeDeviceConfirmationDialogService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
         private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
         private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
         private readonly IDeviceListService _deviceListService;
-        private readonly IDeviceSelectionService _deviceSelectionService;
         private readonly IDeviceConfigService _deviceConfigService;
         private readonly IRandomDeviceService _randomDeviceService;
         private readonly ISimProfileService _simProfileService;
@@ -104,13 +101,10 @@ namespace DeepDroidChanger.ViewModels
             IDeviceIntegrityService deviceIntegrityService,
             IInstallPackageDialogService installPackageDialogService,
             IDeviceViewerDialogService deviceViewerDialogService,
-            IDeleteDeviceConfirmationDialogService deleteDeviceConfirmationDialogService,
-            IChangeDeviceConfirmationDialogService changeDeviceConfirmationDialogService,
             IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
             IAdvancedChangeConfigDialogService advancedChangeConfigDialogService,
             IRandomDeviceInfoDialogService randomDeviceInfoDialogService,
             IDeviceListService deviceListService,
-            IDeviceSelectionService deviceSelectionService,
             IDeviceConfigService deviceConfigService,
             IRandomDeviceService randomDeviceService,
             ISimProfileService simProfileService,
@@ -137,13 +131,10 @@ namespace DeepDroidChanger.ViewModels
             _deviceIntegrityService = deviceIntegrityService;
             _installPackageDialogService = installPackageDialogService;
             _deviceViewerDialogService = deviceViewerDialogService;
-            _deleteDeviceConfirmationDialogService = deleteDeviceConfirmationDialogService;
-            _changeDeviceConfirmationDialogService = changeDeviceConfirmationDialogService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
             _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
             _randomDeviceInfoDialogService = randomDeviceInfoDialogService;
             _deviceListService = deviceListService;
-            _deviceSelectionService = deviceSelectionService;
             _deviceConfigService = deviceConfigService;
             _randomDeviceService = randomDeviceService;
             _simProfileService = simProfileService;
@@ -551,8 +542,8 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                var confirmed = await _deleteDeviceConfirmationDialogService
-                    .ShowDeleteDeviceConfirmationAsync(device.Name, device.Serial, cancellationToken)
+                var confirmed = await _deviceActionConfirmationDialogService
+                    .ConfirmDeleteDeviceAsync(device.Name, device.Serial, cancellationToken)
                     .ConfigureAwait(true);
 
                 if (!confirmed)
@@ -971,8 +962,8 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                bool confirmed = await _changeDeviceConfirmationDialogService
-                    .ShowChangeDeviceConfirmationAsync(
+                bool confirmed = await _deviceActionConfirmationDialogService
+                    .ConfirmChangeAndWipeAsync(
                         device.Name,
                         device.Serial,
                         changeOptions,
@@ -1246,8 +1237,8 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                bool confirmed = await _changeDeviceConfirmationDialogService
-                    .ShowChangeDeviceConfirmationAsync(
+                bool confirmed = await _deviceActionConfirmationDialogService
+                    .ConfirmChangeAndWipeAsync(
                         device.Name,
                         device.Serial,
                         changeOptions,
@@ -2205,7 +2196,7 @@ namespace DeepDroidChanger.ViewModels
 
         private void RestoreSelection(string targetSerial)
         {
-            string? selectedSerial = _deviceSelectionService.FindSelectionSerial(
+            string? selectedSerial = _deviceListService.FindSelectionSerial(
                 targetSerial,
                 Devices.Select(device => device.Serial).ToList(),
                 _allDeviceRows.Select(device => device.Serial).ToList());

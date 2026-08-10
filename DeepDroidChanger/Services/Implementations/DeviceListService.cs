@@ -72,5 +72,19 @@ namespace DeepDroidChanger.Services
                 connectedDevice.Status == AdbDeviceStatus.Online
                 && !DeviceRowFactory.ContainsSerial(storedDevices, connectedDevice.Serial));
         }
+
+        public string? FindSelectionSerial(
+            string? targetSerial,
+            IReadOnlyList<string> visibleSerials,
+            IReadOnlyList<string> allSerials)
+        {
+            if (string.IsNullOrWhiteSpace(targetSerial))
+                return null;
+
+            return visibleSerials.FirstOrDefault(serial =>
+                       string.Equals(serial, targetSerial, StringComparison.OrdinalIgnoreCase))
+                   ?? allSerials.FirstOrDefault(serial =>
+                       string.Equals(serial, targetSerial, StringComparison.OrdinalIgnoreCase));
+        }
     }
 }

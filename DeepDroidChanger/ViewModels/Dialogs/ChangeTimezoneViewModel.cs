@@ -10,7 +10,7 @@ namespace DeepDroidChanger.ViewModels
 {
     public sealed partial class ChangeTimezoneViewModel : ObservableObject
     {
-        private readonly ITimezoneDataService _timezoneDataService;
+        private readonly ILocationDataService _locationDataService;
         private readonly IDeviceStoreService _deviceStoreService;
         private readonly ILocalizationService _localizationService;
         private readonly ILogger<ChangeTimezoneViewModel> _logger;
@@ -50,12 +50,12 @@ namespace DeepDroidChanger.ViewModels
         private bool _isLoading = true;
 
         public ChangeTimezoneViewModel(
-            ITimezoneDataService timezoneDataService,
+            ILocationDataService locationDataService,
             IDeviceStoreService deviceStoreService,
             ILocalizationService localizationService,
             ILogger<ChangeTimezoneViewModel> logger)
         {
-            _timezoneDataService = timezoneDataService;
+            _locationDataService = locationDataService;
             _deviceStoreService = deviceStoreService;
             _localizationService = localizationService;
             _logger = logger;
@@ -304,7 +304,7 @@ namespace DeepDroidChanger.ViewModels
         {
             try
             {
-                var timezones = await _timezoneDataService.GetTimezonesAsync(cancellationToken).ConfigureAwait(true);
+                var timezones = await _locationDataService.GetTimezonesAsync(cancellationToken).ConfigureAwait(true);
 
                 AllTimezones.Clear();
                 foreach (var tz in timezones)

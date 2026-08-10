@@ -658,9 +658,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         };
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, profile));
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
         DeviceChangeOptions? confirmedOptions = null;
-        confirmation.ShowChangeDeviceConfirmationAsync(
+        confirmation.ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -674,7 +674,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -684,7 +684,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsTrue(viewModel.ChangeDeviceCommand.CanExecute(null));
         await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
 
-        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+        await confirmation.Received(1).ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Is<DeviceChangeOptions>(options =>
@@ -743,15 +743,13 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, profile));
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
-        IDeviceActionConfirmationDialogService actionConfirmation = CreateDeviceActionConfirmationDialogService();
+        IDeviceActionConfirmationDialogService confirmation = CreateDeviceActionConfirmationDialogService();
         IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
-            deviceActionConfirmationDialog: actionConfirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -760,9 +758,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsTrue(viewModel.ChangeWithoutWipeCommand.CanExecute(null));
         await viewModel.ChangeWithoutWipeCommand.ExecuteAsync(null);
 
-        await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(
+        await confirmation.DidNotReceiveWithAnyArgs().ConfirmChangeAndWipeAsync(
             default!, default!, default!, default);
-        await actionConfirmation.Received(1).ConfirmChangeWithoutWipeAsync(
+        await confirmation.Received(1).ConfirmChangeWithoutWipeAsync(
             "Phone",
             "A",
             Arg.Any<CancellationToken>());
@@ -813,7 +811,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
-            deviceActionConfirmationDialog: actionConfirmation,
+            deviceActionConfirmation: actionConfirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -862,8 +860,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .Returns(new RandomDeviceResult(
                 RandomDeviceStatus.Created,
                 new DeviceInfoApiDevice { Model = "Pixel 9" }));
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
-        confirmation.ShowChangeDeviceConfirmationAsync(
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -873,14 +871,14 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
         await viewModel.RandomDeviceCommand.ExecuteAsync(null);
 
         await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
 
-        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+        await confirmation.Received(1).ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -909,13 +907,13 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .Returns(new RandomDeviceResult(
                 RandomDeviceStatus.Created,
                 new DeviceInfoApiDevice { Model = "Pixel 8" }));
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
         IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -932,7 +930,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
 
         Assert.Contains("Log_DeviceMustBeOnline", processLogs);
-        await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(
+        await confirmation.DidNotReceiveWithAnyArgs().ConfirmChangeAndWipeAsync(
             default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
             default!, default!, default, default!, default, default);
@@ -953,12 +951,12 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
         IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
         var processLogs = new List<string>();
@@ -977,7 +975,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.AreEqual(
             2,
             processLogs.Count(log => log == "Log_RandomDeviceRequired"));
-        await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(
+        await confirmation.DidNotReceiveWithAnyArgs().ConfirmChangeAndWipeAsync(
             default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
             default!, default!, default, default!, default, default);
@@ -1440,8 +1438,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .Returns(new DeviceDeleteResult(true, new DeviceListSnapshot([], [])));
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
-        IDeleteDeviceConfirmationDialogService confirmation = Substitute.For<IDeleteDeviceConfirmationDialogService>();
-        confirmation.ShowDeleteDeviceConfirmationAsync(
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmDeleteDeviceAsync(
                 "Offline phone",
                 "A",
                 Arg.Any<CancellationToken>())
@@ -1449,7 +1447,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         var viewModel = CreateViewModel(
             deviceList,
             carriers,
-            deleteDeviceConfirmation: confirmation);
+            deviceActionConfirmation: confirmation);
         await viewModel.InitializeAsync(CancellationToken.None);
         var processLogs = new List<string>();
         Assert.IsNotNull(viewModel.SelectedDevice);
@@ -1464,7 +1462,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.DeleteDeviceCommand.ExecuteAsync(device);
 
         Assert.DoesNotContain("Log_DeviceMustBeOnline", processLogs);
-        await confirmation.Received(1).ShowDeleteDeviceConfirmationAsync(
+        await confirmation.Received(1).ConfirmDeleteDeviceAsync(
             "Offline phone",
             "A",
             Arg.Any<CancellationToken>());
@@ -1506,7 +1504,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             simProfileService: simProfileService,
-            deviceActionConfirmationDialog: actionConfirmation,
+            deviceActionConfirmation: actionConfirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
         Assert.IsTrue(viewModel.ChangeSimCommand.CanExecute(null));
@@ -1585,7 +1583,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             carriers,
             randomDevice: randomDevice,
             simProfileService: simProfileService,
-            deviceActionConfirmationDialog: actionConfirmation,
+            deviceActionConfirmation: actionConfirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -1895,9 +1893,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
                         ? "Profile A"
                         : "Profile B"
                 })));
-        IChangeDeviceConfirmationDialogService confirmation =
-            Substitute.For<IChangeDeviceConfirmationDialogService>();
-        confirmation.ShowChangeDeviceConfirmationAsync(
+        IDeviceActionConfirmationDialogService confirmation =
+            Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmChangeAndWipeAsync(
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<DeviceChangeOptions>(),
@@ -1937,7 +1935,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -2055,7 +2053,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Offline)]));
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
         IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
 
@@ -2063,7 +2061,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -2072,7 +2070,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
 
         await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
-        await confirmation.DidNotReceiveWithAnyArgs().ShowChangeDeviceConfirmationAsync(default!, default!, default!, default);
+        await confirmation.DidNotReceiveWithAnyArgs().ConfirmChangeAndWipeAsync(default!, default!, default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
         Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices[0].Process);
         Assert.AreEqual(DeviceProcessState.Failed, viewModel.Devices[0].ProcessState);
@@ -2113,8 +2111,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(RandomDeviceStatus.Created, randomProfile));
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
-        confirmation.ShowChangeDeviceConfirmationAsync(
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -2126,7 +2124,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -2136,7 +2134,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await randomDevice.Received(1).CreateRandomProfileAsync(
             Arg.Any<RandomDeviceRequest>(),
             Arg.Any<CancellationToken>());
-        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+        await confirmation.Received(1).ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Is<DeviceChangeOptions>(options =>
@@ -2189,8 +2187,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
-        confirmation.ShowChangeDeviceConfirmationAsync(
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -2202,14 +2200,14 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
         viewModel.SelectedDevice = viewModel.Devices[0];
         await viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
 
-        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+        await confirmation.Received(1).ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Is<DeviceChangeOptions>(options =>
@@ -2241,8 +2239,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(new RandomDeviceResult(RandomDeviceStatus.Failed, null));
-        IChangeDeviceConfirmationDialogService confirmation = Substitute.For<IChangeDeviceConfirmationDialogService>();
-        confirmation.ShowChangeDeviceConfirmationAsync(
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -2254,14 +2252,14 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            changeDeviceConfirmation: confirmation,
+            deviceActionConfirmation: confirmation,
             deviceChange: deviceChange);
         await viewModel.InitializeAsync(CancellationToken.None);
 
         viewModel.SelectedDevice = viewModel.Devices[0];
         await viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
 
-        await confirmation.Received(1).ShowChangeDeviceConfirmationAsync(
+        await confirmation.Received(1).ConfirmChangeAndWipeAsync(
             "Phone",
             "A",
             Arg.Any<DeviceChangeOptions>(),
@@ -2751,9 +2749,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IRandomDeviceService? randomDevice = null,
         IRandomDeviceInfoDialogService? randomDeviceInfoDialog = null,
         ISimProfileService? simProfileService = null,
-        IDeleteDeviceConfirmationDialogService? deleteDeviceConfirmation = null,
-        IChangeDeviceConfirmationDialogService? changeDeviceConfirmation = null,
-        IDeviceActionConfirmationDialogService? deviceActionConfirmationDialog = null,
+        IDeviceActionConfirmationDialogService? deviceActionConfirmation = null,
         IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
         IDeviceChangeService? deviceChange = null,
         IDeviceActionGuardService? deviceActionGuard = null,
@@ -2766,6 +2762,21 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     {
         deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
+        deviceList.FindSelectionSerial(
+                Arg.Any<string>(),
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<IReadOnlyList<string>>())
+            .Returns(callInfo =>
+            {
+                string targetSerial = callInfo.ArgAt<string>(0);
+                IReadOnlyList<string> visibleSerials = callInfo.ArgAt<IReadOnlyList<string>>(1);
+                IReadOnlyList<string> allSerials = callInfo.ArgAt<IReadOnlyList<string>>(2);
+
+                return visibleSerials.FirstOrDefault(serial =>
+                           string.Equals(serial, targetSerial, StringComparison.OrdinalIgnoreCase))
+                       ?? allSerials.FirstOrDefault(serial =>
+                           string.Equals(serial, targetSerial, StringComparison.OrdinalIgnoreCase));
+            });
 
         return new ChangeSingleDeviceViewModel(
             Substitute.For<IAddDevicesDialogService>(),
@@ -2781,13 +2792,10 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             Substitute.For<IDeviceIntegrityService>(),
             Substitute.For<IInstallPackageDialogService>(),
             deviceViewerDialog ?? Substitute.For<IDeviceViewerDialogService>(),
-            deleteDeviceConfirmation ?? Substitute.For<IDeleteDeviceConfirmationDialogService>(),
-            changeDeviceConfirmation ?? Substitute.For<IChangeDeviceConfirmationDialogService>(),
-            deviceActionConfirmationDialog ?? CreateDeviceActionConfirmationDialogService(),
+            deviceActionConfirmation ?? CreateDeviceActionConfirmationDialogService(),
             advancedChangeConfig ?? Substitute.For<IAdvancedChangeConfigDialogService>(),
             randomDeviceInfoDialog ?? Substitute.For<IRandomDeviceInfoDialogService>(),
             deviceList,
-            new DeviceSelectionService(),
             deviceConfig ?? Substitute.For<IDeviceConfigService>(),
             randomDevice ?? Substitute.For<IRandomDeviceService>(),
             simProfileService ?? Substitute.For<ISimProfileService>(),
