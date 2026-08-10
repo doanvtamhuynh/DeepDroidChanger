@@ -885,14 +885,9 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task RandomDeviceAsync(CancellationToken cancellationToken)
         {
-            DeviceRowViewModel? device = SelectedDevice;
+            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
-            {
-                await ShowToolbarLogAsync("Log_SelectDeviceFirst", cancellationToken).ConfigureAwait(true);
                 return;
-            }
-
-            SelectSingleDevice(device);
 
             using IDisposable? actionLease = TryAcquireDeviceAction(device);
             if (actionLease == null)
@@ -1298,7 +1293,7 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task RandomSimAsync(CancellationToken cancellationToken)
         {
-            DeviceRowViewModel? device = await GetSelectedDeviceAsync(cancellationToken).ConfigureAwait(true);
+            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -2066,6 +2061,7 @@ namespace DeepDroidChanger.ViewModels
             }
 
             ApplyDeviceFilter();
+            NotifyDeviceInteractionChanged();
         }
 
         private void RefreshDeviceRows(IReadOnlyList<StoredDeviceConfig> storedDevices, IReadOnlyList<AdbDevice> connectedDevices)
@@ -2227,7 +2223,10 @@ namespace DeepDroidChanger.ViewModels
             }
 
             if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
+            {
                 ApplyDeviceFilter();
+                NotifyDeviceInteractionChanged();
+            }
         }
 
         private void SelectSingleDevice(DeviceRowViewModel? selectedDevice)

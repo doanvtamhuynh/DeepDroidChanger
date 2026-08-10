@@ -772,6 +772,7 @@
 
                             <Grid x:Name="BatchChangeConfigurationFormGrid"
                                   Grid.Row="1"
+                                  IsEnabled="{Binding CanOperateSelectedInfoDevice}"
                                   Style="{StaticResource MultipleDeviceInfoFormGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -904,12 +905,14 @@
                             </Grid>
 
                             <Grid x:Name="MultipleDeviceActionsContent"
-                                  Grid.Row="1">
+                                  Grid.Row="1"
+                                  IsEnabled="{Binding CanOperateSelectedInfoDevice}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -979,6 +982,17 @@
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeSim}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="3"
+                                        Grid.Column="0"
+                                        Command="{Binding RandomChangeAndWipeSelectedDevicesCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Sync" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomChangeAndWipe}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>

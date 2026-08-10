@@ -32,6 +32,8 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelectedTooltip">Generate random device information for selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipe">Change &amp; Wipe Device</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipeTooltip">Change selected devices' information and wipe app data.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipe">Random, Change &amp; Wipe</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip">Generate random information, then change and wipe selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChange">Wipe Without Change</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChangeTooltip">Wipe app data on selected devices without changing their information.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipe">Change Without Wipe</sys:String>

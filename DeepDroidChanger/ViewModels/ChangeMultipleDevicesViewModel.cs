@@ -36,7 +36,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly ILogger<ChangeMultipleDevicesViewModel> _logger;
     private readonly SemaphoreSlim _deviceRefreshLock = new(1, 1);
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
-    private readonly SemaphoreSlim _batchActionLock = new(1, 1);
+    private readonly SemaphoreSlim _batchActionThrottle =
+        new(MaxConcurrentBatchActions, MaxConcurrentBatchActions);
+    private readonly object _activeBatchTargetsLock = new();
+    private readonly HashSet<BatchActionTarget> _activeBatchTargets = [];
     private readonly object _pendingDeviceEditsLock = new();
     private readonly Dictionary<string, PendingDeviceEdit> _pendingDeviceEdits =
         new(StringComparer.OrdinalIgnoreCase);
@@ -62,6 +65,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private bool _isBatchUpdatingSelection;
     private bool _isSynchronizingDeviceInfo;
     private bool _isDisposed;
+    private int _activeBatchActionCount;
+    private int _activeRandomizationCount;
 
     [ObservableProperty]
     private bool _isLoadingDevices;
@@ -191,12 +196,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
             ApplySelectedDeviceInfo(value);
             OnPropertyChanged(nameof(CanInteractWithSelectedInfoDevice));
+            OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
             ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
         }
     }
 
     public bool CanInteractWithSelectedInfoDevice =>
         SelectedInfoDevice == null || !IsDeviceBusy(SelectedInfoDevice);
+
+    public bool CanOperateSelectedInfoDevice =>
+        SelectedInfoDevice != null && !IsDeviceBusy(SelectedInfoDevice);
 
     public bool? AllDevicesSelectionState
     {
@@ -374,7 +383,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private bool CanAddNewDevices()
     {
-        return !IsLoadingDevices && !IsBatchActionRunning;
+        return !IsLoadingDevices;
     }
 
     [RelayCommand]
@@ -410,59 +419,55 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         SynchronizeSelectedDeviceSettings();
     }
 
-    [RelayCommand(CanExecute = nameof(CanRandomizeSelectedDevices))]
+    [RelayCommand(CanExecute = nameof(CanRandomizeSelectedDevices), AllowConcurrentExecutions = true)]
     private async Task RandomSelectedDevicesAsync(CancellationToken cancellationToken)
     {
-        if (!await _batchActionLock.WaitAsync(0, cancellationToken).ConfigureAwait(true))
-            return;
-
-        var leases = new List<(DeviceRowViewModel Device, IDisposable Lease)>();
+        var targets = new List<BatchActionTarget>();
+        bool started = false;
         try
         {
-            DeviceRowViewModel[] targets = _allDeviceRows
+            DeviceRowViewModel[] selectedDevices = _allDeviceRows
                 .Where(device => device.IsSelected)
                 .ToArray();
-            if (targets.Length == 0)
+            if (selectedDevices.Length == 0)
                 return;
 
-            IsRandomizingSelectedDevices = true;
-            IsBatchActionRunning = true;
-            NotifySelectionChanged();
             RandomDeviceRequest request = CreateCurrentRandomDeviceRequest();
-
-            try
+            foreach (DeviceRowViewModel device in selectedDevices)
             {
-                foreach (DeviceRowViewModel device in targets)
-                {
-                    IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
-                    if (lease == null)
-                    {
-                        SetDeviceLog(device, "Log_ActionAlreadyInProgress");
-                        continue;
-                    }
+                if (IsDeviceBusy(device))
+                    continue;
 
-                    leases.Add((device, lease));
+                if (device.ConnectionStatus != AdbDeviceStatus.Online)
+                {
+                    SetDeviceLog(device, "Log_DeviceMustBeOnline");
+                    continue;
                 }
 
-                using var throttle = new SemaphoreSlim(MaxConcurrentBatchActions, MaxConcurrentBatchActions);
-                Task[] operations = leases
-                    .Select(item => RandomSelectedDeviceAsync(
-                        item.Device,
-                        item.Lease,
-                        request,
-                        throttle,
-                        cancellationToken))
-                    .ToArray();
-                await Task.WhenAll(operations).ConfigureAwait(true);
-                leases.Clear();
+                IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
+                if (lease != null)
+                {
+                    var target = new BatchActionTarget(
+                        device,
+                        lease,
+                        deviceProfile: null,
+                        simProfile: null,
+                        randomDeviceRequest: CreateRandomDeviceRequestCopy(request));
+                    RegisterBatchTarget(target);
+                    targets.Add(target);
+                }
             }
-            catch
-            {
-                foreach ((_, IDisposable lease) in leases)
-                    lease.Dispose();
-                leases.Clear();
-                throw;
-            }
+
+            if (targets.Count == 0)
+                return;
+
+            BeginBatchAction(isRandomizing: true);
+            started = true;
+            await Task.WhenAll(targets.Select(target =>
+                    StartBatchTargetWorker(
+                        target,
+                        () => RandomSelectedDeviceAsync(target, cancellationToken))))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -473,47 +478,49 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
         finally
         {
-            foreach ((_, IDisposable lease) in leases)
-                lease.Dispose();
+            CompleteBatchOwnedTargets(targets);
 
-            IsRandomizingSelectedDevices = false;
-            IsBatchActionRunning = false;
-            NotifySelectionChanged();
-            _batchActionLock.Release();
+            if (started)
+                EndBatchAction(isRandomizing: true);
         }
     }
 
     private bool CanRandomizeSelectedDevices()
     {
-        return !IsBatchActionRunning
-               && _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
+        return CanRunSelectedDeviceBatchAction();
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction))]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeSelectedDevicesAsync(CancellationToken cancellationToken)
     {
         return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.ChangeAndWipe, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction))]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task RandomChangeAndWipeSelectedDevicesAsync(CancellationToken cancellationToken)
+    {
+        return RunRandomChangeAndWipeSelectedDevicesAsync(cancellationToken);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeSelectedDevicesWithoutWipeAsync(CancellationToken cancellationToken)
     {
         return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.ChangeWithoutWipe, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction))]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task WipeSelectedDevicesWithoutChangeAsync(CancellationToken cancellationToken)
     {
         return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.WipeWithoutChange, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction))]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task RandomSelectedSimsAsync(CancellationToken cancellationToken)
     {
         return RunSelectedDeviceBatchActionAsync(null, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction))]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeSelectedSimsAsync(CancellationToken cancellationToken)
     {
         return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.ChangeSim, cancellationToken);
@@ -521,7 +528,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private bool CanRunSelectedDeviceBatchAction()
     {
-        return !IsBatchActionRunning
+        return CanOperateSelectedInfoDevice
                && _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
     }
 
@@ -529,37 +536,26 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         MultipleDeviceBatchAction? action,
         CancellationToken cancellationToken)
     {
-        if (!await _batchActionLock.WaitAsync(0, cancellationToken).ConfigureAwait(true))
-            return;
-
         var targets = new List<BatchActionTarget>();
+        bool started = false;
         try
         {
-            IsBatchActionRunning = true;
-            NotifySelectionChanged();
             DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
             bool changeSimEnabled = IsChangeSimEnabled;
             CarrierCountryOption? country = SelectedCountry;
             CarrierOption? carrier = SelectedCarrier;
+            DeviceRowViewModel[] selectedDevices = _allDeviceRows
+                .Where(device => device.IsSelected)
+                .ToArray();
+            if (selectedDevices.Length == 0)
+                return;
 
-            foreach (DeviceRowViewModel device in _allDeviceRows.Where(device => device.IsSelected).ToArray())
+            foreach (DeviceRowViewModel device in selectedDevices)
             {
                 if (IsDeviceBusy(device))
-                {
-                    SetDeviceLog(device, "Log_ActionAlreadyInProgress");
                     continue;
-                }
 
-                if (action != null
-                    && action != MultipleDeviceBatchAction.ChangeSim
-                    && device.ConnectionStatus != AdbDeviceStatus.Online)
-                {
-                    SetDeviceLog(device, "Log_DeviceMustBeOnline");
-                    continue;
-                }
-
-                if (action == MultipleDeviceBatchAction.ChangeSim
-                    && device.ConnectionStatus != AdbDeviceStatus.Online)
+                if (device.ConnectionStatus != AdbDeviceStatus.Online)
                 {
                     SetDeviceLog(device, "Log_DeviceMustBeOnline");
                     continue;
@@ -573,6 +569,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                         SetDeviceLog(device, "Log_RandomDeviceRequired");
                         continue;
                     }
+                }
+                else if (action == MultipleDeviceBatchAction.ChangeSim)
+                {
+                    _randomDeviceProfiles.TryGetValue(device.Serial, out deviceProfile);
                 }
 
                 SimProfile? simProfile = null;
@@ -590,11 +590,24 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     continue;
                 }
 
-                targets.Add(new BatchActionTarget(device, lease, deviceProfile, simProfile));
+                var target = new BatchActionTarget(
+                    device,
+                    lease,
+                    CloneDeviceProfile(deviceProfile),
+                    CloneSimProfile(simProfile),
+                    DeviceChangeOptionsHelper.CreateNormalizedCopy(changeOptions),
+                    changeSimEnabled,
+                    country,
+                    carrier);
+                RegisterBatchTarget(target);
+                targets.Add(target);
             }
 
             if (targets.Count == 0)
                 return;
+
+            BeginBatchAction(isRandomizing: false);
+            started = true;
 
             if (action != null)
             {
@@ -604,22 +617,18 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 if (!confirmed)
                 {
                     foreach (BatchActionTarget target in targets)
-                        SetDeviceLog(target.Device, GetCanceledLogKey(action.Value));
+                        SetTargetLog(target, GetCanceledLogKey(action.Value));
                     return;
                 }
             }
 
-            using var throttle = new SemaphoreSlim(MaxConcurrentBatchActions, MaxConcurrentBatchActions);
             Task[] operations = targets
-                .Select(target => ExecuteBatchActionTargetAsync(
-                    action,
+                .Select(target => StartBatchTargetWorker(
                     target,
-                    changeOptions,
-                    changeSimEnabled,
-                    country,
-                    carrier,
-                    throttle,
-                    cancellationToken))
+                    () => ExecuteBatchActionTargetAsync(
+                        action,
+                        target,
+                        cancellationToken)))
                 .ToArray();
             await Task.WhenAll(operations).ConfigureAwait(true);
         }
@@ -632,41 +641,128 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
         finally
         {
-            foreach (BatchActionTarget target in targets)
-                target.Lease.Dispose();
+            CompleteBatchOwnedTargets(targets);
 
-            IsBatchActionRunning = false;
-            NotifySelectionChanged();
-            _batchActionLock.Release();
+            if (started)
+                EndBatchAction(isRandomizing: false);
+        }
+    }
+
+    private async Task RunRandomChangeAndWipeSelectedDevicesAsync(CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        bool started = false;
+        try
+        {
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            RandomDeviceRequest randomRequest = CreateCurrentRandomDeviceRequest();
+            DeviceRowViewModel[] selectedDevices = _allDeviceRows
+                .Where(device => device.IsSelected)
+                .ToArray();
+            if (selectedDevices.Length == 0)
+                return;
+
+            foreach (DeviceRowViewModel device in selectedDevices)
+            {
+                if (IsDeviceBusy(device))
+                    continue;
+
+                if (device.ConnectionStatus != AdbDeviceStatus.Online)
+                {
+                    SetDeviceLog(device, "Log_DeviceMustBeOnline");
+                    continue;
+                }
+
+                IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
+                if (lease == null)
+                {
+                    SetDeviceLog(device, "Log_ActionAlreadyInProgress");
+                    continue;
+                }
+
+                var target = new BatchActionTarget(
+                    device,
+                    lease,
+                    deviceProfile: null,
+                    simProfile: null,
+                    DeviceChangeOptionsHelper.CreateNormalizedCopy(changeOptions),
+                    changeSimEnabled,
+                    country: null,
+                    carrier: null,
+                    randomDeviceRequest: CreateRandomDeviceRequestCopy(randomRequest));
+                RegisterBatchTarget(target);
+                targets.Add(target);
+            }
+
+            if (targets.Count == 0)
+                return;
+
+            BeginBatchAction(isRandomizing: true);
+            started = true;
+
+            bool confirmed = await _deviceActionConfirmationDialogService
+                .ConfirmMultipleAsync(MultipleDeviceBatchAction.ChangeAndWipe, targets.Count, cancellationToken)
+                .ConfigureAwait(true);
+            if (!confirmed)
+            {
+                foreach (BatchActionTarget target in targets)
+                    SetTargetLog(target, GetCanceledLogKey(MultipleDeviceBatchAction.ChangeAndWipe));
+                return;
+            }
+
+            await Task.WhenAll(targets.Select(target =>
+                    StartBatchTargetWorker(
+                        target,
+                        () => ExecuteRandomChangeAndWipeTargetAsync(target, cancellationToken))))
+                .ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to randomize, change, and wipe selected devices.");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+
+            if (started)
+                EndBatchAction(isRandomizing: true);
         }
     }
 
     private async Task ExecuteBatchActionTargetAsync(
         MultipleDeviceBatchAction? action,
         BatchActionTarget target,
-        DeviceChangeOptions changeOptions,
-        bool changeSimEnabled,
-        CarrierCountryOption? country,
-        CarrierOption? carrier,
-        SemaphoreSlim throttle,
         CancellationToken cancellationToken)
     {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            target.InvalidationToken);
         try
         {
-            await throttle.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
             try
             {
-                await RunOnUiContextAsync(() => SetDeviceLog(target.Device, GetStartLogKey(action)))
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target).ConfigureAwait(false))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, GetStartLogKey(action)))
                     .ConfigureAwait(false);
-                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(target.Device, action);
+                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(target, action);
                 switch (action)
                 {
                     case MultipleDeviceBatchAction.ChangeAndWipe:
                         await _deviceChangeService.ChangeAsync(
                                 target.Device.Serial,
                                 target.DeviceProfile!,
-                                changeSimEnabled,
-                                changeOptions,
+                                target.ChangeSimEnabled,
+                                target.ChangeOptions!,
                                 progress,
                                 cancellationToken)
                             .ConfigureAwait(false);
@@ -675,8 +771,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                         await _deviceChangeService.ChangeWithoutWipeAsync(
                                 target.Device.Serial,
                                 target.DeviceProfile!,
-                                changeSimEnabled,
-                                changeOptions,
+                                target.ChangeSimEnabled,
+                                target.ChangeOptions!,
                                 progress,
                                 cancellationToken)
                             .ConfigureAwait(false);
@@ -684,27 +780,29 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     case MultipleDeviceBatchAction.WipeWithoutChange:
                         await _deviceChangeService.WipeWithoutChangeAsync(
                                 target.Device.Serial,
-                                changeOptions,
+                                target.ChangeOptions!,
                                 progress,
                                 cancellationToken)
                             .ConfigureAwait(false);
                         break;
                     case MultipleDeviceBatchAction.ChangeSim:
                     {
-                        SimProfile editedProfile = CreateEditedSimProfile(target.Device.Serial, target.SimProfile!);
+                        SimProfile editedProfile = CreateEditedSimProfile(target.DeviceProfile, target.SimProfile!);
                         await _deviceChangeService.ChangeSimAsync(
                                 target.Device.Serial,
                                 editedProfile,
                                 cancellationToken)
                             .ConfigureAwait(false);
-                        await RunOnUiContextAsync(() => ApplyRandomSimInfo(target.Device.Serial, editedProfile))
+                        await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, editedProfile))
                             .ConfigureAwait(false);
                         break;
                     }
                     case null:
                     {
-                        SimProfile randomSim = _simProfileService.CreateRandomProfile(country, carrier);
-                        await RunOnUiContextAsync(() => ApplyRandomSimInfo(target.Device.Serial, randomSim))
+                        SimProfile randomSim = _simProfileService.CreateRandomProfile(
+                            target.Country,
+                            target.Carrier);
+                        await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, randomSim))
                             .ConfigureAwait(false);
                         break;
                     }
@@ -712,28 +810,109 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                         throw new ArgumentOutOfRangeException(nameof(action), action, null);
                 }
 
-                await RunOnUiContextAsync(() => SetDeviceLog(target.Device, GetSuccessLogKey(action)))
+                await RunOnUiContextAsync(() => SetTargetLog(target, GetSuccessLogKey(action)))
                     .ConfigureAwait(false);
             }
             finally
             {
-                throttle.Release();
+                _batchActionThrottle.Release();
             }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
         }
         catch (OperationCanceledException)
         {
-            await RunOnUiContextAsync(() => SetDeviceLog(target.Device, "Log_Ready"))
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_Ready"))
                 .ConfigureAwait(false);
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to execute {Action} for device {Serial}.", action, target.Device.Serial);
-            await RunOnUiContextAsync(() => SetDeviceLog(target.Device, GetFailureLogKey(action)))
+            await RunOnUiContextAsync(() => SetTargetLog(target, GetFailureLogKey(action)))
                 .ConfigureAwait(false);
         }
         finally
         {
-            target.Lease.Dispose();
+            CompleteBatchTarget(target);
+        }
+    }
+
+    private async Task ExecuteRandomChangeAndWipeTargetAsync(
+        BatchActionTarget target,
+        CancellationToken cancellationToken)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                if (!target.TryStartExecution()
+                    || !await CanStartBatchTargetAsync(target).ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDevice"))
+                    .ConfigureAwait(false);
+                RandomDeviceResult randomResult = await _randomDeviceService
+                    .CreateRandomProfileAsync(target.RandomDeviceRequest!, targetCancellation.Token)
+                    .ConfigureAwait(false);
+                if (randomResult.Status == RandomDeviceStatus.LoginRequired)
+                {
+                    await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDeviceLoginRequired"))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                if (randomResult.Status != RandomDeviceStatus.Created || randomResult.Profile == null)
+                {
+                    await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDeviceFailed"))
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                DeviceInfoApiDevice profile = CloneDeviceProfile(randomResult.Profile)!;
+                await RunOnUiContextAsync(() => ApplyRandomDeviceInfo(target, randomResult.Profile))
+                    .ConfigureAwait(false);
+
+                await _deviceChangeService.ChangeAsync(
+                        target.Device.Serial,
+                        profile,
+                        target.ChangeSimEnabled,
+                        target.ChangeOptions!,
+                        CreateDeviceChangeProgress(target, MultipleDeviceBatchAction.ChangeAndWipe),
+                        targetCancellation.Token)
+                    .ConfigureAwait(false);
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeDeviceSuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_Ready"))
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception,
+                "Failed to randomize, change, and wipe device {Serial}.", target.Device.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeDeviceFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
         }
     }
 
@@ -743,11 +922,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     private IProgress<DeviceChangeStage> CreateDeviceChangeProgress(
-        DeviceRowViewModel device,
+        BatchActionTarget target,
         MultipleDeviceBatchAction? action)
     {
         return new Progress<DeviceChangeStage>(stage =>
-            SetDeviceLog(device, stage switch
+            SetTargetLog(target, stage switch
             {
                 DeviceChangeStage.Preparing => "Log_ChangeDevicePreparing",
                 DeviceChangeStage.ApplyingProfile => "Log_ChangeDeviceApplyingProfile",
@@ -812,21 +991,27 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     private async Task RandomSelectedDeviceAsync(
-        DeviceRowViewModel device,
-        IDisposable lease,
-        RandomDeviceRequest request,
-        SemaphoreSlim throttle,
+        BatchActionTarget target,
         CancellationToken cancellationToken)
     {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            target.InvalidationToken);
         try
         {
-            await throttle.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
             try
             {
-                await RunOnUiContextAsync(() => SetDeviceLog(device, "Log_RandomDevice"))
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target).ConfigureAwait(false))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDevice"))
                     .ConfigureAwait(false);
                 RandomDeviceResult result = await _randomDeviceService
-                    .CreateRandomProfileAsync(request, cancellationToken)
+                    .CreateRandomProfileAsync(target.RandomDeviceRequest!, cancellationToken)
                     .ConfigureAwait(false);
 
                 await RunOnUiContextAsync(() =>
@@ -834,38 +1019,60 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     switch (result.Status)
                     {
                         case RandomDeviceStatus.Created when result.Profile != null:
-                            ApplyRandomDeviceInfo(device.Serial, result.Profile);
-                            SetDeviceLog(device, "Log_RandomDeviceSuccess");
+                            ApplyRandomDeviceInfo(target, result.Profile);
+                            SetTargetLog(target, "Log_RandomDeviceSuccess");
                             break;
                         case RandomDeviceStatus.LoginRequired:
-                            SetDeviceLog(device, "Log_RandomDeviceLoginRequired");
+                            SetTargetLog(target, "Log_RandomDeviceLoginRequired");
                             break;
                         default:
-                            SetDeviceLog(device, "Log_RandomDeviceFailed");
+                            SetTargetLog(target, "Log_RandomDeviceFailed");
                             break;
                     }
                 }).ConfigureAwait(false);
             }
             finally
             {
-                throttle.Release();
+                _batchActionThrottle.Release();
             }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
         }
         catch (OperationCanceledException)
         {
-            await RunOnUiContextAsync(() => SetDeviceLog(device, "Log_Ready"))
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_Ready"))
                 .ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Failed to randomize device {Serial}.", device.Serial);
-            await RunOnUiContextAsync(() => SetDeviceLog(device, "Log_RandomDeviceFailed"))
+            _logger.LogError(exception, "Failed to randomize device {Serial}.", target.Device.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDeviceFailed"))
                 .ConfigureAwait(false);
         }
         finally
         {
-            lease.Dispose();
+            CompleteBatchTarget(target);
         }
+    }
+
+    private async Task<bool> CanStartBatchTargetAsync(BatchActionTarget target)
+    {
+        bool canStart = false;
+        await RunOnUiContextAsync(() =>
+        {
+            if (!IsCurrentTarget(target))
+                return;
+
+            if (target.Device.ConnectionStatus != AdbDeviceStatus.Online)
+            {
+                SetTargetLog(target, "Log_DeviceMustBeOnline");
+                return;
+            }
+
+            canStart = true;
+        }).ConfigureAwait(false);
+        return canStart;
     }
 
     [RelayCommand]
@@ -885,7 +1092,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     [RelayCommand(CanExecute = nameof(CanOpenAdvancedChangeConfig))]
     private async Task OpenAdvancedChangeConfigAsync(CancellationToken cancellationToken)
     {
-        DeviceRowViewModel? sourceDevice = GetFirstSelectedOnlineDevice();
+        DeviceRowViewModel? sourceDevice = GetSelectedInfoOnlineDevice();
         if (sourceDevice == null || UseDefaultChangeMode)
             return;
 
@@ -933,15 +1140,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private bool CanOpenAdvancedChangeConfig()
     {
-        return !UseDefaultChangeMode && GetFirstSelectedOnlineDevice() != null;
+        return !UseDefaultChangeMode && GetSelectedInfoOnlineDevice() != null;
     }
 
-    private DeviceRowViewModel? GetFirstSelectedOnlineDevice()
+    private DeviceRowViewModel? GetSelectedInfoOnlineDevice()
     {
-        return _allDeviceRows.FirstOrDefault(device =>
-            device.IsSelected
-            && device.ConnectionStatus == AdbDeviceStatus.Online
-            && !IsDeviceBusy(device));
+        return SelectedInfoDevice is { IsSelected: true } device
+               && device.ConnectionStatus == AdbDeviceStatus.Online
+               && !IsDeviceBusy(device)
+            ? device
+            : null;
     }
 
     private async Task LoadCarrierProfilesAsync(CancellationToken cancellationToken)
@@ -995,6 +1203,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             .Select(device => device.Serial)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (string serial in _randomDeviceProfiles.Keys
+                     .Concat(_randomSimProfiles.Keys)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
                      .Where(serial => !currentSerials.Contains(serial))
                      .ToArray())
         {
@@ -1012,36 +1222,51 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         var connectedBySerial = connectedDevices.ToDictionary(
             device => device.Serial,
             StringComparer.OrdinalIgnoreCase);
-        var processBySerial = new Dictionary<string, (string Message, DeviceProcessState State)>(
+        var existingRows = _allDeviceRows.ToDictionary(
+            device => device.Serial,
             StringComparer.OrdinalIgnoreCase);
-        foreach (DeviceRowViewModel device in _allDeviceRows)
-            processBySerial[device.Serial] = (device.Process, device.ProcessState);
+        var refreshedRows = new List<DeviceRowViewModel>(storedDevices.Count);
 
         _isRefreshingRows = true;
         try
         {
-            foreach (DeviceRowViewModel device in _allDeviceRows)
-                device.PropertyChanged -= OnDeviceRowPropertyChanged;
-
-            _allDeviceRows.Clear();
             for (int index = 0; index < storedDevices.Count; index++)
             {
                 StoredDeviceConfig storedDevice = storedDevices[index];
                 connectedBySerial.TryGetValue(storedDevice.Serial, out AdbDevice? connectedDevice);
-                DeviceRowViewModel row = DeviceRowFactory.CreateDeviceRow(
-                    index + 1,
-                    storedDevice,
-                    connectedDevice,
-                    GetConnectionStatusText(connectedDevice?.Status ?? AdbDeviceStatus.Offline),
-                    _localizationService.GetString("Log_Ready"));
-                if (processBySerial.TryGetValue(row.Serial, out var previousProcess))
-                    row.RestoreProcess(previousProcess.Message, previousProcess.State);
+                AdbDeviceStatus connectionStatus = connectedDevice?.Status ?? AdbDeviceStatus.Offline;
+                string statusText = GetConnectionStatusText(connectionStatus);
+                if (existingRows.Remove(storedDevice.Serial, out DeviceRowViewModel? row))
+                {
+                    row.UpdateSnapshot(
+                        index + 1,
+                        storedDevice.Name,
+                        storedDevice.Type,
+                        connectionStatus,
+                        statusText,
+                        IsDeviceBusy(row.Serial));
+                }
+                else
+                {
+                    row = DeviceRowFactory.CreateDeviceRow(
+                        index + 1,
+                        storedDevice,
+                        connectedDevice,
+                        statusText,
+                        _localizationService.GetString("Log_Ready"));
+                    row.IsActionBusy = IsDeviceBusy(row.Serial);
+                    row.PropertyChanged += OnDeviceRowPropertyChanged;
+                }
 
                 row.IsSelected = selectedSerials.Contains(row.Serial);
-                row.IsActionBusy = _deviceActionGuardService.IsBusy(row.Serial);
-                row.PropertyChanged += OnDeviceRowPropertyChanged;
-                _allDeviceRows.Add(row);
+                refreshedRows.Add(row);
             }
+
+            foreach (DeviceRowViewModel removedRow in existingRows.Values)
+                removedRow.PropertyChanged -= OnDeviceRowPropertyChanged;
+
+            _allDeviceRows.Clear();
+            _allDeviceRows.AddRange(refreshedRows);
 
             ApplyDeviceFilterCore();
         }
@@ -1049,6 +1274,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             _isRefreshingRows = false;
         }
+
+        InvalidateQueuedBatchTargets(serial =>
+            !currentSerials.Contains(serial)
+            || !connectedBySerial.TryGetValue(serial, out AdbDevice? connectedDevice)
+            || connectedDevice.Status != AdbDeviceStatus.Online);
 
         SynchronizeSelectedDeviceSettings();
         if (selectedInfoSerial != null)
@@ -1158,7 +1388,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
 
         if (args.PropertyName == nameof(DeviceRowViewModel.ConnectionStatus))
+        {
             ApplyDeviceFilter();
+            NotifySelectionChanged();
+        }
     }
 
     private void OnDeviceBusyStateChanged(string serial, bool isBusy)
@@ -1168,16 +1401,18 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
         void ApplyBusyState()
         {
+            bool effectiveBusy = isBusy || HasActiveBatchTarget(serial);
             foreach (DeviceRowViewModel device in _allDeviceRows
                          .Where(device => SerialEquals(device.Serial, serial)))
             {
-                device.IsActionBusy = isBusy;
+                device.IsActionBusy = effectiveBusy;
             }
 
             if (SelectedInfoDevice != null
                 && SerialEquals(SelectedInfoDevice.Serial, serial))
             {
                 OnPropertyChanged(nameof(CanInteractWithSelectedInfoDevice));
+                OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
             }
 
             NotifySelectionChanged();
@@ -1196,7 +1431,21 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private bool IsDeviceBusy(DeviceRowViewModel device)
     {
-        return _deviceActionGuardService.IsBusy(device.Serial);
+        return IsDeviceBusy(device.Serial);
+    }
+
+    private bool IsDeviceBusy(string serial)
+    {
+        return _deviceActionGuardService.IsBusy(serial) || HasActiveBatchTarget(serial);
+    }
+
+    private bool HasActiveBatchTarget(string serial)
+    {
+        lock (_activeBatchTargetsLock)
+        {
+            return _activeBatchTargets.Any(target =>
+                SerialEquals(target.Device.Serial, serial));
+        }
     }
 
     private string GetLogText(string resourceKey)
@@ -1213,6 +1462,23 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _logger.LogInformation("Multiple Device {Serial} action: {Message}", device.Serial, message);
     }
 
+    private void SetTargetLog(BatchActionTarget target, string resourceKey)
+    {
+        if (IsCurrentTarget(target) && IsActiveBatchTarget(target))
+            SetDeviceLog(target.Device, resourceKey);
+    }
+
+    private bool IsActiveBatchTarget(BatchActionTarget target)
+    {
+        lock (_activeBatchTargetsLock)
+            return _activeBatchTargets.Contains(target);
+    }
+
+    private bool IsCurrentTarget(BatchActionTarget target)
+    {
+        return _allDeviceRows.Any(device => ReferenceEquals(device, target.Device));
+    }
+
     private void ApplySelectedDeviceInfo(DeviceRowViewModel? selectedDevice)
     {
         if (selectedDevice != null
@@ -1226,8 +1492,12 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private void ApplyRandomDeviceInfo(string serial, DeviceInfoApiDevice randomDevice)
+    private void ApplyRandomDeviceInfo(BatchActionTarget target, DeviceInfoApiDevice randomDevice)
     {
+        if (!IsCurrentTarget(target))
+            return;
+
+        string serial = target.Device.Serial;
         _randomDeviceProfiles[serial] = randomDevice;
         SimProfile? simProfile = CreateSimProfile(randomDevice);
         if (simProfile == null)
@@ -1280,6 +1550,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     {
         if (_isSynchronizingDeviceInfo
             || SelectedInfoDevice == null
+            || IsDeviceBusy(SelectedInfoDevice)
             || !_randomDeviceProfiles.TryGetValue(SelectedInfoDevice.Serial, out DeviceInfoApiDevice? profile))
         {
             return;
@@ -1288,8 +1559,12 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         CopyFormValuesToProfile(profile);
     }
 
-    private void ApplyRandomSimInfo(string serial, SimProfile simProfile)
+    private void ApplyRandomSimInfo(BatchActionTarget target, SimProfile simProfile)
     {
+        if (!IsCurrentTarget(target))
+            return;
+
+        string serial = target.Device.Serial;
         _randomSimProfiles[serial] = simProfile;
         if (_randomDeviceProfiles.TryGetValue(serial, out DeviceInfoApiDevice? randomDevice))
         {
@@ -1315,9 +1590,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         });
     }
 
-    private SimProfile CreateEditedSimProfile(string serial, SimProfile profile)
+    private static SimProfile CreateEditedSimProfile(
+        DeviceInfoApiDevice? deviceProfile,
+        SimProfile profile)
     {
-        if (!_randomDeviceProfiles.TryGetValue(serial, out DeviceInfoApiDevice? deviceProfile))
+        if (deviceProfile == null)
             return profile;
 
         return new SimProfile
@@ -1399,14 +1676,51 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             SelectedInfoDevice = selectedRows.FirstOrDefault();
     }
 
+    private void BeginBatchAction(bool isRandomizing)
+    {
+        _activeBatchActionCount++;
+        if (_activeBatchActionCount == 1)
+            IsBatchActionRunning = true;
+
+        if (isRandomizing)
+        {
+            _activeRandomizationCount++;
+            if (_activeRandomizationCount == 1)
+                IsRandomizingSelectedDevices = true;
+        }
+
+        NotifySelectionChanged();
+    }
+
+    private void EndBatchAction(bool isRandomizing)
+    {
+        if (isRandomizing && _activeRandomizationCount > 0)
+        {
+            _activeRandomizationCount--;
+            if (_activeRandomizationCount == 0)
+                IsRandomizingSelectedDevices = false;
+        }
+
+        if (_activeBatchActionCount > 0)
+        {
+            _activeBatchActionCount--;
+            if (_activeBatchActionCount == 0)
+                IsBatchActionRunning = false;
+        }
+
+        NotifySelectionChanged();
+    }
+
     private void NotifySelectionChanged()
     {
         OnPropertyChanged(nameof(AllDevicesSelectionState));
         OnPropertyChanged(nameof(CanInteractWithSelectedInfoDevice));
+        OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
         AddNewDevicesCommand.NotifyCanExecuteChanged();
         OpenAdvancedChangeConfigCommand.NotifyCanExecuteChanged();
         RandomSelectedDevicesCommand.NotifyCanExecuteChanged();
         ChangeSelectedDevicesCommand.NotifyCanExecuteChanged();
+        RandomChangeAndWipeSelectedDevicesCommand.NotifyCanExecuteChanged();
         ChangeSelectedDevicesWithoutWipeCommand.NotifyCanExecuteChanged();
         WipeSelectedDevicesWithoutChangeCommand.NotifyCanExecuteChanged();
         RandomSelectedSimsCommand.NotifyCanExecuteChanged();
@@ -1484,7 +1798,12 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             _isRefreshingRows = wasRefreshingRows;
         }
 
+        InvalidateQueuedBatchTargets(serial =>
+            !connectedBySerial.TryGetValue(serial, out AdbDevice? connectedDevice)
+            || connectedDevice.Status != AdbDeviceStatus.Online);
+
         ApplyDeviceFilter();
+        NotifySelectionChanged();
     }
 
     private string GetConnectionStatusText(AdbDeviceStatus status)
@@ -1983,6 +2302,142 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         };
     }
 
+    private static RandomDeviceRequest CreateRandomDeviceRequestCopy(RandomDeviceRequest request)
+    {
+        return new RandomDeviceRequest
+        {
+            SelectedBrand = request.SelectedBrand,
+            SelectedAndroidVersion = request.SelectedAndroidVersion,
+            UseIntegritySecurityPatch = request.UseIntegritySecurityPatch,
+            Country = request.Country,
+            Carrier = request.Carrier
+        };
+    }
+
+    private void RegisterBatchTarget(BatchActionTarget target)
+    {
+        lock (_activeBatchTargetsLock)
+            _activeBatchTargets.Add(target);
+    }
+
+    private static Task StartBatchTargetWorker(BatchActionTarget target, Func<Task> worker)
+    {
+        target.TransferCompletionOwnershipToWorker();
+        return worker();
+    }
+
+    private void CompleteBatchOwnedTargets(IEnumerable<BatchActionTarget> targets)
+    {
+        foreach (BatchActionTarget target in targets)
+        {
+            if (!target.IsCompletionOwnedByWorker)
+                CompleteBatchTarget(target);
+        }
+    }
+
+    private void CompleteBatchTarget(BatchActionTarget target)
+    {
+        lock (_activeBatchTargetsLock)
+            _activeBatchTargets.Remove(target);
+
+        target.Dispose();
+        OnDeviceBusyStateChanged(
+            target.Device.Serial,
+            _deviceActionGuardService.IsBusy(target.Device.Serial));
+    }
+
+    private void InvalidateQueuedBatchTargets(Func<string, bool> shouldInvalidate)
+    {
+        var invalidatedTargets = new List<BatchActionTarget>();
+        lock (_activeBatchTargetsLock)
+        {
+            foreach (BatchActionTarget target in _activeBatchTargets.ToArray())
+            {
+                if (!shouldInvalidate(target.Device.Serial) || !target.TryInvalidateQueued())
+                    continue;
+
+                _activeBatchTargets.Remove(target);
+                invalidatedTargets.Add(target);
+            }
+        }
+
+        foreach (BatchActionTarget target in invalidatedTargets)
+        {
+            target.CancelQueuedExecution();
+            if (IsCurrentTarget(target) && target.Device.ConnectionStatus != AdbDeviceStatus.Online)
+                SetDeviceLog(target.Device, "Log_DeviceMustBeOnline");
+        }
+    }
+
+    private static DeviceInfoApiDevice? CloneDeviceProfile(DeviceInfoApiDevice? profile)
+    {
+        if (profile == null)
+            return null;
+
+        return new DeviceInfoApiDevice
+        {
+            Model = profile.Model,
+            Gaid = profile.Gaid,
+            Board = profile.Board,
+            Baseband = profile.Baseband,
+            SecurityPatch = profile.SecurityPatch,
+            Name = profile.Name,
+            Fingerprint = profile.Fingerprint,
+            BuildDisplayId = profile.BuildDisplayId,
+            Manufacturer = profile.Manufacturer,
+            BuildDateUtc = profile.BuildDateUtc,
+            BuildDate = profile.BuildDate,
+            Hardware = profile.Hardware,
+            Imei = profile.Imei,
+            Gpu = profile.Gpu,
+            Imei1 = profile.Imei1,
+            BuildHost = profile.BuildHost,
+            Gsf = profile.Gsf,
+            Platform = profile.Platform,
+            Bootloader = profile.Bootloader,
+            Brand = profile.Brand,
+            Product = profile.Product,
+            Code = profile.Code,
+            Release = profile.Release,
+            Sdk = profile.Sdk,
+            Serial = profile.Serial,
+            Imsi = profile.Imsi,
+            Iccid = profile.Iccid,
+            SimPhoneNumber = profile.SimPhoneNumber,
+            SimOperatorNumeric = profile.SimOperatorNumeric,
+            SimOperatorCountry = profile.SimOperatorCountry,
+            SimOperatorName = profile.SimOperatorName,
+            WifiMacAddress = profile.WifiMacAddress,
+            BluetoothMacAddress = profile.BluetoothMacAddress,
+            BuildId = profile.BuildId,
+            BuildIncremental = profile.BuildIncremental,
+            BuildDescription = profile.BuildDescription,
+            BuildFlavor = profile.BuildFlavor,
+            BuildUser = profile.BuildUser,
+            SettingDeviceName = profile.SettingDeviceName,
+            SettingBluetoothName = profile.SettingBluetoothName,
+            WifiBssid = profile.WifiBssid,
+            WifiSsid = profile.WifiSsid,
+            VbmetaDigest = profile.VbmetaDigest
+        };
+    }
+
+    private static SimProfile? CloneSimProfile(SimProfile? profile)
+    {
+        if (profile == null)
+            return null;
+
+        return new SimProfile
+        {
+            Iccid = profile.Iccid,
+            Imsi = profile.Imsi,
+            PhoneNumber = profile.PhoneNumber,
+            OperatorName = profile.OperatorName,
+            OperatorCountry = profile.OperatorCountry,
+            OperatorNumeric = profile.OperatorNumeric
+        };
+    }
+
     private void CopyFormValuesToProfile(DeviceInfoApiDevice profile)
     {
         profile.Name = DeviceInfo.Name.Trim();
@@ -2135,21 +2590,75 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private sealed class BatchActionTarget
     {
+        private readonly CancellationTokenSource _invalidation = new();
+        private int _state;
+        private int _completionOwner;
+        private int _isDisposed;
+
         public BatchActionTarget(
             DeviceRowViewModel device,
             IDisposable lease,
             DeviceInfoApiDevice? deviceProfile,
-            SimProfile? simProfile)
+            SimProfile? simProfile,
+            DeviceChangeOptions? changeOptions = null,
+            bool changeSimEnabled = false,
+            CarrierCountryOption? country = null,
+            CarrierOption? carrier = null,
+            RandomDeviceRequest? randomDeviceRequest = null)
         {
             Device = device;
             Lease = lease;
             DeviceProfile = deviceProfile;
             SimProfile = simProfile;
+            ChangeOptions = changeOptions;
+            ChangeSimEnabled = changeSimEnabled;
+            Country = country;
+            Carrier = carrier;
+            RandomDeviceRequest = randomDeviceRequest;
         }
 
         public DeviceRowViewModel Device { get; }
         public IDisposable Lease { get; }
         public DeviceInfoApiDevice? DeviceProfile { get; }
         public SimProfile? SimProfile { get; }
+        public DeviceChangeOptions? ChangeOptions { get; }
+        public bool ChangeSimEnabled { get; }
+        public CarrierCountryOption? Country { get; }
+        public CarrierOption? Carrier { get; }
+        public RandomDeviceRequest? RandomDeviceRequest { get; }
+        public CancellationToken InvalidationToken => _invalidation.Token;
+        public bool IsInvalidated => Volatile.Read(ref _state) == 2;
+        public bool IsCompletionOwnedByWorker => Volatile.Read(ref _completionOwner) == 1;
+
+        public void TransferCompletionOwnershipToWorker()
+        {
+            Interlocked.Exchange(ref _completionOwner, 1);
+        }
+
+        public bool TryStartExecution()
+        {
+            return Interlocked.CompareExchange(ref _state, 1, 0) == 0;
+        }
+
+        public bool TryInvalidateQueued()
+        {
+            return Interlocked.CompareExchange(ref _state, 2, 0) == 0;
+        }
+
+        public void CancelQueuedExecution()
+        {
+            _invalidation.Cancel();
+            Lease.Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _isDisposed, 1) != 0)
+                return;
+
+            _invalidation.Cancel();
+            Lease.Dispose();
+            _invalidation.Dispose();
+        }
     }
 }

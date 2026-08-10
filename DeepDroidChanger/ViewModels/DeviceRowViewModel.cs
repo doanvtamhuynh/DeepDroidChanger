@@ -5,6 +5,7 @@ namespace DeepDroidChanger.ViewModels;
 
 public sealed class DeviceRowViewModel : ObservableObject
 {
+    private int _index;
     private bool _isSelected;
     private string _name;
     private string _type;
@@ -29,7 +30,7 @@ public sealed class DeviceRowViewModel : ObservableObject
         string status,
         string process)
     {
-        Index = index;
+        _index = index;
         _isSelected = isSelected;
         Serial = serial;
         _name = name;
@@ -41,7 +42,11 @@ public sealed class DeviceRowViewModel : ObservableObject
         _processState = DeviceProcessState.Ready;
     }
 
-    public int Index { get; }
+    public int Index
+    {
+        get => _index;
+        private set => SetProperty(ref _index, value);
+    }
     public string Serial { get; }
     public string Active { get; }
     public AdbDeviceStatus ConnectionStatus
@@ -161,6 +166,22 @@ public sealed class DeviceRowViewModel : ObservableObject
     }
 
     public bool CanEdit => !IsActionBusy;
+
+    internal void UpdateSnapshot(
+        int index,
+        string name,
+        string type,
+        AdbDeviceStatus connectionStatus,
+        string status,
+        bool isActionBusy)
+    {
+        Index = index;
+        Name = name;
+        Type = type;
+        ConnectionStatus = connectionStatus;
+        Status = status;
+        IsActionBusy = isActionBusy;
+    }
 
     public bool IsGmsDisabled
     {

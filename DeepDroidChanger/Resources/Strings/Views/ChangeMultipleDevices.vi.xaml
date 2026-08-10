@@ -32,6 +32,8 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelectedTooltip">Tạo ngẫu nhiên thông tin thiết bị cho các thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipe">Đổi &amp; Wipe thiết bị</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipeTooltip">Đổi thông tin các thiết bị đã chọn và wipe dữ liệu ứng dụng.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipe">Random, Change &amp; Wipe</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip">Tạo ngẫu nhiên thông tin, rồi đổi và wipe các thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChange">Wipe không đổi thông tin</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChangeTooltip">Wipe dữ liệu ứng dụng của các thiết bị đã chọn nhưng không đổi thông tin.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipe">Đổi thông tin không wipe</sys:String>
