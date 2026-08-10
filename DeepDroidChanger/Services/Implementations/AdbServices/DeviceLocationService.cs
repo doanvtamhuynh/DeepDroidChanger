@@ -1,4 +1,5 @@
 using DeepDroidChanger.Constants;
+using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
@@ -7,9 +8,6 @@ namespace DeepDroidChanger.Services
 {
     public sealed class DeviceLocationService : IDeviceLocationService
     {
-        private const int RandomDecimalCeiling = 1000;
-        private const double CoordinateBlockScale = 10d;
-        private const double RandomCoordinateScale = 10000d;
         private const double MinLatitude = -90d;
         private const double MaxLatitude = 90d;
         private const double MinLongitude = -180d;
@@ -68,8 +66,8 @@ namespace DeepDroidChanger.Services
             if (!IsValidResolvedCoordinate(geoInfo.Latitude, geoInfo.Longitude, geoInfo.CountryCode))
                 throw new InvalidOperationException("Failed to resolve location by device IP.");
 
-            var randomizedLat = RandomizeCoordinate(geoInfo.Latitude, MinLatitude, MaxLatitude);
-            var randomizedLon = RandomizeCoordinate(geoInfo.Longitude, MinLongitude, MaxLongitude);
+            var randomizedLat = LocationCoordinateRandomizer.RandomizeLatitude(geoInfo.Latitude, _randomService);
+            var randomizedLon = LocationCoordinateRandomizer.RandomizeLongitude(geoInfo.Longitude, _randomService);
 
             string countryCode = geoInfo.CountryCode;
             string cityName = string.Empty;
@@ -171,17 +169,5 @@ namespace DeepDroidChanger.Services
             return longitude is >= MinLongitude and <= MaxLongitude;
         }
 
-        private string RandomizeCoordinate(double coordinate, double minimum, double maximum)
-        {
-            var blockStart = coordinate >= 0d
-                ? Math.Floor(coordinate * CoordinateBlockScale) / CoordinateBlockScale
-                : Math.Ceiling(coordinate * CoordinateBlockScale) / CoordinateBlockScale;
-            var randomOffset = _randomService.RandomInRange(0, RandomDecimalCeiling) / RandomCoordinateScale;
-            var randomized = coordinate >= 0d
-                ? blockStart + randomOffset
-                : blockStart - randomOffset;
-
-            return Math.Clamp(randomized, minimum, maximum).ToString("F4", CultureInfo.InvariantCulture);
-        }
     }
 }

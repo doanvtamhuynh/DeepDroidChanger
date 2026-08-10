@@ -602,10 +602,17 @@ public sealed class DeviceChangeService : IDeviceChangeService
             if (changeLocation && _locationService != null)
             {
                 LocationOption selectedLocation = random.PickRandom(targetLocations);
+                string latitude = LocationCoordinateRandomizer.RandomizeLatitude(
+                    selectedLocation.Latitude,
+                    random);
+                string longitude = LocationCoordinateRandomizer.RandomizeLongitude(
+                    selectedLocation.Longitude,
+                    random);
+
                 await _locationService.ApplyLocationAsync(
                         serial,
-                        selectedLocation.LatitudeString,
-                        selectedLocation.LongitudeString,
+                        latitude,
+                        longitude,
                         cancellationToken)
                     .ConfigureAwait(false);
             }

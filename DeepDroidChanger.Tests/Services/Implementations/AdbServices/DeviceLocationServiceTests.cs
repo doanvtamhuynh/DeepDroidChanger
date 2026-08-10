@@ -152,4 +152,31 @@ public sealed class DeviceLocationServiceTests
         Assert.AreEqual("VN", result.CountryCode);
         Assert.AreEqual("Ho Chi Minh City", result.CityName);
     }
+
+    [TestMethod]
+    public async Task ResolveLocationByDeviceIpAsync_RandomizesTheTrailingCoordinateDigits()
+    {
+        IIpGeolocationService geolocation = Substitute.For<IIpGeolocationService>();
+        geolocation.GetDeviceIpGeolocationAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new IpGeolocationInfo
+            {
+                Success = true,
+                CountryCode = "XX",
+                Latitude = 21.0285,
+                Longitude = -74.0060
+            });
+
+        IRandomService random = Substitute.For<IRandomService>();
+        random.RandomInRange(0, 1000).Returns(123, 456);
+        var service = new DeviceLocationService(
+            Substitute.For<IAdbCommandService>(),
+            geolocation,
+            random,
+            NullLogger<DeviceLocationService>.Instance);
+
+        DeviceLocationResult result = await service.ResolveLocationByDeviceIpAsync("SERIAL", CancellationToken.None);
+
+        Assert.AreEqual("21.0123", result.Latitude);
+        Assert.AreEqual("-74.0456", result.Longitude);
+    }
 }

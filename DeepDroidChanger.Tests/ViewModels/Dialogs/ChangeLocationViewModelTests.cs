@@ -26,6 +26,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance);
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(
@@ -42,6 +43,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -79,6 +81,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -109,6 +112,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -132,6 +136,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -156,6 +161,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -168,8 +174,62 @@ public sealed class ChangeLocationViewModelTests
         viewModel.SelectedCountry = vietnam;
 
         Assert.IsNotNull(viewModel.SelectedLocation);
-        Assert.AreEqual("21.0285", viewModel.Latitude);
-        Assert.AreEqual("105.8542", viewModel.Longitude);
+        Assert.AreEqual("21.0000", viewModel.Latitude);
+        Assert.AreEqual("105.8000", viewModel.Longitude);
+    }
+
+    [TestMethod]
+    public async Task SelectingCountryLocation_RandomizesTrailingDigitsBeforePersisting()
+    {
+        var config = new StoredDeviceConfig { Serial = "ABC" };
+        IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(config);
+        ILocationDataService locationService = CreateMockLocationDataService();
+        IRandomService random = Substitute.For<IRandomService>();
+        random.RandomInRange(0, 1000).Returns(123, 456);
+        var viewModel = new ChangeLocationViewModel(
+            locationService,
+            store,
+            DialogViewModelTestFactory.CreateLocalizationService(),
+            random,
+            NullLogger<ChangeLocationViewModel>.Instance)
+        {
+            DeviceSerial = "abc",
+        };
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedCountry = viewModel.Countries.First(country => country.CountryCode == "VN");
+        await viewModel.FlushPendingConfigSaveAsync();
+
+        Assert.AreEqual("21.0123", viewModel.Latitude);
+        Assert.AreEqual("105.8456", viewModel.Longitude);
+        Assert.AreEqual("21.0123", config.LocationLatitude);
+        Assert.AreEqual("105.8456", config.LocationLongitude);
+    }
+
+    [TestMethod]
+    public async Task ApplyingDropdownCoordinatesAfterNewSelection_DoesNotRandomizeTwice()
+    {
+        IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(new StoredDeviceConfig { Serial = "ABC" });
+        ILocationDataService locationService = CreateMockLocationDataService();
+        IRandomService random = Substitute.For<IRandomService>();
+        random.RandomInRange(0, 1000).Returns(123, 456, 789, 987);
+        var viewModel = new ChangeLocationViewModel(
+            locationService,
+            store,
+            DialogViewModelTestFactory.CreateLocalizationService(),
+            random,
+            NullLogger<ChangeLocationViewModel>.Instance)
+        {
+            DeviceSerial = "abc",
+        };
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedCountry = viewModel.Countries.First(country => country.CountryCode == "VN");
+        viewModel.ApplySelectedLocationCoordinatesCommand.Execute(null);
+
+        Assert.AreEqual("21.0123", viewModel.Latitude);
+        Assert.AreEqual("105.8456", viewModel.Longitude);
+        random.Received(2).RandomInRange(0, 1000);
     }
 
     [TestMethod]
@@ -182,6 +242,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -221,6 +282,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -258,6 +320,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -285,6 +348,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -300,8 +364,8 @@ public sealed class ChangeLocationViewModelTests
         var hcm = vm1.CountryLocations.FirstOrDefault(loc => loc.CityName == "Ho Chi Minh City");
         Assert.IsNotNull(hcm);
         vm1.SelectedLocation = hcm;
-        Assert.AreEqual("10.7500", vm1.Latitude);
-        Assert.AreEqual("106.6667", vm1.Longitude);
+        Assert.AreEqual("10.7000", vm1.Latitude);
+        Assert.AreEqual("106.6000", vm1.Longitude);
 
         // User manually edits latitude
         vm1.Latitude = "10.7599";
@@ -314,13 +378,14 @@ public sealed class ChangeLocationViewModelTests
         Assert.AreEqual("VN", config.LocationCountryCode, "CountryCode should be saved after manual lat edit");
         Assert.AreEqual("Ho Chi Minh City", config.LocationCityName, "CityName should be saved after manual lat edit");
         Assert.AreEqual("10.7599", config.LocationLatitude, "Manual latitude should be saved");
-        Assert.AreEqual("106.6667", config.LocationLongitude, "Longitude should be saved");
+        Assert.AreEqual("106.6000", config.LocationLongitude, "Longitude should be saved");
 
         // === PHASE 2: Reopen dialog — should restore VN / Ho Chi Minh City with custom lat ===
         var vm2 = new ChangeLocationViewModel(
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -332,7 +397,7 @@ public sealed class ChangeLocationViewModelTests
         Assert.IsNotNull(vm2.SelectedLocation, "Location should be restored on reopen");
         Assert.AreEqual("Ho Chi Minh City", vm2.SelectedLocation.CityName, "City should be Ho Chi Minh City on reopen");
         Assert.AreEqual("10.7599", vm2.Latitude, "Custom latitude should be preserved on reopen");
-        Assert.AreEqual("106.6667", vm2.Longitude, "Longitude should be preserved on reopen");
+        Assert.AreEqual("106.6000", vm2.Longitude, "Longitude should be preserved on reopen");
     }
 
     [TestMethod]
@@ -355,6 +420,7 @@ public sealed class ChangeLocationViewModelTests
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            Substitute.For<IRandomService>(),
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -372,11 +438,11 @@ public sealed class ChangeLocationViewModelTests
     }
 
     [TestMethod]
-    public async Task ApplySelectedLocationCoordinates_ReloadsDefaultCoordinatesForSameSelectedCity()
+    public async Task ApplySelectedLocationCoordinates_RandomizesCoordinatesForSameSelectedCity()
     {
         // Scenario: User opens dialog with restored US > New York and custom latitude 17.0000.
         // User clicks New York in the dropdown again.
-        // Executing ApplySelectedLocationCoordinatesCommand should reload New York's default coordinates (40.7128, -74.0060).
+        // Executing ApplySelectedLocationCoordinatesCommand should randomize New York's coordinates.
         var config = new StoredDeviceConfig
         {
             Serial = "ABC",
@@ -389,11 +455,14 @@ public sealed class ChangeLocationViewModelTests
 
         IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(config);
         ILocationDataService locationService = CreateMockLocationDataService();
+        IRandomService random = Substitute.For<IRandomService>();
+        random.RandomInRange(0, 1000).Returns(123, 456);
 
         var viewModel = new ChangeLocationViewModel(
             locationService,
             store,
             DialogViewModelTestFactory.CreateLocalizationService(),
+            random,
             NullLogger<ChangeLocationViewModel>.Instance)
         {
             DeviceSerial = "abc",
@@ -406,8 +475,8 @@ public sealed class ChangeLocationViewModelTests
         // User re-selects New York from dropdown (triggers ApplySelectedLocationCoordinatesCommand)
         viewModel.ApplySelectedLocationCoordinatesCommand.Execute(null);
 
-        Assert.AreEqual("40.7128", viewModel.Latitude, "Latitude should be reloaded from New York's default coordinates");
-        Assert.AreEqual("-74.0060", viewModel.Longitude, "Longitude should be reloaded from New York's default coordinates");
+        Assert.AreEqual("40.7123", viewModel.Latitude, "Latitude should be randomized from New York's coordinates");
+        Assert.AreEqual("-74.0456", viewModel.Longitude, "Longitude should be randomized from New York's coordinates");
     }
 
     private static ILocationDataService CreateMockLocationDataService()

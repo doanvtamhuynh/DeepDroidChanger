@@ -978,6 +978,8 @@ public sealed partial class DeviceChangeServiceTests
         IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
         IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
         ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
+        IRandomService randomService = Substitute.For<IRandomService>();
+        randomService.RandomInRange(0, 1000).Returns(123, 456);
 
         var testLocations = new List<LocationOption>
         {
@@ -989,7 +991,8 @@ public sealed partial class DeviceChangeServiceTests
             adb,
             locationService: locationService,
             timezoneService: timezoneService,
-            locationDataService: locationDataService);
+            locationDataService: locationDataService,
+            randomService: randomService);
 
         DeviceInfoApiDevice profile = CreateProfile();
         profile.SimOperatorCountry = "vn";
@@ -1003,7 +1006,7 @@ public sealed partial class DeviceChangeServiceTests
 
         await service.ChangeAsync("SERIAL", profile, changeSim: true, options, progress: null, CancellationToken.None);
 
-        await locationService.Received(1).ApplyLocationAsync("SERIAL", "21.0300", "105.8690", Arg.Any<CancellationToken>());
+        await locationService.Received(1).ApplyLocationAsync("SERIAL", "21.0123", "105.8456", Arg.Any<CancellationToken>());
         await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "Asia/Ho_Chi_Minh", Arg.Any<CancellationToken>());
     }
 
@@ -1073,7 +1076,7 @@ public sealed partial class DeviceChangeServiceTests
 
         await service.ChangeAsync("SERIAL", profile, changeSim: true, options, progress: null, CancellationToken.None);
 
-        await locationService.Received(1).ApplyLocationAsync("SERIAL", "34.0522", "-118.2437", Arg.Any<CancellationToken>());
+        await locationService.Received(1).ApplyLocationAsync("SERIAL", "34.0000", "-118.2000", Arg.Any<CancellationToken>());
         await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "America/Los_Angeles", Arg.Any<CancellationToken>());
     }
 }

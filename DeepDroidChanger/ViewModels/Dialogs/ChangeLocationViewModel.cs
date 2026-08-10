@@ -19,11 +19,13 @@ namespace DeepDroidChanger.ViewModels
         private readonly ILocationDataService _locationDataService;
         private readonly IDeviceStoreService _deviceStoreService;
         private readonly ILocalizationService _localizationService;
+        private readonly IRandomService _randomService;
         private readonly ILogger<ChangeLocationViewModel> _logger;
         private readonly object _configSaveLock = new();
         private Task _pendingConfigSave = Task.CompletedTask;
         private bool _isInitializing;
         private bool _isUpdatingCountryFromLocation;
+        private bool _selectionChangedSinceLastCoordinatesCommand;
         private string _lastCountryCode = string.Empty;
         private string _lastCityName = string.Empty;
 
@@ -67,11 +69,13 @@ namespace DeepDroidChanger.ViewModels
             ILocationDataService locationDataService,
             IDeviceStoreService deviceStoreService,
             ILocalizationService localizationService,
+            IRandomService randomService,
             ILogger<ChangeLocationViewModel> logger)
         {
             _locationDataService = locationDataService;
             _deviceStoreService = deviceStoreService;
             _localizationService = localizationService;
+            _randomService = randomService;
             _logger = logger;
 
             AllLocations = new ObservableCollection<LocationOption>();
@@ -159,8 +163,8 @@ namespace DeepDroidChanger.ViewModels
 
             if (!_isInitializing && value != null && IsConfigMode)
             {
-                Latitude = value.LatitudeString;
-                Longitude = value.LongitudeString;
+                ApplyRandomizedLocationCoordinates(value);
+                _selectionChangedSinceLastCoordinatesCommand = true;
             }
 
             if (_isUpdatingCountryFromLocation)
@@ -206,9 +210,20 @@ namespace DeepDroidChanger.ViewModels
         {
             if (!_isInitializing && SelectedLocation != null && IsConfigMode)
             {
-                Latitude = SelectedLocation.LatitudeString;
-                Longitude = SelectedLocation.LongitudeString;
+                if (_selectionChangedSinceLastCoordinatesCommand)
+                {
+                    _selectionChangedSinceLastCoordinatesCommand = false;
+                    return;
+                }
+
+                ApplyRandomizedLocationCoordinates(SelectedLocation);
             }
+        }
+
+        private void ApplyRandomizedLocationCoordinates(LocationOption location)
+        {
+            Latitude = LocationCoordinateRandomizer.RandomizeLatitude(location.Latitude, _randomService);
+            Longitude = LocationCoordinateRandomizer.RandomizeLongitude(location.Longitude, _randomService);
         }
 
         public ChangeLocationDialogResult? BuildResult()
