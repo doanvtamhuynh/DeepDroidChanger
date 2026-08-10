@@ -2,7 +2,6 @@
 <UserControl x:Class="DeepDroidChanger.Views.ChangeSingleDeviceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:behaviors="clr-namespace:DeepDroidChanger.Behaviors"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:models="clr-namespace:DeepDroidChanger.Models"
@@ -39,64 +38,6 @@
                     Value="{DynamicResource DeviceGridRowContextMenuStyle}"/>
         </Style>
 
-        <Style x:Key="DeviceActionsContextMenuToggleTextBaseStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
-            <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
-            <Setter Property="FontWeight"
-                    Value="SemiBold"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextPrimary}"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
-            <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuGmsTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource DeviceActionsContextMenuToggleTextBaseStyle}">
-            <Setter Property="Text"
-                    Value="{DynamicResource ChangeSingleDevice_RowMenuDisableGms}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsGmsDisabled, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                             Value="True">
-                    <Setter Property="Text"
-                            Value="{DynamicResource ChangeSingleDevice_RowMenuEnableGms}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuPlayStoreTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource DeviceActionsContextMenuToggleTextBaseStyle}">
-            <Setter Property="Text"
-                    Value="{DynamicResource ChangeSingleDevice_RowMenuDisablePlayStore}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsPlayStoreDisabled, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                             Value="True">
-                    <Setter Property="Text"
-                            Value="{DynamicResource ChangeSingleDevice_RowMenuEnablePlayStore}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuWifiTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource DeviceActionsContextMenuToggleTextBaseStyle}">
-            <Setter Property="Text"
-                    Value="{DynamicResource ChangeSingleDevice_RowMenuEnableWifi}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding PlacementTarget.DataContext.IsWifiEnabled, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                             Value="True">
-                    <Setter Property="Text"
-                            Value="{DynamicResource ChangeSingleDevice_RowMenuDisableWifi}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
         <Style x:Key="DeviceGridRowContextMenuStyle"
                TargetType="DataGridRow"
                BasedOn="{StaticResource DeviceTableRowStyle}">
@@ -108,164 +49,164 @@
                     Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
             <Setter Property="ContextMenu">
                 <Setter.Value>
-                    <ContextMenu Style="{DynamicResource DeviceActionsContextMenuStyle}">
-                        <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="Cellphone"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource ChangeSingleDevice_ActionViewDevice}"
-                                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                        <ContextMenu Style="{DynamicResource DeviceActionsContextMenuStyle}">
+                            <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Cellphone"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeSingleDevice_ActionViewDevice}"
+                                                   Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceInfoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="InformationOutline"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource ChangeSingleDevice_RowMenuDeviceInfo}"
-                                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceInfoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="InformationOutline"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeSingleDevice_RowMenuDeviceInfo}"
+                                                   Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.CopySerialCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="ContentCopy"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource ChangeSingleDevice_RowMenuCopySerial}"
-                                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.CopySerialCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="ContentCopy"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeSingleDevice_RowMenuCopySerial}"
+                                                   Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.ToggleGmsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="Google"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Style="{StaticResource DeviceActionsContextMenuGmsTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.ToggleGmsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Google"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Style="{StaticResource DeviceActionsContextMenuGmsTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.TogglePlayStoreCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="GooglePlay"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Style="{StaticResource DeviceActionsContextMenuPlayStoreTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.TogglePlayStoreCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="GooglePlay"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Style="{StaticResource DeviceActionsContextMenuPlayStoreTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.ToggleWifiCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="Wifi"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Style="{StaticResource DeviceActionsContextMenuWifiTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.ToggleWifiCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Wifi"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Style="{StaticResource DeviceActionsContextMenuWifiTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.RebootDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="Restart"
-                                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource ChangeSingleDevice_RowMenuRebootDevice}"
-                                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.RebootDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Restart"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeSingleDevice_RowMenuRebootDevice}"
+                                                   Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
 
-                        <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
+                            <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
 
-                        <MenuItem Command="{Binding PlacementTarget.Tag.DeleteDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                  Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
-                            <MenuItem.Header>
-                                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Kind="Delete"
-                                                             Style="{DynamicResource DeviceActionsContextMenuDangerButtonIconStyle}"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="{DynamicResource ChangeSingleDevice_RowMenuDeleteDevice}"
-                                               Style="{DynamicResource DeviceActionsContextMenuDangerButtonTextStyle}"/>
-                                    <TextBlock Grid.Column="2"
-                                               Text="{Binding InputGestureText, RelativeSource={RelativeSource AncestorType=MenuItem}}"
-                                               Style="{DynamicResource DeviceActionsContextMenuShortcutTextStyle}"/>
-                                </Grid>
-                            </MenuItem.Header>
-                        </MenuItem>
-                    </ContextMenu>
+                            <MenuItem Command="{Binding PlacementTarget.Tag.DeleteDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
+                                <MenuItem.Header>
+                                    <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Delete"
+                                                                 Style="{DynamicResource DeviceActionsContextMenuDangerButtonIconStyle}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeSingleDevice_RowMenuDeleteDevice}"
+                                                   Style="{DynamicResource DeviceActionsContextMenuDangerButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding InputGestureText, RelativeSource={RelativeSource AncestorType=MenuItem}}"
+                                                   Style="{DynamicResource DeviceActionsContextMenuShortcutTextStyle}"/>
+                                    </Grid>
+                                </MenuItem.Header>
+                            </MenuItem>
+                        </ContextMenu>
                 </Setter.Value>
             </Setter>
         </Style>
@@ -522,377 +463,6 @@
         <Setter Property="Margin" Value="14,0,14,0"/>
     </Style>
 
-    <Thickness x:Key="DeviceActionsContextMenuPadding">6</Thickness>
-        <Thickness x:Key="DeviceActionsContextMenuItemPadding">12,9</Thickness>
-        <Thickness x:Key="DeviceActionsContextMenuItemMargin">2,1</Thickness>
-        <Thickness x:Key="DeviceActionsContextMenuDangerItemMargin">2,5,2,1</Thickness>
-        <Thickness x:Key="DeviceActionsContextMenuIconMargin">0,0,14,0</Thickness>
-        <Thickness x:Key="DeviceActionsContextMenuShortcutMargin">28,0,0,0</Thickness>
-        <Thickness x:Key="DeviceActionsContextMenuSeparatorMargin">12,6,12,3</Thickness>
-
-        <sys:Double x:Key="DeviceActionsContextMenuMinWidth">248</sys:Double>
-        <sys:Double x:Key="DeviceActionsContextMenuItemMinHeight">38</sys:Double>
-        <sys:Double x:Key="DeviceActionsContextMenuIconSize">17</sys:Double>
-        <sys:Double x:Key="DeviceActionsContextMenuDangerHoverOpacity">0.14</sys:Double>
-        <sys:Double x:Key="DeviceActionsContextMenuDangerPressedOpacity">0.22</sys:Double>
-
-        <Style x:Key="DeviceActionsContextMenuStyle"
-               TargetType="ContextMenu">
-            <Setter Property="Background"
-                    Value="{DynamicResource Brush.Surface}"/>
-            <Setter Property="BorderBrush"
-                    Value="{DynamicResource Brush.Border}"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextPrimary}"/>
-            <Setter Property="Padding"
-                    Value="{StaticResource DeviceActionsContextMenuPadding}"/>
-            <Setter Property="SnapsToDevicePixels"
-                    Value="True"/>
-            <Setter Property="OverridesDefaultStyle"
-                    Value="True"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ContextMenu">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
-                                CornerRadius="{StaticResource Radius.Overlay}"
-                                Padding="{TemplateBinding Padding}"
-                                SnapsToDevicePixels="True">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="{StaticResource Metric.Elevation.FloatingBlurRadius}"
-                                                  ShadowDepth="{StaticResource Metric.Elevation.FloatingShadowDepth}"
-                                                  Direction="270"
-                                                  Opacity="{StaticResource Metric.Elevation.FloatingShadowOpacity}"/>
-                            </Border.Effect>
-                            <StackPanel ClipToBounds="False"
-                                        IsItemsHost="True"
-                                        KeyboardNavigation.DirectionalNavigation="Cycle"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuItemStyle"
-               TargetType="MenuItem">
-            <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
-            <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextPrimary}"/>
-            <Setter Property="Background"
-                    Value="{DynamicResource Brush.SurfaceHover}"/>
-            <Setter Property="BorderBrush"
-
-                    Value="{DynamicResource Brush.SurfaceSelected}"/>
-            <Setter Property="Padding"
-                    Value="{StaticResource DeviceActionsContextMenuItemPadding}"/>
-            <Setter Property="Margin"
-                    Value="{StaticResource DeviceActionsContextMenuItemMargin}"/>
-            <Setter Property="MinWidth"
-                    Value="{StaticResource DeviceActionsContextMenuMinWidth}"/>
-            <Setter Property="MinHeight"
-                    Value="{StaticResource DeviceActionsContextMenuItemMinHeight}"/>
-            <Setter Property="Cursor"
-                    Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Border Margin="{TemplateBinding Margin}"
-                                MinWidth="{TemplateBinding MinWidth}"
-                                MinHeight="{TemplateBinding MinHeight}"
-                                SnapsToDevicePixels="True">
-                            <Grid>
-                                <Border x:Name="HoverOverlay"
-                                        Background="{TemplateBinding Background}"
-                                        CornerRadius="{StaticResource Radius.Interactive}"
-                                        Opacity="0"/>
-                                <Border x:Name="PressedOverlay"
-                                        Background="{TemplateBinding BorderBrush}"
-                                        CornerRadius="{StaticResource Radius.Interactive}"
-                                        Opacity="0"/>
-                                <ContentPresenter x:Name="HeaderPresenter"
-                                                  Margin="{TemplateBinding Padding}"
-                                                  ContentSource="Header"
-                                                  RecognizesAccessKey="True"
-                                                  TextElement.Foreground="{TemplateBinding Foreground}"
-                                                  VerticalAlignment="Center"/>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted"
-                                     Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="1"
-                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="0"
-                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="0"
-                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                            <EventTrigger RoutedEvent="PreviewMouseDown">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="1"
-                                                         Duration="{StaticResource Metric.Animation.PressDuration}"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                            <EventTrigger RoutedEvent="PreviewMouseUp">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0"
-                                                         Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                            <DoubleAnimation.EasingFunction>
-                                                <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                            <Trigger Property="IsEnabled"
-                                     Value="False">
-                                <Setter Property="Cursor"
-                                        Value="Arrow"/>
-                                <Setter Property="Foreground"
-                                        Value="{DynamicResource Brush.TextDisabled}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuDangerItemStyle"
-               TargetType="MenuItem"
-               BasedOn="{StaticResource DeviceActionsContextMenuItemStyle}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="Background"
-                    Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="BorderBrush"
-                    Value="{DynamicResource Brush.DangerPressed}"/>
-            <Setter Property="Margin"
-                    Value="{StaticResource DeviceActionsContextMenuDangerItemMargin}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Border Margin="{TemplateBinding Margin}"
-                                MinWidth="{TemplateBinding MinWidth}"
-                                MinHeight="{TemplateBinding MinHeight}"
-                                SnapsToDevicePixels="True">
-                            <Grid>
-                                <Border x:Name="HoverOverlay"
-                                        Background="{TemplateBinding Background}"
-                                        CornerRadius="{StaticResource Radius.Interactive}"
-                                        Opacity="0"/>
-                                <Border x:Name="PressedOverlay"
-                                        Background="{TemplateBinding BorderBrush}"
-                                        CornerRadius="{StaticResource Radius.Interactive}"
-                                        Opacity="0"/>
-                                <ContentPresenter x:Name="HeaderPresenter"
-                                                  Margin="{TemplateBinding Padding}"
-                                                  ContentSource="Header"
-                                                  RecognizesAccessKey="True"
-                                                  TextElement.Foreground="{TemplateBinding Foreground}"
-                                                  VerticalAlignment="Center"/>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted"
-                                     Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="{StaticResource DeviceActionsContextMenuDangerHoverOpacity}"
-                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="HoverOverlay"
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="0"
-                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="0"
-                                                             Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                            <EventTrigger RoutedEvent="PreviewMouseDown">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="{StaticResource DeviceActionsContextMenuDangerPressedOpacity}"
-                                                         Duration="{StaticResource Metric.Animation.PressDuration}"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                            <EventTrigger RoutedEvent="PreviewMouseUp">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="PressedOverlay"
-                                                         Storyboard.TargetProperty="Opacity"
-                                                         To="0"
-                                                         Duration="{StaticResource Metric.Animation.HoverDuration}">
-                                            <DoubleAnimation.EasingFunction>
-                                                <StaticResource ResourceKey="Metric.Animation.EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                            <Trigger Property="IsEnabled"
-                                     Value="False">
-                                <Setter Property="Cursor"
-                                        Value="Arrow"/>
-                                <Setter Property="Foreground"
-                                        Value="{DynamicResource Brush.TextDisabled}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuHeaderGridStyle"
-               TargetType="Grid">
-            <Setter Property="MinHeight"
-                    Value="22"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuButtonIconStyle"
-               TargetType="materialDesign:PackIcon">
-            <Setter Property="Width"
-                    Value="{StaticResource DeviceActionsContextMenuIconSize}"/>
-            <Setter Property="Height"
-                    Value="{StaticResource DeviceActionsContextMenuIconSize}"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextPrimary}"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
-            <Setter Property="Margin"
-                    Value="{StaticResource DeviceActionsContextMenuIconMargin}"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuDangerButtonIconStyle"
-               TargetType="materialDesign:PackIcon"
-               BasedOn="{StaticResource DeviceActionsContextMenuButtonIconStyle}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.Danger}"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuButtonTextStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
-            <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
-            <Setter Property="FontWeight"
-                    Value="SemiBold"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextPrimary}"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
-            <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuDangerButtonTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource DeviceActionsContextMenuButtonTextStyle}">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.Danger}"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuShortcutTextStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
-            <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Small}"/>
-            <Setter Property="FontWeight"
-                    Value="SemiBold"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextSecondary}"/>
-            <Setter Property="Margin"
-                    Value="{StaticResource DeviceActionsContextMenuShortcutMargin}"/>
-            <Setter Property="HorizontalAlignment"
-                    Value="Right"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
-        </Style>
-
-        <Style x:Key="DeviceActionsContextMenuSeparatorStyle"
-               TargetType="Separator">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Separator">
-                        <Border Height="1"
-                                Margin="{StaticResource DeviceActionsContextMenuSeparatorMargin}"
-                                Background="{DynamicResource Brush.Border}"/>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid x:Name="ChangeSingleDeviceRootGrid"

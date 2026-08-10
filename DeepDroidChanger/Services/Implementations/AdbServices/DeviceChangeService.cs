@@ -632,6 +632,36 @@ public sealed class DeviceChangeService : IDeviceChangeService
             ? countryLocations
             : locations;
         IRandomService random = _randomService ?? new RandomService();
+        IReadOnlyList<LocationOption> contextLocations = changeTimezone
+            ? targetLocations
+                .Where(location => !string.IsNullOrWhiteSpace(location.Timezone))
+                .ToArray()
+            : targetLocations;
+        if (contextLocations.Count == 0)
+        {
+            _logger.LogWarning(
+                "No valid advanced location/timezone context is available for {Serial}.",
+                serial);
+            return;
+        }
+
+        LocationOption selectedLocation;
+        try
+        {
+            selectedLocation = random.PickRandom(contextLocations);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Failed to select an advanced location context for {Serial}.",
+                serial);
+            return;
+        }
 
         if (changeLocation)
         {
@@ -645,10 +675,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
             {
                 try
                 {
-                    LocationOption? selectedLocation = random.PickRandom(targetLocations);
-                    if (selectedLocation == null)
-                        throw new InvalidOperationException("Location selection returned no value.");
-
                     string latitude = LocationCoordinateRandomizer.RandomizeLatitude(
                         selectedLocation.Latitude,
                         random);
@@ -689,15 +715,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             {
                 try
                 {
-                    List<string> countryTimezones = targetLocations
-                        .Select(loc => loc.Timezone)
-                        .Where(tz => !string.IsNullOrWhiteSpace(tz))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-
-                    string selectedTimezone = countryTimezones.Count > 0
-                        ? random.PickRandom(countryTimezones)
-                        : random.PickRandom(targetLocations).Timezone;
+                    string selectedTimezone = selectedLocation.Timezone;
                     if (string.IsNullOrWhiteSpace(selectedTimezone))
                         throw new InvalidOperationException("Timezone selection returned no value.");
 

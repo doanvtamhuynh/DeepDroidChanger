@@ -179,4 +179,138 @@ public sealed class DeviceLocationServiceTests
         Assert.AreEqual("21.0123", result.Latitude);
         Assert.AreEqual("-74.0456", result.Longitude);
     }
+
+    [TestMethod]
+    public async Task ApplyCatalogLocationAsync_RandomizesAndReturnsSelectedMetadata()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        IRandomService random = Substitute.For<IRandomService>();
+        random.RandomInRange(0, 1000).Returns(123, 456);
+        var location = new LocationOption(
+            "VN",
+            "Vietnam",
+            "Ho Chi Minh City",
+            "Asia/Ho_Chi_Minh",
+            "UTC +07:00",
+            10.75,
+            106.6667);
+        var service = new DeviceLocationService(
+            adb,
+            Substitute.For<IIpGeolocationService>(),
+            random,
+            NullLogger<DeviceLocationService>.Instance);
+
+        DeviceLocationResult result = await service.ApplyCatalogLocationAsync(
+            "SERIAL",
+            location,
+            CancellationToken.None);
+
+        Assert.AreEqual("10.7123", result.Latitude);
+        Assert.AreEqual("106.6456", result.Longitude);
+        Assert.AreEqual("VN", result.CountryCode);
+        Assert.AreEqual("Ho Chi Minh City", result.CityName);
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL", PropertyConstants.Latitude, "10.7123", Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL", PropertyConstants.Longitude, "106.6456", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ResolveLocationByDeviceIpAsync_ChoosesNearestCityInsideResolvedCountry()
+    {
+        IIpGeolocationService geolocation = Substitute.For<IIpGeolocationService>();
+        geolocation.GetDeviceIpGeolocationAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new IpGeolocationInfo
+            {
+                CountryCode = "VN",
+                Latitude = 10.75,
+                Longitude = 106.6667
+            });
+        ILocationDataService locations = Substitute.For<ILocationDataService>();
+        locations.GetLocationsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new LocationOption("VN", "Vietnam", "Hanoi", "Asia/Ho_Chi_Minh", "+07:00", 21.0, 105.8),
+                new LocationOption("VN", "Vietnam", "Ho Chi Minh City", "Asia/Ho_Chi_Minh", "+07:00", 10.75, 106.6667),
+                new LocationOption("US", "United States", "New York", "America/New_York", "-05:00", 40.7, -74.0)
+            });
+        var service = new DeviceLocationService(
+            Substitute.For<IAdbCommandService>(),
+            geolocation,
+            locations,
+            Substitute.For<IRandomService>(),
+            NullLogger<DeviceLocationService>.Instance);
+
+        DeviceLocationResult result = await service.ResolveLocationByDeviceIpAsync(
+            "SERIAL",
+            CancellationToken.None);
+
+        Assert.AreEqual("Ho Chi Minh City", result.CityName);
+        Assert.AreEqual("VN", result.CountryCode);
+    }
+
+    [TestMethod]
+    public async Task ResolveLocationByDeviceIpAsync_ChoosesNearestCityAcrossDateLine()
+    {
+        IIpGeolocationService geolocation = Substitute.For<IIpGeolocationService>();
+        geolocation.GetDeviceIpGeolocationAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new IpGeolocationInfo
+            {
+                CountryCode = "XX",
+                Latitude = 0d,
+                Longitude = 179.9d
+            });
+        ILocationDataService locations = Substitute.For<ILocationDataService>();
+        locations.GetLocationsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new LocationOption("XX", "Test", "Across Date Line", "Etc/UTC", "+00:00", 0d, -179.9d),
+                new LocationOption("XX", "Test", "Farther City", "Etc/UTC", "+00:00", 0d, 170d)
+            });
+        var service = new DeviceLocationService(
+            Substitute.For<IAdbCommandService>(),
+            geolocation,
+            locations,
+            Substitute.For<IRandomService>(),
+            NullLogger<DeviceLocationService>.Instance);
+
+        DeviceLocationResult result = await service.ResolveLocationByDeviceIpAsync(
+            "SERIAL",
+            CancellationToken.None);
+
+        Assert.AreEqual("Across Date Line", result.CityName);
+    }
+
+    [TestMethod]
+    public async Task ResolveLocationByDeviceIpAsync_UsesGeographicDistanceForGlobalFallback()
+    {
+        IIpGeolocationService geolocation = Substitute.For<IIpGeolocationService>();
+        geolocation.GetDeviceIpGeolocationAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new IpGeolocationInfo
+            {
+                CountryCode = "NO_MATCH",
+                Latitude = 0d,
+                Longitude = 179.9d
+            });
+        ILocationDataService locations = Substitute.For<ILocationDataService>();
+        locations.GetLocationsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new LocationOption("XX", "Test", "Across Date Line", "Etc/UTC", "+00:00", 0d, -179.9d),
+                new LocationOption("YY", "Test", "Farther City", "Etc/UTC", "+00:00", 0d, 170d)
+            });
+        var service = new DeviceLocationService(
+            Substitute.For<IAdbCommandService>(),
+            geolocation,
+            locations,
+            Substitute.For<IRandomService>(),
+            NullLogger<DeviceLocationService>.Instance);
+
+        DeviceLocationResult result = await service.ResolveLocationByDeviceIpAsync(
+            "SERIAL",
+            CancellationToken.None);
+
+        Assert.AreEqual("Across Date Line", result.CityName);
+        Assert.AreEqual("XX", result.CountryCode);
+    }
 }

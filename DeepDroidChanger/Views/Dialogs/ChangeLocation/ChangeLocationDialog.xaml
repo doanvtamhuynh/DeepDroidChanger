@@ -169,6 +169,7 @@
         </Grid>
 
         <Grid Grid.Row="3"
+              Visibility="{Binding IsSingleMode, Converter={StaticResource BooleanToVisibilityConverter}}"
               Style="{StaticResource ChangeLocationSelectorGridStyle}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

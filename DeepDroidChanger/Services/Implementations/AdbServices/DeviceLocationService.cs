@@ -79,19 +79,24 @@ namespace DeepDroidChanger.Services
                     var locations = await _locationDataService.GetLocationsAsync(cancellationToken).ConfigureAwait(false);
                     if (locations.Count > 0)
                     {
-                        LocationOption? match = null;
-                        if (!string.IsNullOrWhiteSpace(geoInfo.CountryCode))
-                        {
-                            match = locations.FirstOrDefault(loc =>
-                                string.Equals(loc.CountryCode, geoInfo.CountryCode, StringComparison.OrdinalIgnoreCase));
-                        }
-
-                        if (match == null)
-                        {
-                            match = locations
-                                .OrderBy(loc => Math.Pow(loc.Latitude - geoInfo.Latitude, 2) + Math.Pow(loc.Longitude - geoInfo.Longitude, 2))
-                                .FirstOrDefault();
-                        }
+                        IReadOnlyList<LocationOption> countryLocations = string.IsNullOrWhiteSpace(geoInfo.CountryCode)
+                            ? Array.Empty<LocationOption>()
+                            : locations
+                                .Where(loc => string.Equals(
+                                    loc.CountryCode,
+                                    geoInfo.CountryCode,
+                                    StringComparison.OrdinalIgnoreCase))
+                                .ToArray();
+                        IReadOnlyList<LocationOption> candidates = countryLocations.Count > 0
+                            ? countryLocations
+                            : locations;
+                        LocationOption? match = candidates
+                            .OrderBy(loc => CalculateGreatCircleDistance(
+                                geoInfo.Latitude,
+                                geoInfo.Longitude,
+                                loc.Latitude,
+                                loc.Longitude))
+                            .FirstOrDefault();
 
                         if (match != null)
                         {
@@ -100,6 +105,10 @@ namespace DeepDroidChanger.Services
                         }
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception exception)
                 {
                     _logger.LogWarning(exception, "Failed to resolve city name for IP geolocation.");
@@ -107,6 +116,51 @@ namespace DeepDroidChanger.Services
             }
 
             return new DeviceLocationResult(randomizedLat, randomizedLon, countryCode, cityName);
+        }
+
+        private static double CalculateGreatCircleDistance(
+            double latitude1,
+            double longitude1,
+            double latitude2,
+            double longitude2)
+        {
+            const double DegreesToRadians = Math.PI / 180d;
+
+            double latitudeDelta = (latitude2 - latitude1) * DegreesToRadians;
+            double longitudeDelta = (longitude2 - longitude1) * DegreesToRadians;
+            double latitude1Radians = latitude1 * DegreesToRadians;
+            double latitude2Radians = latitude2 * DegreesToRadians;
+
+            double sinLatitudeDelta = Math.Sin(latitudeDelta / 2d);
+            double sinLongitudeDelta = Math.Sin(longitudeDelta / 2d);
+            double haversine = sinLatitudeDelta * sinLatitudeDelta
+                + Math.Cos(latitude1Radians)
+                    * Math.Cos(latitude2Radians)
+                    * sinLongitudeDelta
+                    * sinLongitudeDelta;
+
+            double clampedHaversine = Math.Clamp(haversine, 0d, 1d);
+            return 2d * Math.Atan2(
+                Math.Sqrt(clampedHaversine),
+                Math.Sqrt(1d - clampedHaversine));
+        }
+
+        public async Task<DeviceLocationResult> ApplyCatalogLocationAsync(
+            string serial,
+            LocationOption location,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(location);
+
+            string latitude = LocationCoordinateRandomizer.RandomizeLatitude(location.Latitude, _randomService);
+            string longitude = LocationCoordinateRandomizer.RandomizeLongitude(location.Longitude, _randomService);
+            await ApplyLocationAsync(serial, latitude, longitude, cancellationToken).ConfigureAwait(false);
+
+            return new DeviceLocationResult(
+                latitude,
+                longitude,
+                location.CountryCode,
+                location.CityName);
         }
 
         public async Task<DeviceLocationResult> ApplyAsync(

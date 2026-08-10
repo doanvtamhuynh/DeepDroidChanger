@@ -479,6 +479,36 @@ public sealed class ChangeLocationViewModelTests
         Assert.AreEqual("-74.0456", viewModel.Longitude, "Longitude should be randomized from New York's coordinates");
     }
 
+    [TestMethod]
+    public async Task BatchMode_IsInputOnlyAndDoesNotRandomizeOrPersistWhileSelectingCatalogLocation()
+    {
+        var config = new StoredDeviceConfig { Serial = "ABC" };
+        IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(config);
+        IRandomService random = Substitute.For<IRandomService>();
+        var viewModel = new ChangeLocationViewModel(
+            CreateMockLocationDataService(),
+            store,
+            DialogViewModelTestFactory.CreateLocalizationService(),
+            random,
+            NullLogger<ChangeLocationViewModel>.Instance)
+        {
+            IsBatchMode = true,
+            BatchTargetCount = 2
+        };
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedCountry = viewModel.Countries.First(country => country.CountryCode == "VN");
+        LocationOption selected = viewModel.SelectedLocation!;
+        viewModel.ApplySelectedLocationCoordinatesCommand.Execute(null);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        ChangeLocationDialogResult result = viewModel.BuildResult()!;
+        Assert.AreSame(selected, result.SelectedLocation);
+        Assert.AreEqual(string.Empty, result.Latitude);
+        await store.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default!, default);
+        random.DidNotReceive().RandomInRange(Arg.Any<int>(), Arg.Any<int>());
+    }
+
     private static ILocationDataService CreateMockLocationDataService()
     {
         ILocationDataService service = Substitute.For<ILocationDataService>();

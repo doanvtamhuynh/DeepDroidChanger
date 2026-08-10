@@ -73,8 +73,8 @@ namespace DeepDroidChanger.Services
             var startLock = new SemaphoreSlim(1, 1);
             Task? monitorTask = null;
             Task? deviceIpTask = null;
+            Task? nativeWindowSyncTask = null;
             var isClosed = false;
-            var syncPending = false;
             long sessionGeneration = 0;
 
             long BeginNewSession()
@@ -158,18 +158,27 @@ namespace DeepDroidChanger.Services
                 currentSession.SetVisible(false);
             }
 
+            Task SynchronizeNativeWindowAsync()
+            {
+                if (isClosed)
+                    return Task.CompletedTask;
+
+                if (nativeWindowSyncTask is { IsCompleted: false })
+                    return nativeWindowSyncTask;
+
+                nativeWindowSyncTask = window.Dispatcher.InvokeAsync(
+                    SyncNativeWindow,
+                    DispatcherPriority.Render).Task;
+                return nativeWindowSyncTask;
+            }
+
             void RequestNativeWindowSync()
             {
-                if (isClosed || syncPending)
+                if (isClosed || nativeWindowSyncTask is { IsCompleted: false })
                     return;
 
-                syncPending = true;
                 _ = ObserveBackgroundTaskAsync(
-                    window.Dispatcher.InvokeAsync(() =>
-                    {
-                        syncPending = false;
-                        SyncNativeWindow();
-                    }, DispatcherPriority.Render).Task,
+                    SynchronizeNativeWindowAsync(),
                     "native-window synchronization",
                     serial);
             }
@@ -294,23 +303,26 @@ namespace DeepDroidChanger.Services
                         return;
 
                     var generation = BeginNewSession();
-                    await _streamCoordinator.EnsureStreamAsync(
-                            new DeviceViewerStartContext(
-                                serial,
-                                startLock,
-                                lifetimeCts.Token,
-                                GetSession,
-                                SetSession,
-                                StopSessionAsync,
-                                RequestNativeWindowSync,
-                                generation,
-                                IsCurrentSession,
-                                MarkWaitingForDeviceAsync,
-                                MarkStartingAsync,
-                                PrepareStreamBoundsAsync,
-                                GetOwnerHandleAsync,
-                                MarkStreamingAsync,
-                                MarkStreamErrorAsync))
+                    var startContext = new DeviceViewerStartContext(
+                        serial,
+                        startLock,
+                        lifetimeCts.Token,
+                        GetSession,
+                        SetSession,
+                        StopSessionAsync,
+                        RequestNativeWindowSync,
+                        generation,
+                        IsCurrentSession,
+                        MarkWaitingForDeviceAsync,
+                        MarkStartingAsync,
+                        PrepareStreamBoundsAsync,
+                        GetOwnerHandleAsync,
+                        MarkStreamingAsync,
+                        MarkStreamErrorAsync);
+                    await StartAndSynchronizeStreamBeforeDeviceIpRefreshAsync(
+                            () => _streamCoordinator.EnsureStreamAsync(startContext),
+                            SynchronizeNativeWindowAsync,
+                            () => RequestDeviceIpRefresh(showCheckingState: true))
                         .ConfigureAwait(true);
 
                     if (monitorTask != null)
@@ -492,7 +504,16 @@ namespace DeepDroidChanger.Services
             window.AddHandler(ButtonBase.ClickEvent, commandButtonClickRoutedHandler, true);
             window.Closing += HideStreamOnClosing;
             window.Closed += CloseStream;
-            RequestDeviceIpRefresh(showCheckingState: true);
+        }
+
+        internal static async Task StartAndSynchronizeStreamBeforeDeviceIpRefreshAsync(
+            Func<Task> startStreamAsync,
+            Func<Task> synchronizeNativeWindowAsync,
+            Action requestDeviceIpRefresh)
+        {
+            await startStreamAsync().ConfigureAwait(true);
+            await synchronizeNativeWindowAsync().ConfigureAwait(true);
+            requestDeviceIpRefresh();
         }
 
         private async Task ObserveBackgroundTaskAsync(Task task, string operation, string serial)

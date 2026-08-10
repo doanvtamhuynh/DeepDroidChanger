@@ -89,6 +89,27 @@ public sealed class ChangeTimezoneViewModelTests
         Assert.AreEqual("America/New_York", viewModel.SelectedTimezone?.Timezone);
     }
 
+    [TestMethod]
+    public async Task BatchMode_ReturnsSelectedTimezoneWithoutPersistingDialogEdits()
+    {
+        IDeviceStoreService store = DialogViewModelTestFactory.CreateStore(
+            new StoredDeviceConfig { Serial = "ABC", Timezone = "Europe/Paris" });
+        ILocationDataService timezones = Substitute.For<ILocationDataService>();
+        var selected = new TimezoneOption("VN", "Vietnam", "Asia/Ho_Chi_Minh", "+07:00");
+        timezones.GetTimezonesAsync(Arg.Any<CancellationToken>()).Returns([selected]);
+        var viewModel = CreateViewModel(store, timezones);
+        viewModel.IsBatchMode = true;
+        viewModel.BatchTargetCount = 3;
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SaveCommand.ExecuteAsync(null);
+
+        ChangeTimezoneDialogResult result = viewModel.BuildResult()!;
+        Assert.AreEqual(ChangeTimezoneMode.Data, result.Mode);
+        Assert.AreEqual("Asia/Ho_Chi_Minh", result.Timezone);
+        await store.DidNotReceiveWithAnyArgs().UpdateAsync(default!, default!, default);
+    }
+
     private static ChangeTimezoneViewModel CreateViewModel(
         IDeviceStoreService store,
         ILocationDataService timezones)

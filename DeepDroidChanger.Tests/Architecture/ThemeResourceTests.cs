@@ -101,6 +101,7 @@ public sealed partial class ThemeResourceTests
             "DataGridControl.xaml",
             "TabControl.xaml",
             "MenuControl.xaml",
+            "DeviceActionsContextMenu.xaml",
             "ProgressBarControl.xaml",
             "SeparatorControl.xaml",
             "ToolTipControl.xaml",
@@ -130,7 +131,13 @@ public sealed partial class ThemeResourceTests
     public void ControlDictionaries_DeclareTheirStaticResourceDependencies()
     {
         string themesRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger", "Resources", "Themes");
-        string[] files = Directory.GetFiles(themesRoot, "*Control.xaml", SearchOption.TopDirectoryOnly);
+        string[] files = Directory.GetFiles(themesRoot, "*.xaml", SearchOption.TopDirectoryOnly)
+            .Where(path => Path.GetFileName(path).EndsWith("Control.xaml", StringComparison.Ordinal)
+                || string.Equals(
+                    Path.GetFileName(path),
+                    "DeviceActionsContextMenu.xaml",
+                    StringComparison.Ordinal))
+            .ToArray();
         var violations = new List<string>();
 
         foreach (string path in files)

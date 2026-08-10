@@ -77,4 +77,8 @@
     <sys:String x:Key="ChangeMultipleDevices_StatusOnline">Online</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusUnauthorized">Unauthorized</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocation">Change Location</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezone">Change Timezone</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocationTooltip">Apply a Location to the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Apply a Timezone to the selected online devices.</sys:String>
 </ResourceDictionary>

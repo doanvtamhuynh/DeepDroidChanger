@@ -39,6 +39,12 @@ namespace DeepDroidChanger.ViewModels
         private string _deviceInfoText = string.Empty;
 
         [ObservableProperty]
+        private bool _isBatchMode;
+
+        [ObservableProperty]
+        private int _batchTargetCount;
+
+        [ObservableProperty]
         private bool _isConfigMode = true;
 
         [ObservableProperty]
@@ -91,6 +97,9 @@ namespace DeepDroidChanger.ViewModels
         public ObservableCollection<CountryOption> FilteredCountries { get; }
         public ObservableCollection<LocationOption> CountryLocations { get; }
 
+        public bool IsSingleEditableLocationMode => !IsBatchMode && IsConfigMode;
+        public bool IsSingleMode => !IsBatchMode;
+
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -103,6 +112,7 @@ namespace DeepDroidChanger.ViewModels
                 IsDeviceIpMode = false;
 
             SaveCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(IsSingleEditableLocationMode));
             QueueConfigSave();
         }
 
@@ -115,8 +125,19 @@ namespace DeepDroidChanger.ViewModels
             }
 
             SaveCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(IsSingleEditableLocationMode));
             QueueConfigSave();
         }
+
+        partial void OnIsBatchModeChanged(bool value)
+        {
+            OnPropertyChanged(nameof(IsSingleEditableLocationMode));
+            OnPropertyChanged(nameof(IsSingleMode));
+            UpdateDeviceInfoText();
+            SaveCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnBatchTargetCountChanged(int value) => UpdateDeviceInfoText();
 
         partial void OnLatitudeChanged(string value)
         {
@@ -136,6 +157,22 @@ namespace DeepDroidChanger.ViewModels
 
         private void UpdateDeviceInfoText()
         {
+            if (IsBatchMode)
+            {
+                string format = _localizationService.GetString("ChangeLocation_BatchDeviceInfo");
+                try
+                {
+                    DeviceInfoText = format.Contains("{0}", StringComparison.Ordinal)
+                        ? string.Format(format, BatchTargetCount)
+                        : $"{format} ({BatchTargetCount})";
+                }
+                catch (FormatException)
+                {
+                    DeviceInfoText = $"{format} ({BatchTargetCount})";
+                }
+                return;
+            }
+
             DeviceInfoText = DeviceInfoTextHelper.Create(_localizationService, DeviceName, DeviceSerial);
         }
 
@@ -161,7 +198,7 @@ namespace DeepDroidChanger.ViewModels
                 _lastCountryCode = value.CountryCode;
             }
 
-            if (!_isInitializing && value != null && IsConfigMode)
+            if (!_isInitializing && value != null && IsConfigMode && !IsBatchMode)
             {
                 ApplyRandomizedLocationCoordinates(value);
                 _selectionChangedSinceLastCoordinatesCommand = true;
@@ -208,7 +245,7 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand]
         public void ApplySelectedLocationCoordinates()
         {
-            if (!_isInitializing && SelectedLocation != null && IsConfigMode)
+            if (!_isInitializing && !IsBatchMode && SelectedLocation != null && IsConfigMode)
             {
                 if (_selectionChangedSinceLastCoordinatesCommand)
                 {
@@ -229,13 +266,23 @@ namespace DeepDroidChanger.ViewModels
         public ChangeLocationDialogResult? BuildResult()
         {
             var mode = IsDeviceIpMode ? ChangeLocationMode.DeviceIp : ChangeLocationMode.Config;
-            return new ChangeLocationDialogResult(mode, Latitude, Longitude);
+            if (IsBatchMode && mode == ChangeLocationMode.Config && SelectedLocation == null)
+                return null;
+
+            return new ChangeLocationDialogResult(
+                mode,
+                IsBatchMode ? string.Empty : Latitude,
+                IsBatchMode ? string.Empty : Longitude,
+                IsBatchMode ? SelectedLocation : null);
         }
 
         private bool CanSave()
         {
             if (IsDeviceIpMode)
                 return true;
+
+            if (IsBatchMode)
+                return IsConfigMode && SelectedLocation != null;
 
             return IsConfigMode &&
                    double.TryParse(Latitude, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat) &&
@@ -250,7 +297,8 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                QueueConfigSave();
+                if (!IsBatchMode)
+                    QueueConfigSave();
                 await FlushPendingConfigSaveAsync().ConfigureAwait(true);
                 CloseRequested?.Invoke(this, true);
             }
@@ -284,7 +332,7 @@ namespace DeepDroidChanger.ViewModels
 
         private void QueueConfigSave()
         {
-            if (_isInitializing || string.IsNullOrWhiteSpace(DeviceSerial))
+            if (_isInitializing || IsBatchMode || string.IsNullOrWhiteSpace(DeviceSerial))
                 return;
 
             var mode = IsDeviceIpMode ? ChangeLocationMode.DeviceIp : ChangeLocationMode.Config;
@@ -345,7 +393,8 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 _isInitializing = true;
-                await LoadDeviceConfigAsync(cancellationToken);
+                if (!IsBatchMode)
+                    await LoadDeviceConfigAsync(cancellationToken);
                 await LoadLocationsAsync(cancellationToken);
             }
             finally

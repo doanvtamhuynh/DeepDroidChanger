@@ -11,4 +11,5 @@
     <sys:String x:Key="ChangeTimezone_TimezoneLabel">Timezone</sys:String>
     <sys:String x:Key="ChangeTimezone_SearchHint">Search timezone...</sys:String>
     <sys:String x:Key="ChangeTimezone_SaveButton">Apply</sys:String>
+    <sys:String x:Key="ChangeTimezone_BatchDeviceInfo">Apply to {0} devices</sys:String>
 </ResourceDictionary>

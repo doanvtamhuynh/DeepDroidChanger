@@ -19,6 +19,7 @@
         <ResourceDictionary Source="DataGridControl.xaml"/>
         <ResourceDictionary Source="TabControl.xaml"/>
         <ResourceDictionary Source="MenuControl.xaml"/>
+        <ResourceDictionary Source="DeviceActionsContextMenu.xaml"/>
         <ResourceDictionary Source="ProgressBarControl.xaml"/>
         <ResourceDictionary Source="SeparatorControl.xaml"/>
         <ResourceDictionary Source="ToolTipControl.xaml"/>

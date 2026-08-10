@@ -599,10 +599,6 @@ namespace DeepDroidChanger.ViewModels
             if (device == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
             SetDeviceLog(device, "Log_RebootingDevice");
 
             try
@@ -759,10 +755,6 @@ namespace DeepDroidChanger.ViewModels
             if (device == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
             try
             {
                 GooglePackageState state = await _deviceActionService
@@ -830,10 +822,6 @@ namespace DeepDroidChanger.ViewModels
             CancellationToken cancellationToken = CancellationToken.None;
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
                 return;
 
             try

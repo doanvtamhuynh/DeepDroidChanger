@@ -13,4 +13,5 @@
     <system:String x:Key="ChangeLocation_LongitudeLabel">Longitude</system:String>
     <system:String x:Key="ChangeLocation_LongitudeHint">Range: -180 to 180, e.g., 105.8542</system:String>
     <system:String x:Key="ChangeLocation_SaveButton">Apply</system:String>
+    <system:String x:Key="ChangeLocation_BatchDeviceInfo">Apply to {0} devices</system:String>
 </ResourceDictionary>

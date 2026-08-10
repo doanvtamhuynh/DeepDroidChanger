@@ -20,10 +20,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
     private readonly ICarrierDataService _carrierDataService;
     private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
+    private readonly IDeviceActionService? _deviceActionService;
     private readonly IDeviceChangeService _deviceChangeService;
     private readonly IDeviceConfigService _deviceConfigService;
+    private readonly IDeviceLocationService? _deviceLocationService;
     private readonly IDeviceListService _deviceListService;
     private readonly IDeviceActionGuardService _deviceActionGuardService;
+    private readonly IDeviceTimezoneService? _deviceTimezoneService;
+    private readonly IChangeLocationDialogService? _changeLocationDialogService;
+    private readonly IChangeTimezoneDialogService? _changeTimezoneDialogService;
+    private readonly IDeviceViewerDialogService? _deviceViewerDialogService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
     private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
@@ -130,16 +136,28 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IUiDispatcherService uiDispatcher,
         IPollingService pollingService,
         AppSettings settings,
-        ILogger<ChangeMultipleDevicesViewModel> logger)
+        ILogger<ChangeMultipleDevicesViewModel> logger,
+        IDeviceActionService? deviceActionService = null,
+        IDeviceLocationService? deviceLocationService = null,
+        IDeviceTimezoneService? deviceTimezoneService = null,
+        IChangeLocationDialogService? changeLocationDialogService = null,
+        IChangeTimezoneDialogService? changeTimezoneDialogService = null,
+        IDeviceViewerDialogService? deviceViewerDialogService = null)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
         _carrierDataService = carrierDataService;
         _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
+        _deviceActionService = deviceActionService;
         _deviceChangeService = deviceChangeService;
         _deviceConfigService = deviceConfigService;
+        _deviceLocationService = deviceLocationService;
         _deviceListService = deviceListService;
         _deviceActionGuardService = deviceActionGuardService;
+        _deviceTimezoneService = deviceTimezoneService;
+        _changeLocationDialogService = changeLocationDialogService;
+        _changeTimezoneDialogService = changeTimezoneDialogService;
+        _deviceViewerDialogService = deviceViewerDialogService;
         _localizationService = localizationService;
         _multipleDeviceConfigService = multipleDeviceConfigService;
         _randomDeviceInfoDialogService = randomDeviceInfoDialogService;
@@ -386,6 +404,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return !IsLoadingDevices;
     }
 
+    private bool CanExecuteContextDeviceAction(DeviceRowViewModel? device)
+    {
+        return device == null || !IsDeviceBusy(device);
+    }
+
     [RelayCommand]
     private void ToggleDeviceSelection(DeviceRowViewModel? device)
     {
@@ -539,6 +562,730 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     {
         return CanOperateSelectedInfoDevice
                && _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task ChangeSelectedLocationsAsync()
+    {
+        return RunSelectedLocationOrTimezoneAsync(isLocation: true, CancellationToken.None);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task ChangeSelectedTimezonesAsync()
+    {
+        return RunSelectedLocationOrTimezoneAsync(isLocation: false, CancellationToken.None);
+    }
+
+    private async Task RunSelectedLocationOrTimezoneAsync(
+        bool isLocation,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        bool started = false;
+        try
+        {
+            DeviceRowViewModel[] selectedDevices = _allDeviceRows
+                .Where(device => device.IsSelected)
+                .ToArray();
+            if (selectedDevices.Length == 0)
+                return;
+
+            targets = await CreateInitialOnlineTargetsAsync(selectedDevices, cancellationToken)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            BeginBatchAction(isRandomizing: false);
+            started = true;
+
+            ChangeLocationDialogResult? locationResult = null;
+            ChangeTimezoneDialogResult? timezoneResult = null;
+            if (isLocation)
+            {
+                if (_changeLocationDialogService == null)
+                    throw new InvalidOperationException("Change Location dialog service is unavailable.");
+
+                locationResult = await _changeLocationDialogService
+                    .ShowChangeLocationBatchAsync(targets.Count, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            else
+            {
+                if (_changeTimezoneDialogService == null)
+                    throw new InvalidOperationException("Change Timezone dialog service is unavailable.");
+
+                timezoneResult = await _changeTimezoneDialogService
+                    .ShowChangeTimezoneBatchAsync(targets.Count, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+
+            if (locationResult == null && timezoneResult == null)
+            {
+                string canceledKey = isLocation
+                    ? "Log_ChangeLocationCanceled"
+                    : "Log_ChangeTimezoneCanceled";
+                foreach (BatchActionTarget target in targets)
+                    await RunOnUiContextAsync(() => SetTargetLogWithoutRegistration(target, canceledKey))
+                        .ConfigureAwait(true);
+                return;
+            }
+
+            Task[] operations = targets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => isLocation
+                        ? ExecuteLocationBatchTargetAsync(target, locationResult!, cancellationToken)
+                        : ExecuteTimezoneBatchTargetAsync(target, timezoneResult!, cancellationToken)))
+                .ToArray();
+            await Task.WhenAll(operations).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to execute Multiple Device {Action} action.",
+                isLocation ? "Location" : "Timezone");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+            if (started)
+                EndBatchAction(isRandomizing: false);
+        }
+    }
+
+    private async Task<List<BatchActionTarget>> CreateInitialOnlineTargetsAsync(
+        IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        CancellationToken cancellationToken)
+    {
+        async Task<(DeviceRowViewModel Device, bool IsOnline, bool IsBusy)> CheckAsync(
+            DeviceRowViewModel device)
+        {
+            if (IsDeviceBusy(device))
+                return (device, IsOnline: false, IsBusy: true);
+
+            await _batchActionThrottle.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (IsDeviceBusy(device))
+                    return (device, IsOnline: false, IsBusy: true);
+
+                bool isOnline;
+                try
+                {
+                    isOnline = await _deviceListService
+                        .IsDeviceOnlineAsync(device.Serial, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Live initial online preflight failed for device {Serial}.",
+                        device.Serial);
+                    isOnline = false;
+                }
+
+                return (device, isOnline, IsBusy: false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+
+        (DeviceRowViewModel Device, bool IsOnline, bool IsBusy)[] checks = await Task
+            .WhenAll(selectedDevices.Select(CheckAsync))
+            .ConfigureAwait(true);
+        var targets = new List<BatchActionTarget>(checks.Length);
+        foreach ((DeviceRowViewModel device, bool isOnline, bool isBusy) in checks)
+        {
+            if (isBusy)
+                continue;
+
+            if (!isOnline)
+            {
+                await RunOnUiContextAsync(() => SetDeviceLog(device, "Log_DeviceMustBeOnline"))
+                    .ConfigureAwait(true);
+                continue;
+            }
+
+            IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
+            if (lease == null)
+                continue;
+
+            var target = new BatchActionTarget(
+                device,
+                lease,
+                deviceProfile: null,
+                simProfile: null);
+            RegisterBatchTarget(target);
+            targets.Add(target);
+        }
+
+        return targets;
+    }
+
+    private async Task ExecuteLocationBatchTargetAsync(
+        BatchActionTarget target,
+        ChangeLocationDialogResult result,
+        CancellationToken cancellationToken)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await IsExecutionTargetOnlineAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                    return;
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        result.Mode == ChangeLocationMode.DeviceIp
+                            ? "Log_ResolvingByIp"
+                            : "Log_ApplyingLocation"))
+                    .ConfigureAwait(false);
+                if (_deviceLocationService == null)
+                    throw new InvalidOperationException("Device Location service is unavailable.");
+
+                DeviceLocationResult applied = result.Mode == ChangeLocationMode.DeviceIp
+                    ? await _deviceLocationService
+                        .ApplyAsync(target.Device.Serial, result, targetCancellation.Token)
+                        .ConfigureAwait(false)
+                    : result.SelectedLocation == null
+                        ? throw new InvalidOperationException("Batch Location selection is missing.")
+                        : await _deviceLocationService
+                            .ApplyCatalogLocationAsync(
+                                target.Device.Serial,
+                                result.SelectedLocation,
+                                targetCancellation.Token)
+                            .ConfigureAwait(false);
+
+                bool saved = await PersistLocationConfigAsync(
+                        target.Device.Serial,
+                        result.Mode,
+                        applied,
+                        targetCancellation.Token)
+                    .ConfigureAwait(false);
+                if (!saved)
+                    throw new InvalidOperationException("The device Location configuration could not be saved.");
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeLocationSuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_Ready"))
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to change Location for device {Serial}.",
+                target.Device.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeLocationFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
+    private async Task ExecuteTimezoneBatchTargetAsync(
+        BatchActionTarget target,
+        ChangeTimezoneDialogResult result,
+        CancellationToken cancellationToken)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await IsExecutionTargetOnlineAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                    return;
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        result.Mode == ChangeTimezoneMode.DeviceIp
+                            ? "Log_ResolvingByIp"
+                            : "Log_ApplyingTimezone"))
+                    .ConfigureAwait(false);
+                if (_deviceTimezoneService == null)
+                    throw new InvalidOperationException("Device Timezone service is unavailable.");
+
+                string appliedTimezone = await _deviceTimezoneService
+                    .ApplyAsync(target.Device.Serial, result, targetCancellation.Token)
+                    .ConfigureAwait(false);
+                bool saved = await PersistTimezoneConfigAsync(
+                        target.Device.Serial,
+                        result.Mode,
+                        appliedTimezone,
+                        targetCancellation.Token)
+                    .ConfigureAwait(false);
+                if (!saved)
+                    throw new InvalidOperationException("The device Timezone configuration could not be saved.");
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeTimezoneSuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_Ready"))
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to change Timezone for device {Serial}.",
+                target.Device.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeTimezoneFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
+    private async Task<bool> IsExecutionTargetOnlineAsync(
+        BatchActionTarget target,
+        CancellationToken cancellationToken)
+    {
+        bool isOnline;
+        try
+        {
+            isOnline = await _deviceListService
+                .IsDeviceOnlineAsync(target.Device.Serial, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Live execution online check failed for device {Serial}.",
+                target.Device.Serial);
+            isOnline = false;
+        }
+
+        if (isOnline)
+            return true;
+
+        await RunOnUiContextAsync(() => SetTargetLog(target, "Log_DeviceMustBeOnline"))
+            .ConfigureAwait(false);
+        return false;
+    }
+
+    private async Task<bool> PersistLocationConfigAsync(
+        string serial,
+        ChangeLocationMode mode,
+        DeviceLocationResult result,
+        CancellationToken cancellationToken)
+    {
+        await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await _deviceConfigService.SaveLocationConfigAsync(
+                    _storedDevices,
+                    serial,
+                    mode,
+                    result.Latitude,
+                    result.Longitude,
+                    result.CountryCode,
+                    result.CityName,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _deviceRefreshLock.Release();
+        }
+    }
+
+    private async Task<bool> PersistTimezoneConfigAsync(
+        string serial,
+        ChangeTimezoneMode mode,
+        string timezone,
+        CancellationToken cancellationToken)
+    {
+        await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await _deviceConfigService.SaveTimezoneConfigAsync(
+                    _storedDevices,
+                    serial,
+                    mode,
+                    timezone,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _deviceRefreshLock.Release();
+        }
+    }
+
+    private void SetTargetLogWithoutRegistration(BatchActionTarget target, string resourceKey)
+    {
+        if (IsCurrentTarget(target))
+            SetDeviceLog(target.Device, resourceKey);
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task ViewDeviceAsync(DeviceRowViewModel? device)
+    {
+        if (_deviceViewerDialogService == null)
+            return;
+
+        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+        if (device == null)
+            return;
+
+        try
+        {
+            SetDeviceLog(device, "Log_OpeningDialog");
+            await _deviceViewerDialogService
+                .ShowDeviceViewerAsync(device.Serial, device.Name, CancellationToken.None)
+                .ConfigureAwait(true);
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (OperationCanceledException)
+        {
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to open device viewer for {Serial}.", device.Serial);
+            SetDeviceLog(device, "Log_Ready");
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task ViewDeviceInfoAsync(DeviceRowViewModel? device)
+    {
+        await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task CopySerialAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
+    {
+        if (device == null || string.IsNullOrWhiteSpace(device.Serial))
+            return;
+
+        try
+        {
+            await RunOnUiContextAsync(() => System.Windows.Clipboard.SetText(device.Serial))
+                .ConfigureAwait(true);
+            SetDeviceLog(device, "Log_CopySerialSuccess");
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to copy serial for device {Serial}.", device.Serial);
+            SetDeviceLog(device, "Log_CopySerialFailed");
+            SetDeviceLog(device, "Log_Ready");
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task RefreshContextMenuStateAsync(DeviceRowViewModel? device)
+    {
+        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+        if (device == null || _deviceActionService == null)
+            return;
+
+        device.IsContextMenuStateLoading = true;
+        try
+        {
+            Task<GooglePackageState> googleState = _deviceActionService
+                .GetGooglePackageStateAsync(device.Serial, CancellationToken.None);
+            Task<bool> wifiState = _deviceActionService
+                .GetWifiEnabledAsync(device.Serial, CancellationToken.None);
+            try
+            {
+                await Task.WhenAll(googleState, wifiState).ConfigureAwait(true);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogError(exception, "Failed to refresh context menu state for {Serial}.", device.Serial);
+            }
+
+            if (googleState.IsCompletedSuccessfully)
+            {
+                device.IsGmsDisabled = googleState.Result.IsGmsDisabled;
+                device.IsPlayStoreDisabled = googleState.Result.IsPlayStoreDisabled;
+            }
+
+            if (wifiState.IsCompletedSuccessfully)
+                device.IsWifiEnabled = wifiState.Result;
+        }
+        finally
+        {
+            device.IsContextMenuStateLoading = false;
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task ToggleGmsAsync(DeviceRowViewModel? device)
+    {
+        return ToggleGooglePackageAsync(device, isGms: true);
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task TogglePlayStoreAsync(DeviceRowViewModel? device)
+    {
+        return ToggleGooglePackageAsync(device, isGms: false);
+    }
+
+    private async Task ToggleGooglePackageAsync(DeviceRowViewModel? device, bool isGms)
+    {
+        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+        if (device == null || _deviceActionService == null)
+            return;
+
+        try
+        {
+            GooglePackageState state = await _deviceActionService
+                .GetGooglePackageStateAsync(device.Serial, CancellationToken.None)
+                .ConfigureAwait(true);
+            bool enabled = isGms ? state.IsGmsDisabled : state.IsPlayStoreDisabled;
+            if (isGms)
+            {
+                await _deviceActionService
+                    .SetGmsEnabledAsync(device.Serial, enabled, CancellationToken.None)
+                    .ConfigureAwait(true);
+                device.IsGmsDisabled = !enabled;
+            }
+            else
+            {
+                await _deviceActionService
+                    .SetPlayStoreEnabledAsync(device.Serial, enabled, CancellationToken.None)
+                    .ConfigureAwait(true);
+                device.IsPlayStoreDisabled = !enabled;
+            }
+
+            SetDeviceLog(device, (isGms, enabled) switch
+            {
+                (true, true) => "Log_GmsEnabled",
+                (true, false) => "Log_GmsDisabled",
+                (false, true) => "Log_PlayStoreEnabled",
+                _ => "Log_PlayStoreDisabled"
+            });
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (OperationCanceledException)
+        {
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to toggle package state for {Serial}.", device.Serial);
+            SetDeviceLog(
+                device,
+                isGms ? "Log_GmsToggleFailed" : "Log_PlayStoreToggleFailed");
+            SetDeviceLog(device, "Log_Ready");
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task ToggleWifiAsync(DeviceRowViewModel? device)
+    {
+        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+        if (device == null || _deviceActionService == null)
+            return;
+
+        try
+        {
+            bool isEnabled = await _deviceActionService
+                .GetWifiEnabledAsync(device.Serial, CancellationToken.None)
+                .ConfigureAwait(true);
+            bool enabled = !isEnabled;
+            await _deviceActionService
+                .SetWifiEnabledAsync(device.Serial, enabled, CancellationToken.None)
+                .ConfigureAwait(true);
+            device.IsWifiEnabled = enabled;
+            SetDeviceLog(device, enabled ? "Log_WifiEnabled" : "Log_WifiDisabled");
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (OperationCanceledException)
+        {
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to toggle Wi-Fi for {Serial}.", device.Serial);
+            SetDeviceLog(device, "Log_WifiToggleFailed");
+            SetDeviceLog(device, "Log_Ready");
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task RebootDeviceAsync(DeviceRowViewModel? device)
+    {
+        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+        if (device == null || _deviceActionService == null)
+            return;
+
+        try
+        {
+            SetDeviceLog(device, "Log_RebootingDevice");
+            await _deviceActionService
+                .RebootAsync(device.Serial, CancellationToken.None)
+                .ConfigureAwait(true);
+            SetDeviceLog(device, "Log_RebootDeviceSuccess");
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (OperationCanceledException)
+        {
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to reboot device {Serial}.", device.Serial);
+            SetDeviceLog(device, "Log_RebootDeviceFailed");
+            SetDeviceLog(device, "Log_Ready");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteContextDeviceAction), AllowConcurrentExecutions = true)]
+    private async Task DeleteDeviceAsync(DeviceRowViewModel? device)
+    {
+        if (device == null)
+            return;
+
+        using IDisposable? lease = TryAcquireContextAction(device);
+        if (lease == null)
+            return;
+
+        try
+        {
+            bool confirmed = await _deviceActionConfirmationDialogService
+                .ConfirmDeleteDeviceAsync(device.Name, device.Serial, CancellationToken.None)
+                .ConfigureAwait(true);
+            if (!confirmed)
+            {
+                SetDeviceLog(device, "Log_DeleteDeviceCanceled");
+                SetDeviceLog(device, "Log_Ready");
+                return;
+            }
+
+            SetDeviceLog(device, "Log_DeletingDevice");
+            await _deviceRefreshLock.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+            try
+            {
+                DeviceDeleteResult result = await _deviceListService
+                    .DeleteSavedDeviceAsync(device.Serial, CancellationToken.None)
+                    .ConfigureAwait(true);
+                if (!result.Removed)
+                {
+                    SetDeviceLog(device, "Log_DeleteDeviceFailed");
+                    SetDeviceLog(device, "Log_Ready");
+                    return;
+                }
+
+                _randomDeviceProfiles.Remove(device.Serial);
+                _randomSimProfiles.Remove(device.Serial);
+                ApplyDeviceListSnapshot(result.Snapshot);
+            }
+            finally
+            {
+                _deviceRefreshLock.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SetDeviceLog(device, "Log_Ready");
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to delete device {Serial}.", device.Serial);
+            SetDeviceLog(device, "Log_DeleteDeviceFailed");
+            SetDeviceLog(device, "Log_Ready");
+        }
+    }
+
+    private async Task<DeviceRowViewModel?> GetContextOnlineDeviceAsync(DeviceRowViewModel? device)
+    {
+        if (device == null)
+            return null;
+
+        if (device.ConnectionStatus != AdbDeviceStatus.Online)
+        {
+            SetDeviceLog(device, "Log_DeviceMustBeOnline");
+            return null;
+        }
+
+        bool isOnline;
+        try
+        {
+            isOnline = await _deviceListService
+                .IsDeviceOnlineAsync(device.Serial, CancellationToken.None)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning(exception, "Live context-menu online check failed for {Serial}.", device.Serial);
+            isOnline = false;
+        }
+
+        if (isOnline)
+            return device;
+
+        SetDeviceLog(device, "Log_DeviceMustBeOnline");
+        return null;
+    }
+
+    private IDisposable? TryAcquireContextAction(DeviceRowViewModel device)
+    {
+        IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
+        if (lease == null)
+            SetDeviceLog(device, "Log_ActionAlreadyInProgress");
+        return lease;
     }
 
     private async Task RunSelectedDeviceBatchActionAsync(
@@ -1763,7 +2510,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         WipeSelectedDevicesWithoutChangeCommand.NotifyCanExecuteChanged();
         RandomSelectedSimsCommand.NotifyCanExecuteChanged();
         ChangeSelectedSimsCommand.NotifyCanExecuteChanged();
+        ChangeSelectedLocationsCommand.NotifyCanExecuteChanged();
+        ChangeSelectedTimezonesCommand.NotifyCanExecuteChanged();
         ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
+        DeleteDeviceCommand.NotifyCanExecuteChanged();
     }
 
     private async Task RefreshNewDeviceCountAsync(CancellationToken cancellationToken)
@@ -2588,7 +3338,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
         public BatchActionTarget(
             DeviceRowViewModel device,
-            IDisposable lease,
+            IDisposable? lease,
             DeviceInfoApiDevice? deviceProfile,
             SimProfile? simProfile,
             DeviceChangeOptions? changeOptions = null,
@@ -2609,7 +3359,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
 
         public DeviceRowViewModel Device { get; }
-        public IDisposable Lease { get; }
+        public IDisposable? Lease { get; private set; }
         public DeviceInfoApiDevice? DeviceProfile { get; }
         public SimProfile? SimProfile { get; }
         public DeviceChangeOptions? ChangeOptions { get; }
@@ -2639,7 +3389,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         public void CancelQueuedExecution()
         {
             _invalidation.Cancel();
-            Lease.Dispose();
+            Lease?.Dispose();
         }
 
         public void Dispose()
@@ -2648,7 +3398,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 return;
 
             _invalidation.Cancel();
-            Lease.Dispose();
+            Lease?.Dispose();
             _invalidation.Dispose();
         }
     }

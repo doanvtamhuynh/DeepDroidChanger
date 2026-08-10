@@ -23,12 +23,47 @@ namespace DeepDroidChanger.Services
             string deviceName,
             CancellationToken cancellationToken)
         {
+            return await ShowAsync(
+                    deviceSerial,
+                    deviceName,
+                    isBatchMode: false,
+                    targetCount: 0,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        public async Task<ChangeTimezoneDialogResult?> ShowChangeTimezoneBatchAsync(
+            int targetCount,
+            CancellationToken cancellationToken)
+        {
+            return await ShowAsync(
+                    string.Empty,
+                    string.Empty,
+                    isBatchMode: true,
+                    targetCount,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        private async Task<ChangeTimezoneDialogResult?> ShowAsync(
+            string deviceSerial,
+            string deviceName,
+            bool isBatchMode,
+            int targetCount,
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
 
-            _logger.LogDebug("Opening Change Timezone dialog for device {Serial}.", deviceSerial);
+            _logger.LogDebug(
+                "Opening Change Timezone dialog. Batch mode: {IsBatchMode}, Serial: {Serial}, Target count: {TargetCount}.",
+                isBatchMode,
+                deviceSerial,
+                targetCount);
             using var scope = _scopeFactory.CreateScope();
 
             var viewModel = scope.ServiceProvider.GetRequiredService<ChangeTimezoneViewModel>();
+            viewModel.IsBatchMode = isBatchMode;
+            viewModel.BatchTargetCount = targetCount;
             viewModel.DeviceSerial = deviceSerial;
             viewModel.DeviceName = deviceName;
             await viewModel.InitializeAsync(cancellationToken).ConfigureAwait(true);
@@ -57,7 +92,8 @@ namespace DeepDroidChanger.Services
             }
             finally
             {
-                await viewModel.FlushPendingConfigSaveAsync().ConfigureAwait(true);
+                if (!isBatchMode)
+                    await viewModel.FlushPendingConfigSaveAsync().ConfigureAwait(true);
             }
         }
     }

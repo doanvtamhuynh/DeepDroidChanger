@@ -1,6 +1,9 @@
 using DeepDroidChanger.ViewModels;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace DeepDroidChanger.Views
 {
@@ -61,6 +64,40 @@ namespace DeepDroidChanger.Views
                 _viewCancellation?.Dispose();
                 _viewCancellation = null;
             }
+        }
+
+        private void OnDeviceGridPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (row == null)
+                return;
+
+            row.IsSelected = true;
+            row.Focus();
+        }
+
+        private async void OnDeviceRowContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (sender is not DataGridRow { DataContext: DeviceRowViewModel device })
+                return;
+
+            await _viewModel.RefreshContextMenuStateCommand
+                .ExecuteAsync(device)
+                .ConfigureAwait(true);
+        }
+
+        private static T? FindVisualParent<T>(DependencyObject? dependencyObject)
+            where T : DependencyObject
+        {
+            while (dependencyObject != null)
+            {
+                if (dependencyObject is T target)
+                    return target;
+
+                dependencyObject = VisualTreeHelper.GetParent(dependencyObject);
+            }
+
+            return null;
         }
     }
 }

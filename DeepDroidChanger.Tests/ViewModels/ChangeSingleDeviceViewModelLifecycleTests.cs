@@ -1777,6 +1777,10 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
         IDeviceViewerDialogService deviceViewerDialog = Substitute.For<IDeviceViewerDialogService>();
+        deviceAction.GetGooglePackageStateAsync("A", Arg.Any<CancellationToken>())
+            .Returns(new GooglePackageState(false, false));
+        deviceAction.GetWifiEnabledAsync("A", Arg.Any<CancellationToken>())
+            .Returns(true);
         randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
@@ -1823,7 +1827,16 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             busyContextMenuStates[nameof(ChangeSingleDeviceViewModel.DeleteDeviceCommand)],
             CreateActionStateMessage(busyContextMenuStates));
         await viewModel.RebootDeviceCommand.ExecuteAsync(deviceA);
-        await deviceAction.DidNotReceive().RebootAsync("A", Arg.Any<CancellationToken>());
+        await viewModel.ToggleGmsCommand.ExecuteAsync(deviceA);
+        await viewModel.TogglePlayStoreCommand.ExecuteAsync(deviceA);
+        await viewModel.ToggleWifiCommand.ExecuteAsync(deviceA);
+        await deviceAction.Received(1).RebootAsync("A", Arg.Any<CancellationToken>());
+        await deviceAction.Received(1)
+            .SetGmsEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await deviceAction.Received(1)
+            .SetPlayStoreEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await deviceAction.Received(1)
+            .SetWifiEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
         await viewModel.ViewDeviceCommand.ExecuteAsync(deviceA);
         await deviceViewerDialog.Received(1).ShowDeviceViewerAsync(
             "A",

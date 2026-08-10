@@ -64,4 +64,34 @@ public sealed class DeviceTimezoneServiceTests
             "Asia/Ho_Chi_Minh",
             Arg.Any<CancellationToken>());
     }
+
+    [TestMethod]
+    public async Task ResolveTimezoneByDeviceIpAsync_RejectsEmptyTimezone()
+    {
+        IIpGeolocationService geolocation = Substitute.For<IIpGeolocationService>();
+        geolocation.GetDeviceIpGeolocationAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new IpGeolocationInfo { Timezone = "  " });
+        var service = new DeviceTimezoneService(
+            Substitute.For<IAdbCommandService>(),
+            geolocation,
+            NullLogger<DeviceTimezoneService>.Instance);
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            service.ResolveTimezoneByDeviceIpAsync("SERIAL", CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ApplyTimezoneAsync_RejectsEmptyTimezoneBeforeAdbMutation()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        var service = new DeviceTimezoneService(
+            adb,
+            Substitute.For<IIpGeolocationService>(),
+            NullLogger<DeviceTimezoneService>.Instance);
+
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() =>
+            service.ApplyTimezoneAsync("SERIAL", " ", CancellationToken.None));
+
+        await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
+    }
 }

@@ -10,5 +10,10 @@ namespace DeepDroidChanger.Services
             string serial,
             ChangeLocationDialogResult result,
             CancellationToken cancellationToken);
+
+        Task<DeviceLocationResult> ApplyCatalogLocationAsync(
+            string serial,
+            LocationOption location,
+            CancellationToken cancellationToken);
     }
 }

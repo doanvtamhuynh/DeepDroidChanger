@@ -22,6 +22,10 @@ namespace DeepDroidChanger.Services
 
         public async Task ApplyTimezoneAsync(string serial, string timezone, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(timezone))
+                throw new ArgumentException("Timezone cannot be empty.", nameof(timezone));
+
+            timezone = timezone.Trim();
             _logger.LogInformation("Applying timezone {Timezone} to device {Serial}.", timezone, serial);
 
             await _adbCommandService.PutSettingAsync(serial, "global", "auto_time_zone", "0", cancellationToken).ConfigureAwait(false);
@@ -37,7 +41,10 @@ namespace DeepDroidChanger.Services
         {
             _logger.LogInformation("Resolving timezone by device IP for {Serial}.", serial);
             var info = await _adbIpGeolocationService.GetDeviceIpGeolocationAsync(serial, cancellationToken).ConfigureAwait(false);
-            return info.Timezone;
+            if (string.IsNullOrWhiteSpace(info.Timezone))
+                throw new InvalidOperationException("Failed to resolve timezone by device IP.");
+
+            return info.Timezone.Trim();
         }
 
         public async Task<string> ApplyAsync(
@@ -48,7 +55,10 @@ namespace DeepDroidChanger.Services
             ArgumentNullException.ThrowIfNull(result);
             string timezone = result.Mode == ChangeTimezoneMode.DeviceIp
                 ? await ResolveTimezoneByDeviceIpAsync(serial, cancellationToken).ConfigureAwait(false)
-                : result.Timezone;
+                : result.Timezone?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(timezone))
+                throw new InvalidOperationException("Timezone selection returned no value.");
 
             await ApplyTimezoneAsync(serial, timezone, cancellationToken).ConfigureAwait(false);
             return timezone;

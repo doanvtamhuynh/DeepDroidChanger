@@ -8,5 +8,9 @@ namespace DeepDroidChanger.Services
             string deviceSerial,
             string deviceName,
             CancellationToken cancellationToken);
+
+        Task<ChangeLocationDialogResult?> ShowChangeLocationBatchAsync(
+            int targetCount,
+            CancellationToken cancellationToken);
     }
 }

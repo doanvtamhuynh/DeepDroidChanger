@@ -10,6 +10,448 @@ namespace DeepDroidChanger.Tests.ViewModels;
 public sealed class ChangeMultipleDevicesViewModelTests
 {
     [TestMethod]
+    public async Task ChangeSelectedLocations_PreflightsLiveOnlineAndUsesStableInitialTargets()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Alpha" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Beta" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var selectedLocation = new LocationOption(
+            "VN",
+            "Vietnam",
+            "Ho Chi Minh City",
+            "Asia/Ho_Chi_Minh",
+            "+07:00",
+            10.75,
+            106.6667);
+        context.LocationDialog.ShowChangeLocationBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(new ChangeLocationDialogResult(
+                ChangeLocationMode.Config,
+                string.Empty,
+                string.Empty,
+                selectedLocation));
+        context.DeviceConfig.SaveLocationConfigAsync(
+                Arg.Any<IList<StoredDeviceConfig>>(),
+                Arg.Any<string>(),
+                Arg.Any<ChangeLocationMode>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        context.LocationService.ApplyCatalogLocationAsync(
+                "A",
+                selectedLocation,
+                Arg.Any<CancellationToken>())
+            .Returns(new DeviceLocationResult("10.7123", "106.6456", "VN", "Ho Chi Minh City"));
+
+        int onlineChecksForA = 0;
+        int onlineChecksForB = 0;
+        context.DeviceList.IsDeviceOnlineAsync(
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                string serial = callInfo.Arg<string>();
+                if (serial == "A")
+                    Interlocked.Increment(ref onlineChecksForA);
+                else
+                    Interlocked.Increment(ref onlineChecksForB);
+
+                return Task.FromResult(serial == "A");
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
+
+        await context.LocationDialog.Received(1)
+            .ShowChangeLocationBatchAsync(1, Arg.Any<CancellationToken>());
+        await context.LocationService.Received(1)
+            .ApplyCatalogLocationAsync("A", selectedLocation, Arg.Any<CancellationToken>());
+        await context.LocationService.DidNotReceive()
+            .ApplyCatalogLocationAsync("B", Arg.Any<LocationOption>(), Arg.Any<CancellationToken>());
+        Assert.AreEqual(2, onlineChecksForA);
+        Assert.AreEqual(1, onlineChecksForB);
+        Assert.AreEqual("Log_ChangeLocationSuccess", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task ChangeSelectedTimezones_WhenInitialPreflightFindsNoOnlineDevice_DoesNotOpenDialogOrApply()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Alpha" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Beta" }
+                ],
+                []),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        context.DeviceList.IsDeviceOnlineAsync(
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.ChangeSelectedTimezonesCommand.ExecuteAsync(null);
+
+        await context.TimezoneDialog.DidNotReceiveWithAnyArgs()
+            .ShowChangeTimezoneBatchAsync(default, default);
+        await context.TimezoneService.DidNotReceiveWithAnyArgs()
+            .ApplyAsync(default!, default!, default);
+        Assert.IsTrue(viewModel.Devices.All(device => device.Process == "Log_DeviceMustBeOnline"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task ChangeSelectedLocations_SkipsBusyDeviceBeforeOpeningDialog()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Busy" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Ready" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var selectedLocation = new LocationOption(
+            "VN",
+            "Vietnam",
+            "Ho Chi Minh City",
+            "Asia/Ho_Chi_Minh",
+            "+07:00",
+            10.75,
+            106.6667);
+        context.LocationDialog.ShowChangeLocationBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(new ChangeLocationDialogResult(
+                ChangeLocationMode.Config,
+                string.Empty,
+                string.Empty,
+                selectedLocation));
+        context.LocationService.ApplyCatalogLocationAsync(
+                "B",
+                selectedLocation,
+                Arg.Any<CancellationToken>())
+            .Returns(new DeviceLocationResult("10.7123", "106.6456", "VN", "Ho Chi Minh City"));
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "B");
+
+        await viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
+
+        await context.LocationDialog.Received(1)
+            .ShowChangeLocationBatchAsync(1, Arg.Any<CancellationToken>());
+        await context.LocationService.DidNotReceive()
+            .ApplyCatalogLocationAsync("A", Arg.Any<LocationOption>(), Arg.Any<CancellationToken>());
+        await context.LocationService.Received(1)
+            .ApplyCatalogLocationAsync("B", selectedLocation, Arg.Any<CancellationToken>());
+        await context.DeviceList.DidNotReceive()
+            .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_Ready", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("Log_ChangeLocationSuccess", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("B"));
+
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task ChangeSelectedTimezones_SkipsBusyDeviceBeforeOpeningDialog()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Busy" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Ready" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        context.TimezoneDialog.ShowChangeTimezoneBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(new ChangeTimezoneDialogResult(ChangeTimezoneMode.Data, "Asia/Ho_Chi_Minh"));
+        context.TimezoneService.ApplyAsync(
+                "B",
+                Arg.Any<ChangeTimezoneDialogResult>(),
+                Arg.Any<CancellationToken>())
+            .Returns("Asia/Ho_Chi_Minh");
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "B");
+
+        await viewModel.ChangeSelectedTimezonesCommand.ExecuteAsync(null);
+
+        await context.TimezoneDialog.Received(1)
+            .ShowChangeTimezoneBatchAsync(1, Arg.Any<CancellationToken>());
+        await context.TimezoneService.DidNotReceive()
+            .ApplyAsync("A", Arg.Any<ChangeTimezoneDialogResult>(), Arg.Any<CancellationToken>());
+        await context.TimezoneService.Received(1)
+            .ApplyAsync("B", Arg.Any<ChangeTimezoneDialogResult>(), Arg.Any<CancellationToken>());
+        await context.DeviceList.DidNotReceive()
+            .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_Ready", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("Log_ChangeTimezoneSuccess", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("B"));
+
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task ChangeSelectedLocations_HoldsLeaseUntilDialogCompletes()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var dialogOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogResult = new TaskCompletionSource<ChangeLocationDialogResult?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.LocationDialog.ShowChangeLocationBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                dialogOpened.SetResult();
+                return dialogResult.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
+        await dialogOpened.Task;
+
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        Assert.IsNull(context.DeviceActionGuard.TryAcquire("A"));
+
+        dialogResult.SetResult(null);
+        await operation;
+
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task RebootContextCommand_UsesClickedRowWithoutChangingBatchSelection()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Alpha" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Beta" },
+                    new StoredDeviceConfig { Serial = "C", Name = "Gamma" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online),
+                    new AdbDevice("C", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel clicked = viewModel.Devices.Single(device => device.Serial == "C");
+        await viewModel.RebootDeviceCommand.ExecuteAsync(clicked);
+
+        await context.DeviceAction.Received(1).RebootAsync("C", Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive().RebootAsync("A", Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive().RebootAsync("B", Arg.Any<CancellationToken>());
+        Assert.IsTrue(viewModel.Devices.Single(device => device.Serial == "A").IsSelected);
+        Assert.IsTrue(viewModel.Devices.Single(device => device.Serial == "B").IsSelected);
+        Assert.IsFalse(clicked.IsSelected);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task RefreshContextMenuState_QueriesClickedRow()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Alpha" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Beta" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        context.DeviceAction.GetGooglePackageStateAsync("B", Arg.Any<CancellationToken>())
+            .Returns(new GooglePackageState(true, false));
+        context.DeviceAction.GetWifiEnabledAsync("B", Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.RefreshContextMenuStateCommand.ExecuteAsync(
+            viewModel.Devices.Single(device => device.Serial == "B"));
+
+        await context.DeviceAction.Received(1)
+            .GetGooglePackageStateAsync("B", Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(1)
+            .GetWifiEnabledAsync("B", Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive()
+            .GetGooglePackageStateAsync("A", Arg.Any<CancellationToken>());
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task ContextMenuActions_OfflineDeviceMatchesSingleGuards()
+    {
+        StoredDeviceConfig storedDevice = new() { Serial = "A", Name = "Offline", Type = "Phone" };
+        TestContext context = CreateContext(CreateSnapshot([storedDevice], []));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+
+        Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.ViewDeviceInfoCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.ToggleGmsCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.TogglePlayStoreCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.ToggleWifiCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.RebootDeviceCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.DeleteDeviceCommand.CanExecute(device));
+
+        await viewModel.ViewDeviceInfoCommand.ExecuteAsync(device);
+        await viewModel.RebootDeviceCommand.ExecuteAsync(device);
+        await viewModel.ToggleGmsCommand.ExecuteAsync(device);
+        await viewModel.TogglePlayStoreCommand.ExecuteAsync(device);
+        await viewModel.ToggleWifiCommand.ExecuteAsync(device);
+
+        Assert.AreEqual("Log_DeviceMustBeOnline", device.Process);
+        await context.DeviceList.DidNotReceive()
+            .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive()
+            .RebootAsync("A", Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive()
+            .SetGmsEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive()
+            .SetPlayStoreEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await context.DeviceAction.DidNotReceive()
+            .SetWifiEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task ContextMenuActions_BusyOnlineDeviceAllowsMenuActionsAndDisablesDelete()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Busy", Type = "Phone" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        context.DeviceAction.GetGooglePackageStateAsync("A", Arg.Any<CancellationToken>())
+            .Returns(new GooglePackageState(false, false));
+        context.DeviceAction.GetWifiEnabledAsync("A", Arg.Any<CancellationToken>())
+            .Returns(true);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+
+        Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.ViewDeviceInfoCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.ToggleGmsCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.TogglePlayStoreCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.ToggleWifiCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.RebootDeviceCommand.CanExecute(device));
+        Assert.IsFalse(viewModel.DeleteDeviceCommand.CanExecute(device));
+
+        await viewModel.ViewDeviceCommand.ExecuteAsync(device);
+        await viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
+        await viewModel.RebootDeviceCommand.ExecuteAsync(device);
+        await viewModel.ToggleGmsCommand.ExecuteAsync(device);
+        await viewModel.TogglePlayStoreCommand.ExecuteAsync(device);
+        await viewModel.ToggleWifiCommand.ExecuteAsync(device);
+
+        await context.ViewerDialog.Received(1)
+            .ShowDeviceViewerAsync("A", "Busy", Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(1)
+            .RebootAsync("A", Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(1)
+            .SetGmsEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(1)
+            .SetPlayStoreEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(1)
+            .SetWifiEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(3)
+            .GetGooglePackageStateAsync("A", Arg.Any<CancellationToken>());
+        await context.DeviceAction.Received(2)
+            .GetWifiEnabledAsync("A", Arg.Any<CancellationToken>());
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        Assert.AreNotEqual("Log_ActionAlreadyInProgress", device.Process);
+
+        busyLease.Dispose();
+
+        Assert.IsTrue(viewModel.DeleteDeviceCommand.CanExecute(device));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task RefreshContextMenuState_BusyDeviceDisablesOnlyToggleActionsWhileLoading()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Busy", Type = "Phone" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        var packageState = new TaskCompletionSource<GooglePackageState>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.DeviceAction.GetGooglePackageStateAsync("A", Arg.Any<CancellationToken>())
+            .Returns(packageState.Task);
+        context.DeviceAction.GetWifiEnabledAsync("A", Arg.Any<CancellationToken>())
+            .Returns(true);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        Task refresh = viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
+
+        Assert.IsTrue(device.IsContextMenuStateLoading);
+        Assert.IsFalse(device.CanToggleContextMenuActions);
+        Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(device));
+        Assert.IsTrue(viewModel.RebootDeviceCommand.CanExecute(device));
+        Assert.IsFalse(viewModel.DeleteDeviceCommand.CanExecute(device));
+
+        packageState.SetResult(new GooglePackageState(false, false));
+        await refresh;
+
+        Assert.IsFalse(device.IsContextMenuStateLoading);
+        Assert.IsTrue(device.CanToggleContextMenuActions);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
     public async Task ToggleSelectAllDevices_WithUnselectedBusyDevice_CanSelectThenClearEditableRows()
     {
         TestContext context = CreateContext(
@@ -1867,6 +2309,12 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
         IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        IDeviceLocationService locationService = Substitute.For<IDeviceLocationService>();
+        IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
+        IChangeLocationDialogService locationDialog = Substitute.For<IChangeLocationDialogService>();
+        IChangeTimezoneDialogService timezoneDialog = Substitute.For<IChangeTimezoneDialogService>();
+        IDeviceViewerDialogService viewerDialog = Substitute.For<IDeviceViewerDialogService>();
         carrierData.GetCarrierProfilesAsync(Arg.Any<CancellationToken>())
             .Returns(
             [
@@ -1874,6 +2322,23 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 new CarrierProfile("vn", "84", "Vietnam", "Viettel", "452", "04")
             ]);
         IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
+        deviceConfig.SaveLocationConfigAsync(
+                Arg.Any<IList<StoredDeviceConfig>>(),
+                Arg.Any<string>(),
+                Arg.Any<ChangeLocationMode>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        deviceConfig.SaveTimezoneConfigAsync(
+                Arg.Any<IList<StoredDeviceConfig>>(),
+                Arg.Any<string>(),
+                Arg.Any<ChangeTimezoneMode>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
@@ -1930,7 +2395,13 @@ public sealed class ChangeMultipleDevicesViewModelTests
             new ImmediateDispatcherService(),
             polling,
             sharedSettings,
-            NullLogger<ChangeMultipleDevicesViewModel>.Instance);
+            NullLogger<ChangeMultipleDevicesViewModel>.Instance,
+            deviceAction,
+            locationService,
+            timezoneService,
+            locationDialog,
+            timezoneDialog,
+            viewerDialog);
         return new TestContext(
             viewModel,
             addDialog,
@@ -1945,7 +2416,13 @@ public sealed class ChangeMultipleDevicesViewModelTests
             randomDevice,
             randomInfoDialog,
             simProfile,
-            deviceActionGuard);
+            deviceActionGuard,
+            deviceAction,
+            locationService,
+            timezoneService,
+            locationDialog,
+            timezoneDialog,
+            viewerDialog);
     }
 
     private static DeviceListSnapshot CreateSnapshot(
@@ -1969,7 +2446,13 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IRandomDeviceService RandomDevice,
         IRandomDeviceInfoDialogService RandomInfoDialog,
         ISimProfileService SimProfile,
-        IDeviceActionGuardService DeviceActionGuard);
+        IDeviceActionGuardService DeviceActionGuard,
+        IDeviceActionService DeviceAction,
+        IDeviceLocationService LocationService,
+        IDeviceTimezoneService TimezoneService,
+        IChangeLocationDialogService LocationDialog,
+        IChangeTimezoneDialogService TimezoneDialog,
+        IDeviceViewerDialogService ViewerDialog);
 
     private static Task<RandomDeviceResult> StartRandom(
         TaskCompletionSource started,

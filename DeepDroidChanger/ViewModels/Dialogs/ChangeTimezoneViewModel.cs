@@ -29,6 +29,12 @@ namespace DeepDroidChanger.ViewModels
         private string _deviceInfoText = string.Empty;
 
         [ObservableProperty]
+        private bool _isBatchMode;
+
+        [ObservableProperty]
+        private int _batchTargetCount;
+
+        [ObservableProperty]
         private bool _isDataMode = true;
 
         [ObservableProperty]
@@ -88,6 +94,15 @@ namespace DeepDroidChanger.ViewModels
             QueueConfigSave();
         }
 
+        partial void OnIsBatchModeChanged(bool value)
+        {
+            UpdateDeviceInfoText();
+            QueueConfigSave();
+            SaveCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnBatchTargetCountChanged(int value) => UpdateDeviceInfoText();
+
         partial void OnIsDeviceIpModeChanged(bool value)
         {
             if (value)
@@ -106,6 +121,22 @@ namespace DeepDroidChanger.ViewModels
 
         private void UpdateDeviceInfoText()
         {
+            if (IsBatchMode)
+            {
+                string format = _localizationService.GetString("ChangeTimezone_BatchDeviceInfo");
+                try
+                {
+                    DeviceInfoText = format.Contains("{0}", StringComparison.Ordinal)
+                        ? string.Format(format, BatchTargetCount)
+                        : $"{format} ({BatchTargetCount})";
+                }
+                catch (FormatException)
+                {
+                    DeviceInfoText = $"{format} ({BatchTargetCount})";
+                }
+                return;
+            }
+
             DeviceInfoText = DeviceInfoTextHelper.Create(_localizationService, DeviceName, DeviceSerial);
         }
 
@@ -161,6 +192,9 @@ namespace DeepDroidChanger.ViewModels
         {
             var mode = IsDeviceIpMode ? ChangeTimezoneMode.DeviceIp : ChangeTimezoneMode.Data;
             var timezone = SelectedTimezone?.Timezone ?? string.Empty;
+            if (IsBatchMode && mode == ChangeTimezoneMode.Data && SelectedTimezone == null)
+                return null;
+
             return new ChangeTimezoneDialogResult(mode, timezone);
         }
 
@@ -178,7 +212,8 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                QueueConfigSave();
+                if (!IsBatchMode)
+                    QueueConfigSave();
                 await FlushPendingConfigSaveAsync().ConfigureAwait(true);
                 CloseRequested?.Invoke(this, true);
             }
@@ -212,7 +247,7 @@ namespace DeepDroidChanger.ViewModels
 
         private void QueueConfigSave()
         {
-            if (_isInitializing || string.IsNullOrWhiteSpace(DeviceSerial))
+            if (_isInitializing || IsBatchMode || string.IsNullOrWhiteSpace(DeviceSerial))
                 return;
 
             var mode = IsDeviceIpMode ? ChangeTimezoneMode.DeviceIp : ChangeTimezoneMode.Data;
@@ -253,7 +288,8 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 _isInitializing = true;
-                await LoadDeviceConfigAsync(cancellationToken);
+                if (!IsBatchMode)
+                    await LoadDeviceConfigAsync(cancellationToken);
                 await LoadTimezonesAsync(cancellationToken);
             }
             finally

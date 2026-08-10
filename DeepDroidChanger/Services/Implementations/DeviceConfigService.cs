@@ -131,7 +131,7 @@ namespace DeepDroidChanger.Services
             string longitude,
             CancellationToken cancellationToken)
         {
-            return SaveLocationConfigAsync(
+            return SaveLocationConfigCoreAsync(
                 storedDevices,
                 serial,
                 mode,
@@ -139,10 +139,11 @@ namespace DeepDroidChanger.Services
                 longitude,
                 countryCode: string.Empty,
                 cityName: string.Empty,
-                cancellationToken);
+                replaceMetadata: false,
+                cancellationToken: cancellationToken);
         }
 
-        public async Task<bool> SaveLocationConfigAsync(
+        public Task<bool> SaveLocationConfigAsync(
             IList<StoredDeviceConfig> storedDevices,
             string serial,
             ChangeLocationMode mode,
@@ -150,6 +151,29 @@ namespace DeepDroidChanger.Services
             string longitude,
             string countryCode,
             string cityName,
+            CancellationToken cancellationToken)
+        {
+            return SaveLocationConfigCoreAsync(
+                storedDevices,
+                serial,
+                mode,
+                latitude,
+                longitude,
+                countryCode,
+                cityName,
+                replaceMetadata: true,
+                cancellationToken: cancellationToken);
+        }
+
+        private async Task<bool> SaveLocationConfigCoreAsync(
+            IList<StoredDeviceConfig> storedDevices,
+            string serial,
+            ChangeLocationMode mode,
+            string latitude,
+            string longitude,
+            string countryCode,
+            string cityName,
+            bool replaceMetadata,
             CancellationToken cancellationToken)
         {
             var storedDevice = storedDevices.FirstOrDefault(device => DeviceRowFactory.SerialEquals(device.Serial, serial));
@@ -162,11 +186,19 @@ namespace DeepDroidChanger.Services
                 device.LocationLatitude = Normalize(latitude);
                 device.LocationLongitude = Normalize(longitude);
 
-                if (!string.IsNullOrWhiteSpace(countryCode))
+                if (replaceMetadata)
+                {
                     device.LocationCountryCode = Normalize(countryCode);
-
-                if (!string.IsNullOrWhiteSpace(cityName))
                     device.LocationCityName = Normalize(cityName);
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(countryCode))
+                        device.LocationCountryCode = Normalize(countryCode);
+
+                    if (!string.IsNullOrWhiteSpace(cityName))
+                        device.LocationCityName = Normalize(cityName);
+                }
             }
 
             bool updated = await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken).ConfigureAwait(false);

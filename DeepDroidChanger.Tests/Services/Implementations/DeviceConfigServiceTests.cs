@@ -161,6 +161,66 @@ namespace DeepDroidChanger.Tests.Services.Implementations
         }
 
         [TestMethod]
+        public async Task SaveLocationConfigAsync_WithMetadata_ReplacesStaleMetadata()
+        {
+            var store = Substitute.For<IDeviceStoreService>();
+            var service = new DeviceConfigService(store, Substitute.For<ISettingsService>(), new AppSettings());
+            var storedDevices = new List<StoredDeviceConfig>
+            {
+                new()
+                {
+                    Serial = "SERIAL",
+                    LocationCountryCode = "FR",
+                    LocationCityName = "Paris"
+                }
+            };
+            ConfigureUpdates(store, storedDevices);
+
+            bool saved = await service.SaveLocationConfigAsync(
+                storedDevices,
+                "SERIAL",
+                ChangeLocationMode.DeviceIp,
+                "10.7626",
+                "106.6602",
+                "VN",
+                string.Empty,
+                CancellationToken.None);
+
+            Assert.IsTrue(saved);
+            Assert.AreEqual("VN", storedDevices[0].LocationCountryCode);
+            Assert.AreEqual(string.Empty, storedDevices[0].LocationCityName);
+        }
+
+        [TestMethod]
+        public async Task SaveLocationConfigAsync_LegacyOverload_PreservesExistingMetadata()
+        {
+            var store = Substitute.For<IDeviceStoreService>();
+            var service = new DeviceConfigService(store, Substitute.For<ISettingsService>(), new AppSettings());
+            var storedDevices = new List<StoredDeviceConfig>
+            {
+                new()
+                {
+                    Serial = "SERIAL",
+                    LocationCountryCode = "FR",
+                    LocationCityName = "Paris"
+                }
+            };
+            ConfigureUpdates(store, storedDevices);
+
+            bool saved = await service.SaveLocationConfigAsync(
+                storedDevices,
+                "SERIAL",
+                ChangeLocationMode.Config,
+                "10.7626",
+                "106.6602",
+                CancellationToken.None);
+
+            Assert.IsTrue(saved);
+            Assert.AreEqual("FR", storedDevices[0].LocationCountryCode);
+            Assert.AreEqual("Paris", storedDevices[0].LocationCityName);
+        }
+
+        [TestMethod]
         public async Task SaveDeviceProfileAsync_DoesNotOverwriteNewerDialogConfigFromStaleCache()
         {
             using var fixture = new TestTempDirectory();

@@ -7,12 +7,18 @@ namespace DeepDroidChanger.Tests.Architecture;
 public sealed class ArchitectureRuleTests
 {
     [TestMethod]
-    public void ChangeSingleDeviceFeature_UsesCanonicalStructureAndResourceOwnership()
+    public void DeviceContextMenu_UsesSharedStructureAndResourceOwnership()
     {
         string projectRoot = GetProjectRoot();
         string solutionRoot = GetSolutionRoot();
         string canonicalView = Path.Combine(projectRoot, "Views", "ChangeSingleDevice", "ChangeSingleDeviceView.xaml");
         string canonicalViewCodeBehind = string.Concat(canonicalView, ".cs");
+        string multipleView = Path.Combine(projectRoot, "Views", "ChangeMultipleDevices", "ChangeMultipleDevicesView.xaml");
+        string sharedContextMenu = Path.Combine(
+            projectRoot,
+            "Resources",
+            "Themes",
+            "DeviceActionsContextMenu.xaml");
         string canonicalViewModel = Path.Combine(projectRoot, "ViewModels", "ChangeSingleDeviceViewModel.cs");
         string obsoleteFeatureTheme = Path.Combine(projectRoot, "Resources", "Themes", "DeviceManager.xaml");
         string canonicalStrings = Path.Combine(
@@ -47,6 +53,8 @@ public sealed class ArchitectureRuleTests
 
         Assert.IsTrue(File.Exists(canonicalView));
         Assert.IsTrue(File.Exists(canonicalViewCodeBehind));
+        Assert.IsTrue(File.Exists(multipleView));
+        Assert.IsTrue(File.Exists(sharedContextMenu));
         Assert.IsTrue(File.Exists(canonicalViewModel));
         Assert.IsFalse(Directory.Exists(Path.Combine(projectRoot, "Views", "DeviceManager")));
         Assert.IsFalse(File.Exists(Path.Combine(projectRoot, "ViewModels", "DeviceManagerViewModel.cs")));
@@ -93,49 +101,56 @@ public sealed class ArchitectureRuleTests
             "AddDevices_");
 
         string changeSingleDeviceView = File.ReadAllText(canonicalView);
+        string changeMultipleDevicesView = File.ReadAllText(multipleView);
+        string sharedContextMenuResources = File.ReadAllText(sharedContextMenu);
         Assert.Contains("<UserControl.Resources>", changeSingleDeviceView, StringComparison.Ordinal);
-        Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", changeSingleDeviceView, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", sharedContextMenuResources, StringComparison.Ordinal);
+        Assert.Contains(
+            "<ContextMenu Style=\"{DynamicResource DeviceActionsContextMenuStyle}\">",
+            changeSingleDeviceView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<ContextMenu Style=\"{DynamicResource DeviceActionsContextMenuStyle}\">",
+            changeMultipleDevicesView,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "DeviceActionsContextMenu}",
+            changeSingleDeviceView,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "DeviceActionsContextMenu}",
+            changeMultipleDevicesView,
+            StringComparison.Ordinal);
         Assert.Contains("DataGridCheckBoxStyle", changeSingleDeviceView, StringComparison.Ordinal);
-        int copySerialIndex = changeSingleDeviceView.IndexOf(
-            "Command=\"{Binding PlacementTarget.Tag.CopySerialCommand",
-            StringComparison.Ordinal);
-        int toggleGmsIndex = changeSingleDeviceView.IndexOf(
-            "Command=\"{Binding PlacementTarget.Tag.ToggleGmsCommand",
-            StringComparison.Ordinal);
-        int togglePlayStoreIndex = changeSingleDeviceView.IndexOf(
-            "Command=\"{Binding PlacementTarget.Tag.TogglePlayStoreCommand",
-            StringComparison.Ordinal);
-        int toggleWifiIndex = changeSingleDeviceView.IndexOf(
-            "Command=\"{Binding PlacementTarget.Tag.ToggleWifiCommand",
-            StringComparison.Ordinal);
-        int rebootIndex = changeSingleDeviceView.IndexOf(
-            "Command=\"{Binding PlacementTarget.Tag.RebootDeviceCommand",
-            StringComparison.Ordinal);
-        Assert.IsTrue(
-            copySerialIndex < toggleGmsIndex
-            && toggleGmsIndex < togglePlayStoreIndex
-            && togglePlayStoreIndex < toggleWifiIndex
-            && toggleWifiIndex < rebootIndex,
-            "Google package and Wi-Fi actions must appear below Copy Serial and above Reboot Device.");
+        AssertContextMenuCommandOrder(changeSingleDeviceView);
+        AssertContextMenuCommandOrder(changeMultipleDevicesView);
         Assert.Contains(
             "Handler=\"OnDeviceRowContextMenuOpening\"",
             changeSingleDeviceView,
             StringComparison.Ordinal);
         Assert.Contains(
+            "Handler=\"OnDeviceRowContextMenuOpening\"",
+            changeMultipleDevicesView,
+            StringComparison.Ordinal);
+        Assert.Contains(
             "PlacementTarget.DataContext.IsGmsDisabled",
-            changeSingleDeviceView,
+            sharedContextMenuResources,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.IsPlayStoreDisabled",
-            changeSingleDeviceView,
+            sharedContextMenuResources,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.IsWifiEnabled",
-            changeSingleDeviceView,
+            sharedContextMenuResources,
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.CanToggleContextMenuActions",
             changeSingleDeviceView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "PlacementTarget.DataContext.CanToggleContextMenuActions",
+            changeMultipleDevicesView,
             StringComparison.Ordinal);
         string changeSingleDeviceViewCodeBehind = File.ReadAllText(canonicalViewCodeBehind);
         Assert.Contains(
@@ -147,6 +162,32 @@ public sealed class ArchitectureRuleTests
             changeSingleDeviceView,
             StringComparison.Ordinal,
             "ChangeSingleDeviceView must not depend on AddDevices-owned styles.");
+    }
+
+    private static void AssertContextMenuCommandOrder(string viewXaml)
+    {
+        int copySerialIndex = viewXaml.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.CopySerialCommand",
+            StringComparison.Ordinal);
+        int toggleGmsIndex = viewXaml.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.ToggleGmsCommand",
+            StringComparison.Ordinal);
+        int togglePlayStoreIndex = viewXaml.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.TogglePlayStoreCommand",
+            StringComparison.Ordinal);
+        int toggleWifiIndex = viewXaml.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.ToggleWifiCommand",
+            StringComparison.Ordinal);
+        int rebootIndex = viewXaml.IndexOf(
+            "Command=\"{Binding PlacementTarget.Tag.RebootDeviceCommand",
+            StringComparison.Ordinal);
+
+        Assert.IsTrue(
+            copySerialIndex < toggleGmsIndex
+            && toggleGmsIndex < togglePlayStoreIndex
+            && togglePlayStoreIndex < toggleWifiIndex
+            && toggleWifiIndex < rebootIndex,
+            "Google package and Wi-Fi actions must appear below Copy Serial and above Reboot Device.");
     }
 
     [TestMethod]

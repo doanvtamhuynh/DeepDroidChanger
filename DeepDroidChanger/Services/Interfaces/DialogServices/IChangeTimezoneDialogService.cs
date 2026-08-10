@@ -8,5 +8,9 @@ namespace DeepDroidChanger.Services
             string deviceSerial,
             string deviceName,
             CancellationToken cancellationToken);
+
+        Task<ChangeTimezoneDialogResult?> ShowChangeTimezoneBatchAsync(
+            int targetCount,
+            CancellationToken cancellationToken);
     }
 }
