@@ -1741,6 +1741,44 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     }
 
     [TestMethod]
+    public async Task RandomDevice_WhenActionLeaseIsUnavailable_LeavesExistingLogUnchanged()
+    {
+        StoredDeviceConfig storedDevice = new() { Serial = "A", Name = "Phone", Type = "Phone" };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>())
+            .Returns([storedDevice]);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                [storedDevice],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        IDeviceActionGuardService actionGuard = Substitute.For<IDeviceActionGuardService>();
+        actionGuard.IsBusy("A").Returns(false);
+        actionGuard.TryAcquire("A").Returns((IDisposable?)null);
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceActionGuard: actionGuard);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        string processBefore = device.Process;
+        DeviceProcessState processStateBefore = device.ProcessState;
+
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(processBefore, device.Process);
+        Assert.AreEqual(processStateBefore, device.ProcessState);
+        await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
+
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
     public async Task DeviceActionGuard_BlocksOnlyBusySerialAndKeepsRandomInfoIsolatedPerDevice()
     {
         StoredDeviceConfig[] storedDevices =

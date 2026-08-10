@@ -1282,10 +1282,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private IDisposable? TryAcquireContextAction(DeviceRowViewModel device)
     {
-        IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
-        if (lease == null)
-            SetDeviceLog(device, "Log_ActionAlreadyInProgress");
-        return lease;
+        return _deviceActionGuardService.TryAcquire(device.Serial);
     }
 
     private async Task RunSelectedDeviceBatchActionAsync(
@@ -1341,10 +1338,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
                 IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
                 if (lease == null)
-                {
-                    SetDeviceLog(device, "Log_ActionAlreadyInProgress");
                     continue;
-                }
 
                 var target = new BatchActionTarget(
                     device,
@@ -1432,10 +1426,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
                 IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
                 if (lease == null)
-                {
-                    SetDeviceLog(device, "Log_ActionAlreadyInProgress");
                     continue;
-                }
 
                 var target = new BatchActionTarget(
                     device,
@@ -3051,10 +3042,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
         IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
         if (lease == null)
-        {
-            SetDeviceLog(device, "Log_ActionAlreadyInProgress");
             return;
-        }
 
         using (lease)
         {

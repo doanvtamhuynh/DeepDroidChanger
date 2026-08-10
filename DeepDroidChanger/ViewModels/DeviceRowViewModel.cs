@@ -136,7 +136,6 @@ public sealed class DeviceRowViewModel : ObservableObject
             || resourceKey.Contains("Failure", StringComparison.Ordinal)
             || resourceKey.EndsWith("Required", StringComparison.Ordinal)
             || resourceKey.EndsWith("DeviceMustBeOnline", StringComparison.Ordinal)
-            || resourceKey.EndsWith("ActionAlreadyInProgress", StringComparison.Ordinal)
             || resourceKey.EndsWith("NoFiles", StringComparison.Ordinal)
             || resourceKey.EndsWith("NoInternet", StringComparison.Ordinal)
             || resourceKey.EndsWith("Empty", StringComparison.Ordinal)

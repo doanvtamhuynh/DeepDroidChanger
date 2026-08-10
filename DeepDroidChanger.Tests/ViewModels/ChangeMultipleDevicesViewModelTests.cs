@@ -408,7 +408,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await context.DeviceAction.Received(2)
             .GetWifiEnabledAsync("A", Arg.Any<CancellationToken>());
         Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
-        Assert.AreNotEqual("Log_ActionAlreadyInProgress", device.Process);
+        Assert.AreEqual("Log_Ready", device.Process);
 
         busyLease.Dispose();
 

@@ -23,7 +23,6 @@
     <sys:String x:Key="Log_RandomDeviceLoginRequired">Please sign in again before generating device information</sys:String>
     <sys:String x:Key="Log_RandomDeviceRequired">Generate random device information first</sys:String>
     <sys:String x:Key="Log_DeviceMustBeOnline">Device must be online</sys:String>
-    <sys:String x:Key="Log_ActionAlreadyInProgress">Another action is already running for this device</sys:String>
     <sys:String x:Key="Log_ChangeDevice">Opening Change Device confirmation</sys:String>
     <sys:String x:Key="Log_ChangeDeviceCanceled">Change Device canceled</sys:String>
     <sys:String x:Key="Log_ChangeDevicePreparing">Checking ADB root access</sys:String>

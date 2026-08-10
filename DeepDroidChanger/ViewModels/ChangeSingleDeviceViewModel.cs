@@ -414,11 +414,7 @@ namespace DeepDroidChanger.ViewModels
 
         private IDisposable? TryAcquireDeviceAction(DeviceRowViewModel device)
         {
-            IDisposable? lease = _deviceActionGuardService.TryAcquire(device.Serial);
-            if (lease == null)
-                SetDeviceLog(device, "Log_ActionAlreadyInProgress");
-
-            return lease;
+            return _deviceActionGuardService.TryAcquire(device.Serial);
         }
 
         private void OnDeviceBusyStateChanged(string serial, bool isBusy)
