@@ -768,6 +768,89 @@ public sealed class ChangeMultipleDevicesViewModelTests
     }
 
     [TestMethod]
+    public async Task RandomSelectedDevices_StartingSecondBatch_DoesNotCancelFirstBatch()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone A" },
+            new() { Serial = "B", Name = "Phone B" }
+        ];
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                storedDevices,
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var deviceAStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deviceBStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deviceACompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var deviceBCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken deviceAToken = default;
+        CancellationToken deviceBToken = default;
+        int invocationCount = 0;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.ArgAt<CancellationToken>(1);
+                int invocation = Interlocked.Increment(ref invocationCount);
+                if (invocation == 1)
+                {
+                    deviceAToken = token;
+                    deviceAStarted.TrySetResult();
+                    return deviceACompletion.Task;
+                }
+
+                if (invocation == 2)
+                {
+                    deviceBToken = token;
+                    deviceBStarted.TrySetResult();
+                    return deviceBCompletion.Task;
+                }
+
+                throw new InvalidOperationException("Unexpected random-device invocation.");
+            });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        Task firstBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await deviceAStarted.Task;
+
+        viewModel.ToggleDeviceSelectionCommand.Execute(deviceB);
+        viewModel.SelectedInfoDevice = deviceB;
+        Task secondBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await deviceBStarted.Task;
+
+        Assert.IsFalse(deviceAToken.IsCancellationRequested);
+        Assert.IsFalse(deviceBToken.IsCancellationRequested);
+        Assert.IsFalse(firstBatch.IsCompleted);
+        Assert.IsTrue(deviceA.IsActionBusy);
+        Assert.IsTrue(deviceB.IsActionBusy);
+
+        deviceACompletion.SetResult(new RandomDeviceResult(
+            RandomDeviceStatus.Created,
+            new DeviceInfoApiDevice { Model = "Profile A" }));
+        await firstBatch;
+        Assert.IsFalse(deviceA.IsActionBusy);
+        Assert.IsTrue(deviceB.IsActionBusy);
+
+        deviceBCompletion.SetResult(new RandomDeviceResult(
+            RandomDeviceStatus.Created,
+            new DeviceInfoApiDevice { Model = "Profile B" }));
+        await secondBatch;
+        Assert.IsFalse(deviceB.IsActionBusy);
+
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
     public async Task RandomBatchActions_OfflineSelectionRemainsEnabledAndLogsOnlineRequirement()
     {
         StoredDeviceConfig storedDevice = new() { Serial = "A", Name = "Phone" };
@@ -1792,6 +1875,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
             ]);
         IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
         deviceActionGuard ??= new DeviceActionGuardService();
         IRandomDeviceInfoDialogService randomInfoDialog =
             Substitute.For<IRandomDeviceInfoDialogService>();

@@ -10,6 +10,11 @@ public interface IDeviceListService
 
     Task<IReadOnlyList<AdbDevice>> LoadDetectedDevicesAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Performs a live, serial-scoped ADB transport check before a device operation starts.
+    /// </summary>
+    Task<bool> IsDeviceOnlineAsync(string serial, CancellationToken cancellationToken);
+
     Task<DeviceListSnapshot> AddSelectedDevicesAsync(
         IEnumerable<StoredDeviceConfig> selectedDevices,
         CancellationToken cancellationToken);

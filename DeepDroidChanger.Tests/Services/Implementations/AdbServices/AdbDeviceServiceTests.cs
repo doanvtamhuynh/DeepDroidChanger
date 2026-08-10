@@ -1,11 +1,29 @@
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
+using NSubstitute;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
 
 [TestClass]
 public sealed class AdbDeviceServiceTests
 {
+    [TestMethod]
+    public async Task IsDeviceOnlineAsync_UsesExplicitSerialGetState()
+    {
+        IAdbCommandService adbCommand = Substitute.For<IAdbCommandService>();
+        adbCommand.RunAdbAsync("SERIAL-A", "get-state", Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, "device\r\n", string.Empty));
+        var service = new AdbDeviceService(adbCommand);
+
+        bool isOnline = await service.IsDeviceOnlineAsync("SERIAL-A", CancellationToken.None);
+
+        Assert.IsTrue(isOnline);
+        await adbCommand.Received(1).RunAdbAsync(
+            "SERIAL-A",
+            "get-state",
+            CancellationToken.None);
+    }
+
     [TestMethod]
     public void ParseDevices_DaemonNoiseAndKnownStates_ReturnsDeviceRowsOnly()
     {

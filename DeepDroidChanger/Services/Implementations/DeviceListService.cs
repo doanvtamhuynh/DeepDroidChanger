@@ -37,6 +37,11 @@ namespace DeepDroidChanger.Services
                 .ToList();
         }
 
+        public Task<bool> IsDeviceOnlineAsync(string serial, CancellationToken cancellationToken)
+        {
+            return _deviceService.IsDeviceOnlineAsync(serial, cancellationToken);
+        }
+
         public async Task<DeviceListSnapshot> AddSelectedDevicesAsync(
             IEnumerable<StoredDeviceConfig> selectedDevices,
             CancellationToken cancellationToken)

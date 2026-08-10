@@ -420,8 +420,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRandomizeSelectedDevices), AllowConcurrentExecutions = true)]
-    private async Task RandomSelectedDevicesAsync(CancellationToken cancellationToken)
+    private async Task RandomSelectedDevicesAsync()
     {
+        CancellationToken cancellationToken = CancellationToken.None;
         var targets = new List<BatchActionTarget>();
         bool started = false;
         try
@@ -491,39 +492,47 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedDevicesAsync(CancellationToken cancellationToken)
+    private Task ChangeSelectedDevicesAsync()
     {
-        return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.ChangeAndWipe, cancellationToken);
+        return RunSelectedDeviceBatchActionAsync(
+            MultipleDeviceBatchAction.ChangeAndWipe,
+            CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task RandomChangeAndWipeSelectedDevicesAsync(CancellationToken cancellationToken)
+    private Task RandomChangeAndWipeSelectedDevicesAsync()
     {
-        return RunRandomChangeAndWipeSelectedDevicesAsync(cancellationToken);
+        return RunRandomChangeAndWipeSelectedDevicesAsync(CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedDevicesWithoutWipeAsync(CancellationToken cancellationToken)
+    private Task ChangeSelectedDevicesWithoutWipeAsync()
     {
-        return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.ChangeWithoutWipe, cancellationToken);
+        return RunSelectedDeviceBatchActionAsync(
+            MultipleDeviceBatchAction.ChangeWithoutWipe,
+            CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task WipeSelectedDevicesWithoutChangeAsync(CancellationToken cancellationToken)
+    private Task WipeSelectedDevicesWithoutChangeAsync()
     {
-        return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.WipeWithoutChange, cancellationToken);
+        return RunSelectedDeviceBatchActionAsync(
+            MultipleDeviceBatchAction.WipeWithoutChange,
+            CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task RandomSelectedSimsAsync(CancellationToken cancellationToken)
+    private Task RandomSelectedSimsAsync()
     {
-        return RunSelectedDeviceBatchActionAsync(null, cancellationToken);
+        return RunSelectedDeviceBatchActionAsync(null, CancellationToken.None);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedSimsAsync(CancellationToken cancellationToken)
+    private Task ChangeSelectedSimsAsync()
     {
-        return RunSelectedDeviceBatchActionAsync(MultipleDeviceBatchAction.ChangeSim, cancellationToken);
+        return RunSelectedDeviceBatchActionAsync(
+            MultipleDeviceBatchAction.ChangeSim,
+            CancellationToken.None);
     }
 
     private bool CanRunSelectedDeviceBatchAction()
@@ -764,7 +773,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                                 target.ChangeSimEnabled,
                                 target.ChangeOptions!,
                                 progress,
-                                cancellationToken)
+                                targetCancellation.Token)
                             .ConfigureAwait(false);
                         break;
                     case MultipleDeviceBatchAction.ChangeWithoutWipe:
@@ -774,7 +783,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                                 target.ChangeSimEnabled,
                                 target.ChangeOptions!,
                                 progress,
-                                cancellationToken)
+                                targetCancellation.Token)
                             .ConfigureAwait(false);
                         break;
                     case MultipleDeviceBatchAction.WipeWithoutChange:
@@ -782,7 +791,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                                 target.Device.Serial,
                                 target.ChangeOptions!,
                                 progress,
-                                cancellationToken)
+                                targetCancellation.Token)
                             .ConfigureAwait(false);
                         break;
                     case MultipleDeviceBatchAction.ChangeSim:
@@ -791,7 +800,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                         await _deviceChangeService.ChangeSimAsync(
                                 target.Device.Serial,
                                 editedProfile,
-                                cancellationToken)
+                                targetCancellation.Token)
                             .ConfigureAwait(false);
                         await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, editedProfile))
                             .ConfigureAwait(false);
@@ -1011,7 +1020,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDevice"))
                     .ConfigureAwait(false);
                 RandomDeviceResult result = await _randomDeviceService
-                    .CreateRandomProfileAsync(target.RandomDeviceRequest!, cancellationToken)
+                    .CreateRandomProfileAsync(target.RandomDeviceRequest!, targetCancellation.Token)
                     .ConfigureAwait(false);
 
                 await RunOnUiContextAsync(() =>
@@ -1072,7 +1081,36 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
             canStart = true;
         }).ConfigureAwait(false);
-        return canStart;
+
+        if (!canStart)
+            return false;
+
+        bool isOnline;
+        try
+        {
+            isOnline = await _deviceListService
+                .IsDeviceOnlineAsync(target.Device.Serial, target.InvalidationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Live ADB preflight failed for device {Serial}.",
+                target.Device.Serial);
+            isOnline = false;
+        }
+
+        if (isOnline)
+            return true;
+
+        await RunOnUiContextAsync(() => SetTargetLog(target, "Log_DeviceMustBeOnline"))
+            .ConfigureAwait(false);
+        return false;
     }
 
     [RelayCommand]
@@ -2251,8 +2289,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanViewRandomDeviceInfo), AllowConcurrentExecutions = true)]
-    private async Task ViewRandomDeviceInfoAsync(CancellationToken cancellationToken)
+    private async Task ViewRandomDeviceInfoAsync()
     {
+        CancellationToken cancellationToken = CancellationToken.None;
         DeviceRowViewModel? device = SelectedInfoDevice;
         if (device == null
             || !_randomDeviceProfiles.TryGetValue(device.Serial, out DeviceInfoApiDevice? profile))
@@ -2371,55 +2410,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private static DeviceInfoApiDevice? CloneDeviceProfile(DeviceInfoApiDevice? profile)
     {
-        if (profile == null)
-            return null;
-
-        return new DeviceInfoApiDevice
-        {
-            Model = profile.Model,
-            Gaid = profile.Gaid,
-            Board = profile.Board,
-            Baseband = profile.Baseband,
-            SecurityPatch = profile.SecurityPatch,
-            Name = profile.Name,
-            Fingerprint = profile.Fingerprint,
-            BuildDisplayId = profile.BuildDisplayId,
-            Manufacturer = profile.Manufacturer,
-            BuildDateUtc = profile.BuildDateUtc,
-            BuildDate = profile.BuildDate,
-            Hardware = profile.Hardware,
-            Imei = profile.Imei,
-            Gpu = profile.Gpu,
-            Imei1 = profile.Imei1,
-            BuildHost = profile.BuildHost,
-            Gsf = profile.Gsf,
-            Platform = profile.Platform,
-            Bootloader = profile.Bootloader,
-            Brand = profile.Brand,
-            Product = profile.Product,
-            Code = profile.Code,
-            Release = profile.Release,
-            Sdk = profile.Sdk,
-            Serial = profile.Serial,
-            Imsi = profile.Imsi,
-            Iccid = profile.Iccid,
-            SimPhoneNumber = profile.SimPhoneNumber,
-            SimOperatorNumeric = profile.SimOperatorNumeric,
-            SimOperatorCountry = profile.SimOperatorCountry,
-            SimOperatorName = profile.SimOperatorName,
-            WifiMacAddress = profile.WifiMacAddress,
-            BluetoothMacAddress = profile.BluetoothMacAddress,
-            BuildId = profile.BuildId,
-            BuildIncremental = profile.BuildIncremental,
-            BuildDescription = profile.BuildDescription,
-            BuildFlavor = profile.BuildFlavor,
-            BuildUser = profile.BuildUser,
-            SettingDeviceName = profile.SettingDeviceName,
-            SettingBluetoothName = profile.SettingBluetoothName,
-            WifiBssid = profile.WifiBssid,
-            WifiSsid = profile.WifiSsid,
-            VbmetaDigest = profile.VbmetaDigest
-        };
+        return profile?.Clone();
     }
 
     private static SimProfile? CloneSimProfile(SimProfile? profile)

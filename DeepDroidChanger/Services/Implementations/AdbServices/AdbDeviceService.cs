@@ -28,6 +28,20 @@ namespace DeepDroidChanger.Services
             return ParseDevices(result.StandardOutput);
         }
 
+        public async Task<bool> IsDeviceOnlineAsync(string serial, CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+
+            CommandResult result = await _adbCommandService
+                .RunAdbAsync(serial, "get-state", cancellationToken)
+                .ConfigureAwait(false);
+            return result.ExitCode == 0
+                   && string.Equals(
+                       result.StandardOutput?.Trim(),
+                       "device",
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
         public Task<string> GetDeviceTypeAsync(string serial, CancellationToken cancellationToken)
         {
             return _adbCommandService.GetPropertyAsync(serial, PropertyConstants.DeepDroidDevice, cancellationToken);

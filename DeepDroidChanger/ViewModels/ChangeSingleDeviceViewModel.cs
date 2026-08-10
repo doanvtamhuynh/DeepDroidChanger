@@ -538,8 +538,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task DeleteDeviceAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
+        private async Task DeleteDeviceAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             device = await GetDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -600,10 +601,15 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task RebootDeviceAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
+        private async Task RebootDeviceAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
+                return;
+
+            using IDisposable? actionLease = TryAcquireDeviceAction(device);
+            if (actionLease == null)
                 return;
 
             SetDeviceLog(device, "Log_RebootingDevice");
@@ -660,10 +666,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task RefreshGooglePackageStateAsync(
-            DeviceRowViewModel? device,
-            CancellationToken cancellationToken)
+        private async Task RefreshGooglePackageStateAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -691,10 +696,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task RefreshContextMenuStateAsync(
-            DeviceRowViewModel? device,
-            CancellationToken cancellationToken)
+        private async Task RefreshContextMenuStateAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -744,19 +748,15 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private Task ToggleGmsAsync(
-            DeviceRowViewModel? device,
-            CancellationToken cancellationToken)
+        private Task ToggleGmsAsync(DeviceRowViewModel? device)
         {
-            return ToggleGooglePackageAsync(device, isGms: true, cancellationToken);
+            return ToggleGooglePackageAsync(device, isGms: true, CancellationToken.None);
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private Task TogglePlayStoreAsync(
-            DeviceRowViewModel? device,
-            CancellationToken cancellationToken)
+        private Task TogglePlayStoreAsync(DeviceRowViewModel? device)
         {
-            return ToggleGooglePackageAsync(device, isGms: false, cancellationToken);
+            return ToggleGooglePackageAsync(device, isGms: false, CancellationToken.None);
         }
 
         private async Task ToggleGooglePackageAsync(
@@ -766,6 +766,10 @@ namespace DeepDroidChanger.ViewModels
         {
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
+                return;
+
+            using IDisposable? actionLease = TryAcquireDeviceAction(device);
+            if (actionLease == null)
                 return;
 
             try
@@ -830,12 +834,15 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task ToggleWifiAsync(
-            DeviceRowViewModel? device,
-            CancellationToken cancellationToken)
+        private async Task ToggleWifiAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
+                return;
+
+            using IDisposable? actionLease = TryAcquireDeviceAction(device);
+            if (actionLease == null)
                 return;
 
             try
@@ -875,17 +882,21 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task ViewDeviceInfoAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
+        private async Task ViewDeviceInfoAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task RandomDeviceAsync(CancellationToken cancellationToken)
+        private async Task RandomDeviceAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            RandomDeviceRequest request = CreateCurrentRandomDeviceRequest();
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -896,7 +907,6 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 SetDeviceLog(device, "Log_RandomDevice");
-                RandomDeviceRequest request = CreateCurrentRandomDeviceRequest();
                 var randomResult = await _randomDeviceService
                     .CreateRandomProfileAsync(request, cancellationToken)
                     .ConfigureAwait(true);
@@ -932,9 +942,17 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeDeviceAsync(CancellationToken cancellationToken)
+        private async Task ChangeDeviceAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
+            if (profile != null)
+                CopyFormValuesToProfile(profile);
+
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -942,13 +960,13 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            DeviceInfoApiDevice? profile = await GetRandomDeviceProfileAsync(device, cancellationToken).ConfigureAwait(true);
             if (profile == null)
+            {
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceRequired", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
                 return;
+            }
 
-            CopyFormValuesToProfile(profile);
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            bool changeSimEnabled = IsChangeSimEnabled;
             SetDeviceLog(device, "Log_ChangeDevice");
 
             try
@@ -997,9 +1015,17 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeWithoutWipeAsync(CancellationToken cancellationToken)
+        private async Task ChangeWithoutWipeAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
+            if (profile != null)
+                CopyFormValuesToProfile(profile);
+
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1007,13 +1033,12 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            DeviceInfoApiDevice? profile = await GetRandomDeviceProfileAsync(device, cancellationToken).ConfigureAwait(true);
             if (profile == null)
+            {
+                await ShowDeviceLogAsync(device, "Log_RandomDeviceRequired", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
                 return;
-
-            CopyFormValuesToProfile(profile);
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            bool changeSimEnabled = IsChangeSimEnabled;
+            }
 
             try
             {
@@ -1069,17 +1094,18 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task WipeWithoutChangeAsync(CancellationToken cancellationToken)
+        private async Task WipeWithoutChangeAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
             using IDisposable? actionLease = TryAcquireDeviceAction(device);
             if (actionLease == null)
                 return;
-
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
 
             try
             {
@@ -1138,37 +1164,46 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanOpenAdvancedChangeConfig), AllowConcurrentExecutions = true)]
-        private async Task OpenAdvancedChangeConfigAsync(CancellationToken cancellationToken)
+        private async Task OpenAdvancedChangeConfigAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null || UseDefaultChangeMode)
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            bool useDefaultChangeMode = UseDefaultChangeMode;
+            DeviceProfileConfig profileSnapshot = CreateDeviceProfileConfig();
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
+            if (device == null || useDefaultChangeMode)
                 return;
 
             using IDisposable? actionLease = TryAcquireDeviceAction(device);
             if (actionLease == null)
                 return;
 
+            DeviceChangeOptions optionsSnapshot = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                profileSnapshot.ChangeOptions,
+                useDefaultMode: false);
             SetDeviceLog(device, "Log_OpeningDialog");
             try
             {
                 AdvancedChangeConfigDialogResult? result = await _advancedChangeConfigDialogService
                     .ShowAdvancedChangeConfigAsync(
                         device.Serial,
-                        DeviceChangeOptionsHelper.CreateNormalizedCopy(
-                            _deviceChangeOptions,
-                            useDefaultMode: false),
-                        _useIntegritySecurityPatch,
+                        optionsSnapshot,
+                        profileSnapshot.UseIntegritySecurityPatch,
                         cancellationToken)
                     .ConfigureAwait(true);
                 if (result == null)
                     return;
 
-                _deviceChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                profileSnapshot.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
                     result.Options,
                     useDefaultMode: false);
-                _useIntegritySecurityPatch = result.UseIntegritySecurityPatch;
-                UseDefaultChangeMode = false;
-                QueueSelectedDeviceProfileSave();
+                profileSnapshot.UseIntegritySecurityPatch = result.UseIntegritySecurityPatch;
+                await SaveDeviceProfileAsync(device.Serial, profileSnapshot, cancellationToken)
+                    .ConfigureAwait(true);
+
+                if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, device.Serial))
+                    ApplyStoredDeviceConfig(SelectedDevice);
+
                 await ShowDeviceLogAsync(
                         device,
                         "Log_AdvancedChangeConfigSaved",
@@ -1194,9 +1229,14 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task RandomChangeAndWipeDeviceAsync(CancellationToken cancellationToken)
+        private async Task RandomChangeAndWipeDeviceAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            RandomDeviceRequest randomRequest = CreateCurrentRandomDeviceRequest();
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1204,9 +1244,6 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            bool changeSimEnabled = IsChangeSimEnabled;
-            RandomDeviceRequest randomRequest = CreateCurrentRandomDeviceRequest();
             try
             {
                 bool confirmed = await _changeDeviceConfirmationDialogService
@@ -1242,8 +1279,8 @@ namespace DeepDroidChanger.ViewModels
                         return;
                     }
 
-                    profile = randomResult.Profile;
-                    ApplyRandomDeviceInfo(device.Serial, profile);
+                    profile = randomResult.Profile.Clone();
+                    ApplyRandomDeviceInfo(device.Serial, randomResult.Profile);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1291,9 +1328,13 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task RandomSimAsync(CancellationToken cancellationToken)
+        private async Task RandomSimAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            CarrierCountryOption? country = SelectedCountry;
+            CarrierOption? carrier = SelectedCarrier;
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1304,7 +1345,7 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 SetDeviceLog(device, "Log_RandomSim");
-                SimProfile simProfile = _simProfileService.CreateRandomProfile(SelectedCountry, SelectedCarrier);
+                SimProfile simProfile = _simProfileService.CreateRandomProfile(country, carrier);
                 ApplyRandomSimInfo(device.Serial, simProfile);
             await ShowDeviceLogAsync(device, "Log_RandomSimSuccess", cancellationToken).ConfigureAwait(true);
                 SetDeviceLog(device, "Log_Ready");
@@ -1319,11 +1360,6 @@ namespace DeepDroidChanger.ViewModels
             await ShowDeviceLogAsync(device, "Log_RandomSimFailed", CancellationToken.None).ConfigureAwait(true);
                 SetDeviceLog(device, "Log_Ready");
             }
-        }
-
-        private Task<DeviceRowViewModel?> GetSelectedDeviceAsync(CancellationToken cancellationToken)
-        {
-            return GetDeviceAsync(SelectedDevice, cancellationToken);
         }
 
         private async Task<DeviceRowViewModel?> GetDeviceAsync(
@@ -1353,30 +1389,64 @@ namespace DeepDroidChanger.ViewModels
             if (device == null)
                 return null;
 
-            if (device.ConnectionStatus == AdbDeviceStatus.Online)
+            if (device.ConnectionStatus != AdbDeviceStatus.Online)
+            {
+                await ShowDeviceLogAsync(device, "Log_DeviceMustBeOnline", cancellationToken).ConfigureAwait(true);
+                SetDeviceLog(device, "Log_Ready");
+                return null;
+            }
+
+            bool isOnline;
+            try
+            {
+                isOnline = await _deviceListService
+                    .IsDeviceOnlineAsync(device.Serial, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Live ADB preflight failed for device {Serial}.", device.Serial);
+                isOnline = false;
+            }
+
+            if (isOnline)
+            {
                 return device;
+            }
 
             await ShowDeviceLogAsync(device, "Log_DeviceMustBeOnline", cancellationToken).ConfigureAwait(true);
             SetDeviceLog(device, "Log_Ready");
             return null;
         }
 
-        private async Task<DeviceInfoApiDevice?> GetRandomDeviceProfileAsync(
-            DeviceRowViewModel device,
-            CancellationToken cancellationToken)
+        private DeviceInfoApiDevice? CreateRandomDeviceProfileSnapshot(DeviceRowViewModel? device)
         {
-            if (_randomDeviceProfiles.TryGetValue(device.Serial, out DeviceInfoApiDevice? profile))
-                return profile;
+            if (device != null
+                && _randomDeviceProfiles.TryGetValue(device.Serial, out DeviceInfoApiDevice? profile))
+            {
+                return profile.Clone();
+            }
 
-                await ShowDeviceLogAsync(device, "Log_RandomDeviceRequired", cancellationToken).ConfigureAwait(true);
-            SetDeviceLog(device, "Log_Ready");
             return null;
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeSimAsync(CancellationToken cancellationToken)
+        private async Task ChangeSimAsync()
         {
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
+            CancellationToken cancellationToken = CancellationToken.None;
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            SimProfile? sourceProfile = selectedDevice != null
+                && _randomSimProfiles.TryGetValue(selectedDevice.Serial, out SimProfile? profile)
+                ? profile
+                : null;
+            SimProfile? editedProfile = sourceProfile == null
+                ? null
+                : CreateEditedSimProfile(sourceProfile);
+            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1384,14 +1454,12 @@ namespace DeepDroidChanger.ViewModels
             if (actionLease == null)
                 return;
 
-            if (!_randomSimProfiles.TryGetValue(device.Serial, out SimProfile? profile))
+            if (editedProfile == null)
             {
                 await ShowDeviceLogAsync(device, "Log_RandomSimRequired", cancellationToken).ConfigureAwait(true);
                 SetDeviceLog(device, "Log_Ready");
                 return;
             }
-
-            SimProfile editedProfile = CreateEditedSimProfile(profile);
 
             try
             {
@@ -1427,8 +1495,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeLocationAsync(CancellationToken cancellationToken)
+        private async Task ChangeLocationAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -1488,8 +1557,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeTimezoneAsync(CancellationToken cancellationToken)
+        private async Task ChangeTimezoneAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -1568,8 +1638,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanViewRandomDeviceInfo), AllowConcurrentExecutions = true)]
-        private async Task ViewRandomDeviceInfoAsync(CancellationToken cancellationToken)
+        private async Task ViewRandomDeviceInfoAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = SelectedDevice;
             if (device == null
                 || !_randomDeviceProfiles.TryGetValue(device.Serial, out DeviceInfoApiDevice? profile))
@@ -1658,8 +1729,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task UpdateIntegrityAsync(CancellationToken cancellationToken)
+        private async Task UpdateIntegrityAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -1726,8 +1798,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task InstallApkAsync(CancellationToken cancellationToken)
+        private async Task InstallApkAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -1789,8 +1862,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task FakeProxyAsync(CancellationToken cancellationToken)
+        private async Task FakeProxyAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -1864,8 +1938,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task StopFakeProxyAsync(CancellationToken cancellationToken)
+        private async Task StopFakeProxyAsync()
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
@@ -1898,8 +1973,9 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task ViewDeviceAsync(DeviceRowViewModel? device, CancellationToken cancellationToken)
+        private async Task ViewDeviceAsync(DeviceRowViewModel? device)
         {
+            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? targetDevice = await GetOnlineDeviceAsync(
                     device ?? SelectedDevice,
                     cancellationToken)
@@ -2541,6 +2617,15 @@ namespace DeepDroidChanger.ViewModels
 
         private async Task SaveDeviceProfileAsync(PendingDeviceProfileEdit pendingEdit, CancellationToken cancellationToken)
         {
+            await SaveDeviceProfileAsync(pendingEdit.Serial, pendingEdit.Profile, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private async Task SaveDeviceProfileAsync(
+            string serial,
+            DeviceProfileConfig profile,
+            CancellationToken cancellationToken)
+        {
             try
             {
                 await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -2549,8 +2634,8 @@ namespace DeepDroidChanger.ViewModels
                     await _deviceConfigService
                         .SaveDeviceProfileAsync(
                             _storedDevices,
-                            pendingEdit.Serial,
-                            pendingEdit.Profile,
+                            serial,
+                            profile,
                             cancellationToken)
                         .ConfigureAwait(false);
                 }

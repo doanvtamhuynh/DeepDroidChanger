@@ -1106,6 +1106,91 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     }
 
     [TestMethod]
+    public async Task AdvancedChangeConfig_DialogResultAfterSelectionChange_PersistsToOriginalSerialOnly()
+    {
+        var settings = new AppSettings { SelectedSingleDeviceSerial = "A" };
+        StoredDeviceConfig[] storedDevices =
+        [
+            new()
+            {
+                Serial = "A",
+                Name = "Phone A",
+                ChangeOptions = new DeviceChangeOptions { UseDefaultMode = false }
+            },
+            new()
+            {
+                Serial = "B",
+                Name = "Phone B",
+                ChangeOptions = new DeviceChangeOptions { UseDefaultMode = true }
+            }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var dialogStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCompletion = new TaskCompletionSource<AdvancedChangeConfigDialogResult?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        IAdvancedChangeConfigDialogService dialog = Substitute.For<IAdvancedChangeConfigDialogService>();
+        dialog.ShowAdvancedChangeConfigAsync(
+                "A",
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                dialogStarted.TrySetResult();
+                return dialogCompletion.Task;
+            });
+        IDeviceConfigService deviceConfig = Substitute.For<IDeviceConfigService>();
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceConfig: deviceConfig,
+            advancedChangeConfig: dialog,
+            settings: settings);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        viewModel.SelectedDevice = deviceA;
+        Task configureA = viewModel.OpenAdvancedChangeConfigCommand.ExecuteAsync(null);
+        await dialogStarted.Task;
+
+        viewModel.SelectedDevice = deviceB;
+        dialogCompletion.SetResult(new AdvancedChangeConfigDialogResult(
+            new DeviceChangeOptions { UseDefaultMode = false, ChangeAndroidId = true },
+            useIntegritySecurityPatch: false));
+        await configureA;
+
+        Assert.AreSame(deviceB, viewModel.SelectedDevice);
+        Assert.IsTrue(viewModel.UseDefaultChangeMode);
+        await deviceConfig.Received(1).SaveDeviceProfileAsync(
+            Arg.Any<IList<StoredDeviceConfig>>(),
+            "A",
+            Arg.Is<DeviceProfileConfig>(profile =>
+                !profile.ChangeOptions.UseDefaultMode
+                && profile.ChangeOptions.ChangeAndroidId
+                && !profile.UseIntegritySecurityPatch),
+            Arg.Any<CancellationToken>());
+        await deviceConfig.DidNotReceive().SaveDeviceProfileAsync(
+            Arg.Any<IList<StoredDeviceConfig>>(),
+            "B",
+            Arg.Any<DeviceProfileConfig>(),
+            Arg.Any<CancellationToken>());
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
     public async Task AdvancedChangeConfig_DefaultModeSelected_KeepsButtonDisabled()
     {
         StoredDeviceConfig[] storedDevices =
@@ -1740,7 +1825,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             busyContextMenuStates[nameof(ChangeSingleDeviceViewModel.DeleteDeviceCommand)],
             CreateActionStateMessage(busyContextMenuStates));
         await viewModel.RebootDeviceCommand.ExecuteAsync(deviceA);
-        await deviceAction.Received(1).RebootAsync("A", Arg.Any<CancellationToken>());
+        await deviceAction.DidNotReceive().RebootAsync("A", Arg.Any<CancellationToken>());
         await viewModel.ViewDeviceCommand.ExecuteAsync(deviceA);
         await deviceViewerDialog.Received(1).ShowDeviceViewerAsync(
             "A",
@@ -1773,6 +1858,118 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         viewModel.SelectedDevice = deviceA;
         Assert.AreEqual("Profile A", viewModel.DeviceInfo.Model);
         Assert.IsTrue(viewModel.CanInteractWithSelectedDevice);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task ChangeDeviceCommand_StartingSecondSerial_DoesNotCancelFirstOperation()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone A", Type = "Phone" },
+            new() { Serial = "B", Name = "Phone B", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        int randomInvocation = 0;
+        randomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice
+                {
+                    Model = Interlocked.Increment(ref randomInvocation) == 1
+                        ? "Profile A"
+                        : "Profile B"
+                })));
+        IChangeDeviceConfirmationDialogService confirmation =
+            Substitute.For<IChangeDeviceConfirmationDialogService>();
+        confirmation.ShowChangeDeviceConfirmationAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+        var deviceAStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deviceBStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deviceACompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deviceBCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken deviceAToken = default;
+        CancellationToken deviceBToken = default;
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        deviceChange.ChangeAsync(
+                Arg.Any<string>(),
+                Arg.Any<DeviceInfoApiDevice>(),
+                Arg.Any<bool>(),
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<IProgress<DeviceChangeStage>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                string serial = callInfo.ArgAt<string>(0);
+                CancellationToken token = callInfo.ArgAt<CancellationToken>(5);
+                if (serial == "A")
+                {
+                    deviceAToken = token;
+                    deviceAStarted.TrySetResult();
+                    return deviceACompletion.Task;
+                }
+
+                deviceBToken = token;
+                deviceBStarted.TrySetResult();
+                return deviceBCompletion.Task;
+            });
+
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            changeDeviceConfirmation: confirmation,
+            deviceChange: deviceChange);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        viewModel.SelectedDevice = deviceA;
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        viewModel.SelectedDevice = deviceB;
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+
+        viewModel.SelectedDevice = deviceA;
+        Task deviceAAction = viewModel.ChangeDeviceCommand.ExecuteAsync(null);
+        await deviceAStarted.Task;
+
+        viewModel.SelectedDevice = deviceB;
+        Task deviceBAction = viewModel.ChangeDeviceCommand.ExecuteAsync(null);
+        await deviceBStarted.Task;
+
+        Assert.IsFalse(deviceAToken.IsCancellationRequested);
+        Assert.IsFalse(deviceBToken.IsCancellationRequested);
+        Assert.IsFalse(deviceAAction.IsCompleted);
+        Assert.IsTrue(deviceA.IsActionBusy);
+        Assert.IsTrue(deviceB.IsActionBusy);
+
+        deviceACompletion.SetResult();
+        await deviceAAction;
+        Assert.IsFalse(deviceA.IsActionBusy);
+        Assert.IsTrue(deviceB.IsActionBusy);
+
+        deviceBCompletion.SetResult();
+        await deviceBAction;
+        Assert.IsFalse(deviceB.IsActionBusy);
 
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
@@ -2567,6 +2764,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         ISettingsService? settingsService = null,
         AppSettings? settings = null)
     {
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
         return new ChangeSingleDeviceViewModel(
             Substitute.For<IAddDevicesDialogService>(),
             carriers,
