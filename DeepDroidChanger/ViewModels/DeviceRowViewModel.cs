@@ -95,7 +95,9 @@ public sealed class DeviceRowViewModel : ObservableObject
     {
         DeviceProcessState nextState = GetProcessState(resourceKey);
         if (nextState == DeviceProcessState.Ready
-            && ProcessState is DeviceProcessState.Succeeded or DeviceProcessState.Failed)
+            && ProcessState is DeviceProcessState.Succeeded
+                or DeviceProcessState.Failed
+                or DeviceProcessState.Canceled)
         {
             return;
         }
@@ -120,6 +122,9 @@ public sealed class DeviceRowViewModel : ObservableObject
 
         if (resourceKey.Contains("Partial", StringComparison.Ordinal))
             return DeviceProcessState.Failed;
+
+        if (resourceKey.Contains("Canceled", StringComparison.Ordinal))
+            return DeviceProcessState.Canceled;
 
         if (resourceKey.Contains("Success", StringComparison.Ordinal)
             || resourceKey.EndsWith("Enabled", StringComparison.Ordinal)

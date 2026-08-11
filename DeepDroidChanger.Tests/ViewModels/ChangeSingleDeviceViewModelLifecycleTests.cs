@@ -790,6 +790,67 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     }
 
     [TestMethod]
+    public async Task RebootAfterCanceledChange_ReplacesCanceledLogWithInProgress()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(Arg.Any<RandomDeviceRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice { Model = "Pixel 9" }));
+        IDeviceActionConfirmationDialogService confirmation = Substitute.For<IDeviceActionConfirmationDialogService>();
+        confirmation.ConfirmChangeAndWipeAsync(
+                "Phone",
+                "A",
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(false);
+        IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
+        var rebootStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rebootCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        deviceAction.RebootAsync("A", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                rebootStarted.SetResult();
+                return rebootCompletion.Task;
+            });
+
+        var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceActionConfirmation: confirmation,
+            deviceAction: deviceAction);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await viewModel.ChangeDeviceCommand.ExecuteAsync(null);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices[0].ProcessState);
+
+        Task rebootTask = viewModel.RebootDeviceCommand.ExecuteAsync(viewModel.Devices[0]);
+        await rebootStarted.Task;
+
+        Assert.AreEqual("Log_RebootingDevice", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.InProgress, viewModel.Devices[0].ProcessState);
+
+        rebootCompletion.SetResult();
+        await rebootTask;
+        Assert.AreEqual(DeviceProcessState.Succeeded, viewModel.Devices[0].ProcessState);
+
+        await viewModel.DeactivateAsync();
+        viewModel.Dispose();
+    }
+
+    [TestMethod]
     public async Task WipeWithoutChange_OnlineDevice_UsesSelectedDeviceCleanupConfigWithoutProfile()
     {
         StoredDeviceConfig[] storedDevices =
@@ -895,6 +956,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             Arg.Any<CancellationToken>());
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(
             default!, default!, default, default!, default, default);
+        Assert.AreEqual("Log_ChangeDeviceCanceled", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices[0].ProcessState);
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
     }
@@ -1890,6 +1953,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             "A",
             "Phone A",
             Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_Ready", deviceA.Process);
+        Assert.AreEqual(DeviceProcessState.Ready, deviceA.ProcessState);
 
         viewModel.SelectedDevice = deviceB;
 
@@ -2278,7 +2343,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await randomDevice.DidNotReceiveWithAnyArgs().CreateRandomProfileAsync(default!, default);
         await deviceChange.DidNotReceiveWithAnyArgs().ChangeAsync(default!, default!, default, default!, default, default);
 
-        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
+        Assert.AreEqual("Log_ChangeDeviceCanceled", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices[0].ProcessState);
 
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
@@ -2363,8 +2429,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
 
         await packageInstall.DidNotReceiveWithAnyArgs()
             .InstallAsync(default!, default!, default!, default);
-        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
-        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices[0].ProcessState);
         Assert.IsFalse(guard.IsBusy("A"));
         await viewModel.DeactivateAsync();
     }
@@ -2410,13 +2476,13 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .InstallAsync("A", "first.apk", request.Options, Arg.Any<CancellationToken>());
         await packageInstall.Received(1)
             .InstallAsync("A", "second.xapk", request.Options, Arg.Any<CancellationToken>());
-        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
-        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        Assert.AreEqual("Log_InstallPackagePartialFormat", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Failed, viewModel.Devices[0].ProcessState);
         await viewModel.DeactivateAsync();
     }
 
     [TestMethod]
-    public async Task InstallApk_SinglePackageFailure_ShowsResultThenReturnsReady()
+    public async Task InstallApk_SinglePackageFailure_PersistsResult()
     {
         StoredDeviceConfig[] storedDevices =
         [new() { Serial = "A", Name = "Phone", Type = "Phone" }];
@@ -2460,11 +2526,10 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.InstallApkCommand.ExecuteAsync(null);
 
         int failureIndex = processLogs.IndexOf("Log_InstallPackageVersionDowngrade");
-        int readyIndex = processLogs.LastIndexOf("Log_Ready");
         Assert.IsTrue(failureIndex >= 0, "The detailed install result should be shown.");
-        Assert.IsTrue(readyIndex > failureIndex, "The Single install result should be reset to Ready afterward.");
-        Assert.AreEqual("Log_Ready", device.Process);
-        Assert.AreEqual(DeviceProcessState.Ready, device.ProcessState);
+        Assert.AreEqual(-1, processLogs.LastIndexOf("Log_Ready"));
+        Assert.AreEqual("Log_InstallPackageVersionDowngrade", device.Process);
+        Assert.AreEqual(DeviceProcessState.Failed, device.ProcessState);
         await viewModel.DeactivateAsync();
     }
 
@@ -2501,8 +2566,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .InstallAsync(default!, default!, default!, default);
         await deviceList.Received(2)
             .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
-        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
-        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Failed, viewModel.Devices[0].ProcessState);
         await viewModel.DeactivateAsync();
     }
 
@@ -2550,8 +2615,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .InstallAsync("A", "first.apk", Arg.Any<InstallPackageOptions>(), Arg.Any<CancellationToken>());
         await packageInstall.Received(1)
             .InstallAsync("A", "second.apk", Arg.Any<InstallPackageOptions>(), Arg.Any<CancellationToken>());
-        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
-        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        Assert.AreEqual("Log_InstallPackagePartialFormat", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Failed, viewModel.Devices[0].ProcessState);
         await viewModel.DeactivateAsync();
     }
 

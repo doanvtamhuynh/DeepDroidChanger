@@ -45,10 +45,44 @@ public sealed class DeviceRowViewModelTests
     }
 
     [TestMethod]
+    public void SetProcess_CanceledThenReady_KeepsCanceledResult()
+    {
+        var row = new DeviceRowViewModel(1, false, "serial", "name", "type", "Active", AdbDeviceStatus.Online, "Online", "Ready...");
+
+        row.SetProcess("Change Device canceled", "Log_ChangeDeviceCanceled");
+        row.SetProcess("Ready...", "Log_Ready");
+
+        Assert.AreEqual("Change Device canceled", row.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, row.ProcessState);
+    }
+
+    [TestMethod]
+    public void SetProcess_CanceledKey_ClassifiesAsCanceled()
+    {
+        var row = new DeviceRowViewModel(1, false, "serial", "name", "type", "Active", AdbDeviceStatus.Online, "Online", "Ready...");
+
+        row.SetProcess("Location change canceled", "Log_ChangeLocationCanceled");
+
+        Assert.AreEqual(DeviceProcessState.Canceled, row.ProcessState);
+    }
+
+    [TestMethod]
     public void SetProcess_NewActionAfterResult_ReplacesTerminalState()
     {
         var row = new DeviceRowViewModel(1, false, "serial", "name", "type", "Active", AdbDeviceStatus.Online, "Online", "Ready...");
         row.SetProcess("Device change completed", "Log_ChangeDeviceSuccess");
+
+        row.SetProcess("Changing device...", "Log_ChangeDevice");
+
+        Assert.AreEqual("Changing device...", row.Process);
+        Assert.AreEqual(DeviceProcessState.InProgress, row.ProcessState);
+    }
+
+    [TestMethod]
+    public void SetProcess_NewActionAfterCanceled_ReplacesTerminalState()
+    {
+        var row = new DeviceRowViewModel(1, false, "serial", "name", "type", "Active", AdbDeviceStatus.Online, "Online", "Ready...");
+        row.SetProcess("Change Device canceled", "Log_ChangeDeviceCanceled");
 
         row.SetProcess("Changing device...", "Log_ChangeDevice");
 

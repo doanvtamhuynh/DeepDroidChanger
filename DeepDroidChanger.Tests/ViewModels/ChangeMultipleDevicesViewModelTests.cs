@@ -255,12 +255,65 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await operation;
 
         Assert.AreEqual("Log_ChangeLocationCanceled", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices.Single().ProcessState);
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
         await viewModel.DeactivateAsync();
     }
 
     [TestMethod]
-    public async Task LocationAndTimezoneActions_IgnoreBusySelectedInfoDeviceWhenAnotherSelectedDeviceIsIdle()
+    public async Task ChangeSelectedLocations_LifecycleCancellationReturnsRunningTargetToReady()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var selectedLocation = new LocationOption(
+            "VN",
+            "Vietnam",
+            "Ho Chi Minh City",
+            "Asia/Ho_Chi_Minh",
+            "+07:00",
+            10.75,
+            106.6667);
+        context.LocationDialog.ShowChangeLocationBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(new ChangeLocationDialogResult(
+                ChangeLocationMode.Config,
+                string.Empty,
+                string.Empty,
+                selectedLocation));
+        var applyStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var applyCompletion = new TaskCompletionSource<DeviceLocationResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.LocationService.ApplyCatalogLocationAsync(
+                "A",
+                selectedLocation,
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => applyCompletion.TrySetCanceled(token));
+                applyStarted.SetResult();
+                return applyCompletion.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
+        await applyStarted.Task;
+        Assert.AreEqual(DeviceProcessState.InProgress, viewModel.Devices.Single().ProcessState);
+
+        await viewModel.DeactivateAsync();
+        await operation;
+
+        Assert.AreEqual("Log_Ready", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices.Single().ProcessState);
+    }
+
+    [TestMethod]
+    public async Task LocationAndTimezoneActions_BusySelectedInfoDeviceRemainDisabled()
     {
         TestContext context = CreateContext(
             CreateSnapshot(
@@ -279,8 +332,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
         using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
         viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "A");
 
-        Assert.IsTrue(viewModel.ChangeSelectedLocationsCommand.CanExecute(null));
-        Assert.IsTrue(viewModel.ChangeSelectedTimezonesCommand.CanExecute(null));
+        Assert.IsFalse(viewModel.ChangeSelectedLocationsCommand.CanExecute(null));
+        Assert.IsFalse(viewModel.ChangeSelectedTimezonesCommand.CanExecute(null));
         await viewModel.DeactivateAsync();
     }
 
@@ -459,6 +512,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await context.InstallPackageDialog.Received(1)
             .ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>());
         Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices.Single().ProcessState);
         await viewModel.DeactivateAsync();
     }
 
@@ -743,6 +797,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await operation;
 
         Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual(
+            DeviceProcessState.Canceled,
+            viewModel.Devices.Single(device => device.Serial == "A").ProcessState);
         Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "B").Process);
         await viewModel.DeactivateAsync();
     }
@@ -1209,6 +1266,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await operation;
 
         Assert.AreEqual("Log_ChangeTimezoneCanceled", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices.Single().ProcessState);
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
         await context.TimezoneService.DidNotReceiveWithAnyArgs()
             .ApplyAsync(default!, default!, default);
@@ -1258,6 +1316,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await operation;
 
         Assert.AreEqual("Log_ChangeLocationCanceled", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual(
+            DeviceProcessState.Canceled,
+            viewModel.Devices.Single(device => device.Serial == "A").ProcessState);
         Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "B").Process);
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("B"));
@@ -1307,6 +1368,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await operation;
 
         Assert.AreEqual("Log_ChangeTimezoneCanceled", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual(
+            DeviceProcessState.Canceled,
+            viewModel.Devices.Single(device => device.Serial == "A").ProcessState);
         Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "B").Process);
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("B"));
@@ -1386,9 +1450,55 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await context.DeviceAction.Received(1).RebootAsync("C", Arg.Any<CancellationToken>());
         await context.DeviceAction.DidNotReceive().RebootAsync("A", Arg.Any<CancellationToken>());
         await context.DeviceAction.DidNotReceive().RebootAsync("B", Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_RebootDeviceSuccess", clicked.Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, clicked.ProcessState);
         Assert.IsTrue(viewModel.Devices.Single(device => device.Serial == "A").IsSelected);
         Assert.IsTrue(viewModel.Devices.Single(device => device.Serial == "B").IsSelected);
         Assert.IsFalse(clicked.IsSelected);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task RebootContextCommand_FailurePersistsFailedResult()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Alpha" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        context.DeviceAction.RebootAsync("A", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("reboot failed")));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        await viewModel.RebootDeviceCommand.ExecuteAsync(device);
+
+        Assert.AreEqual("Log_RebootDeviceFailed", device.Process);
+        Assert.AreEqual(DeviceProcessState.Failed, device.ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task DeleteContextCommand_CanceledConfirmationPersistsCanceledResult()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Alpha" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        context.ActionConfirmation.ConfirmDeleteDeviceAsync(
+                "Alpha",
+                "A",
+                Arg.Any<CancellationToken>())
+            .Returns(false);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        await viewModel.DeleteDeviceCommand.ExecuteAsync(device);
+
+        Assert.AreEqual("Log_DeleteDeviceCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        Assert.HasCount(1, viewModel.Devices);
         await viewModel.DeactivateAsync();
     }
 
@@ -1451,6 +1561,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.ToggleWifiCommand.ExecuteAsync(device);
 
         Assert.AreEqual("Log_DeviceMustBeOnline", device.Process);
+        Assert.AreEqual(DeviceProcessState.Failed, device.ProcessState);
         await context.DeviceList.DidNotReceive()
             .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
         await context.DeviceAction.DidNotReceive()
@@ -2129,6 +2240,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
             Arg.Any<CarrierOption>());
         Assert.AreEqual(
             "Log_DeviceMustBeOnline", offlineDevice.Process);
+        Assert.AreEqual(DeviceProcessState.Failed, offlineDevice.ProcessState);
 
         completion.SetResult();
         await firstAction;

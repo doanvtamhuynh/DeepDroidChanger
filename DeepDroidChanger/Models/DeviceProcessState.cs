@@ -5,5 +5,6 @@ public enum DeviceProcessState
     Ready,
     InProgress,
     Succeeded,
-    Failed
+    Failed,
+    Canceled
 }

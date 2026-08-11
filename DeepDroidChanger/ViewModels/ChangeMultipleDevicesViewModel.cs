@@ -1283,13 +1283,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             await RunOnUiContextAsync(() => System.Windows.Clipboard.SetText(device.Serial))
                 .ConfigureAwait(true);
             SetDeviceLog(device, "Log_CopySerialSuccess");
-            SetDeviceLog(device, "Log_Ready");
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to copy serial for device {Serial}.", device.Serial);
             SetDeviceLog(device, "Log_CopySerialFailed");
-            SetDeviceLog(device, "Log_Ready");
         }
     }
 
@@ -1377,7 +1375,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 (false, true) => "Log_PlayStoreEnabled",
                 _ => "Log_PlayStoreDisabled"
             });
-            SetDeviceLog(device, "Log_Ready");
         }
         catch (OperationCanceledException)
         {
@@ -1389,7 +1386,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             SetDeviceLog(
                 device,
                 isGms ? "Log_GmsToggleFailed" : "Log_PlayStoreToggleFailed");
-            SetDeviceLog(device, "Log_Ready");
         }
     }
 
@@ -1411,7 +1407,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 .ConfigureAwait(true);
             device.IsWifiEnabled = enabled;
             SetDeviceLog(device, enabled ? "Log_WifiEnabled" : "Log_WifiDisabled");
-            SetDeviceLog(device, "Log_Ready");
         }
         catch (OperationCanceledException)
         {
@@ -1421,7 +1416,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             _logger.LogError(exception, "Failed to toggle Wi-Fi for {Serial}.", device.Serial);
             SetDeviceLog(device, "Log_WifiToggleFailed");
-            SetDeviceLog(device, "Log_Ready");
         }
     }
 
@@ -1439,7 +1433,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 .RebootAsync(device.Serial, CancellationToken.None)
                 .ConfigureAwait(true);
             SetDeviceLog(device, "Log_RebootDeviceSuccess");
-            SetDeviceLog(device, "Log_Ready");
         }
         catch (OperationCanceledException)
         {
@@ -1449,7 +1442,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             _logger.LogError(exception, "Failed to reboot device {Serial}.", device.Serial);
             SetDeviceLog(device, "Log_RebootDeviceFailed");
-            SetDeviceLog(device, "Log_Ready");
         }
     }
 
@@ -1471,7 +1463,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             if (!confirmed)
             {
                 SetDeviceLog(device, "Log_DeleteDeviceCanceled");
-                SetDeviceLog(device, "Log_Ready");
                 return;
             }
 
@@ -1485,7 +1476,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 if (!result.Removed)
                 {
                     SetDeviceLog(device, "Log_DeleteDeviceFailed");
-                    SetDeviceLog(device, "Log_Ready");
                     return;
                 }
 
@@ -1506,7 +1496,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             _logger.LogError(exception, "Failed to delete device {Serial}.", device.Serial);
             SetDeviceLog(device, "Log_DeleteDeviceFailed");
-            SetDeviceLog(device, "Log_Ready");
         }
     }
 
