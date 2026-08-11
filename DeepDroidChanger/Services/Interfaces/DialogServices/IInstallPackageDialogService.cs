@@ -7,5 +7,9 @@ namespace DeepDroidChanger.Services
             string deviceSerial,
             string deviceName,
             CancellationToken cancellationToken);
+
+        Task<InstallPackageBatchRequest?> ShowInstallPackageBatchAsync(
+            int targetCount,
+            CancellationToken cancellationToken);
     }
 }

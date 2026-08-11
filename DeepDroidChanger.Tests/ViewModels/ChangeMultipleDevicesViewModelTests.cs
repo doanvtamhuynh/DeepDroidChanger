@@ -419,6 +419,741 @@ public sealed class ChangeMultipleDevicesViewModelTests
     }
 
     [TestMethod]
+    public async Task InstallSelectedPackages_OfflineTargetShowsDeviceMustBeOnline()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Offline" }],
+                []),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        context.DeviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(false);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.InstallPackageDialog.DidNotReceiveWithAnyArgs()
+            .ShowInstallPackageBatchAsync(default, default);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_CachedOfflineButLiveOnlineIsEligible()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Cached offline" }],
+                []),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        context.DeviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(true);
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns((InstallPackageBatchRequest?)null);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.InstallPackageDialog.Received(1)
+            .ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_LiveOnlineCheckFailureShowsOfflineFeedbackAndLogsDiagnostic()
+    {
+        var logger = new DeepDroidChanger.Tests.Fakes.TestLogger<ChangeMultipleDevicesViewModel>();
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Failure" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] },
+            logger: logger);
+        context.DeviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<bool>(new InvalidOperationException("ADB unavailable")));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.InstallPackageDialog.DidNotReceiveWithAnyArgs()
+            .ShowInstallPackageBatchAsync(default, default);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single().Process);
+        Assert.IsTrue(logger.Messages.Any(message =>
+            message.Contains("Live initial online preflight failed", StringComparison.Ordinal)));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_LeaseRaceLostLeavesProcessUnchangedAndDoesNotOpenDialog()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Racing" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var onlineCheckStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var onlineCheckResult = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.DeviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                onlineCheckStarted.TrySetResult();
+                return onlineCheckResult.Task;
+            });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+        await onlineCheckStarted.Task;
+        using IDisposable competingLease = context.DeviceActionGuard.TryAcquire("A")!;
+        onlineCheckResult.SetResult(true);
+
+        await operation;
+
+        await context.InstallPackageDialog.DidNotReceiveWithAnyArgs()
+            .ShowInstallPackageBatchAsync(default, default);
+        Assert.AreEqual("Log_Ready", viewModel.Devices.Single().Process);
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_MixedEligibilityUsesOnlyReservedOnlineTargets()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new StoredDeviceConfig { Serial = "A", Name = "Offline" },
+            new StoredDeviceConfig { Serial = "B", Name = "Busy" },
+            new StoredDeviceConfig { Serial = "C", Name = "Online C" },
+            new StoredDeviceConfig { Serial = "D", Name = "Online D" }
+        ];
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                storedDevices,
+                [
+                    new AdbDevice("C", AdbDeviceStatus.Online),
+                    new AdbDevice("D", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B", "C", "D"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("B")!;
+        context.DeviceList.IsDeviceOnlineAsync(
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<string>() is "C" or "D"));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(
+                2,
+                Arg.Any<CancellationToken>())
+            .Returns((InstallPackageBatchRequest?)null);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.InstallPackageDialog.Received(1)
+            .ShowInstallPackageBatchAsync(2, Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("Log_Ready", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices.Single(device => device.Serial == "C").Process);
+        Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices.Single(device => device.Serial == "D").Process);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("C"));
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("D"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_HoldsReservationsWhileDialogIsOpen()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "C", Name = "C" },
+                    new StoredDeviceConfig { Serial = "D", Name = "D" }
+                ],
+                [new AdbDevice("C", AdbDeviceStatus.Online), new AdbDevice("D", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["C", "D"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var dialogOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogResult = new TaskCompletionSource<InstallPackageBatchRequest?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(2, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                dialogOpened.TrySetResult();
+                return dialogResult.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+        await dialogOpened.Task;
+
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("C"));
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("D"));
+        Assert.IsNull(context.DeviceActionGuard.TryAcquire("C"));
+        Assert.IsNull(context.DeviceActionGuard.TryAcquire("D"));
+
+        dialogResult.SetResult(null);
+        await operation;
+
+        await context.PackageInstall.DidNotReceiveWithAnyArgs()
+            .InstallAsync(default!, default!, default!, default);
+        await context.DeviceConfig.DidNotReceiveWithAnyArgs().SaveLocationConfigAsync(
+            default!,
+            default!,
+            default,
+            default!,
+            default!,
+            default!,
+            default!,
+            default);
+        await context.DeviceConfig.DidNotReceiveWithAnyArgs().SaveTimezoneConfigAsync(
+            default!,
+            default!,
+            default,
+            default!,
+            default);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("C"));
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("D"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task Dispose_WithInstallPackageDialogOpen_DoesNotWaitForDialogCompletion()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var dialogOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCompletion = new TaskCompletionSource<InstallPackageBatchRequest?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken dialogToken = default;
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                dialogToken = callInfo.Arg<CancellationToken>();
+                dialogOpened.TrySetResult();
+                return dialogCompletion.Task;
+            });
+        ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+        await dialogOpened.Task;
+
+        Task disposeTask = Task.Run(viewModel.Dispose);
+        Task firstCompletion = await Task.WhenAny(
+            disposeTask,
+            Task.Delay(TimeSpan.FromSeconds(1)));
+        bool disposedBeforeDialogCompleted = ReferenceEquals(firstCompletion, disposeTask);
+
+        try
+        {
+            Assert.IsTrue(
+                disposedBeforeDialogCompleted,
+                "Dispose must signal cancellation without synchronously waiting for an open dialog.");
+            Assert.IsTrue(dialogToken.IsCancellationRequested);
+        }
+        finally
+        {
+            dialogCompletion.TrySetResult(null);
+        }
+
+        await Task.WhenAll(disposeTask, operation);
+
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
+    }
+
+    [TestMethod]
+    public async Task Deactivate_WithInstallPackageDialogOpen_RequestsCancellation()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var dialogOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCompletion = new TaskCompletionSource<InstallPackageBatchRequest?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken dialogToken = default;
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                dialogToken = callInfo.Arg<CancellationToken>();
+                dialogOpened.TrySetResult();
+                dialogToken.Register(() => dialogCompletion.TrySetResult(null));
+                return dialogCompletion.Task;
+            });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+        await dialogOpened.Task;
+        await viewModel.DeactivateAsync();
+        await operation;
+
+        Assert.IsTrue(dialogToken.IsCancellationRequested);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_TargetDisconnectsWhileDialogOpen_ThenCancelPreservesOfflineLog()
+    {
+        DeviceListSnapshot initial = CreateSnapshot(
+            [
+                new StoredDeviceConfig { Serial = "A", Name = "A" },
+                new StoredDeviceConfig { Serial = "B", Name = "B" }
+            ],
+            [new AdbDevice("A", AdbDeviceStatus.Online), new AdbDevice("B", AdbDeviceStatus.Online)]);
+        DeviceListSnapshot disconnected = CreateSnapshot(
+            [
+                new StoredDeviceConfig { Serial = "A", Name = "A" },
+                new StoredDeviceConfig { Serial = "B", Name = "B" }
+            ],
+            [new AdbDevice("A", AdbDeviceStatus.Online)]);
+        TestContext context = CreateContext(
+            initial,
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        context.DeviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(initial, initial, disconnected);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var dialogOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogResult = new TaskCompletionSource<InstallPackageBatchRequest?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(2, Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                dialogOpened.TrySetResult();
+                return dialogResult.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+        await dialogOpened.Task;
+
+        await context.Polling.TickAsync();
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("B"));
+
+        dialogResult.SetResult(null);
+        await operation;
+
+        Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_RechecksLiveOnlineBeforeInstallation()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        context.DeviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true), Task.FromResult(false));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageBatchRequest(
+                Array.AsReadOnly(new[] { "one.apk" }),
+                new InstallPackageOptions(true, false)));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.PackageInstall.DidNotReceiveWithAnyArgs()
+            .InstallAsync(default!, default!, default!, default);
+        Assert.AreEqual("Log_DeviceMustBeOnline", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_UsesSamePackageSnapshotForEveryEligibleDevice()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "A" },
+                    new StoredDeviceConfig { Serial = "B", Name = "B" }
+                ],
+                [new AdbDevice("A", AdbDeviceStatus.Online), new AdbDevice("B", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk", "two.xapk" }),
+            new InstallPackageOptions(false, true));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(2, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => new InstallPackageResult(
+                callInfo.ArgAt<string>(1),
+                true,
+                "Log_InstallPackageSuccess"));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.PackageInstall.Received(1)
+            .InstallAsync("A", "one.apk", request.Options, Arg.Any<CancellationToken>());
+        await context.PackageInstall.Received(1)
+            .InstallAsync("A", "two.xapk", request.Options, Arg.Any<CancellationToken>());
+        await context.PackageInstall.Received(1)
+            .InstallAsync("B", "one.apk", request.Options, Arg.Any<CancellationToken>());
+        await context.PackageInstall.Received(1)
+            .InstallAsync("B", "two.xapk", request.Options, Arg.Any<CancellationToken>());
+        Assert.AreEqual("complete 2/2", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("complete 2/2", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_InstallsPackagesSequentiallyPerDevice()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk", "two.apk" }),
+            new InstallPackageOptions(true, false));
+        var calls = new List<string>();
+        var firstPackageStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstPackage = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondPackageStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => InstallPackageAsync(
+                callInfo.ArgAt<string>(0),
+                callInfo.ArgAt<string>(1)));
+
+        async Task<InstallPackageResult> InstallPackageAsync(string serial, string filePath)
+        {
+            calls.Add($"{serial}:{filePath}");
+            if (filePath == "one.apk")
+            {
+                firstPackageStarted.TrySetResult();
+                await releaseFirstPackage.Task;
+            }
+            else
+            {
+                secondPackageStarted.TrySetResult();
+            }
+
+            return new InstallPackageResult(filePath, true, "Log_InstallPackageSuccess");
+        }
+
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+        try
+        {
+            await firstPackageStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            Assert.IsFalse(secondPackageStarted.Task.IsCompleted);
+        }
+        finally
+        {
+            releaseFirstPackage.TrySetResult();
+        }
+
+        await operation;
+
+        CollectionAssert.AreEqual(new[] { "A:one.apk", "A:two.apk" }, calls);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_AllowsDifferentDevicesToRunConcurrently()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "A" },
+                    new StoredDeviceConfig { Serial = "B", Name = "B" },
+                    new StoredDeviceConfig { Serial = "C", Name = "C" },
+                    new StoredDeviceConfig { Serial = "D", Name = "D" },
+                    new StoredDeviceConfig { Serial = "E", Name = "E" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online),
+                    new AdbDevice("C", AdbDeviceStatus.Online),
+                    new AdbDevice("D", AdbDeviceStatus.Online),
+                    new AdbDevice("E", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B", "C", "D", "E"] });
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var startedBySerial = new Dictionary<string, TaskCompletionSource>(StringComparer.Ordinal)
+        {
+            ["A"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
+            ["B"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
+            ["C"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
+            ["D"] = new(TaskCreationOptions.RunContinuationsAsynchronously),
+            ["E"] = new(TaskCreationOptions.RunContinuationsAsynchronously)
+        };
+        int activeWorkers = 0;
+        int maximumActiveWorkers = 0;
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk" }),
+            new InstallPackageOptions(true, false));
+
+        async Task<InstallPackageResult> InstallAndWaitAsync(string serial, string filePath)
+        {
+            int current = Interlocked.Increment(ref activeWorkers);
+            while (current > Volatile.Read(ref maximumActiveWorkers)
+                   && Interlocked.CompareExchange(
+                       ref maximumActiveWorkers,
+                       current,
+                       Volatile.Read(ref maximumActiveWorkers)) != current)
+            {
+            }
+
+            startedBySerial[serial].TrySetResult();
+
+            await release.Task;
+            Interlocked.Decrement(ref activeWorkers);
+            return new InstallPackageResult(filePath, true, "Log_InstallPackageSuccess");
+        }
+
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(5, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => InstallAndWaitAsync(
+                callInfo.ArgAt<string>(0),
+                callInfo.ArgAt<string>(1)));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        async Task<int> WaitForStartedWorkersAsync()
+        {
+            var pending = startedBySerial.Values
+                .Select(started => started.Task)
+                .ToList();
+            int startedCount = 0;
+            while (startedCount < 4)
+            {
+                Task completed = await Task.WhenAny(pending)
+                    .WaitAsync(TimeSpan.FromSeconds(1));
+                pending.Remove(completed);
+                startedCount++;
+            }
+
+            Assert.IsFalse(pending.Single().IsCompleted);
+            return startedCount;
+        }
+
+        try
+        {
+            int startedCount = await WaitForStartedWorkersAsync();
+            Assert.AreEqual(4, startedCount);
+            Assert.IsGreaterThan(1, maximumActiveWorkers);
+            Assert.IsLessThanOrEqualTo(4, maximumActiveWorkers);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        await operation;
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_PackageFailureDoesNotStopRemainingPackages()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk", "two.apk" }),
+            new InstallPackageOptions(true, false));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                "A",
+                "one.apk",
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageResult("one.apk", false, "Log_InstallPackageNoMatchingAbis"));
+        context.PackageInstall.InstallAsync(
+                "A",
+                "two.apk",
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageResult("two.apk", true, "Log_InstallPackageSuccess"));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.PackageInstall.Received(1)
+            .InstallAsync("A", "two.apk", request.Options, Arg.Any<CancellationToken>());
+        Assert.AreEqual("partial 1/2", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_AllPackagesFailedUsesFailedSummary()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk", "two.apk" }),
+            new InstallPackageOptions(true, false));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => new InstallPackageResult(
+                callInfo.ArgAt<string>(1),
+                false,
+                "Log_InstallPackageAdbFailure"));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("failed 0/2", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_OneDeviceFailureDoesNotStopOtherDevices()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "A" },
+                    new StoredDeviceConfig { Serial = "B", Name = "B" }
+                ],
+                [new AdbDevice("A", AdbDeviceStatus.Online), new AdbDevice("B", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk", "two.apk" }),
+            new InstallPackageOptions(true, false));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(2, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => new InstallPackageResult(
+                callInfo.ArgAt<string>(1),
+                callInfo.ArgAt<string>(0) == "B",
+                callInfo.ArgAt<string>(0) == "B"
+                    ? "Log_InstallPackageSuccess"
+                    : "Log_InstallPackageAdbFailure"));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        await context.PackageInstall.Received(1)
+            .InstallAsync("A", "two.apk", request.Options, Arg.Any<CancellationToken>());
+        await context.PackageInstall.Received(1)
+            .InstallAsync("B", "two.apk", request.Options, Arg.Any<CancellationToken>());
+        Assert.AreEqual("failed 0/2", viewModel.Devices.Single(device => device.Serial == "A").Process);
+        Assert.AreEqual("complete 2/2", viewModel.Devices.Single(device => device.Serial == "B").Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_SinglePackageFailurePreservesDetailedFailureMessage()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk" }),
+            new InstallPackageOptions(true, false));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageResult(
+                "one.apk",
+                false,
+                "Log_InstallPackageNoMatchingAbis"));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("Log_InstallPackageNoMatchingAbis", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallSelectedPackages_FormattedSinglePackageFailureUsesMessageArguments()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "A" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        var request = new InstallPackageBatchRequest(
+            Array.AsReadOnly(new[] { "one.apk" }),
+            new InstallPackageOptions(true, false));
+        context.InstallPackageDialog.ShowInstallPackageBatchAsync(1, Arg.Any<CancellationToken>())
+            .Returns(request);
+        context.PackageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageResult(
+                "one.apk",
+                false,
+                "Log_InstallPackageAdbFailureCodeFormat",
+                "INSTALL_FAILED_TEST",
+                "INSTALL_FAILED_TEST"));
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("ADB failed: INSTALL_FAILED_TEST", viewModel.Devices.Single().Process);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
     public async Task ChangeSelectedTimezones_LiveOnlineExceptionShowsOfflineFeedbackAndLogsDiagnostic()
     {
         var logger = new DeepDroidChanger.Tests.Fakes.TestLogger<ChangeMultipleDevicesViewModel>();
@@ -2685,6 +3420,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IChangeLocationDialogService locationDialog = Substitute.For<IChangeLocationDialogService>();
         IChangeTimezoneDialogService timezoneDialog = Substitute.For<IChangeTimezoneDialogService>();
         IDeviceViewerDialogService viewerDialog = Substitute.For<IDeviceViewerDialogService>();
+        IInstallPackageDialogService installPackageDialog = Substitute.For<IInstallPackageDialogService>();
+        IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
         carrierData.GetCarrierProfilesAsync(Arg.Any<CancellationToken>())
             .Returns(
             [
@@ -2738,6 +3475,11 @@ public sealed class ChangeMultipleDevicesViewModelTests
             {
                 "ChangeMultipleDevices_NewDeviceCount" => "New devices: {0}",
                 "ChangeMultipleDevices_NotAvailable" => "N/A",
+                "InstallPackage_BatchDeviceInfo" => "Install packages on {0} devices",
+                "Log_InstallPackageCompleteFormat" => "complete {0}/{1}",
+                "Log_InstallPackagePartialFormat" => "partial {0}/{1}",
+                "Log_InstallPackageFailedFormat" => "failed {0}/{1}",
+                "Log_InstallPackageAdbFailureCodeFormat" => "ADB failed: {0}",
                 _ => callInfo.Arg<string>()
             });
         IMultipleDeviceConfigService multipleConfig =
@@ -2771,7 +3513,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
             timezoneService,
             locationDialog,
             timezoneDialog,
-            viewerDialog);
+            viewerDialog,
+            installPackageDialog,
+            packageInstall);
         return new TestContext(
             viewModel,
             addDialog,
@@ -2792,7 +3536,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
             timezoneService,
             locationDialog,
             timezoneDialog,
-            viewerDialog);
+            viewerDialog,
+            installPackageDialog,
+            packageInstall);
     }
 
     private static DeviceListSnapshot CreateSnapshot(
@@ -2822,7 +3568,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IDeviceTimezoneService TimezoneService,
         IChangeLocationDialogService LocationDialog,
         IChangeTimezoneDialogService TimezoneDialog,
-        IDeviceViewerDialogService ViewerDialog);
+        IDeviceViewerDialogService ViewerDialog,
+        IInstallPackageDialogService InstallPackageDialog,
+        IPackageInstallService PackageInstall);
 
     private static Task<RandomDeviceResult> StartRandom(
         TaskCompletionSource started,

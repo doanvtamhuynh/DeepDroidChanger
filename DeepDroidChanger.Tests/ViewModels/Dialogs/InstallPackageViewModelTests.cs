@@ -63,6 +63,96 @@ public sealed class InstallPackageViewModelTests
         Assert.IsFalse(viewModel.IsInstalling);
     }
 
+    [TestMethod]
+    public async Task BatchMode_StartInstall_DoesNotCallPackageInstallService()
+    {
+        IFilePickerDialogService filePicker = Substitute.For<IFilePickerDialogService>();
+        filePicker.ShowOpenFileDialogMulti(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(["batch.apk"]);
+        IPackageInstallService installer = Substitute.For<IPackageInstallService>();
+        using var viewModel = CreateViewModel(filePicker, installer);
+        viewModel.InitializeBatch(2);
+        viewModel.AddFilesCommand.Execute(null);
+
+        await viewModel.StartInstallCommand.ExecuteAsync(null);
+
+        await installer.DidNotReceiveWithAnyArgs()
+            .InstallAsync(default!, default!, default!, default);
+        Assert.IsFalse(viewModel.IsInstalling);
+        Assert.IsFalse(viewModel.HasCompleted);
+    }
+
+    [TestMethod]
+    public async Task BatchMode_StartInstall_RequestsSuccessfulDialogClose()
+    {
+        IFilePickerDialogService filePicker = Substitute.For<IFilePickerDialogService>();
+        filePicker.ShowOpenFileDialogMulti(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(["batch.apk"]);
+        using var viewModel = CreateViewModel(filePicker, Substitute.For<IPackageInstallService>());
+        viewModel.InitializeBatch(2);
+        viewModel.AddFilesCommand.Execute(null);
+        bool? closeResult = null;
+        viewModel.CloseRequested += (_, result) => closeResult = result;
+
+        await viewModel.StartInstallCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(true, closeResult);
+    }
+
+    [TestMethod]
+    public async Task BatchMode_BuildRequest_CapturesQueueOrderAndOptionsAsStableSnapshot()
+    {
+        IFilePickerDialogService filePicker = Substitute.For<IFilePickerDialogService>();
+        filePicker.ShowOpenFileDialogMulti(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(["one.apk", "two.xapk"]);
+        using var viewModel = CreateViewModel(filePicker, Substitute.For<IPackageInstallService>());
+        viewModel.InitializeBatch(2);
+        viewModel.GrantPermissions = false;
+        viewModel.AllowDowngrade = true;
+        viewModel.AddFilesCommand.Execute(null);
+
+        await viewModel.StartInstallCommand.ExecuteAsync(null);
+        InstallPackageBatchRequest request = viewModel.BuildBatchRequest()!;
+        viewModel.Packages.Clear();
+
+        CollectionAssert.AreEqual(new[] { "one.apk", "two.xapk" }, request.FilePaths.ToArray());
+        Assert.IsFalse(request.Options.GrantPermissions);
+        Assert.IsTrue(request.Options.AllowDowngrade);
+        Assert.AreEqual(2, request.FilePaths.Count);
+    }
+
+    [TestMethod]
+    public async Task BatchMode_StartInstallRequiresAtLeastOneFile()
+    {
+        using var viewModel = CreateViewModel(
+            Substitute.For<IFilePickerDialogService>(),
+            Substitute.For<IPackageInstallService>());
+        viewModel.InitializeBatch(2);
+        bool closeRequested = false;
+        viewModel.CloseRequested += (_, _) => closeRequested = true;
+
+        await viewModel.StartInstallCommand.ExecuteAsync(null);
+
+        Assert.AreEqual("Log_InstallPackageNoFiles", viewModel.SummaryText);
+        Assert.IsFalse(closeRequested);
+    }
+
+    [TestMethod]
+    public void Initialize_RestoresSingleModeAfterBatchInitialization()
+    {
+        using var viewModel = CreateViewModel(
+            Substitute.For<IFilePickerDialogService>(),
+            Substitute.For<IPackageInstallService>());
+
+        viewModel.InitializeBatch(3);
+        viewModel.Initialize("SERIAL", "Pixel");
+
+        Assert.IsFalse(viewModel.IsBatchMode);
+        Assert.AreEqual(0, viewModel.BatchTargetCount);
+        Assert.AreEqual("SERIAL", viewModel.DeviceSerial);
+        Assert.AreEqual("Pixel", viewModel.DeviceName);
+    }
+
     private static InstallPackageViewModel CreateViewModel(
         IFilePickerDialogService filePicker,
         IPackageInstallService installer)

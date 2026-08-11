@@ -23,6 +23,7 @@ namespace DeepDroidChanger.ViewModels
         private int _successCount;
         private int _failedCount;
         private bool _isDisposed;
+        private InstallPackageBatchRequest? _batchRequest;
 
         public InstallPackageViewModel(
             IFilePickerDialogService filePickerDialogService,
@@ -50,6 +51,12 @@ namespace DeepDroidChanger.ViewModels
 
         [ObservableProperty]
         private string _deviceInfoText = string.Empty;
+
+        [ObservableProperty]
+        private bool _isBatchMode;
+
+        [ObservableProperty]
+        private int _batchTargetCount;
 
         [ObservableProperty]
         private InstallPackageQueueItemViewModel? _selectedPackage;
@@ -80,13 +87,29 @@ namespace DeepDroidChanger.ViewModels
 
         public void Initialize(string deviceSerial, string deviceName)
         {
+            IsBatchMode = false;
+            BatchTargetCount = 0;
             DeviceSerial = deviceSerial;
             DeviceName = deviceName;
+            _batchRequest = null;
+            UpdateDeviceInfoText();
+        }
+
+        public void InitializeBatch(int targetCount)
+        {
+            IsBatchMode = true;
+            BatchTargetCount = targetCount;
+            DeviceSerial = string.Empty;
+            DeviceName = string.Empty;
+            _batchRequest = null;
+            ResetRunState();
             UpdateDeviceInfoText();
         }
 
         partial void OnDeviceSerialChanged(string value) => UpdateDeviceInfoText();
         partial void OnDeviceNameChanged(string value) => UpdateDeviceInfoText();
+        partial void OnIsBatchModeChanged(bool value) => UpdateDeviceInfoText();
+        partial void OnBatchTargetCountChanged(int value) => UpdateDeviceInfoText();
 
         partial void OnSelectedPackageChanged(InstallPackageQueueItemViewModel? value)
         {
@@ -140,6 +163,19 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanStartInstall))]
         private async Task StartInstallAsync(CancellationToken cancellationToken)
         {
+            if (IsBatchMode)
+            {
+                _batchRequest = BuildBatchRequestCore();
+                if (_batchRequest == null)
+                {
+                    SummaryText = GetLogText("Log_InstallPackageNoFiles");
+                    return;
+                }
+
+                CloseRequested?.Invoke(this, true);
+                return;
+            }
+
             if (Packages.Count == 0)
             {
                 SummaryText = GetLogText("Log_InstallPackageNoFiles");
@@ -230,6 +266,14 @@ namespace DeepDroidChanger.ViewModels
             return new InstallPackageDialogResult(Packages.Count, _successCount, _failedCount, IsCanceled);
         }
 
+        public InstallPackageBatchRequest? BuildBatchRequest()
+        {
+            if (!IsBatchMode)
+                return null;
+
+            return _batchRequest ?? BuildBatchRequestCore();
+        }
+
         public void Dispose()
         {
             if (_isDisposed)
@@ -243,7 +287,7 @@ namespace DeepDroidChanger.ViewModels
 
         private bool CanAddFiles() => !IsInstalling;
         private bool CanRemoveSelectedPackage() => !IsInstalling && SelectedPackage != null;
-        private bool CanStartInstall() => !IsInstalling && !HasCompleted && Packages.Count > 0;
+        private bool CanStartInstall() => !IsInstalling && !HasCompleted && (IsBatchMode || Packages.Count > 0);
         private bool CanCloseDialog() => !IsInstalling;
 
         private void OnPackagesChanged(object? sender, NotifyCollectionChangedEventArgs args)
@@ -297,6 +341,17 @@ namespace DeepDroidChanger.ViewModels
             SummaryText = GetLogText("Log_InstallPackagePending");
         }
 
+        private InstallPackageBatchRequest? BuildBatchRequestCore()
+        {
+            if (!IsBatchMode || Packages.Count == 0)
+                return null;
+
+            string[] filePaths = Packages.Select(package => package.FilePath).ToArray();
+            return new InstallPackageBatchRequest(
+                Array.AsReadOnly(filePaths),
+                new InstallPackageOptions(GrantPermissions, AllowDowngrade));
+        }
+
         private string CreateSummaryText()
         {
             var totalCount = Packages.Count;
@@ -340,7 +395,11 @@ namespace DeepDroidChanger.ViewModels
 
         private void UpdateDeviceInfoText()
         {
-            DeviceInfoText = DeviceInfoTextHelper.Create(_localizationService, DeviceName, DeviceSerial);
+            DeviceInfoText = IsBatchMode
+                ? string.Format(
+                    GetLogText("InstallPackage_BatchDeviceInfo"),
+                    BatchTargetCount)
+                : DeviceInfoTextHelper.Create(_localizationService, DeviceName, DeviceSerial);
         }
     }
 }

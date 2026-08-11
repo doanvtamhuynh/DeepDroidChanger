@@ -29,6 +29,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IDeviceTimezoneService _deviceTimezoneService;
     private readonly IChangeLocationDialogService _changeLocationDialogService;
     private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
+    private readonly IInstallPackageDialogService _installPackageDialogService;
+    private readonly IPackageInstallService _packageInstallService;
     private readonly IDeviceViewerDialogService _deviceViewerDialogService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
@@ -51,8 +53,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         new(StringComparer.OrdinalIgnoreCase);
     private readonly object _pendingConfigSaveLock = new();
     private readonly object _pendingSettingsSaveLock = new();
-    private readonly object _locationTimezoneWorkflowsLock = new();
-    private readonly Dictionary<Task, CancellationTokenSource> _locationTimezoneWorkflows = [];
+    private readonly object _dialogBatchWorkflowsLock = new();
+    private readonly Dictionary<Task, CancellationTokenSource> _dialogBatchWorkflows = [];
     private readonly List<DeviceRowViewModel> _allDeviceRows = [];
     private readonly Dictionary<string, DeviceInfoApiDevice> _randomDeviceProfiles =
         new(StringComparer.OrdinalIgnoreCase);
@@ -144,7 +146,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceTimezoneService deviceTimezoneService,
         IChangeLocationDialogService changeLocationDialogService,
         IChangeTimezoneDialogService changeTimezoneDialogService,
-        IDeviceViewerDialogService deviceViewerDialogService)
+        IDeviceViewerDialogService deviceViewerDialogService,
+        IInstallPackageDialogService installPackageDialogService,
+        IPackageInstallService packageInstallService)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
@@ -159,6 +163,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _deviceTimezoneService = deviceTimezoneService;
         _changeLocationDialogService = changeLocationDialogService;
         _changeTimezoneDialogService = changeTimezoneDialogService;
+        _installPackageDialogService = installPackageDialogService;
+        _packageInstallService = packageInstallService;
         _deviceViewerDialogService = deviceViewerDialogService;
         _localizationService = localizationService;
         _multipleDeviceConfigService = multipleDeviceConfigService;
@@ -281,7 +287,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     public async Task DeactivateAsync()
     {
-        await CancelLocationTimezoneWorkflowsAsync().ConfigureAwait(false);
+        await CancelDialogBatchWorkflowsAsync().ConfigureAwait(false);
         await FlushPendingDeviceEditsAsync().ConfigureAwait(false);
         await FlushPendingConfigurationSaveAsync().ConfigureAwait(false);
         await FlushPendingSettingsSaveAsync().ConfigureAwait(false);
@@ -579,22 +585,34 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return StartLocationTimezoneWorkflowAsync(isLocation: false, cancellationToken);
     }
 
+    [RelayCommand(CanExecute = nameof(CanInstallSelectedPackages), AllowConcurrentExecutions = true)]
+    private Task InstallSelectedPackagesAsync(CancellationToken cancellationToken)
+    {
+        DeviceRowViewModel[] selectedDevices = _allDeviceRows
+            .Where(device => device.IsSelected)
+            .ToArray();
+        if (selectedDevices.Length == 0)
+            return Task.CompletedTask;
+
+        return StartTrackedDialogBatchWorkflow(
+            workflowCancellation => RunSelectedInstallPackageWorkflowAsync(
+                selectedDevices,
+                workflowCancellation),
+            cancellationToken);
+    }
+
+    private bool CanInstallSelectedPackages()
+    {
+        return _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
+    }
+
     private Task StartLocationTimezoneWorkflowAsync(
         bool isLocation,
         CancellationToken commandCancellationToken)
     {
-        var workflowCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+        return StartTrackedDialogBatchWorkflow(
+            cancellationToken => RunSelectedLocationOrTimezoneAsync(isLocation, cancellationToken),
             commandCancellationToken);
-        var completion = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        lock (_locationTimezoneWorkflowsLock)
-            _locationTimezoneWorkflows[completion.Task] = workflowCancellation;
-
-        _ = CompleteLocationTimezoneWorkflowAsync(
-            isLocation,
-            workflowCancellation,
-            completion);
-        return completion.Task;
     }
 
     private async Task RunSelectedLocationOrTimezoneAsync(
@@ -672,21 +690,217 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
+    private async Task RunSelectedInstallPackageWorkflowAsync(
+        IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        bool started = false;
+        try
+        {
+            targets = await CreateReservedEligibleTargetsAsync(selectedDevices, cancellationToken)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            BeginBatchAction(isRandomizing: false);
+            started = true;
+
+            InstallPackageBatchRequest? request = await _installPackageDialogService
+                .ShowInstallPackageBatchAsync(targets.Count, cancellationToken)
+                .ConfigureAwait(true);
+            if (request == null)
+            {
+                foreach (BatchActionTarget target in targets)
+                {
+                    await RunOnUiContextAsync(() => SetTargetLog(
+                            target,
+                            "Log_InstallPackageCanceled"))
+                        .ConfigureAwait(true);
+                }
+
+                return;
+            }
+
+            Task[] operations = targets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => ExecuteInstallPackageTargetAsync(
+                        target,
+                        request,
+                        cancellationToken)))
+                .ToArray();
+            await Task.WhenAll(operations).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to execute Multiple Device Install Package action.");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+            if (started)
+                EndBatchAction(isRandomizing: false);
+        }
+    }
+
+    private async Task ExecuteInstallPackageTargetAsync(
+        BatchActionTarget target,
+        InstallPackageBatchRequest request,
+        CancellationToken cancellationToken)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await IsExecutionTargetOnlineAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                if (!IsCurrentTarget(target))
+                    return;
+
+                int successCount = 0;
+                int totalCount = request.FilePaths.Count;
+                InstallPackageResult? singlePackageResult = null;
+                foreach (string filePath in request.FilePaths)
+                {
+                    targetCancellation.Token.ThrowIfCancellationRequested();
+                    await RunOnUiContextAsync(() => SetTargetLog(
+                            target,
+                            "Log_InstallPackageInstalling"))
+                        .ConfigureAwait(false);
+
+                    InstallPackageResult result;
+                    try
+                    {
+                        result = await _packageInstallService
+                            .InstallAsync(
+                                target.Device.Serial,
+                                filePath,
+                                request.Options,
+                                targetCancellation.Token)
+                            .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(
+                            exception,
+                            "Unexpected package installation failure for device {Serial}, file {FilePath}.",
+                            target.Device.Serial,
+                            filePath);
+                        result = new InstallPackageResult(
+                            filePath,
+                            false,
+                            "Log_InstallPackageAdbFailure");
+                    }
+
+                    if (result.Success)
+                        successCount++;
+                    if (totalCount == 1)
+                        singlePackageResult = result;
+                }
+
+                if (singlePackageResult is { } singleResult)
+                {
+                    await RunOnUiContextAsync(() => SetTargetLog(
+                            target,
+                            singleResult.MessageResourceKey,
+                            singleResult.MessageArguments.ToArray()))
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    string summaryKey = successCount == totalCount
+                        ? "Log_InstallPackageCompleteFormat"
+                        : successCount > 0
+                            ? "Log_InstallPackagePartialFormat"
+                            : "Log_InstallPackageFailedFormat";
+                    await RunOnUiContextAsync(() => SetTargetLog(
+                            target,
+                            summaryKey,
+                            successCount,
+                            totalCount))
+                        .ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_Ready"))
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to install packages for device {Serial}.",
+                target.Device.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_InstallPackageAdbFailure"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
     private bool CanRunSelectedLocationOrTimezoneAction()
     {
         return _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
     }
 
-    private async Task CompleteLocationTimezoneWorkflowAsync(
-        bool isLocation,
+    private Task StartTrackedDialogBatchWorkflow(
+        Func<CancellationToken, Task> workflow,
+        CancellationToken commandCancellationToken)
+    {
+        var workflowCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            commandCancellationToken);
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_dialogBatchWorkflowsLock)
+            _dialogBatchWorkflows[completion.Task] = workflowCancellation;
+
+        _ = CompleteTrackedDialogBatchWorkflowAsync(
+            workflow,
+            workflowCancellation,
+            completion);
+        return completion.Task;
+    }
+
+    private async Task CompleteTrackedDialogBatchWorkflowAsync(
+        Func<CancellationToken, Task> workflow,
         CancellationTokenSource workflowCancellation,
         TaskCompletionSource completion)
     {
         try
         {
-            await RunSelectedLocationOrTimezoneAsync(
-                    isLocation,
-                    workflowCancellation.Token)
+            await workflow(workflowCancellation.Token)
                 .ConfigureAwait(false);
             completion.TrySetResult();
         }
@@ -700,16 +914,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
         finally
         {
-            lock (_locationTimezoneWorkflowsLock)
-                _locationTimezoneWorkflows.Remove(completion.Task);
+            lock (_dialogBatchWorkflowsLock)
+                _dialogBatchWorkflows.Remove(completion.Task);
 
             workflowCancellation.Dispose();
         }
     }
 
-    private async Task CancelLocationTimezoneWorkflowsAsync()
+    private async Task CancelDialogBatchWorkflowsAsync()
     {
-        Task[] workflows = RequestLocationTimezoneWorkflowCancellation();
+        Task[] workflows = RequestDialogBatchWorkflowCancellation();
 
         if (workflows.Length == 0)
             return;
@@ -723,14 +937,14 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private Task[] RequestLocationTimezoneWorkflowCancellation()
+    private Task[] RequestDialogBatchWorkflowCancellation()
     {
-        lock (_locationTimezoneWorkflowsLock)
+        lock (_dialogBatchWorkflowsLock)
         {
-            foreach (CancellationTokenSource cancellation in _locationTimezoneWorkflows.Values)
+            foreach (CancellationTokenSource cancellation in _dialogBatchWorkflows.Values)
                 cancellation.Cancel();
 
-            return _locationTimezoneWorkflows.Keys.ToArray();
+            return _dialogBatchWorkflows.Keys.ToArray();
         }
     }
 
@@ -2291,19 +2505,28 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return _localizationService.GetString(resourceKey);
     }
 
-    private void SetDeviceLog(DeviceRowViewModel device, string resourceKey)
+    private void SetDeviceLog(
+        DeviceRowViewModel device,
+        string resourceKey,
+        params object[] formatArguments)
     {
-        string message = GetLogText(resourceKey);
+        string template = GetLogText(resourceKey);
+        string message = formatArguments.Length == 0
+            ? template
+            : string.Format(template, formatArguments);
         DeviceRowViewModel currentDevice = _allDeviceRows.FirstOrDefault(
             row => SerialEquals(row.Serial, device.Serial)) ?? device;
         currentDevice.SetProcess(message, resourceKey);
         _logger.LogInformation("Multiple Device {Serial} action: {Message}", device.Serial, message);
     }
 
-    private void SetTargetLog(BatchActionTarget target, string resourceKey)
+    private void SetTargetLog(
+        BatchActionTarget target,
+        string resourceKey,
+        params object[] formatArguments)
     {
         if (IsCurrentTarget(target) && IsActiveBatchTarget(target))
-            SetDeviceLog(target.Device, resourceKey);
+            SetDeviceLog(target.Device, resourceKey, formatArguments);
     }
 
     private bool IsActiveBatchTarget(BatchActionTarget target)
@@ -2565,6 +2788,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         ChangeSelectedSimsCommand.NotifyCanExecuteChanged();
         ChangeSelectedLocationsCommand.NotifyCanExecuteChanged();
         ChangeSelectedTimezonesCommand.NotifyCanExecuteChanged();
+        InstallSelectedPackagesCommand.NotifyCanExecuteChanged();
         ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
         DeleteDeviceCommand.NotifyCanExecuteChanged();
     }
@@ -3351,7 +3575,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         if (_isDisposed)
             return;
 
-        RequestLocationTimezoneWorkflowCancellation();
+        RequestDialogBatchWorkflowCancellation();
         FlushPendingDeviceEditsAsync().GetAwaiter().GetResult();
         FlushPendingConfigurationSaveAsync().GetAwaiter().GetResult();
         FlushPendingSettingsSaveAsync().GetAwaiter().GetResult();

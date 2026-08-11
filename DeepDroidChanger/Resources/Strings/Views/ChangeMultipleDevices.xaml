@@ -81,4 +81,6 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezone">Change Timezone</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocationTooltip">Apply a Location to the selected online devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Apply a Timezone to the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionInstallApk">Install APK/XAPK</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionInstallApkTooltip">Install selected APK/XAPK files on the selected online devices.</sys:String>
 </ResourceDictionary>

@@ -25,13 +25,35 @@ namespace DeepDroidChanger.Services
             string deviceName,
             CancellationToken cancellationToken)
         {
+            return ShowAsync(
+                initialize: viewModel => viewModel.Initialize(deviceSerial, deviceName),
+                buildResult: viewModel => viewModel.BuildResult(),
+                cancellationToken: cancellationToken);
+        }
+
+        public Task<InstallPackageBatchRequest?> ShowInstallPackageBatchAsync(
+            int targetCount,
+            CancellationToken cancellationToken)
+        {
+            return ShowAsync(
+                initialize: viewModel => viewModel.InitializeBatch(targetCount),
+                buildResult: viewModel => viewModel.BuildBatchRequest(),
+                cancellationToken: cancellationToken);
+        }
+
+        private Task<TResult?> ShowAsync<TResult>(
+            Action<InstallPackageViewModel> initialize,
+            Func<InstallPackageViewModel, TResult?> buildResult,
+            CancellationToken cancellationToken)
+            where TResult : class
+        {
             cancellationToken.ThrowIfCancellationRequested();
 
             _logger.LogDebug("Opening Install Package dialog.");
             using var scope = _scopeFactory.CreateScope();
 
             var viewModel = scope.ServiceProvider.GetRequiredService<InstallPackageViewModel>();
-            viewModel.Initialize(deviceSerial, deviceName);
+            initialize(viewModel);
 
             var window = scope.ServiceProvider.GetRequiredService<InstallPackageDialog>();
             window.Owner = Application.Current?.MainWindow;
@@ -42,12 +64,12 @@ namespace DeepDroidChanger.Services
                 window.DialogResult = result;
             };
 
-            var dialogResult = window.ShowDialog() ?? false;
+            using CancellationTokenRegistration cancellationRegistration =
+                DialogCancellation.RegisterClose(window, cancellationToken);
+            bool dialogResult = window.ShowDialog() ?? false;
             cancellationToken.ThrowIfCancellationRequested();
 
-            InstallPackageDialogResult? result = dialogResult
-                ? viewModel.BuildResult()
-                : null;
+            TResult? result = dialogResult ? buildResult(viewModel) : null;
 
             _logger.LogDebug("Install Package dialog closed. Result: {HasResult}.", result != null);
 

@@ -15,4 +15,5 @@
     <sys:String x:Key="InstallPackage_Start">Start install</sys:String>
     <sys:String x:Key="InstallPackage_Cancel">Cancel</sys:String>
     <sys:String x:Key="InstallPackage_Close">Close</sys:String>
+    <sys:String x:Key="InstallPackage_BatchDeviceInfo">Install packages on {0} devices</sys:String>
 </ResourceDictionary>

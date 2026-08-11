@@ -15,4 +15,5 @@
     <sys:String x:Key="InstallPackage_Start">Bắt đầu cài</sys:String>
     <sys:String x:Key="InstallPackage_Cancel">Hủy</sys:String>
     <sys:String x:Key="InstallPackage_Close">Đóng</sys:String>
+    <sys:String x:Key="InstallPackage_BatchDeviceInfo">C&#224;i c&#225;c g&#243;i tr&#234;n {0} thi&#7871;t b&#7883;</sys:String>
 </ResourceDictionary>

@@ -81,4 +81,6 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezone">Đổi Timezone</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocationTooltip">Áp dụng Location cho các thiết bị online đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Áp dụng Timezone cho các thiết bị online đã chọn.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionInstallApk">C&#224;i APK/XAPK</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionInstallApkTooltip">C&#224;i c&#225;c t&#7879;p APK/XAPK &#273;&#227; ch&#7885;n tr&#234;n c&#225;c thi&#7871;t b&#7883; online &#273;&#227; ch&#7885;n.</sys:String>
 </ResourceDictionary>

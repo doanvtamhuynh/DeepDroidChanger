@@ -693,7 +693,12 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             Arg.Any<CancellationToken>());
         await deviceChange.Received(1).ChangeAsync(
             "A",
-            profile,
+            Arg.Is<DeviceInfoApiDevice>(actual =>
+                !ReferenceEquals(actual, profile)
+                && actual.Brand == profile.Brand
+                && actual.Model == profile.Model
+                && actual.Fingerprint == profile.Fingerprint
+                && actual.Serial == profile.Serial),
             false,
             Arg.Is<DeviceChangeOptions>(options =>
                 ReferenceEquals(options, confirmedOptions)
@@ -766,7 +771,12 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             Arg.Any<CancellationToken>());
         await deviceChange.Received(1).ChangeWithoutWipeAsync(
             "A",
-            profile,
+            Arg.Is<DeviceInfoApiDevice>(actual =>
+                !ReferenceEquals(actual, profile)
+                && actual.Brand == profile.Brand
+                && actual.Model == profile.Model
+                && actual.Fingerprint == profile.Fingerprint
+                && actual.Serial == profile.Serial),
             false,
             Arg.Is<DeviceChangeOptions>(options =>
                 !options.UseDefaultMode
