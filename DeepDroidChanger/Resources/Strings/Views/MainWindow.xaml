@@ -2,14 +2,14 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <sys:String x:Key="Nav_ChangeDevices">Change Devices</sys:String>
+    <sys:String x:Key="Nav_DevicesManager">Devices Manager</sys:String>
     <sys:String x:Key="Nav_ChangeSingleDevice">Change Single Device</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDevice">Change Multiple Device</sys:String>
     <sys:String x:Key="Nav_Settings">Settings</sys:String>
     <sys:String x:Key="Nav_ToggleSidebar">Expand or collapse sidebar</sys:String>
     <sys:String x:Key="Nav_Language">Switch language</sys:String>
     <sys:String x:Key="Nav_Theme">Switch theme</sys:String>
-    <sys:String x:Key="Nav_ChangeDevicesTooltip">Open the device-change workspace and choose single-device or batch work.</sys:String>
+    <sys:String x:Key="Nav_DevicesManagerTooltip">Open Devices Manager and choose single-device or batch work.</sys:String>
     <sys:String x:Key="Nav_ChangeSingleDeviceTooltip">Open the workspace for configuring and changing one selected device.</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDeviceTooltip">Open the workspace for applying actions to several selected devices.</sys:String>
     <sys:String x:Key="Nav_SettingsTooltip">Open application settings and preferences.</sys:String>

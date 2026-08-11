@@ -13,7 +13,7 @@ DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đ
 - Ghi nhớ tài khoản theo lựa chọn; mật khẩu được bảo vệ bằng Windows DPAPI `CurrentUser`.
 - Token phiên chỉ tồn tại trong bộ nhớ, không được ghi xuống cấu hình.
 - Sidebar có thể thu gọn; hỗ trợ Light/Dark, tiếng Anh/tiếng Việt và Per-Monitor DPI.
-- Điều hướng giữa Change Devices và Settings.
+- Điều hướng giữa Devices Manager và Settings.
 
 ### Quản lý thiết bị
 

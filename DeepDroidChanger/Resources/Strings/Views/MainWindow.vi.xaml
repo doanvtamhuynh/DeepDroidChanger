@@ -2,14 +2,14 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <sys:String x:Key="Nav_ChangeDevices">Thay đổi thiết bị</sys:String>
+    <sys:String x:Key="Nav_DevicesManager">Quản lí thiết bị</sys:String>
     <sys:String x:Key="Nav_ChangeSingleDevice">Đổi một thiết bị</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDevice">Đổi nhiều thiết bị</sys:String>
     <sys:String x:Key="Nav_Settings">Cài đặt</sys:String>
     <sys:String x:Key="Nav_ToggleSidebar">Mở rộng hoặc thu gọn thanh bên</sys:String>
     <sys:String x:Key="Nav_Language">Chuyển ngôn ngữ</sys:String>
     <sys:String x:Key="Nav_Theme">Chuyển giao diện</sys:String>
-    <sys:String x:Key="Nav_ChangeDevicesTooltip">Mở khu vực đổi thiết bị để chọn thao tác cho một hoặc nhiều thiết bị.</sys:String>
+    <sys:String x:Key="Nav_DevicesManagerTooltip">Mở Quản lí thiết bị để chọn thao tác cho một hoặc nhiều thiết bị.</sys:String>
     <sys:String x:Key="Nav_ChangeSingleDeviceTooltip">Mở khu vực cấu hình và đổi cho một thiết bị đang chọn.</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDeviceTooltip">Mở khu vực áp dụng thao tác cho nhiều thiết bị đã chọn.</sys:String>
     <sys:String x:Key="Nav_SettingsTooltip">Mở cài đặt và tùy chọn của ứng dụng.</sys:String>

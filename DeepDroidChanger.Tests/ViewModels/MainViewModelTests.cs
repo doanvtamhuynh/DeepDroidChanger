@@ -45,13 +45,13 @@ public sealed class MainViewModelTests
         themes.Received(1).ApplyTheme("Light");
 
         viewModel.NavigateChangeMultipleDevicesCommand.Execute(null);
-        Assert.IsTrue(viewModel.IsChangeDevicesActive);
+        Assert.IsTrue(viewModel.IsDevicesManagerActive);
         Assert.IsTrue(viewModel.IsChangeMultipleDevicesActive);
         Assert.IsFalse(viewModel.IsChangeSingleDeviceActive);
         viewModel.NavigateSettingsCommand.Execute(null);
         Assert.IsTrue(viewModel.IsSettingsActive);
         viewModel.NavigateChangeSingleDeviceCommand.Execute(null);
-        Assert.IsTrue(viewModel.IsChangeDevicesActive);
+        Assert.IsTrue(viewModel.IsDevicesManagerActive);
         Assert.IsTrue(viewModel.IsChangeSingleDeviceActive);
         Assert.IsFalse(viewModel.IsChangeMultipleDevicesActive);
         CollectionAssert.AreEqual(
@@ -60,7 +60,7 @@ public sealed class MainViewModelTests
     }
 
     [TestMethod]
-    public void ChangeDevicesMenus_KeepExpandedSubmenuAndCloseCollapsedFlyout()
+    public void DevicesManagerMenus_KeepExpandedSubmenuAndCloseCollapsedFlyout()
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
         localization.NormalizeLanguage(Arg.Any<string>()).Returns("en");
@@ -72,45 +72,45 @@ public sealed class MainViewModelTests
             themes,
             Substitute.For<ISettingsService>());
 
-        Assert.IsFalse(viewModel.IsChangeDevicesSubmenuOpen);
-        Assert.IsFalse(viewModel.IsChangeDevicesFlyoutOpen);
-        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.ChevronDown, viewModel.ChangeDevicesChevronIconKind);
+        Assert.IsFalse(viewModel.IsDevicesManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerFlyoutOpen);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.ChevronDown, viewModel.DevicesManagerChevronIconKind);
 
-        viewModel.ToggleChangeDevicesMenuCommand.Execute(null);
+        viewModel.ToggleDevicesManagerMenuCommand.Execute(null);
 
-        Assert.IsTrue(viewModel.IsChangeDevicesSubmenuOpen);
-        Assert.IsFalse(viewModel.IsChangeDevicesFlyoutOpen);
-        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.ChevronUp, viewModel.ChangeDevicesChevronIconKind);
+        Assert.IsTrue(viewModel.IsDevicesManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerFlyoutOpen);
+        Assert.AreEqual(MaterialDesignThemes.Wpf.PackIconKind.ChevronUp, viewModel.DevicesManagerChevronIconKind);
 
         viewModel.NavigateChangeMultipleDevicesCommand.Execute(null);
 
         Assert.IsTrue(viewModel.IsChangeMultipleDevicesActive);
-        Assert.IsTrue(viewModel.IsChangeDevicesSubmenuOpen);
+        Assert.IsTrue(viewModel.IsDevicesManagerSubmenuOpen);
 
         viewModel.ToggleSidebarCommand.Execute(null);
 
         Assert.IsTrue(viewModel.IsSidebarCollapsed);
-        Assert.IsFalse(viewModel.IsChangeDevicesSubmenuOpen);
-        Assert.IsFalse(viewModel.IsChangeDevicesFlyoutOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerFlyoutOpen);
 
-        viewModel.ToggleChangeDevicesMenuCommand.Execute(null);
+        viewModel.ToggleDevicesManagerMenuCommand.Execute(null);
 
-        Assert.IsFalse(viewModel.IsChangeDevicesSubmenuOpen);
-        Assert.IsTrue(viewModel.IsChangeDevicesFlyoutOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerSubmenuOpen);
+        Assert.IsTrue(viewModel.IsDevicesManagerFlyoutOpen);
 
         viewModel.NavigateChangeSingleDeviceCommand.Execute(null);
 
         Assert.IsTrue(viewModel.IsChangeSingleDeviceActive);
-        Assert.IsFalse(viewModel.IsChangeDevicesFlyoutOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerFlyoutOpen);
 
-        viewModel.ToggleChangeDevicesMenuCommand.Execute(null);
-        Assert.IsTrue(viewModel.IsChangeDevicesFlyoutOpen);
+        viewModel.ToggleDevicesManagerMenuCommand.Execute(null);
+        Assert.IsTrue(viewModel.IsDevicesManagerFlyoutOpen);
 
         viewModel.NavigateSettingsCommand.Execute(null);
 
         Assert.IsTrue(viewModel.IsSettingsActive);
-        Assert.IsFalse(viewModel.IsChangeDevicesSubmenuOpen);
-        Assert.IsFalse(viewModel.IsChangeDevicesFlyoutOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerSubmenuOpen);
+        Assert.IsFalse(viewModel.IsDevicesManagerFlyoutOpen);
     }
 
     [TestMethod]
