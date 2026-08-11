@@ -20,16 +20,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
     private readonly ICarrierDataService _carrierDataService;
     private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
-    private readonly IDeviceActionService? _deviceActionService;
+    private readonly IDeviceActionService _deviceActionService;
     private readonly IDeviceChangeService _deviceChangeService;
     private readonly IDeviceConfigService _deviceConfigService;
-    private readonly IDeviceLocationService? _deviceLocationService;
+    private readonly IDeviceLocationService _deviceLocationService;
     private readonly IDeviceListService _deviceListService;
     private readonly IDeviceActionGuardService _deviceActionGuardService;
-    private readonly IDeviceTimezoneService? _deviceTimezoneService;
-    private readonly IChangeLocationDialogService? _changeLocationDialogService;
-    private readonly IChangeTimezoneDialogService? _changeTimezoneDialogService;
-    private readonly IDeviceViewerDialogService? _deviceViewerDialogService;
+    private readonly IDeviceTimezoneService _deviceTimezoneService;
+    private readonly IChangeLocationDialogService _changeLocationDialogService;
+    private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
+    private readonly IDeviceViewerDialogService _deviceViewerDialogService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
     private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
@@ -51,6 +51,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         new(StringComparer.OrdinalIgnoreCase);
     private readonly object _pendingConfigSaveLock = new();
     private readonly object _pendingSettingsSaveLock = new();
+    private readonly object _locationTimezoneWorkflowsLock = new();
+    private readonly Dictionary<Task, CancellationTokenSource> _locationTimezoneWorkflows = [];
     private readonly List<DeviceRowViewModel> _allDeviceRows = [];
     private readonly Dictionary<string, DeviceInfoApiDevice> _randomDeviceProfiles =
         new(StringComparer.OrdinalIgnoreCase);
@@ -137,12 +139,12 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IPollingService pollingService,
         AppSettings settings,
         ILogger<ChangeMultipleDevicesViewModel> logger,
-        IDeviceActionService? deviceActionService = null,
-        IDeviceLocationService? deviceLocationService = null,
-        IDeviceTimezoneService? deviceTimezoneService = null,
-        IChangeLocationDialogService? changeLocationDialogService = null,
-        IChangeTimezoneDialogService? changeTimezoneDialogService = null,
-        IDeviceViewerDialogService? deviceViewerDialogService = null)
+        IDeviceActionService deviceActionService,
+        IDeviceLocationService deviceLocationService,
+        IDeviceTimezoneService deviceTimezoneService,
+        IChangeLocationDialogService changeLocationDialogService,
+        IChangeTimezoneDialogService changeTimezoneDialogService,
+        IDeviceViewerDialogService deviceViewerDialogService)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
@@ -279,6 +281,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     public async Task DeactivateAsync()
     {
+        await CancelLocationTimezoneWorkflowsAsync().ConfigureAwait(false);
         await FlushPendingDeviceEditsAsync().ConfigureAwait(false);
         await FlushPendingConfigurationSaveAsync().ConfigureAwait(false);
         await FlushPendingSettingsSaveAsync().ConfigureAwait(false);
@@ -564,16 +567,34 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                && _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedLocationsAsync()
+    [RelayCommand(CanExecute = nameof(CanRunSelectedLocationOrTimezoneAction), AllowConcurrentExecutions = true)]
+    private Task ChangeSelectedLocationsAsync(CancellationToken cancellationToken)
     {
-        return RunSelectedLocationOrTimezoneAsync(isLocation: true, CancellationToken.None);
+        return StartLocationTimezoneWorkflowAsync(isLocation: true, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedTimezonesAsync()
+    [RelayCommand(CanExecute = nameof(CanRunSelectedLocationOrTimezoneAction), AllowConcurrentExecutions = true)]
+    private Task ChangeSelectedTimezonesAsync(CancellationToken cancellationToken)
     {
-        return RunSelectedLocationOrTimezoneAsync(isLocation: false, CancellationToken.None);
+        return StartLocationTimezoneWorkflowAsync(isLocation: false, cancellationToken);
+    }
+
+    private Task StartLocationTimezoneWorkflowAsync(
+        bool isLocation,
+        CancellationToken commandCancellationToken)
+    {
+        var workflowCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            commandCancellationToken);
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_locationTimezoneWorkflowsLock)
+            _locationTimezoneWorkflows[completion.Task] = workflowCancellation;
+
+        _ = CompleteLocationTimezoneWorkflowAsync(
+            isLocation,
+            workflowCancellation,
+            completion);
+        return completion.Task;
     }
 
     private async Task RunSelectedLocationOrTimezoneAsync(
@@ -590,7 +611,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             if (selectedDevices.Length == 0)
                 return;
 
-            targets = await CreateInitialOnlineTargetsAsync(selectedDevices, cancellationToken)
+            targets = await CreateReservedEligibleTargetsAsync(selectedDevices, cancellationToken)
                 .ConfigureAwait(true);
             if (targets.Count == 0)
                 return;
@@ -602,18 +623,12 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             ChangeTimezoneDialogResult? timezoneResult = null;
             if (isLocation)
             {
-                if (_changeLocationDialogService == null)
-                    throw new InvalidOperationException("Change Location dialog service is unavailable.");
-
                 locationResult = await _changeLocationDialogService
                     .ShowChangeLocationBatchAsync(targets.Count, cancellationToken)
                     .ConfigureAwait(true);
             }
             else
             {
-                if (_changeTimezoneDialogService == null)
-                    throw new InvalidOperationException("Change Timezone dialog service is unavailable.");
-
                 timezoneResult = await _changeTimezoneDialogService
                     .ShowChangeTimezoneBatchAsync(targets.Count, cancellationToken)
                     .ConfigureAwait(true);
@@ -625,7 +640,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     ? "Log_ChangeLocationCanceled"
                     : "Log_ChangeTimezoneCanceled";
                 foreach (BatchActionTarget target in targets)
-                    await RunOnUiContextAsync(() => SetTargetLogWithoutRegistration(target, canceledKey))
+                    await RunOnUiContextAsync(() => SetTargetLog(target, canceledKey))
                         .ConfigureAwait(true);
                 return;
             }
@@ -657,7 +672,69 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private async Task<List<BatchActionTarget>> CreateInitialOnlineTargetsAsync(
+    private bool CanRunSelectedLocationOrTimezoneAction()
+    {
+        return _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
+    }
+
+    private async Task CompleteLocationTimezoneWorkflowAsync(
+        bool isLocation,
+        CancellationTokenSource workflowCancellation,
+        TaskCompletionSource completion)
+    {
+        try
+        {
+            await RunSelectedLocationOrTimezoneAsync(
+                    isLocation,
+                    workflowCancellation.Token)
+                .ConfigureAwait(false);
+            completion.TrySetResult();
+        }
+        catch (OperationCanceledException) when (workflowCancellation.IsCancellationRequested)
+        {
+            completion.TrySetCanceled(workflowCancellation.Token);
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(exception);
+        }
+        finally
+        {
+            lock (_locationTimezoneWorkflowsLock)
+                _locationTimezoneWorkflows.Remove(completion.Task);
+
+            workflowCancellation.Dispose();
+        }
+    }
+
+    private async Task CancelLocationTimezoneWorkflowsAsync()
+    {
+        Task[] workflows = RequestLocationTimezoneWorkflowCancellation();
+
+        if (workflows.Length == 0)
+            return;
+
+        try
+        {
+            await Task.WhenAll(workflows).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private Task[] RequestLocationTimezoneWorkflowCancellation()
+    {
+        lock (_locationTimezoneWorkflowsLock)
+        {
+            foreach (CancellationTokenSource cancellation in _locationTimezoneWorkflows.Values)
+                cancellation.Cancel();
+
+            return _locationTimezoneWorkflows.Keys.ToArray();
+        }
+    }
+
+    private async Task<List<BatchActionTarget>> CreateReservedEligibleTargetsAsync(
         IReadOnlyList<DeviceRowViewModel> selectedDevices,
         CancellationToken cancellationToken)
     {
@@ -761,9 +838,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                             ? "Log_ResolvingByIp"
                             : "Log_ApplyingLocation"))
                     .ConfigureAwait(false);
-                if (_deviceLocationService == null)
-                    throw new InvalidOperationException("Device Location service is unavailable.");
-
                 DeviceLocationResult applied = result.Mode == ChangeLocationMode.DeviceIp
                     ? await _deviceLocationService
                         .ApplyAsync(target.Device.Serial, result, targetCancellation.Token)
@@ -844,9 +918,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                             ? "Log_ResolvingByIp"
                             : "Log_ApplyingTimezone"))
                     .ConfigureAwait(false);
-                if (_deviceTimezoneService == null)
-                    throw new InvalidOperationException("Device Timezone service is unavailable.");
-
                 string appliedTimezone = await _deviceTimezoneService
                     .ApplyAsync(target.Device.Serial, result, targetCancellation.Token)
                     .ConfigureAwait(false);
@@ -970,18 +1041,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private void SetTargetLogWithoutRegistration(BatchActionTarget target, string resourceKey)
-    {
-        if (IsCurrentTarget(target))
-            SetDeviceLog(target.Device, resourceKey);
-    }
-
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task ViewDeviceAsync(DeviceRowViewModel? device)
     {
-        if (_deviceViewerDialogService == null)
-            return;
-
         device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
         if (device == null)
             return;
@@ -1036,7 +1098,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private async Task RefreshContextMenuStateAsync(DeviceRowViewModel? device)
     {
         device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
-        if (device == null || _deviceActionService == null)
+        if (device == null)
             return;
 
         device.IsContextMenuStateLoading = true;
@@ -1085,7 +1147,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private async Task ToggleGooglePackageAsync(DeviceRowViewModel? device, bool isGms)
     {
         device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
-        if (device == null || _deviceActionService == null)
+        if (device == null)
             return;
 
         try
@@ -1136,7 +1198,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private async Task ToggleWifiAsync(DeviceRowViewModel? device)
     {
         device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
-        if (device == null || _deviceActionService == null)
+        if (device == null)
             return;
 
         try
@@ -1168,7 +1230,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private async Task RebootDeviceAsync(DeviceRowViewModel? device)
     {
         device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
-        if (device == null || _deviceActionService == null)
+        if (device == null)
             return;
 
         try
@@ -3095,6 +3157,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     {
         lock (_activeBatchTargetsLock)
             _activeBatchTargets.Add(target);
+
+        NotifySelectionChanged();
     }
 
     private static Task StartBatchTargetWorker(BatchActionTarget target, Func<Task> worker)
@@ -3287,6 +3351,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         if (_isDisposed)
             return;
 
+        RequestLocationTimezoneWorkflowCancellation();
         FlushPendingDeviceEditsAsync().GetAwaiter().GetResult();
         FlushPendingConfigurationSaveAsync().GetAwaiter().GetResult();
         FlushPendingSettingsSaveAsync().GetAwaiter().GetResult();

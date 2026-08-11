@@ -106,24 +106,23 @@ public sealed class ArchitectureRuleTests
         Assert.Contains("<UserControl.Resources>", changeSingleDeviceView, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"DeviceActionsContextMenuStyle\"", sharedContextMenuResources, StringComparison.Ordinal);
         Assert.Contains(
-            "<ContextMenu Style=\"{DynamicResource DeviceActionsContextMenuStyle}\">",
+            "x:Key=\"DeviceActionsContextMenu\"",
+            sharedContextMenuResources,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "x:Shared=\"False\"",
+            sharedContextMenuResources,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Value=\"{DynamicResource DeviceActionsContextMenu}\"",
             changeSingleDeviceView,
             StringComparison.Ordinal);
         Assert.Contains(
-            "<ContextMenu Style=\"{DynamicResource DeviceActionsContextMenuStyle}\">",
-            changeMultipleDevicesView,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "DeviceActionsContextMenu}",
-            changeSingleDeviceView,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(
-            "DeviceActionsContextMenu}",
+            "Value=\"{DynamicResource DeviceActionsContextMenu}\"",
             changeMultipleDevicesView,
             StringComparison.Ordinal);
         Assert.Contains("DataGridCheckBoxStyle", changeSingleDeviceView, StringComparison.Ordinal);
-        AssertContextMenuCommandOrder(changeSingleDeviceView);
-        AssertContextMenuCommandOrder(changeMultipleDevicesView);
+        AssertContextMenuCommandOrder(sharedContextMenuResources);
         Assert.Contains(
             "Handler=\"OnDeviceRowContextMenuOpening\"",
             changeSingleDeviceView,
@@ -146,11 +145,7 @@ public sealed class ArchitectureRuleTests
             StringComparison.Ordinal);
         Assert.Contains(
             "PlacementTarget.DataContext.CanToggleContextMenuActions",
-            changeSingleDeviceView,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "PlacementTarget.DataContext.CanToggleContextMenuActions",
-            changeMultipleDevicesView,
+            sharedContextMenuResources,
             StringComparison.Ordinal);
         string changeSingleDeviceViewCodeBehind = File.ReadAllText(canonicalViewCodeBehind);
         Assert.Contains(

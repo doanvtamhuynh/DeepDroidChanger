@@ -20,6 +20,167 @@
     <sys:Double x:Key="DeviceActionsContextMenuDangerHoverOpacity">0.14</sys:Double>
     <sys:Double x:Key="DeviceActionsContextMenuDangerPressedOpacity">0.22</sys:Double>
 
+    <ContextMenu x:Key="DeviceActionsContextMenu"
+                 x:Shared="False"
+                 Style="{DynamicResource DeviceActionsContextMenuStyle}">
+        <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Cellphone"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeSingleDevice_ActionViewDevice}"
+                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceInfoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="InformationOutline"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeSingleDevice_RowMenuDeviceInfo}"
+                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.CopySerialCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="ContentCopy"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeSingleDevice_RowMenuCopySerial}"
+                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.ToggleGmsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Google"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Style="{DynamicResource DeviceActionsContextMenuGmsTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.TogglePlayStoreCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="GooglePlay"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Style="{DynamicResource DeviceActionsContextMenuPlayStoreTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.ToggleWifiCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Wifi"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Style="{DynamicResource DeviceActionsContextMenuWifiTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.RebootDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Restart"
+                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeSingleDevice_RowMenuRebootDevice}"
+                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
+        <Separator Style="{DynamicResource DeviceActionsContextMenuSeparatorStyle}"/>
+
+        <MenuItem Command="{Binding PlacementTarget.Tag.DeleteDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuDangerItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Delete"
+                                             Style="{DynamicResource DeviceActionsContextMenuDangerButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeSingleDevice_RowMenuDeleteDevice}"
+                               Style="{DynamicResource DeviceActionsContextMenuDangerButtonTextStyle}"/>
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding InputGestureText, RelativeSource={RelativeSource AncestorType=MenuItem}}"
+                               Style="{DynamicResource DeviceActionsContextMenuShortcutTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+    </ContextMenu>
+
     <Style x:Key="DeviceActionsContextMenuToggleTextBaseStyle"
            TargetType="TextBlock">
         <Setter Property="FontFamily"

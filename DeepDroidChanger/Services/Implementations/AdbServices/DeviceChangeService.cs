@@ -675,17 +675,9 @@ public sealed class DeviceChangeService : IDeviceChangeService
             {
                 try
                 {
-                    string latitude = LocationCoordinateRandomizer.RandomizeLatitude(
-                        selectedLocation.Latitude,
-                        random);
-                    string longitude = LocationCoordinateRandomizer.RandomizeLongitude(
-                        selectedLocation.Longitude,
-                        random);
-
-                    await _locationService.ApplyLocationAsync(
+                    await _locationService.ApplyCatalogLocationAsync(
                             serial,
-                            latitude,
-                            longitude,
+                            selectedLocation,
                             cancellationToken)
                         .ConfigureAwait(false);
                 }

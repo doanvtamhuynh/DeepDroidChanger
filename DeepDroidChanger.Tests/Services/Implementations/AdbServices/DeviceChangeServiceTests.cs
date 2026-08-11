@@ -982,8 +982,6 @@ public sealed partial class DeviceChangeServiceTests
         IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
         ILocationDataService locationDataService = Substitute.For<ILocationDataService>();
         IRandomService randomService = Substitute.For<IRandomService>();
-        randomService.RandomInRange(0, 1000).Returns(123, 456);
-
         var testLocations = new List<LocationOption>
         {
             new LocationOption("vn", "Viet Nam", "Hanoi", "Asia/Ho_Chi_Minh", "UTC+7", 21.0300, 105.8690)
@@ -991,6 +989,11 @@ public sealed partial class DeviceChangeServiceTests
         locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<LocationOption>>(testLocations));
         randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocations[0]);
         randomService.PickRandom(Arg.Any<IReadOnlyList<string>>()).Returns("Asia/Ho_Chi_Minh");
+        locationService.ApplyCatalogLocationAsync(
+                "SERIAL",
+                testLocations[0],
+                Arg.Any<CancellationToken>())
+            .Returns(new DeviceLocationResult("21.0123", "105.8456", "vn", "Hanoi"));
 
         DeviceChangeService service = CreateService(
             adb,
@@ -1011,7 +1014,10 @@ public sealed partial class DeviceChangeServiceTests
 
         await service.ChangeAsync("SERIAL", profile, changeSim: true, options, progress: null, CancellationToken.None);
 
-        await locationService.Received(1).ApplyLocationAsync("SERIAL", "21.0123", "105.8456", Arg.Any<CancellationToken>());
+        await locationService.Received(1).ApplyCatalogLocationAsync(
+            "SERIAL",
+            testLocations[0],
+            Arg.Any<CancellationToken>());
         await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "Asia/Ho_Chi_Minh", Arg.Any<CancellationToken>());
     }
 
@@ -1036,12 +1042,12 @@ public sealed partial class DeviceChangeServiceTests
             .Returns(Task.FromResult<IReadOnlyList<LocationOption>>([testLocation]));
         randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocation);
         randomService.PickRandom(Arg.Any<IReadOnlyList<string>>()).Returns("Asia/Ho_Chi_Minh");
-        locationService.ApplyLocationAsync(
+        locationService.ApplyCatalogLocationAsync(
                 Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<string>(),
+                Arg.Any<LocationOption>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new InvalidOperationException("location failed")));
+            .Returns(Task.FromException<DeviceLocationResult>(
+                new InvalidOperationException("location failed")));
         DeviceChangeService service = CreateService(
             adb,
             locationService: locationService,
@@ -1093,12 +1099,11 @@ public sealed partial class DeviceChangeServiceTests
         locationDataService.GetLocationsAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<IReadOnlyList<LocationOption>>([testLocation]));
         randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocation);
-        locationService.ApplyLocationAsync(
+        locationService.ApplyCatalogLocationAsync(
                 Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<string>(),
+                Arg.Any<LocationOption>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromCanceled(cancellationSource.Token));
+            .Returns(Task.FromCanceled<DeviceLocationResult>(cancellationSource.Token));
         DeviceChangeService service = CreateService(
             adb,
             locationService: locationService,
@@ -1144,7 +1149,7 @@ public sealed partial class DeviceChangeServiceTests
         await service.ChangeAsync("SERIAL", CreateProfile(), changeSim: true, options, progress: null, CancellationToken.None);
 
         await locationDataService.DidNotReceiveWithAnyArgs().GetLocationsAsync(Arg.Any<CancellationToken>());
-        await locationService.DidNotReceiveWithAnyArgs().ApplyLocationAsync(default!, default!, default!, default);
+        await locationService.DidNotReceiveWithAnyArgs().ApplyCatalogLocationAsync(default!, default!, default);
         await timezoneService.DidNotReceiveWithAnyArgs().ApplyTimezoneAsync(default!, default!, default);
     }
 
@@ -1166,6 +1171,11 @@ public sealed partial class DeviceChangeServiceTests
 
         randomService.PickRandom(Arg.Any<IReadOnlyList<LocationOption>>()).Returns(testLocations[1]);
         randomService.PickRandom(Arg.Any<IReadOnlyList<string>>()).Returns("America/Los_Angeles");
+        locationService.ApplyCatalogLocationAsync(
+                "SERIAL",
+                testLocations[1],
+                Arg.Any<CancellationToken>())
+            .Returns(new DeviceLocationResult("34.0000", "-118.2000", "us", "Los Angeles"));
 
         DeviceChangeService service = CreateService(
             adb,
@@ -1186,7 +1196,10 @@ public sealed partial class DeviceChangeServiceTests
 
         await service.ChangeAsync("SERIAL", profile, changeSim: true, options, progress: null, CancellationToken.None);
 
-        await locationService.Received(1).ApplyLocationAsync("SERIAL", "34.0000", "-118.2000", Arg.Any<CancellationToken>());
+        await locationService.Received(1).ApplyCatalogLocationAsync(
+            "SERIAL",
+            testLocations[1],
+            Arg.Any<CancellationToken>());
         await timezoneService.Received(1).ApplyTimezoneAsync("SERIAL", "America/Los_Angeles", Arg.Any<CancellationToken>());
     }
 }

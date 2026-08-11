@@ -79,6 +79,8 @@ namespace DeepDroidChanger.Services
                     window.DialogResult = result;
                 };
 
+                using CancellationTokenRegistration cancellationRegistration =
+                    DialogCancellation.RegisterClose(window, cancellationToken);
                 var dialogResult = window.ShowDialog() ?? false;
                 cancellationToken.ThrowIfCancellationRequested();
 
