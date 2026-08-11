@@ -451,7 +451,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         SynchronizeSelectedDeviceSettings();
     }
 
-    [RelayCommand(CanExecute = nameof(CanRandomizeSelectedDevices), AllowConcurrentExecutions = true)]
+    private bool CanRunSelectedDeviceBatchAction()
+    {
+        return CanOperateSelectedInfoDevice
+               && _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private async Task RandomSelectedDevicesAsync()
     {
         CancellationToken cancellationToken = CancellationToken.None;
@@ -518,11 +524,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private bool CanRandomizeSelectedDevices()
-    {
-        return CanRunSelectedDeviceBatchAction();
-    }
-
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeSelectedDevicesAsync()
     {
@@ -567,25 +568,19 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             CancellationToken.None);
     }
 
-    private bool CanRunSelectedDeviceBatchAction()
-    {
-        return CanOperateSelectedInfoDevice
-               && _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRunSelectedLocationOrTimezoneAction), AllowConcurrentExecutions = true)]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeSelectedLocationsAsync(CancellationToken cancellationToken)
     {
         return StartLocationTimezoneWorkflowAsync(isLocation: true, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanRunSelectedLocationOrTimezoneAction), AllowConcurrentExecutions = true)]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeSelectedTimezonesAsync(CancellationToken cancellationToken)
     {
         return StartLocationTimezoneWorkflowAsync(isLocation: false, cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanInstallSelectedPackages), AllowConcurrentExecutions = true)]
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task InstallSelectedPackagesAsync(CancellationToken cancellationToken)
     {
         DeviceRowViewModel[] selectedDevices = _allDeviceRows
@@ -599,11 +594,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 selectedDevices,
                 workflowCancellation),
             cancellationToken);
-    }
-
-    private bool CanInstallSelectedPackages()
-    {
-        return _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
     }
 
     private Task StartLocationTimezoneWorkflowAsync(
@@ -868,11 +858,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             CompleteBatchTarget(target);
         }
-    }
-
-    private bool CanRunSelectedLocationOrTimezoneAction()
-    {
-        return _allDeviceRows.Any(device => device.IsSelected && !IsDeviceBusy(device));
     }
 
     private Task StartTrackedDialogBatchWorkflow(
