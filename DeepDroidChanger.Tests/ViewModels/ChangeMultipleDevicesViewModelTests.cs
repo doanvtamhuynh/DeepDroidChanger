@@ -338,6 +338,114 @@ public sealed class ChangeMultipleDevicesViewModelTests
     }
 
     [TestMethod]
+    public async Task SelectedInfoDeviceChange_NotifiesAllSharedBatchCommandsInBothDirections()
+    {
+        IDeviceActionGuardService deviceActionGuard = new DeviceActionGuardService();
+        using IDisposable busyDeviceLease = deviceActionGuard.TryAcquire("A")!;
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "A", Name = "Busy" },
+                    new StoredDeviceConfig { Serial = "B", Name = "Ready" }
+                ],
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] },
+            deviceActionGuard: deviceActionGuard);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        var sharedGuardCommands = new (string Name, System.Windows.Input.ICommand Command)[]
+        {
+            (nameof(viewModel.RandomSelectedDevicesCommand), viewModel.RandomSelectedDevicesCommand),
+            (nameof(viewModel.ChangeSelectedDevicesCommand), viewModel.ChangeSelectedDevicesCommand),
+            (nameof(viewModel.RandomChangeAndWipeSelectedDevicesCommand), viewModel.RandomChangeAndWipeSelectedDevicesCommand),
+            (nameof(viewModel.ChangeSelectedDevicesWithoutWipeCommand), viewModel.ChangeSelectedDevicesWithoutWipeCommand),
+            (nameof(viewModel.WipeSelectedDevicesWithoutChangeCommand), viewModel.WipeSelectedDevicesWithoutChangeCommand),
+            (nameof(viewModel.RandomSelectedSimsCommand), viewModel.RandomSelectedSimsCommand),
+            (nameof(viewModel.ChangeSelectedSimsCommand), viewModel.ChangeSelectedSimsCommand),
+            (nameof(viewModel.ChangeSelectedLocationsCommand), viewModel.ChangeSelectedLocationsCommand),
+            (nameof(viewModel.ChangeSelectedTimezonesCommand), viewModel.ChangeSelectedTimezonesCommand),
+            (nameof(viewModel.InstallSelectedPackagesCommand), viewModel.InstallSelectedPackagesCommand)
+        };
+        var notifications = sharedGuardCommands.ToDictionary(command => command.Name, _ => 0);
+        foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+        {
+            string commandName = name;
+            command.CanExecuteChanged += (_, _) => notifications[commandName]++;
+        }
+
+        void AssertSharedGuardState(bool expected, string state)
+        {
+            foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+            {
+                Assert.AreEqual(expected, command.CanExecute(null), $"{name} should be {state}.");
+            }
+        }
+
+        Assert.AreSame(deviceA, viewModel.SelectedInfoDevice);
+        AssertSharedGuardState(false, "disabled while the info device is busy");
+
+        viewModel.SelectedInfoDevice = deviceB;
+
+        foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+        {
+            Assert.IsGreaterThan(0, notifications[name], $"{name} did not notify after selecting a free info device.");
+        }
+        AssertSharedGuardState(true, "enabled after selecting a free info device");
+
+        var notificationsBeforeBusy = notifications.ToDictionary(pair => pair.Key, pair => pair.Value);
+        using IDisposable secondBusyDeviceLease = deviceActionGuard.TryAcquire("B")!;
+        AssertSharedGuardState(false, "disabled when the selected info device becomes busy");
+        foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+        {
+            Assert.IsGreaterThan(
+                notificationsBeforeBusy[name],
+                notifications[name],
+                $"{name} did not notify when the selected info device became busy.");
+        }
+
+        var notificationsBeforeRelease = notifications.ToDictionary(pair => pair.Key, pair => pair.Value);
+        secondBusyDeviceLease.Dispose();
+        AssertSharedGuardState(true, "enabled after the selected info device becomes free");
+        foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+        {
+            Assert.IsGreaterThan(
+                notificationsBeforeRelease[name],
+                notifications[name],
+                $"{name} did not notify when the selected info device became free.");
+        }
+
+        var notificationsBeforeBusySelection = notifications.ToDictionary(pair => pair.Key, pair => pair.Value);
+        viewModel.SelectedInfoDevice = deviceA;
+        AssertSharedGuardState(false, "disabled after switching back to the busy info device");
+        foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+        {
+            Assert.IsGreaterThan(
+                notificationsBeforeBusySelection[name],
+                notifications[name],
+                $"{name} did not notify after switching back to a busy info device.");
+        }
+
+        var notificationsBeforeNullSelection = notifications.ToDictionary(pair => pair.Key, pair => pair.Value);
+        viewModel.SelectedInfoDevice = null;
+        AssertSharedGuardState(false, "disabled when the info device is cleared");
+        foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
+        {
+            Assert.IsGreaterThan(
+                notificationsBeforeNullSelection[name],
+                notifications[name],
+                $"{name} did not notify when the info device was cleared.");
+        }
+
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
     public async Task Dispose_WithLocationDialogOpen_DoesNotWaitForDialogCompletion()
     {
         TestContext context = CreateContext(

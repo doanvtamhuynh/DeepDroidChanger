@@ -1773,6 +1773,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             randomDevice: randomDevice,
             simProfileService: simProfileService);
         await viewModel.InitializeAsync(CancellationToken.None);
+        int randomSimCanExecuteChanged = 0;
+        viewModel.RandomSimCommand.CanExecuteChanged += (_, _) => randomSimCanExecuteChanged++;
 
         Task randomDeviceTask = viewModel.RandomDeviceCommand.ExecuteAsync(null);
         await randomDeviceStarted.Task;
@@ -1781,6 +1783,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsTrue(viewModel.SelectedDevice!.IsActionBusy);
         Assert.IsFalse(viewModel.SelectedDevice.CanEdit);
         Assert.IsFalse(viewModel.RandomSimCommand.CanExecute(null));
+        Assert.IsGreaterThan(0, randomSimCanExecuteChanged);
         await viewModel.RandomSimCommand.ExecuteAsync(null);
         simProfileService.DidNotReceiveWithAnyArgs().CreateRandomProfile(default, default);
 
@@ -1800,6 +1803,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsFalse(viewModel.SelectedDevice.IsActionBusy);
         Assert.IsTrue(viewModel.SelectedDevice.CanEdit);
         Assert.IsTrue(viewModel.RandomSimCommand.CanExecute(null));
+        Assert.IsGreaterThan(1, randomSimCanExecuteChanged);
         await viewModel.RandomSimCommand.ExecuteAsync(null);
 
         simProfileService.Received(1).CreateRandomProfile(
@@ -1956,12 +1960,15 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.AreEqual("Log_Ready", deviceA.Process);
         Assert.AreEqual(DeviceProcessState.Ready, deviceA.ProcessState);
 
+        int changeDeviceCanExecuteChanged = 0;
+        viewModel.ChangeDeviceCommand.CanExecuteChanged += (_, _) => changeDeviceCanExecuteChanged++;
         viewModel.SelectedDevice = deviceB;
 
         Assert.IsFalse(deviceB.IsActionBusy);
         Assert.IsTrue(deviceB.CanEdit);
         Assert.IsTrue(viewModel.CanInteractWithSelectedDevice);
         Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        Assert.IsGreaterThan(0, changeDeviceCanExecuteChanged);
         Dictionary<string, bool> otherDeviceActionStates = GetGuardedActionStates(viewModel);
         Assert.IsTrue(
             otherDeviceActionStates.All(pair => pair.Value),
@@ -1985,6 +1992,61 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
 
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task NonSelectedBusyRow_RefreshesDeleteWithoutDisablingSelectedActions()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone A", Type = "Phone" },
+            new() { Serial = "B", Name = "Phone B", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                storedDevices,
+                [
+                    new AdbDevice("A", AdbDeviceStatus.Online),
+                    new AdbDevice("B", AdbDeviceStatus.Online)
+                ]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IDeviceActionGuardService deviceActionGuard = new DeviceActionGuardService();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceActionGuard: deviceActionGuard);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        viewModel.SelectedDevice = deviceA;
+        Assert.IsTrue(viewModel.DeleteDeviceCommand.CanExecute(deviceB));
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+
+        int deleteCanExecuteChanged = 0;
+        int randomDeviceCanExecuteChanged = 0;
+        viewModel.DeleteDeviceCommand.CanExecuteChanged += (_, _) => deleteCanExecuteChanged++;
+        viewModel.RandomDeviceCommand.CanExecuteChanged += (_, _) => randomDeviceCanExecuteChanged++;
+
+        using IDisposable busyDeviceLease = deviceActionGuard.TryAcquire("B")!;
+        Assert.IsTrue(deviceB.IsActionBusy);
+        Assert.IsGreaterThan(0, deleteCanExecuteChanged);
+        Assert.IsFalse(viewModel.DeleteDeviceCommand.CanExecute(deviceB));
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        Assert.AreEqual(0, randomDeviceCanExecuteChanged);
+
+        int notificationsBeforeRelease = deleteCanExecuteChanged;
+        busyDeviceLease.Dispose();
+        Assert.IsFalse(deviceB.IsActionBusy);
+        Assert.IsGreaterThan(notificationsBeforeRelease, deleteCanExecuteChanged);
+        Assert.IsTrue(viewModel.DeleteDeviceCommand.CanExecute(deviceB));
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        Assert.AreEqual(0, randomDeviceCanExecuteChanged);
+
+        await viewModel.DeactivateAsync();
     }
 
     [TestMethod]

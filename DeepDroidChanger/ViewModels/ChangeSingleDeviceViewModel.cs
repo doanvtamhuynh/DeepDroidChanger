@@ -413,8 +413,12 @@ namespace DeepDroidChanger.ViewModels
                 foreach (DeviceRowViewModel device in _allDeviceRows.Where(device => SerialEquals(device.Serial, serial)))
                     device.IsActionBusy = isBusy;
 
-                if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, serial))
+                bool selectedDeviceChangedBusy = SelectedDevice != null
+                    && SerialEquals(SelectedDevice.Serial, serial);
+                if (selectedDeviceChangedBusy)
                     NotifyDeviceInteractionChanged();
+                else
+                    DeleteDeviceCommand.NotifyCanExecuteChanged();
             }
 
             if (_uiDispatcher.CheckAccess())

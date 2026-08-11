@@ -223,6 +223,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             ApplySelectedDeviceInfo(value);
             OnPropertyChanged(nameof(CanInteractWithSelectedInfoDevice));
             OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
+            NotifyBatchActionCanExecuteChanged();
             ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
         }
     }
@@ -2753,6 +2754,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
         AddNewDevicesCommand.NotifyCanExecuteChanged();
         OpenAdvancedChangeConfigCommand.NotifyCanExecuteChanged();
+        NotifyBatchActionCanExecuteChanged();
+        ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
+        DeleteDeviceCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyBatchActionCanExecuteChanged()
+    {
         RandomSelectedDevicesCommand.NotifyCanExecuteChanged();
         ChangeSelectedDevicesCommand.NotifyCanExecuteChanged();
         RandomChangeAndWipeSelectedDevicesCommand.NotifyCanExecuteChanged();
@@ -2763,8 +2771,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         ChangeSelectedLocationsCommand.NotifyCanExecuteChanged();
         ChangeSelectedTimezonesCommand.NotifyCanExecuteChanged();
         InstallSelectedPackagesCommand.NotifyCanExecuteChanged();
-        ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
-        DeleteDeviceCommand.NotifyCanExecuteChanged();
     }
 
     private async Task RefreshNewDeviceCountAsync(CancellationToken cancellationToken)
