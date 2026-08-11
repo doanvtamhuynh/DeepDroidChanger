@@ -27,6 +27,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IInstallPackageDialogService _installPackageDialogService;
+        private readonly IPackageInstallService _packageInstallService;
         private readonly IDeviceViewerDialogService _deviceViewerDialogService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
         private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
@@ -100,6 +101,7 @@ namespace DeepDroidChanger.ViewModels
             IUpdateIntegrityDialogService updateIntegrityDialogService,
             IDeviceIntegrityService deviceIntegrityService,
             IInstallPackageDialogService installPackageDialogService,
+            IPackageInstallService packageInstallService,
             IDeviceViewerDialogService deviceViewerDialogService,
             IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
             IAdvancedChangeConfigDialogService advancedChangeConfigDialogService,
@@ -130,6 +132,7 @@ namespace DeepDroidChanger.ViewModels
             _updateIntegrityDialogService = updateIntegrityDialogService;
             _deviceIntegrityService = deviceIntegrityService;
             _installPackageDialogService = installPackageDialogService;
+            _packageInstallService = packageInstallService;
             _deviceViewerDialogService = deviceViewerDialogService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
             _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
@@ -355,6 +358,15 @@ namespace DeepDroidChanger.ViewModels
             DeviceRowViewModel currentDevice = _allDeviceRows.FirstOrDefault(
                 row => SerialEquals(row.Serial, device.Serial)) ?? device;
             currentDevice.SetProcess(message, resourceKey);
+            _logger.LogInformation("Device {Serial} action: {Message}", device.Serial, message);
+        }
+
+        private void ResetDeviceLogToReady(DeviceRowViewModel device)
+        {
+            string message = GetLogText("Log_Ready");
+            DeviceRowViewModel currentDevice = _allDeviceRows.FirstOrDefault(
+                row => SerialEquals(row.Serial, device.Serial)) ?? device;
+            currentDevice.RestoreProcess(message, DeviceProcessState.Ready);
             _logger.LogInformation("Device {Serial} action: {Message}", device.Serial, message);
         }
 
@@ -1792,48 +1804,120 @@ namespace DeepDroidChanger.ViewModels
                     .ShowInstallPackageAsync(device.Serial, device.Name, cancellationToken)
                     .ConfigureAwait(true);
 
-                if (dialogResult == null || dialogResult.TotalCount == 0)
+                if (dialogResult == null)
                 {
                     await ShowDeviceLogAsync(device, "Log_InstallPackageCanceled", cancellationToken).ConfigureAwait(true);
-                    SetDeviceLog(device, "Log_Ready");
+                    ResetDeviceLogToReady(device);
                     return;
                 }
 
-                string summaryKey = CreateInstallPackageSummaryKey(dialogResult);
-                await ShowDeviceLogAsync(
-                        device,
-                        summaryKey,
-                        cancellationToken,
-                        dialogResult.SuccessCount,
-                        dialogResult.TotalCount)
-                    .ConfigureAwait(true);
-                SetDeviceLog(device, "Log_Ready");
+                bool isOnline;
+                try
+                {
+                    isOnline = await _deviceListService
+                        .IsDeviceOnlineAsync(device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Live ADB confirmation failed for device {Serial} after install dialog.",
+                        device.Serial);
+                    isOnline = false;
+                }
+
+                if (!isOnline)
+                {
+                    await ShowDeviceLogAsync(device, "Log_DeviceMustBeOnline", cancellationToken)
+                        .ConfigureAwait(true);
+                    ResetDeviceLogToReady(device);
+                    return;
+                }
+
+                int successCount = 0;
+                int totalCount = dialogResult.FilePaths.Count;
+                InstallPackageResult? singlePackageResult = null;
+                foreach (string filePath in dialogResult.FilePaths)
+                {
+                    SetDeviceLog(device, "Log_InstallPackageInstalling");
+
+                    InstallPackageResult result;
+                    try
+                    {
+                        result = await _packageInstallService
+                            .InstallAsync(
+                                device.Serial,
+                                filePath,
+                                dialogResult.Options,
+                                cancellationToken)
+                            .ConfigureAwait(true);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(
+                            exception,
+                            "Unexpected package installation failure for device {Serial}, file {FilePath}.",
+                            device.Serial,
+                            filePath);
+                        result = new InstallPackageResult(
+                            filePath,
+                            false,
+                            "Log_InstallPackageAdbFailure");
+                    }
+
+                    if (result.Success)
+                        successCount++;
+                    if (totalCount == 1)
+                        singlePackageResult = result;
+                }
+
+                if (singlePackageResult is { } singleResult)
+                {
+                    await ShowDeviceLogAsync(
+                            device,
+                            singleResult.MessageResourceKey,
+                            CancellationToken.None,
+                            singleResult.MessageArguments.ToArray())
+                        .ConfigureAwait(true);
+                }
+                else
+                {
+                    string summaryKey = successCount == totalCount
+                        ? "Log_InstallPackageCompleteFormat"
+                        : successCount > 0
+                            ? "Log_InstallPackagePartialFormat"
+                            : "Log_InstallPackageFailedFormat";
+                    await ShowDeviceLogAsync(
+                            device,
+                            summaryKey,
+                            CancellationToken.None,
+                            successCount,
+                            totalCount)
+                        .ConfigureAwait(true);
+                }
+
+                ResetDeviceLogToReady(device);
             }
             catch (OperationCanceledException)
             {
                 await ShowDeviceLogAsync(device, "Log_InstallPackageCanceled", CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, "Log_Ready");
+                ResetDeviceLogToReady(device);
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Failed to install package for selected device.");
                 await ShowDeviceLogAsync(device, "Log_InstallPackageAdbFailure", CancellationToken.None).ConfigureAwait(true);
-                SetDeviceLog(device, "Log_Ready");
+                ResetDeviceLogToReady(device);
             }
-        }
-
-        private static string CreateInstallPackageSummaryKey(InstallPackageDialogResult result)
-        {
-            if (result.Canceled)
-                return "Log_InstallPackageCanceled";
-
-            if (result.FailedCount == 0 && result.SuccessCount == result.TotalCount)
-                return "Log_InstallPackageCompleteFormat";
-
-            if (result.SuccessCount > 0)
-                return "Log_InstallPackagePartialFormat";
-
-            return "Log_InstallPackageFailedFormat";
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]

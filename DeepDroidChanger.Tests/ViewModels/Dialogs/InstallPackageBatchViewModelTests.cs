@@ -6,20 +6,30 @@ using NSubstitute;
 namespace DeepDroidChanger.Tests.ViewModels.Dialogs;
 
 [TestClass]
-public sealed class InstallPackageViewModelTests
+public sealed class InstallPackageBatchViewModelTests
 {
+    [TestMethod]
+    public void Initialize_SetsBatchTargetHeader()
+    {
+        using var viewModel = CreateViewModel(Substitute.For<IFilePickerDialogService>());
+
+        viewModel.InitializeBatch(3);
+
+        Assert.AreEqual(3, viewModel.BatchTargetCount);
+        Assert.AreEqual("Install packages on 3 devices", viewModel.DeviceInfoText);
+    }
+
     [TestMethod]
     public void StartInstallCommand_NoPackages_CannotExecute()
     {
-        using var viewModel = CreateViewModel(
-            Substitute.For<IFilePickerDialogService>());
-        viewModel.Initialize("SERIAL", "Pixel");
+        using var viewModel = CreateViewModel(Substitute.For<IFilePickerDialogService>());
+        viewModel.InitializeBatch(2);
 
         Assert.IsFalse(viewModel.StartInstallCommand.CanExecute(null));
     }
 
     [TestMethod]
-    public void AddFilesCommand_AddsSelectedPackagesInOrderAndIgnoresDuplicates()
+    public void AddFilesCommand_AddsFilesAndIgnoresDuplicatePaths()
     {
         IFilePickerDialogService filePicker = Substitute.For<IFilePickerDialogService>();
         filePicker.ShowOpenFileDialogMulti(Arg.Any<string>(), Arg.Any<string>())
@@ -52,13 +62,13 @@ public sealed class InstallPackageViewModelTests
     }
 
     [TestMethod]
-    public async Task StartInstallCommand_CreatesStableRequestWithQueueOrderAndOptions()
+    public async Task StartInstallCommand_CreatesStableBatchRequestWithQueueOrderAndOptions()
     {
         IFilePickerDialogService filePicker = Substitute.For<IFilePickerDialogService>();
         filePicker.ShowOpenFileDialogMulti(Arg.Any<string>(), Arg.Any<string>())
             .Returns(["one.apk", "two.xapk"]);
         using var viewModel = CreateViewModel(filePicker);
-        viewModel.Initialize("SERIAL", "Pixel");
+        viewModel.InitializeBatch(2);
         viewModel.GrantPermissions = false;
         viewModel.AllowDowngrade = true;
         viewModel.AddFilesCommand.Execute(null);
@@ -66,7 +76,7 @@ public sealed class InstallPackageViewModelTests
         viewModel.CloseRequested += (_, result) => closeResult = result;
 
         await viewModel.StartInstallCommand.ExecuteAsync(null);
-        InstallPackageRequest request = viewModel.BuildRequest()!;
+        InstallPackageBatchRequest request = viewModel.BuildRequest()!;
         viewModel.Packages.Clear();
 
         CollectionAssert.AreEqual(
@@ -77,11 +87,14 @@ public sealed class InstallPackageViewModelTests
         Assert.AreEqual(true, closeResult);
     }
 
-    private static InstallPackageViewModel CreateViewModel(
+    private static InstallPackageBatchViewModel CreateViewModel(
         IFilePickerDialogService filePicker)
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
-        localization.GetString(Arg.Any<string>()).Returns(callInfo => callInfo.Arg<string>());
-        return new InstallPackageViewModel(filePicker, localization);
+        localization.GetString(Arg.Any<string>()).Returns(callInfo =>
+            callInfo.Arg<string>() == "InstallPackage_BatchDeviceInfo"
+                ? "Install packages on {0} devices"
+                : callInfo.Arg<string>());
+        return new InstallPackageBatchViewModel(filePicker, localization);
     }
 }

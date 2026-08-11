@@ -8,12 +8,8 @@
     <sys:String x:Key="InstallPackage_GrantPermissions">Tự cấp quyền ứng dụng</sys:String>
     <sys:String x:Key="InstallPackage_AllowDowngrade">Cài phiên bản cũ hơn nếu cần</sys:String>
     <sys:String x:Key="InstallPackage_ColumnFile">Tệp</sys:String>
-    <sys:String x:Key="InstallPackage_ColumnStatus">Trạng thái</sys:String>
-    <sys:String x:Key="InstallPackage_ColumnProgress">Tiến trình</sys:String>
     <sys:String x:Key="InstallPackage_AddFiles">Thêm tệp</sys:String>
     <sys:String x:Key="InstallPackage_Remove">Xóa</sys:String>
     <sys:String x:Key="InstallPackage_Start">Bắt đầu cài</sys:String>
-    <sys:String x:Key="InstallPackage_Cancel">Hủy</sys:String>
-    <sys:String x:Key="InstallPackage_Close">Đóng</sys:String>
     <sys:String x:Key="InstallPackage_BatchDeviceInfo">C&#224;i c&#225;c g&#243;i tr&#234;n {0} thi&#7871;t b&#7883;</sys:String>
 </ResourceDictionary>

@@ -68,11 +68,9 @@
     <sys:String x:Key="Log_InstallPackageOpening">Đang mở cài APK/XAPK...</sys:String>
     <sys:String x:Key="Log_InstallPackageFilePickerTitle">Chọn tệp APK/XAPK</sys:String>
     <sys:String x:Key="Log_InstallPackageFilePickerFilter">Tệp gói Android (*.apk;*.xapk)|*.apk;*.xapk</sys:String>
-    <sys:String x:Key="Log_InstallPackagePending">Đang chờ</sys:String>
     <sys:String x:Key="Log_InstallPackageInstalling">Đang cài...</sys:String>
     <sys:String x:Key="Log_InstallPackageSuccess">Cài đặt thành công</sys:String>
     <sys:String x:Key="Log_InstallPackageCanceled">Đã hủy cài đặt</sys:String>
-    <sys:String x:Key="Log_InstallPackageNoFiles">Vui lòng chọn tệp APK/XAPK trước</sys:String>
     <sys:String x:Key="Log_InstallPackageCompleteFormat">Cài đặt hoàn tất: {0}/{1} thành công</sys:String>
     <sys:String x:Key="Log_InstallPackagePartialFormat">Cài đặt một phần: {0}/{1} thành công</sys:String>
     <sys:String x:Key="Log_InstallPackageFailedFormat">Cài đặt thất bại: {0}/{1} thành công</sys:String>

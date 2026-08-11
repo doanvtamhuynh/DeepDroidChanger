@@ -182,6 +182,7 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyViewModel>();
         services.AddTransient<UpdateIntegrityViewModel>();
         services.AddTransient<InstallPackageViewModel>();
+        services.AddTransient<InstallPackageBatchViewModel>();
 
         services.AddTransient<LoginDialog>();
         services.AddTransient<AddDevicesDialog>();
@@ -194,6 +195,7 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyDialog>();
         services.AddTransient<UpdateIntegrityDialog>();
         services.AddTransient<InstallPackageDialog>();
+        services.AddTransient<InstallPackageBatchDialog>();
     }
 
     private static void CopySettings(AppSettings source, AppSettings target)

@@ -8,12 +8,8 @@
     <sys:String x:Key="InstallPackage_GrantPermissions">Auto grant app permissions</sys:String>
     <sys:String x:Key="InstallPackage_AllowDowngrade">Install older version if needed</sys:String>
     <sys:String x:Key="InstallPackage_ColumnFile">File</sys:String>
-    <sys:String x:Key="InstallPackage_ColumnStatus">Status</sys:String>
-    <sys:String x:Key="InstallPackage_ColumnProgress">Progress</sys:String>
     <sys:String x:Key="InstallPackage_AddFiles">Add files</sys:String>
     <sys:String x:Key="InstallPackage_Remove">Remove</sys:String>
     <sys:String x:Key="InstallPackage_Start">Start install</sys:String>
-    <sys:String x:Key="InstallPackage_Cancel">Cancel</sys:String>
-    <sys:String x:Key="InstallPackage_Close">Close</sys:String>
     <sys:String x:Key="InstallPackage_BatchDeviceInfo">Install packages on {0} devices</sys:String>
 </ResourceDictionary>

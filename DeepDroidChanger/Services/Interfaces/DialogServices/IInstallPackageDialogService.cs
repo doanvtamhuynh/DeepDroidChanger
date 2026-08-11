@@ -3,7 +3,7 @@ namespace DeepDroidChanger.Services
 {
     public interface IInstallPackageDialogService
     {
-        Task<InstallPackageDialogResult?> ShowInstallPackageAsync(
+        Task<InstallPackageRequest?> ShowInstallPackageAsync(
             string deviceSerial,
             string deviceName,
             CancellationToken cancellationToken);

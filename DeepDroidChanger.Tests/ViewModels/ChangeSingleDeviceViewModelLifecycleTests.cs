@@ -2334,6 +2334,227 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         viewModel.Dispose();
     }
 
+    [TestMethod]
+    public async Task InstallApk_DialogClosed_DoesNotInstall()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [new() { Serial = "A", Name = "Phone", Type = "Phone" }];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IInstallPackageDialogService dialog = Substitute.For<IInstallPackageDialogService>();
+        dialog.ShowInstallPackageAsync("A", "Phone", Arg.Any<CancellationToken>())
+            .Returns((InstallPackageRequest?)null);
+        IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
+        var guard = new DeviceActionGuardService();
+        using var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceActionGuard: guard,
+            installPackageDialog: dialog,
+            packageInstall: packageInstall);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedDevice = viewModel.Devices[0];
+
+        await viewModel.InstallApkCommand.ExecuteAsync(null);
+
+        await packageInstall.DidNotReceiveWithAnyArgs()
+            .InstallAsync(default!, default!, default!, default);
+        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        Assert.IsFalse(guard.IsBusy("A"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallApk_RequestReturned_InstallsFilesSequentiallyAndContinuesAfterFailure()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [new() { Serial = "A", Name = "Phone", Type = "Phone" }];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IInstallPackageDialogService dialog = Substitute.For<IInstallPackageDialogService>();
+        var request = new InstallPackageRequest(
+            Array.AsReadOnly(new[] { "first.apk", "second.xapk" }),
+            new InstallPackageOptions(false, true));
+        dialog.ShowInstallPackageAsync("A", "Phone", Arg.Any<CancellationToken>()).Returns(request);
+        IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
+        packageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo => callInfo.ArgAt<string>(1) == "first.apk"
+                ? new InstallPackageResult("first.apk", false, "Log_InstallPackageVersionDowngrade")
+                : new InstallPackageResult("second.xapk", true, "Log_InstallPackageSuccess"));
+        using var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            installPackageDialog: dialog,
+            packageInstall: packageInstall);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedDevice = viewModel.Devices[0];
+
+        await viewModel.InstallApkCommand.ExecuteAsync(null);
+
+        await packageInstall.Received(1)
+            .InstallAsync("A", "first.apk", request.Options, Arg.Any<CancellationToken>());
+        await packageInstall.Received(1)
+            .InstallAsync("A", "second.xapk", request.Options, Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallApk_SinglePackageFailure_ShowsResultThenReturnsReady()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [new() { Serial = "A", Name = "Phone", Type = "Phone" }];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IInstallPackageDialogService dialog = Substitute.For<IInstallPackageDialogService>();
+        dialog.ShowInstallPackageAsync("A", "Phone", Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageRequest(
+                Array.AsReadOnly(new[] { "one.apk" }),
+                new InstallPackageOptions(true, false)));
+        IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
+        packageInstall.InstallAsync(
+                "A",
+                "one.apk",
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageResult(
+                "one.apk",
+                false,
+                "Log_InstallPackageVersionDowngrade"));
+        using var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            installPackageDialog: dialog,
+            packageInstall: packageInstall);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel device = viewModel.Devices[0];
+        viewModel.SelectedDevice = device;
+        var processLogs = new List<string>();
+        device.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(DeviceRowViewModel.Process))
+                processLogs.Add(device.Process);
+        };
+
+        await viewModel.InstallApkCommand.ExecuteAsync(null);
+
+        int failureIndex = processLogs.IndexOf("Log_InstallPackageVersionDowngrade");
+        int readyIndex = processLogs.LastIndexOf("Log_Ready");
+        Assert.IsTrue(failureIndex >= 0, "The detailed install result should be shown.");
+        Assert.IsTrue(readyIndex > failureIndex, "The Single install result should be reset to Ready afterward.");
+        Assert.AreEqual("Log_Ready", device.Process);
+        Assert.AreEqual(DeviceProcessState.Ready, device.ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallApk_OfflineAfterDialog_DoesNotInstall()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [new() { Serial = "A", Name = "Phone", Type = "Phone" }];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IInstallPackageDialogService dialog = Substitute.For<IInstallPackageDialogService>();
+        dialog.ShowInstallPackageAsync("A", "Phone", Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageRequest(
+                Array.AsReadOnly(new[] { "one.apk" }),
+                new InstallPackageOptions(true, false)));
+        IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
+        using var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            installPackageDialog: dialog,
+            packageInstall: packageInstall);
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true, false);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedDevice = viewModel.Devices[0];
+
+        await viewModel.InstallApkCommand.ExecuteAsync(null);
+
+        await packageInstall.DidNotReceiveWithAnyArgs()
+            .InstallAsync(default!, default!, default!, default);
+        await deviceList.Received(2)
+            .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task InstallApk_UnexpectedPackageException_ContinuesRemainingFiles()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [new() { Serial = "A", Name = "Phone", Type = "Phone" }];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IInstallPackageDialogService dialog = Substitute.For<IInstallPackageDialogService>();
+        dialog.ShowInstallPackageAsync("A", "Phone", Arg.Any<CancellationToken>())
+            .Returns(new InstallPackageRequest(
+                Array.AsReadOnly(new[] { "first.apk", "second.apk" }),
+                new InstallPackageOptions(true, false)));
+        IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
+        packageInstall.InstallAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<InstallPackageOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                if (callInfo.ArgAt<string>(1) == "first.apk")
+                    throw new InvalidOperationException("unexpected install failure");
+
+                return new InstallPackageResult("second.apk", true, "Log_InstallPackageSuccess");
+            });
+        using var viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            installPackageDialog: dialog,
+            packageInstall: packageInstall);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        viewModel.SelectedDevice = viewModel.Devices[0];
+
+        await viewModel.InstallApkCommand.ExecuteAsync(null);
+
+        await packageInstall.Received(1)
+            .InstallAsync("A", "first.apk", Arg.Any<InstallPackageOptions>(), Arg.Any<CancellationToken>());
+        await packageInstall.Received(1)
+            .InstallAsync("A", "second.apk", Arg.Any<InstallPackageOptions>(), Arg.Any<CancellationToken>());
+        Assert.AreEqual("Log_Ready", viewModel.Devices[0].Process);
+        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices[0].ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
     private static Dictionary<string, bool> GetGuardedActionStates(ChangeSingleDeviceViewModel viewModel)
     {
         return new Dictionary<string, bool>
@@ -2819,7 +3040,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IFakeProxyDialogService? fakeProxyDialog = null,
         IProxyWorkflowService? proxyWorkflowService = null,
         ISettingsService? settingsService = null,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        IInstallPackageDialogService? installPackageDialog = null,
+        IPackageInstallService? packageInstall = null)
     {
         deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
@@ -2851,7 +3074,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             proxyWorkflowService ?? Substitute.For<IProxyWorkflowService>(),
             Substitute.For<IUpdateIntegrityDialogService>(),
             Substitute.For<IDeviceIntegrityService>(),
-            Substitute.For<IInstallPackageDialogService>(),
+            installPackageDialog ?? Substitute.For<IInstallPackageDialogService>(),
+            packageInstall ?? Substitute.For<IPackageInstallService>(),
             deviceViewerDialog ?? Substitute.For<IDeviceViewerDialogService>(),
             deviceActionConfirmation ?? CreateDeviceActionConfirmationDialogService(),
             advancedChangeConfig ?? Substitute.For<IAdvancedChangeConfigDialogService>(),

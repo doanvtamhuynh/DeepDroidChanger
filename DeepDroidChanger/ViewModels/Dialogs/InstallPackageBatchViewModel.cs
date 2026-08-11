@@ -2,20 +2,19 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 
 namespace DeepDroidChanger.ViewModels;
 
-public sealed partial class InstallPackageViewModel : ObservableObject, IDisposable
+public sealed partial class InstallPackageBatchViewModel : ObservableObject, IDisposable
 {
     private readonly IFilePickerDialogService _filePickerDialogService;
     private readonly ILocalizationService _localizationService;
-    private InstallPackageRequest? _request;
+    private InstallPackageBatchRequest? _request;
     private bool _isDisposed;
 
-    public InstallPackageViewModel(
+    public InstallPackageBatchViewModel(
         IFilePickerDialogService filePickerDialogService,
         ILocalizationService localizationService)
     {
@@ -29,10 +28,7 @@ public sealed partial class InstallPackageViewModel : ObservableObject, IDisposa
     public event EventHandler<bool>? CloseRequested;
 
     [ObservableProperty]
-    private string _deviceSerial = string.Empty;
-
-    [ObservableProperty]
-    private string _deviceName = string.Empty;
+    private int _batchTargetCount;
 
     [ObservableProperty]
     private string _deviceInfoText = string.Empty;
@@ -46,10 +42,14 @@ public sealed partial class InstallPackageViewModel : ObservableObject, IDisposa
     [ObservableProperty]
     private bool _allowDowngrade;
 
-    public void Initialize(string deviceSerial, string deviceName)
+    public void InitializeBatch(int targetCount)
     {
-        DeviceSerial = deviceSerial;
-        DeviceName = deviceName;
+        BatchTargetCount = targetCount;
+        UpdateDeviceInfoText();
+    }
+
+    partial void OnBatchTargetCountChanged(int value)
+    {
         UpdateDeviceInfoText();
     }
 
@@ -102,7 +102,7 @@ public sealed partial class InstallPackageViewModel : ObservableObject, IDisposa
         return Task.CompletedTask;
     }
 
-    public InstallPackageRequest? BuildRequest()
+    public InstallPackageBatchRequest? BuildRequest()
     {
         return _request ?? BuildRequestCore();
     }
@@ -126,7 +126,7 @@ public sealed partial class InstallPackageViewModel : ObservableObject, IDisposa
         RemoveSelectedPackageCommand.NotifyCanExecuteChanged();
     }
 
-    private InstallPackageRequest? BuildRequestCore()
+    private InstallPackageBatchRequest? BuildRequestCore()
     {
         if (Packages.Count == 0)
             return null;
@@ -135,16 +135,14 @@ public sealed partial class InstallPackageViewModel : ObservableObject, IDisposa
             .Select(package => package.FilePath)
             .ToArray();
 
-        return new InstallPackageRequest(
+        return new InstallPackageBatchRequest(
             Array.AsReadOnly(filePaths),
             new InstallPackageOptions(GrantPermissions, AllowDowngrade));
     }
 
     private void UpdateDeviceInfoText()
     {
-        DeviceInfoText = DeviceInfoTextHelper.Create(
-            _localizationService,
-            DeviceName,
-            DeviceSerial);
+        string format = _localizationService.GetString("InstallPackage_BatchDeviceInfo");
+        DeviceInfoText = string.Format(format, BatchTargetCount);
     }
 }

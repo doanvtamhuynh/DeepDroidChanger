@@ -2,9 +2,9 @@ using System.Windows;
 
 namespace DeepDroidChanger.Views;
 
-public sealed partial class InstallPackageDialog : Window
+public sealed partial class InstallPackageBatchDialog : Window
 {
-    public InstallPackageDialog()
+    public InstallPackageBatchDialog()
     {
         InitializeComponent();
     }

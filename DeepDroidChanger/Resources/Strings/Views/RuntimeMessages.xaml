@@ -68,11 +68,9 @@
     <sys:String x:Key="Log_InstallPackageOpening">Opening APK/XAPK installer...</sys:String>
     <sys:String x:Key="Log_InstallPackageFilePickerTitle">Select APK/XAPK files</sys:String>
     <sys:String x:Key="Log_InstallPackageFilePickerFilter">Android package files (*.apk;*.xapk)|*.apk;*.xapk</sys:String>
-    <sys:String x:Key="Log_InstallPackagePending">Pending</sys:String>
     <sys:String x:Key="Log_InstallPackageInstalling">Installing...</sys:String>
     <sys:String x:Key="Log_InstallPackageSuccess">Installed successfully</sys:String>
     <sys:String x:Key="Log_InstallPackageCanceled">Install canceled</sys:String>
-    <sys:String x:Key="Log_InstallPackageNoFiles">Select APK/XAPK files first</sys:String>
     <sys:String x:Key="Log_InstallPackageCompleteFormat">Installation complete: {0}/{1} succeeded</sys:String>
     <sys:String x:Key="Log_InstallPackagePartialFormat">Installation partially completed: {0}/{1} succeeded</sys:String>
     <sys:String x:Key="Log_InstallPackageFailedFormat">Installation failed: {0}/{1} succeeded</sys:String>

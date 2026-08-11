@@ -1,79 +1,85 @@
-using DeepDroidChanger.ViewModels;
-using DeepDroidChanger.Models;
-using DeepDroidChanger.Views;
 using System.Windows;
+using DeepDroidChanger.Models;
+using DeepDroidChanger.ViewModels;
+using DeepDroidChanger.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace DeepDroidChanger.Services
+namespace DeepDroidChanger.Services;
+
+public sealed class InstallPackageDialogService : IInstallPackageDialogService
 {
-    public sealed class InstallPackageDialogService : IInstallPackageDialogService
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<InstallPackageDialogService> _logger;
+
+    public InstallPackageDialogService(
+        IServiceScopeFactory scopeFactory,
+        ILogger<InstallPackageDialogService> logger)
     {
-        private readonly IServiceScopeFactory _scopeFactory;
-        private readonly ILogger<InstallPackageDialogService> _logger;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+    }
 
-        public InstallPackageDialogService(
-            IServiceScopeFactory scopeFactory,
-            ILogger<InstallPackageDialogService> logger)
-        {
-            _scopeFactory = scopeFactory;
-            _logger = logger;
-        }
+    public Task<InstallPackageRequest?> ShowInstallPackageAsync(
+        string deviceSerial,
+        string deviceName,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
 
-        public Task<InstallPackageDialogResult?> ShowInstallPackageAsync(
-            string deviceSerial,
-            string deviceName,
-            CancellationToken cancellationToken)
-        {
-            return ShowAsync(
-                initialize: viewModel => viewModel.Initialize(deviceSerial, deviceName),
-                buildResult: viewModel => viewModel.BuildResult(),
-                cancellationToken: cancellationToken);
-        }
+        _logger.LogDebug("Opening Single Device Install Package dialog.");
+        using var scope = _scopeFactory.CreateScope();
+        InstallPackageViewModel viewModel = scope.ServiceProvider
+            .GetRequiredService<InstallPackageViewModel>();
+        viewModel.Initialize(deviceSerial, deviceName);
 
-        public Task<InstallPackageBatchRequest?> ShowInstallPackageBatchAsync(
-            int targetCount,
-            CancellationToken cancellationToken)
-        {
-            return ShowAsync(
-                initialize: viewModel => viewModel.InitializeBatch(targetCount),
-                buildResult: viewModel => viewModel.BuildBatchRequest(),
-                cancellationToken: cancellationToken);
-        }
+        InstallPackageDialog window = scope.ServiceProvider
+            .GetRequiredService<InstallPackageDialog>();
+        window.Owner = Application.Current?.MainWindow;
+        window.DataContext = viewModel;
+        viewModel.CloseRequested += (_, result) => window.DialogResult = result;
 
-        private Task<TResult?> ShowAsync<TResult>(
-            Action<InstallPackageViewModel> initialize,
-            Func<InstallPackageViewModel, TResult?> buildResult,
-            CancellationToken cancellationToken)
-            where TResult : class
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+        using CancellationTokenRegistration cancellationRegistration =
+            DialogCancellation.RegisterClose(window, cancellationToken);
+        bool dialogResult = window.ShowDialog() ?? false;
+        cancellationToken.ThrowIfCancellationRequested();
 
-            _logger.LogDebug("Opening Install Package dialog.");
-            using var scope = _scopeFactory.CreateScope();
+        InstallPackageRequest? request = dialogResult ? viewModel.BuildRequest() : null;
+        _logger.LogDebug(
+            "Single Device Install Package dialog closed. Result: {HasResult}.",
+            request != null);
 
-            var viewModel = scope.ServiceProvider.GetRequiredService<InstallPackageViewModel>();
-            initialize(viewModel);
+        return Task.FromResult(request);
+    }
 
-            var window = scope.ServiceProvider.GetRequiredService<InstallPackageDialog>();
-            window.Owner = Application.Current?.MainWindow;
-            window.DataContext = viewModel;
+    public Task<InstallPackageBatchRequest?> ShowInstallPackageBatchAsync(
+        int targetCount,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
 
-            viewModel.CloseRequested += (_, result) =>
-            {
-                window.DialogResult = result;
-            };
+        _logger.LogDebug("Opening Multiple Device Install Package dialog.");
+        using var scope = _scopeFactory.CreateScope();
+        InstallPackageBatchViewModel viewModel = scope.ServiceProvider
+            .GetRequiredService<InstallPackageBatchViewModel>();
+        viewModel.InitializeBatch(targetCount);
 
-            using CancellationTokenRegistration cancellationRegistration =
-                DialogCancellation.RegisterClose(window, cancellationToken);
-            bool dialogResult = window.ShowDialog() ?? false;
-            cancellationToken.ThrowIfCancellationRequested();
+        InstallPackageBatchDialog window = scope.ServiceProvider
+            .GetRequiredService<InstallPackageBatchDialog>();
+        window.Owner = Application.Current?.MainWindow;
+        window.DataContext = viewModel;
+        viewModel.CloseRequested += (_, result) => window.DialogResult = result;
 
-            TResult? result = dialogResult ? buildResult(viewModel) : null;
+        using CancellationTokenRegistration cancellationRegistration =
+            DialogCancellation.RegisterClose(window, cancellationToken);
+        bool dialogResult = window.ShowDialog() ?? false;
+        cancellationToken.ThrowIfCancellationRequested();
 
-            _logger.LogDebug("Install Package dialog closed. Result: {HasResult}.", result != null);
+        InstallPackageBatchRequest? request = dialogResult ? viewModel.BuildRequest() : null;
+        _logger.LogDebug(
+            "Multiple Device Install Package dialog closed. Result: {HasResult}.",
+            request != null);
 
-            return Task.FromResult(result);
-        }
+        return Task.FromResult(request);
     }
 }
