@@ -16,6 +16,7 @@ namespace DeepDroidChanger.Services
         private const int WindowSearchDelayMilliseconds = 75;
         private const int GracefulStopTimeoutMilliseconds = 1000;
         private const int StopTimeoutMilliseconds = 3000;
+        private const int StartupDiagnosticCapacity = 32;
         private const int GwlHwndParent = -8;
         private const int SW_HIDE = 0;
         private const int SW_SHOWNA = 8;
@@ -27,11 +28,17 @@ namespace DeepDroidChanger.Services
         private readonly CancellationTokenSource _lifetimeCancellation = new();
 
         private readonly ILogger<DeviceViewerStreamService> _logger;
-        private bool _disposed;
+        private readonly AdbToolPathResolver _toolPathResolver;
+        private readonly DeviceViewerProcessJob _processJob;
+        private int _disposed;
 
-        public DeviceViewerStreamService(ILogger<DeviceViewerStreamService> logger)
+        public DeviceViewerStreamService(
+            ILogger<DeviceViewerStreamService> logger,
+            AdbToolPathResolver? toolPathResolver = null)
         {
             _logger = logger;
+            _toolPathResolver = toolPathResolver ?? new AdbToolPathResolver();
+            _processJob = DeviceViewerProcessJob.Create(logger);
         }
 
         public async Task<IDeviceViewerStreamSession> StartAsync(
@@ -40,7 +47,7 @@ namespace DeepDroidChanger.Services
             DeviceViewerStreamBounds bounds,
             CancellationToken cancellationToken)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 _lifetimeCancellation.Token);
@@ -67,7 +74,7 @@ namespace DeepDroidChanger.Services
                 }
 
                 var session = await StartCoreAsync(serial, ownerHwnd, bounds, effectiveCancellationToken).ConfigureAwait(false);
-                if (_disposed)
+                if (Volatile.Read(ref _disposed) != 0)
                 {
                     await session.StopAsync(CancellationToken.None).ConfigureAwait(false);
                     session.Dispose();
@@ -89,20 +96,17 @@ namespace DeepDroidChanger.Services
             DeviceViewerStreamBounds bounds,
             CancellationToken cancellationToken)
         {
-            var toolPath = await ResolveToolPathAsync(cancellationToken).ConfigureAwait(false);
+            var toolPath = _toolPathResolver.GetScrcpyPath();
             var viewScreenPath = Path.GetDirectoryName(toolPath) ?? AppContext.BaseDirectory;
             var windowTitle = CreateWindowTitle(serial);
 
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = toolPath,
-                WorkingDirectory = viewScreenPath,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardError = true
-            };
-
-            AddScrcpyArguments(startInfo, serial, windowTitle, bounds);
+            var startInfo = CreateScrcpyStartInfo(
+                toolPath,
+                viewScreenPath,
+                serial,
+                windowTitle,
+                bounds,
+                _toolPathResolver.GetAdbPath());
 
             _logger.LogDebug(
                 "Starting external scrcpy for {Serial}.",
@@ -112,24 +116,24 @@ namespace DeepDroidChanger.Services
             if (process == null)
                 throw new InvalidOperationException("Failed to start scrcpy process.");
 
-            var startupErrors = new ConcurrentQueue<string>();
+            var startupErrors = new DeviceViewerDiagnosticBuffer(StartupDiagnosticCapacity);
+            var retainStartupDiagnostics = 1;
             process.ErrorDataReceived += (_, args) =>
             {
                 if (string.IsNullOrWhiteSpace(args.Data))
                     return;
 
-                startupErrors.Enqueue(args.Data);
-                _logger.LogDebug(
-                    "scrcpy emitted a diagnostic line for {Serial}. LineLength: {LineLength}",
-                    serial,
-                    args.Data.Length);
+                if (Volatile.Read(ref retainStartupDiagnostics) != 0)
+                    startupErrors.Add(args.Data);
             };
             process.BeginErrorReadLine();
+            _processJob.TryAssign(process, serial);
 
             try
             {
                 var streamHwnd = await FindStreamWindowAsync(process, windowTitle, startupErrors, cancellationToken)
                     .ConfigureAwait(false);
+                Volatile.Write(ref retainStartupDiagnostics, 0);
 
                 ConfigureExternalWindow(streamHwnd, ownerHwnd);
 
@@ -139,6 +143,14 @@ namespace DeepDroidChanger.Services
             }
             catch
             {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogDebug(
+                        "scrcpy startup failed for {Serial}. RetainedDiagnosticLineCount: {DiagnosticLineCount}",
+                        serial,
+                        startupErrors.Count);
+                }
+
                 await StopProcessAsync(process, _logger, CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
@@ -169,7 +181,7 @@ namespace DeepDroidChanger.Services
         private async Task<IntPtr> FindStreamWindowAsync(
             Process process,
             string windowTitle,
-            ConcurrentQueue<string> startupErrors,
+            DeviceViewerDiagnosticBuffer startupErrors,
             CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -245,29 +257,30 @@ namespace DeepDroidChanger.Services
 
         internal static async Task<string> ResolveToolPathAsync(CancellationToken cancellationToken)
         {
-            var outputPath = Path.Combine(
-                AppContext.BaseDirectory,
-                AssetConstants.Tools.RootRelativePath,
-                AssetConstants.Tools.ViewScreenDirectoryName,
-                AssetConstants.Tools.ScrcpyExecutableName);
-            var projectPath = Path.Combine(
-                Environment.CurrentDirectory,
-                AssetConstants.Tools.RootRelativePath,
-                AssetConstants.Tools.ViewScreenDirectoryName,
-                AssetConstants.Tools.ScrcpyExecutableName);
-
-            if (await FileExistsAsync(outputPath, cancellationToken).ConfigureAwait(false))
-                return outputPath;
-
-            if (await FileExistsAsync(projectPath, cancellationToken).ConfigureAwait(false))
-                return projectPath;
-
-            return AssetConstants.Tools.ScrcpyExecutableName;
+            cancellationToken.ThrowIfCancellationRequested();
+            return new AdbToolPathResolver().GetScrcpyPath();
         }
 
-        private static Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken)
+        internal static ProcessStartInfo CreateScrcpyStartInfo(
+            string toolPath,
+            string workingDirectory,
+            string serial,
+            string windowTitle,
+            DeviceViewerStreamBounds bounds,
+            string canonicalAdbPath)
         {
-            return Task.Run(() => File.Exists(path), cancellationToken);
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = toolPath,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true
+            };
+
+            startInfo.Environment["ADB"] = canonicalAdbPath;
+            AddScrcpyArguments(startInfo, serial, windowTitle, bounds);
+            return startInfo;
         }
 
         private static async Task StopProcessAsync(Process process, ILogger logger, CancellationToken cancellationToken = default)
@@ -329,10 +342,9 @@ namespace DeepDroidChanger.Services
 
         public void Dispose()
         {
-            if (_disposed)
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
                 return;
 
-            _disposed = true;
             _lifetimeCancellation.Cancel();
             foreach (DeviceViewerStreamSession session in _activeStreamSessions.Values.ToArray())
                 session.Dispose();
@@ -340,6 +352,7 @@ namespace DeepDroidChanger.Services
             _activeStreamSessions.Clear();
             _serialLocks.Clear();
             _lifetimeCancellation.Dispose();
+            _processJob.Dispose();
         }
 
         private void RemoveActiveSession(string serial, DeviceViewerStreamSession session)
@@ -356,10 +369,10 @@ namespace DeepDroidChanger.Services
             private readonly ILogger _logger;
             private readonly Action<string, DeviceViewerStreamSession> _removeActiveSession;
             private readonly SemaphoreSlim _stopLock = new(1, 1);
+            private readonly object _stateGate = new();
             private DeviceViewerStreamBounds _lastBounds;
-            private bool _isVisible;
-            private bool _stopped;
-            private bool _disposed;
+            private int _stopped;
+            private int _disposed;
 
             public event EventHandler? Exited;
 
@@ -383,7 +396,7 @@ namespace DeepDroidChanger.Services
             {
                 get
                 {
-                    if (_stopped || _disposed)
+                    if (Volatile.Read(ref _stopped) != 0 || Volatile.Read(ref _disposed) != 0)
                         return true;
 
                     try
@@ -399,10 +412,11 @@ namespace DeepDroidChanger.Services
 
             public void UpdateBounds(DeviceViewerStreamBounds bounds)
             {
-                if (_stopped || _disposed || _hwnd == IntPtr.Zero || !IsWindow(_hwnd))
+                if (Volatile.Read(ref _stopped) != 0 || Volatile.Read(ref _disposed) != 0 || _hwnd == IntPtr.Zero || !IsWindow(_hwnd))
                     return;
 
-                _lastBounds = bounds;
+                lock (_stateGate)
+                    _lastBounds = bounds;
                 if (!bounds.IsValid())
                 {
                     SetVisible(false);
@@ -421,13 +435,16 @@ namespace DeepDroidChanger.Services
 
             public void SetVisible(bool isVisible)
             {
-                if (_stopped || _disposed || _hwnd == IntPtr.Zero || !IsWindow(_hwnd))
+                if (Volatile.Read(ref _stopped) != 0 || Volatile.Read(ref _disposed) != 0 || _hwnd == IntPtr.Zero || !IsWindow(_hwnd))
                     return;
 
-                _isVisible = isVisible;
-                if (isVisible && _lastBounds.IsValid())
+                DeviceViewerStreamBounds lastBounds;
+                lock (_stateGate)
+                    lastBounds = _lastBounds;
+
+                if (isVisible && lastBounds.IsValid())
                 {
-                    UpdateBounds(_lastBounds);
+                    UpdateBounds(lastBounds);
                     ShowWindow(_hwnd, SW_SHOWNA);
                     return;
                 }
@@ -437,7 +454,7 @@ namespace DeepDroidChanger.Services
 
             public void Activate()
             {
-                if (_stopped || _disposed || _hwnd == IntPtr.Zero || !IsWindow(_hwnd))
+                if (Volatile.Read(ref _stopped) != 0 || Volatile.Read(ref _disposed) != 0 || _hwnd == IntPtr.Zero || !IsWindow(_hwnd))
                     return;
 
                 SetVisible(true);
@@ -468,10 +485,10 @@ namespace DeepDroidChanger.Services
 
                 try
                 {
-                    if (_stopped)
+                    if (Volatile.Read(ref _stopped) != 0)
                         return;
 
-                    _stopped = true;
+                    Volatile.Write(ref _stopped, 1);
                     _process.Exited -= OnProcessExited;
                     if (_hwnd != IntPtr.Zero)
                         ShowWindow(_hwnd, SW_HIDE);
@@ -486,17 +503,16 @@ namespace DeepDroidChanger.Services
 
             public void Dispose()
             {
-                if (_disposed)
+                if (Interlocked.Exchange(ref _disposed, 1) != 0)
                     return;
 
                 StopAsync(CancellationToken.None).GetAwaiter().GetResult();
                 _stopLock.Dispose();
-                _disposed = true;
             }
 
             private void OnProcessExited(object? sender, EventArgs e)
             {
-                if (_stopped || _disposed)
+                if (Volatile.Read(ref _stopped) != 0 || Volatile.Read(ref _disposed) != 0)
                     return;
 
                 _logger.LogInformation("scrcpy process exited for {Serial}.", _serial);

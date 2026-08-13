@@ -20,16 +20,21 @@ namespace DeepDroidChanger.Services
             new(StringComparer.OrdinalIgnoreCase);
         private readonly IProcessRunnerService _commandRunner;
         private readonly ILogger<AdbCommandService> _logger;
+        private readonly AdbToolPathResolver _toolPathResolver;
 
-        public AdbCommandService(IProcessRunnerService commandRunner, ILogger<AdbCommandService> logger)
+        public AdbCommandService(
+            IProcessRunnerService commandRunner,
+            ILogger<AdbCommandService> logger,
+            AdbToolPathResolver? toolPathResolver = null)
         {
             _commandRunner = commandRunner;
             _logger = logger;
+            _toolPathResolver = toolPathResolver ?? new AdbToolPathResolver();
         }
 
         public async Task<CommandResult> RunAdbAsync(string arguments, CancellationToken cancellationToken)
         {
-            var adbPath = await ResolveToolPathAsync(AssetConstants.Tools.AdbExecutableName, cancellationToken).ConfigureAwait(false);
+            var adbPath = _toolPathResolver.GetAdbPath();
             _logger.LogDebug(
                 "Running ADB tool {AdbPath}. ArgumentLength: {ArgumentLength}",
                 adbPath,
@@ -55,10 +60,7 @@ namespace DeepDroidChanger.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(serial);
             ArgumentException.ThrowIfNullOrWhiteSpace(shellScript);
 
-            string adbPath = await ResolveToolPathAsync(
-                    AssetConstants.Tools.AdbExecutableName,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            string adbPath = _toolPathResolver.GetAdbPath();
             string arguments = $"{"-s"} {QuoteProcessArgument(serial)} shell sh";
             string normalizedScript = shellScript
                 .Replace(WindowsNewLine, "\n", StringComparison.Ordinal)
@@ -77,7 +79,7 @@ namespace DeepDroidChanger.Services
 
         public async Task<CommandResult> RunFastbootAsync(string arguments, CancellationToken cancellationToken)
         {
-            var fastbootPath = await ResolveToolPathAsync(AssetConstants.Tools.FastbootExecutableName, cancellationToken).ConfigureAwait(false);
+            var fastbootPath = _toolPathResolver.GetFastbootPath();
             _logger.LogDebug(
                 "Running Fastboot tool {FastbootPath}. ArgumentLength: {ArgumentLength}",
                 fastbootPath,
@@ -235,25 +237,6 @@ namespace DeepDroidChanger.Services
             }
 
             return result.StandardOutput?.Trim() ?? string.Empty;
-        }
-
-        private static async Task<string> ResolveToolPathAsync(string executableName, CancellationToken cancellationToken)
-        {
-            var outputPath = Path.Combine(AppContext.BaseDirectory, AssetConstants.Tools.RootRelativePath, AssetConstants.Tools.PlatformToolsDirectoryName, executableName);
-            var projectPath = Path.Combine(Environment.CurrentDirectory, AssetConstants.Tools.RootRelativePath, AssetConstants.Tools.PlatformToolsDirectoryName, executableName);
-
-            if (await FileExistsAsync(outputPath, cancellationToken).ConfigureAwait(false))
-                return outputPath;
-
-            if (await FileExistsAsync(projectPath, cancellationToken).ConfigureAwait(false))
-                return projectPath;
-
-            return executableName;
-        }
-
-        private static Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken)
-        {
-            return Task.Run(() => File.Exists(path), cancellationToken);
         }
 
         private static string QuoteProcessArgument(string value)

@@ -11,7 +11,7 @@
         Title="{Binding WindowTitle}"
         Width="590"
         Height="660"
-        MinWidth="324"
+        MinWidth="350"
         MinHeight="660"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"

@@ -27,6 +27,22 @@ public sealed class DeviceViewerStreamServiceTests
     }
 
     [TestMethod]
+    public void CreateScrcpyStartInfo_UsesCanonicalAdbEnvironment()
+    {
+        var startInfo = DeviceViewerStreamService.CreateScrcpyStartInfo(
+            "scrcpy.exe",
+            "tools",
+            "SERIAL",
+            "TITLE",
+            new Models.DeviceViewerStreamBounds(1, 2, 100, 200),
+            "C:\\canonical\\platform-tools\\adb.exe");
+
+        Assert.AreEqual(
+            "C:\\canonical\\platform-tools\\adb.exe",
+            startInfo.Environment["ADB"]);
+    }
+
+    [TestMethod]
     public async Task StartAsync_AfterDispose_ThrowsObjectDisposedException()
     {
         var service = new DeviceViewerStreamService(

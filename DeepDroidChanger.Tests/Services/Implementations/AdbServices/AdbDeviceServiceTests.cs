@@ -41,4 +41,18 @@ public sealed class AdbDeviceServiceTests
         Assert.AreEqual(AdbDeviceStatus.Offline, devices[1].Status);
         Assert.AreEqual(AdbDeviceStatus.Unauthorized, devices[2].Status);
     }
+
+    [TestMethod]
+    public void ParseTrackedDevices_MapsOnlineOfflineUnauthorizedAndDisappearancePayload()
+    {
+        IReadOnlyList<AdbDevice> devices = AdbDeviceService.ParseTrackedDevices(
+            "SERIAL-1\tdevice\nSERIAL-2\toffline\nSERIAL-3\tunauthorized\n");
+
+        Assert.HasCount(3, devices);
+        Assert.AreEqual("SERIAL-1", devices[0].Serial);
+        Assert.AreEqual(AdbDeviceStatus.Online, devices[0].Status);
+        Assert.AreEqual(AdbDeviceStatus.Offline, devices[1].Status);
+        Assert.AreEqual(AdbDeviceStatus.Unauthorized, devices[2].Status);
+        Assert.IsEmpty(AdbDeviceService.ParseTrackedDevices(string.Empty));
+    }
 }

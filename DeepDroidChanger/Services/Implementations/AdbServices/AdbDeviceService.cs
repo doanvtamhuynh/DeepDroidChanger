@@ -50,7 +50,6 @@ namespace DeepDroidChanger.Services
         public static IReadOnlyList<AdbDevice> ParseDevices(string output)
         {
             var devices = new List<AdbDevice>();
-            var isDeviceSection = false;
             var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
 
             foreach (var rawLine in lines)
@@ -59,11 +58,8 @@ namespace DeepDroidChanger.Services
                 if (line.Length == 0)
                     continue;
 
-                if (!isDeviceSection)
-                {
-                    isDeviceSection = line.Equals(DeviceListHeader, StringComparison.OrdinalIgnoreCase);
+                if (line.Equals(DeviceListHeader, StringComparison.OrdinalIgnoreCase))
                     continue;
-                }
 
                 var parts = line.Split(DeviceLineSeparators, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length < 2)
@@ -77,6 +73,11 @@ namespace DeepDroidChanger.Services
             }
 
             return devices;
+        }
+
+        public static IReadOnlyList<AdbDevice> ParseTrackedDevices(string payload)
+        {
+            return ParseDevices(payload);
         }
 
         private static AdbDeviceStatus? ToDeviceStatus(string status)

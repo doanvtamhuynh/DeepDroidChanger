@@ -11,8 +11,12 @@ namespace DeepDroidChanger.Views
     public sealed partial class DeviceViewerDialog : Window
     {
         private const double FallbackDeviceAspectRatio = 9.0 / 20.0;
+        private const double CollapsedWindowMinWidth = 350;
+        private const double DeviceAreaMinimum = 272;
         private const double ExpandedActionsPanelWidth = 315;
         private const double CollapsedActionsRailWidth = 52;
+        private const double ExpandedWindowMinWidth =
+            DeviceAreaMinimum + ExpandedActionsPanelWidth;
         private bool _boundsChangedPending;
         private bool _visibilityChangedPending;
         private bool _readyPending;
@@ -114,15 +118,39 @@ namespace DeepDroidChanger.Views
         {
             var previousWidth = ActionsColumn.Width.IsAbsolute
                 ? ActionsColumn.Width.Value
-                : ExpandedActionsPanelWidth;
+                : CollapsedActionsRailWidth;
             var nextWidth = isExpanded ? ExpandedActionsPanelWidth : CollapsedActionsRailWidth;
+            var currentWindowWidth = !double.IsNaN(Width) && Width > 0
+                ? Width
+                : ActualWidth;
+            if (currentWindowWidth <= 0)
+                currentWindowWidth = isExpanded ? ExpandedWindowMinWidth : CollapsedWindowMinWidth;
+
+            var nextMinWidth = CalculateWindowMinWidth(isExpanded);
+            var desiredWindowWidth = CalculateDesiredWindowWidth(
+                currentWindowWidth,
+                previousWidth,
+                nextWidth);
 
             ActionsColumn.Width = new GridLength(nextWidth);
-            if (!double.IsNaN(Width))
-                Width = Math.Max(MinWidth, Width + nextWidth - previousWidth);
+            MinWidth = nextMinWidth;
+            Width = Math.Max(nextMinWidth, desiredWindowWidth);
 
             UpdateLayout();
             RefreshStreamLayout();
+        }
+
+        internal static double CalculateWindowMinWidth(bool isExpanded)
+        {
+            return isExpanded ? ExpandedWindowMinWidth : CollapsedWindowMinWidth;
+        }
+
+        internal static double CalculateDesiredWindowWidth(
+            double currentWindowWidth,
+            double previousActionsWidth,
+            double nextActionsWidth)
+        {
+            return currentWindowWidth + nextActionsWidth - previousActionsWidth;
         }
 
         private void OnWindowLocationChanged(object? sender, EventArgs e)

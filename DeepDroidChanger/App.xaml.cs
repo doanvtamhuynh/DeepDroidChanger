@@ -110,6 +110,7 @@ public sealed partial class App : Application
         services.AddTransient<IFilePickerDialogService, FilePickerDialogService>();
         services.AddSingleton<IRandomService, RandomService>();
         services.AddSingleton<IProcessRunnerService, ProcessRunnerService>();
+        services.AddSingleton<AdbToolPathResolver>();
         services.AddSingleton<IUiDispatcherService, UiDispatcherService>();
         services.AddSingleton<IPollingService, PollingService>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
@@ -128,6 +129,7 @@ public sealed partial class App : Application
 
         services.AddSingleton<IAdbCommandService, AdbCommandService>();
         services.AddSingleton<IAdbDeviceService, AdbDeviceService>();
+        services.AddSingleton<IAdbDeviceTrackerService, AdbDeviceTrackerService>();
         services.AddSingleton<IDeviceTimezoneService, DeviceTimezoneService>();
         services.AddSingleton<IDeviceLocationService, DeviceLocationService>();
         services.AddSingleton<IProxyService, ProxyService>();
@@ -159,7 +161,7 @@ public sealed partial class App : Application
         services.AddTransient<IDeviceActionConfirmationDialogService, DeviceActionConfirmationDialogService>();
         services.AddTransient<IAdvancedChangeConfigDialogService, AdvancedChangeConfigDialogService>();
         services.AddTransient<IRandomDeviceInfoDialogService, RandomDeviceInfoDialogService>();
-        services.AddTransient<IDeviceViewerDialogService, DeviceViewerDialogService>();
+        services.AddSingleton<IDeviceViewerDialogService, DeviceViewerDialogService>();
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
         services.AddTransient<IInstallPackageDialogService, InstallPackageDialogService>();
