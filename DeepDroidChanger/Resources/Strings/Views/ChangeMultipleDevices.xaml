@@ -24,6 +24,17 @@
     <sys:String x:Key="ChangeMultipleDevices_SelectAllDevices">Select all devices</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ChangeConfigurationHeader">Device Configuration</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionsHeader">Multiple Device Actions</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StopAction">Stop</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StoppingAction">Stopping...</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StopActionTooltip">Stop the current batch action.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ExternalActionRunningFormat">{0} • Running in Single Device</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ExternalActionStoppingFormat">{0} • Stopping in Single Device</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ExternalActionTooltip">This action is owned by Single Device. Stop it from that screen.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_GlobalBatchRunningFormat">{0} batch • Running</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_GlobalBatchStoppingFormat">{0} batch • Stopping</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StopBatch">Stop Batch</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StoppingBatch">Stopping Batch...</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_GlobalBatchTooltip">Stop the active Multiple Device batch.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_InfoDeviceSelectorName">Selected device information</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_InfoDeviceSelectorHint">Choose a selected device</sys:String>

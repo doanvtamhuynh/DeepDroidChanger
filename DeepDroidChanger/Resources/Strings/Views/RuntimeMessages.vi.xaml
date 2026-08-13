@@ -20,6 +20,7 @@
     <sys:String x:Key="Log_RandomDevice">Tạo thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomDeviceSuccess">Đã tạo thông tin thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomDeviceFailed">Tạo thiết bị ngẫu nhiên thất bại</sys:String>
+    <sys:String x:Key="Log_RandomDeviceCanceled">Đã dừng tạo thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomDeviceLoginRequired">Vui lòng đăng nhập lại trước khi tạo thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomDeviceRequired">Vui lòng tạo thông tin thiết bị ngẫu nhiên trước</sys:String>
     <sys:String x:Key="Log_DeviceMustBeOnline">Thiết bị phải đang Online</sys:String>
@@ -42,10 +43,12 @@
     <sys:String x:Key="Log_WipeWithoutChangeFailed">Wipe không đổi thông tin thất bại</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigSaved">Đã lưu cấu hình nâng cao</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigFailed">Tải hoặc lưu cấu hình nâng cao thất bại</sys:String>
+    <sys:String x:Key="Log_AdvancedChangeConfigCanceled">Đã dừng cấu hình nâng cao</sys:String>
     <sys:String x:Key="Log_RandomAndChangeDevice">Đang thực hiện Random, Change &amp; Wipe...</sys:String>
     <sys:String x:Key="Log_RandomSim">Đang tạo thông tin SIM random...</sys:String>
     <sys:String x:Key="Log_RandomSimSuccess">Đã tạo thông tin SIM random</sys:String>
     <sys:String x:Key="Log_RandomSimFailed">Tạo thông tin SIM random thất bại</sys:String>
+    <sys:String x:Key="Log_RandomSimCanceled">Đã dừng tạo thông tin SIM ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomSimRequired">Vui lòng tạo thông tin SIM random trước</sys:String>
     <sys:String x:Key="Log_ChangeSim">Đang đổi thông tin SIM...</sys:String>
     <sys:String x:Key="Log_ChangeSimCanceled">Đã hủy đổi SIM</sys:String>
@@ -94,6 +97,8 @@
     <sys:String x:Key="Log_StoppingProxy">Đang dừng Fake Proxy...</sys:String>
     <sys:String x:Key="Log_StopFakeProxySuccess">Dừng Fake Proxy thành công</sys:String>
     <sys:String x:Key="Log_StopFakeProxyFailed">Dừng Fake Proxy thất bại</sys:String>
+    <sys:String x:Key="Log_StopFakeProxyCanceled">Đã dừng tác vụ dừng Fake Proxy</sys:String>
+    <sys:String x:Key="Log_ViewRandomDeviceInfoCanceled">Đã dừng xem thông tin thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_StartingStream">Đang khởi động truyền hình ảnh...</sys:String>
     <sys:String x:Key="Log_Streaming">Đang truyền hình ảnh</sys:String>
     <sys:String x:Key="Log_WaitingForDevice">Đang chờ thiết bị...</sys:String>
@@ -136,4 +141,20 @@
     <sys:String x:Key="Log_WifiEnabled">Đã bật Wi-Fi</sys:String>
     <sys:String x:Key="Log_WifiDisabled">Đã tắt Wi-Fi</sys:String>
     <sys:String x:Key="Log_WifiToggleFailed">Không thể thay đổi trạng thái Wi-Fi</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RandomDevice">Tạo thiết bị random</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RandomChangeAndWipe">Random, đổi &amp; wipe</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeDevice">Đổi &amp; wipe thiết bị</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeWithoutWipe">Đổi không wipe</sys:String>
+    <sys:String x:Key="DeviceAction_Name_Wipe">Wipe không đổi</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RandomSim">Tạo SIM random</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeSim">Đổi SIM</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeLocation">Đổi vị trí</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeTimezone">Đổi múi giờ</sys:String>
+    <sys:String x:Key="DeviceAction_Name_InstallPackages">Cài APK/XAPK</sys:String>
+    <sys:String x:Key="DeviceAction_Name_DeleteDevice">Xóa thiết bị</sys:String>
+    <sys:String x:Key="DeviceAction_Name_AdvancedChangeConfig">Cấu hình nâng cao</sys:String>
+    <sys:String x:Key="DeviceAction_Name_UpdateIntegrity">Cập nhật Integrity</sys:String>
+    <sys:String x:Key="DeviceAction_Name_FakeProxy">Fake Proxy</sys:String>
+    <sys:String x:Key="DeviceAction_Name_StopFakeProxy">Dừng Fake Proxy</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ViewRandomDeviceInfo">Xem thông tin thiết bị</sys:String>
 </ResourceDictionary>

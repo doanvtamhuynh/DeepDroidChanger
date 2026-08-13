@@ -1,4 +1,5 @@
 using DeepDroidChanger.ViewModels;
+using Microsoft.Extensions.Logging;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -9,12 +10,16 @@ namespace DeepDroidChanger.Views
     public sealed partial class ChangeSingleDeviceView : UserControl
     {
         private readonly ChangeSingleDeviceViewModel _viewModel;
+        private readonly ILogger<ChangeSingleDeviceView> _logger;
         private CancellationTokenSource? _viewCancellation;
         private bool _isActive;
 
-        public ChangeSingleDeviceView(ChangeSingleDeviceViewModel viewModel)
+        public ChangeSingleDeviceView(
+            ChangeSingleDeviceViewModel viewModel,
+            ILogger<ChangeSingleDeviceView> logger)
         {
             _viewModel = viewModel;
+            _logger = logger;
             InitializeComponent();
             DataContext = viewModel;
             Loaded += OnLoaded;
@@ -27,20 +32,24 @@ namespace DeepDroidChanger.Views
                 return;
 
             _isActive = true;
-            _viewCancellation = new CancellationTokenSource();
+            var viewCancellation = new CancellationTokenSource();
+            _viewCancellation = viewCancellation;
             try
             {
-                await _viewModel.InitializeAsync(_viewCancellation.Token).ConfigureAwait(true);
+                await _viewModel.InitializeAsync(viewCancellation.Token).ConfigureAwait(true);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (viewCancellation.IsCancellationRequested)
             {
             }
-            catch
+            catch (Exception exception)
             {
-                _isActive = false;
-                _viewCancellation.Dispose();
-                _viewCancellation = null;
-                throw;
+                _logger.LogError(exception, "Failed to initialize the Single Device view.");
+                if (ReferenceEquals(_viewCancellation, viewCancellation))
+                {
+                    _viewCancellation = null;
+                    _isActive = false;
+                    viewCancellation.Dispose();
+                }
             }
         }
 
@@ -50,18 +59,23 @@ namespace DeepDroidChanger.Views
                 return;
 
             _isActive = false;
+            CancellationTokenSource? viewCancellation = _viewCancellation;
+            _viewCancellation = null;
             try
             {
-                _viewCancellation?.Cancel();
-                await _viewModel.DeactivateAsync().ConfigureAwait(true);
+                viewCancellation?.Cancel();
+                await _viewModel.SuspendAsync().ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
             }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to suspend the Single Device view.");
+            }
             finally
             {
-                _viewCancellation?.Dispose();
-                _viewCancellation = null;
+                viewCancellation?.Dispose();
             }
         }
 

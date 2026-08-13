@@ -91,72 +91,13 @@ public sealed class DeviceRowViewModel : ObservableObject
         private set => SetProperty(ref _processState, value);
     }
 
-    internal void SetProcess(string message, string resourceKey)
-    {
-        DeviceProcessState nextState = GetProcessState(resourceKey);
-        if (nextState == DeviceProcessState.Ready
-            && ProcessState is DeviceProcessState.Succeeded
-                or DeviceProcessState.Failed
-                or DeviceProcessState.Canceled)
-        {
-            return;
-        }
-
-        bool repeatsCurrentMessage = string.Equals(Process, message, StringComparison.Ordinal);
-        Process = message;
-        ProcessState = nextState;
-        if (repeatsCurrentMessage)
-            OnPropertyChanged(nameof(Process));
-    }
-
     internal void RestoreProcess(string message, DeviceProcessState state)
     {
+        bool repeatsCurrentMessage = string.Equals(Process, message, StringComparison.Ordinal);
         Process = message;
         ProcessState = state;
-    }
-
-    private static DeviceProcessState GetProcessState(string resourceKey)
-    {
-        if (string.Equals(resourceKey, "Log_Ready", StringComparison.Ordinal))
-            return DeviceProcessState.Ready;
-
-        if (resourceKey.Contains("Partial", StringComparison.Ordinal))
-            return DeviceProcessState.Failed;
-
-        if (resourceKey.Contains("Canceled", StringComparison.Ordinal))
-            return DeviceProcessState.Canceled;
-
-        if (resourceKey.Contains("Success", StringComparison.Ordinal)
-            || resourceKey.EndsWith("Enabled", StringComparison.Ordinal)
-            || resourceKey.EndsWith("Disabled", StringComparison.Ordinal)
-            || resourceKey.EndsWith("Sent", StringComparison.Ordinal)
-            || resourceKey.EndsWith("Saved", StringComparison.Ordinal)
-            || resourceKey.EndsWith("NoOutput", StringComparison.Ordinal)
-            || resourceKey.EndsWith("CompleteFormat", StringComparison.Ordinal))
-        {
-            return DeviceProcessState.Succeeded;
-        }
-
-        if (resourceKey.Contains("Failed", StringComparison.Ordinal)
-            || resourceKey.Contains("Failure", StringComparison.Ordinal)
-            || resourceKey.EndsWith("Required", StringComparison.Ordinal)
-            || resourceKey.EndsWith("DeviceMustBeOnline", StringComparison.Ordinal)
-            || resourceKey.EndsWith("NoFiles", StringComparison.Ordinal)
-            || resourceKey.EndsWith("NoInternet", StringComparison.Ordinal)
-            || resourceKey.EndsWith("Empty", StringComparison.Ordinal)
-            || resourceKey.EndsWith("AlreadyExists", StringComparison.Ordinal)
-            || resourceKey.EndsWith("VersionDowngrade", StringComparison.Ordinal)
-            || resourceKey.EndsWith("UnknownResult", StringComparison.Ordinal)
-            || resourceKey.Contains("Missing", StringComparison.Ordinal)
-            || resourceKey.Contains("Invalid", StringComparison.Ordinal)
-            || resourceKey.Contains("Unsupported", StringComparison.Ordinal)
-            || resourceKey.Contains("Insufficient", StringComparison.Ordinal)
-            || resourceKey.Contains("NoMatching", StringComparison.Ordinal))
-        {
-            return DeviceProcessState.Failed;
-        }
-
-        return DeviceProcessState.InProgress;
+        if (repeatsCurrentMessage)
+            OnPropertyChanged(nameof(Process));
     }
 
     public bool IsActionBusy

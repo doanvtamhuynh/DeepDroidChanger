@@ -20,6 +20,7 @@
     <sys:String x:Key="Log_RandomDevice">Generating random device information</sys:String>
     <sys:String x:Key="Log_RandomDeviceSuccess">Random device information generated</sys:String>
     <sys:String x:Key="Log_RandomDeviceFailed">Failed to generate random device information</sys:String>
+    <sys:String x:Key="Log_RandomDeviceCanceled">Random device generation stopped</sys:String>
     <sys:String x:Key="Log_RandomDeviceLoginRequired">Please sign in again before generating device information</sys:String>
     <sys:String x:Key="Log_RandomDeviceRequired">Generate random device information first</sys:String>
     <sys:String x:Key="Log_DeviceMustBeOnline">Device must be online</sys:String>
@@ -42,10 +43,12 @@
     <sys:String x:Key="Log_WipeWithoutChangeFailed">Failed to wipe device data without changing device information</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigSaved">Advanced Change Device configuration saved</sys:String>
     <sys:String x:Key="Log_AdvancedChangeConfigFailed">Failed to load or save advanced Change Device configuration</sys:String>
+    <sys:String x:Key="Log_AdvancedChangeConfigCanceled">Advanced Change Device configuration stopped</sys:String>
     <sys:String x:Key="Log_RandomAndChangeDevice">Performing Random, Change &amp; Wipe...</sys:String>
     <sys:String x:Key="Log_RandomSim">Generating random SIM information...</sys:String>
     <sys:String x:Key="Log_RandomSimSuccess">Random SIM information generated</sys:String>
     <sys:String x:Key="Log_RandomSimFailed">Failed to generate random SIM information</sys:String>
+    <sys:String x:Key="Log_RandomSimCanceled">Random SIM generation stopped</sys:String>
     <sys:String x:Key="Log_RandomSimRequired">Generate random SIM information first</sys:String>
     <sys:String x:Key="Log_ChangeSim">Changing SIM information...</sys:String>
     <sys:String x:Key="Log_ChangeSimCanceled">Change SIM canceled</sys:String>
@@ -94,6 +97,8 @@
     <sys:String x:Key="Log_StoppingProxy">Stopping proxy...</sys:String>
     <sys:String x:Key="Log_StopFakeProxySuccess">Fake Proxy stopped successfully</sys:String>
     <sys:String x:Key="Log_StopFakeProxyFailed">Failed to stop Fake Proxy</sys:String>
+    <sys:String x:Key="Log_StopFakeProxyCanceled">Stop Fake Proxy action stopped</sys:String>
+    <sys:String x:Key="Log_ViewRandomDeviceInfoCanceled">Random device information view stopped</sys:String>
     <sys:String x:Key="Log_StartingStream">Starting stream...</sys:String>
     <sys:String x:Key="Log_Streaming">Streaming</sys:String>
     <sys:String x:Key="Log_WaitingForDevice">Waiting for device...</sys:String>
@@ -136,4 +141,20 @@
     <sys:String x:Key="Log_WifiEnabled">Wi-Fi enabled</sys:String>
     <sys:String x:Key="Log_WifiDisabled">Wi-Fi disabled</sys:String>
     <sys:String x:Key="Log_WifiToggleFailed">Failed to change Wi-Fi state</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RandomDevice">Random Device</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RandomChangeAndWipe">Random, Change &amp; Wipe</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeDevice">Change &amp; Wipe Device</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeWithoutWipe">Change Without Wipe</sys:String>
+    <sys:String x:Key="DeviceAction_Name_Wipe">Wipe Without Change</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RandomSim">Random SIM</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeSim">Change SIM</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeLocation">Change Location</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ChangeTimezone">Change Timezone</sys:String>
+    <sys:String x:Key="DeviceAction_Name_InstallPackages">Install APK/XAPK</sys:String>
+    <sys:String x:Key="DeviceAction_Name_DeleteDevice">Delete Device</sys:String>
+    <sys:String x:Key="DeviceAction_Name_AdvancedChangeConfig">Advanced Configuration</sys:String>
+    <sys:String x:Key="DeviceAction_Name_UpdateIntegrity">Update Integrity</sys:String>
+    <sys:String x:Key="DeviceAction_Name_FakeProxy">Fake Proxy</sys:String>
+    <sys:String x:Key="DeviceAction_Name_StopFakeProxy">Stop Fake Proxy</sys:String>
+    <sys:String x:Key="DeviceAction_Name_ViewRandomDeviceInfo">View Device Information</sys:String>
 </ResourceDictionary>

@@ -20,6 +20,12 @@
     <sys:String x:Key="ChangeSingleDevice_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceConfigHeader">Device Configuration</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionSingleHeader">Single Device Actions</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StopAction">Dừng</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StoppingAction">Đang dừng...</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StopActionTooltip">Dừng tác vụ hiện tại.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ExternalActionRunningFormat">{0} • Đang chạy ở Nhiều thiết bị</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ExternalActionStoppingFormat">{0} • Đang dừng ở Nhiều thiết bị</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ExternalActionTooltip">Tác vụ này thuộc màn hình Nhiều thiết bị. Hãy dừng tác vụ tại màn hình đó.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FieldName">Tên</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FieldHardware">Phần cứng</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FieldFingerprint">Fingerprint</sys:String>

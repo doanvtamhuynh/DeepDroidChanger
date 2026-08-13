@@ -45,7 +45,7 @@ public sealed class DependencyInjectionTests
         AssertLifetime<IAuthenticationSessionService>(services, ServiceLifetime.Singleton);
         AssertLifetime<IIdentityProviderClient>(services, ServiceLifetime.Singleton);
         AssertLifetime<IAdbCommandService>(services, ServiceLifetime.Singleton);
-        AssertLifetime<IDeviceActionGuardService>(services, ServiceLifetime.Singleton);
+        AssertLifetime<IDeviceActionCoordinatorService>(services, ServiceLifetime.Singleton);
         AssertLifetime<IMultipleDeviceConfigService>(services, ServiceLifetime.Singleton);
         AssertLifetime<IRuntimeDataMigrationService>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainViewModel>(services, ServiceLifetime.Singleton);

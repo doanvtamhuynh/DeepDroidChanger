@@ -36,7 +36,8 @@ namespace DeepDroidChanger.ViewModels
         private readonly IDeviceConfigService _deviceConfigService;
         private readonly IRandomDeviceService _randomDeviceService;
         private readonly ISimProfileService _simProfileService;
-        private readonly IDeviceActionGuardService _deviceActionGuardService;
+        private readonly IDeviceActionCoordinatorService _deviceActionCoordinatorService;
+        private readonly IDeviceProcessStateService _deviceProcessStateService;
         private readonly IDeviceActionService _deviceActionService;
         private readonly IDeviceChangeService _deviceChangeService;
         private readonly ILocalizationService _localizationService;
@@ -51,7 +52,11 @@ namespace DeepDroidChanger.ViewModels
         private readonly Dictionary<string, PendingDeviceEdit> _pendingDeviceEdits = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _pendingProfileEditLock = new();
         private readonly Dictionary<string, PendingDeviceProfileEdit> _pendingProfileEdits = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _activeActionOperationsLock = new();
+        private readonly HashSet<Guid> _activeActionOperationIds = [];
+        private TaskCompletionSource? _activeActionOperationsCompletion;
         private CancellationTokenSource? _pollCancellation;
+        private CancellationTokenSource _actionLifetimeCancellation = new();
         private Task? _pollTask;
         private List<StoredDeviceConfig> _storedDevices = new();
         private List<CarrierProfile> _carrierProfiles = new();
@@ -110,7 +115,8 @@ namespace DeepDroidChanger.ViewModels
             IDeviceConfigService deviceConfigService,
             IRandomDeviceService randomDeviceService,
             ISimProfileService simProfileService,
-            IDeviceActionGuardService deviceActionGuardService,
+            IDeviceActionCoordinatorService deviceActionCoordinatorService,
+            IDeviceProcessStateService deviceProcessStateService,
             IDeviceActionService deviceActionService,
             IDeviceChangeService deviceChangeService,
             ILocalizationService localizationService,
@@ -141,7 +147,8 @@ namespace DeepDroidChanger.ViewModels
             _deviceConfigService = deviceConfigService;
             _randomDeviceService = randomDeviceService;
             _simProfileService = simProfileService;
-            _deviceActionGuardService = deviceActionGuardService;
+            _deviceActionCoordinatorService = deviceActionCoordinatorService;
+            _deviceProcessStateService = deviceProcessStateService;
             _deviceActionService = deviceActionService;
             _deviceChangeService = deviceChangeService;
             _localizationService = localizationService;
@@ -158,7 +165,8 @@ namespace DeepDroidChanger.ViewModels
             AndroidVersions = new ObservableCollection<string>();
             DeviceInfo = CreateDefaultDeviceInfo();
             DeviceInfo.PropertyChanged += OnDeviceInfoPropertyChanged;
-            _deviceActionGuardService.BusyStateChanged += OnDeviceBusyStateChanged;
+            _deviceActionCoordinatorService.OperationStateChanged += OnDeviceActionStateChanged;
+            _deviceProcessStateService.ProcessChanged += OnDeviceProcessChanged;
 
             Brands = DeviceProfileOptionsHelper.Brands;
             UpdateAndroidVersionOptions("Random", null);
@@ -180,6 +188,39 @@ namespace DeepDroidChanger.ViewModels
         public IReadOnlyDictionary<string, double> DeviceTableColumnRatios =>
             _settings.DeviceTableColumnRatios;
         public bool CanInteractWithSelectedDevice => SelectedDevice == null || !IsDeviceBusy(SelectedDevice);
+        public bool IsSelectedDeviceActionBusy =>
+            SelectedDevice != null && IsDeviceBusy(SelectedDevice);
+        public DeviceActionKind? ActiveSelectedDeviceActionKind =>
+            GetSelectedDeviceOperation()?.Kind;
+        public DeviceActionKind? DisplayedSelectedDeviceActionKind =>
+            GetSelectedDeviceOperation()?.Kind.ToLogicalActionKind();
+        public bool HasExternalSelectedDeviceAction =>
+            GetSelectedDeviceOperation() is { } operation && operation.Kind.IsBatchAction();
+        public string ExternalSelectedDeviceActionText =>
+            GetExternalSelectedDeviceActionText();
+        public bool HasActiveSelectedDeviceActionButton =>
+            GetSelectedDeviceActionButtonPosition().HasValue;
+        public int ActiveSelectedDeviceActionButtonRow =>
+            GetSelectedDeviceActionButtonPosition()?.Row ?? 0;
+        public int ActiveSelectedDeviceActionButtonColumn =>
+            GetSelectedDeviceActionButtonPosition()?.Column ?? 0;
+        public bool IsSelectedDeviceActionRunning =>
+            GetSelectedDeviceOperation()?.State == DeviceActionRuntimeState.Running;
+        public bool IsSelectedDeviceActionStopping =>
+            GetSelectedDeviceOperation()?.State == DeviceActionRuntimeState.Stopping;
+        public bool CanEditSelectedDeviceConfiguration =>
+            SelectedDevice != null && !IsDeviceBusy(SelectedDevice);
+        public bool CanStopSelectedDeviceAction =>
+            GetSelectedDeviceOperation() is
+            {
+                State: DeviceActionRuntimeState.Running,
+                CanCancel: true
+            } operation
+            && !operation.Kind.IsBatchAction();
+        public string SelectedDeviceActionStopText =>
+            _localizationService.GetString(IsSelectedDeviceActionStopping
+                ? "ChangeSingleDevice_StoppingAction"
+                : "ChangeSingleDevice_StopAction");
 
         public async Task InitializeAsync(CancellationToken cancellationToken)
         {
@@ -187,6 +228,12 @@ namespace DeepDroidChanger.ViewModels
             try
             {
                 ObjectDisposedException.ThrowIf(_isDisposed, this);
+                if (_actionLifetimeCancellation.IsCancellationRequested)
+                {
+                    _actionLifetimeCancellation.Dispose();
+                    _actionLifetimeCancellation = new CancellationTokenSource();
+                }
+
                 if (_pollTask is { IsCompleted: false })
                     return;
 
@@ -219,22 +266,51 @@ namespace DeepDroidChanger.ViewModels
 
         public async Task DeactivateAsync()
         {
-            await FlushPendingDeviceEditsAsync().ConfigureAwait(false);
-            await FlushPendingDeviceProfileAsync().ConfigureAwait(false);
+            _actionLifetimeCancellation.Cancel();
+            Task activeActions;
+            lock (_activeActionOperationsLock)
+                activeActions = _activeActionOperationsCompletion?.Task ?? Task.CompletedTask;
+            await activeActions.ConfigureAwait(false);
+            await SuspendAsync().ConfigureAwait(false);
+        }
+
+        public async Task SuspendAsync()
+        {
             await _lifecycleLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                _pollCancellation?.Cancel();
-                if (_pollTask != null)
-                    await _pollTask.ConfigureAwait(false);
-
-                _pollTask = null;
-                _pollCancellation?.Dispose();
-                _pollCancellation = null;
+                await StopPollingAsync().ConfigureAwait(false);
+                await FlushPendingDeviceEditsAsync().ConfigureAwait(false);
+                await FlushPendingDeviceProfileAsync().ConfigureAwait(false);
             }
             finally
             {
                 _lifecycleLock.Release();
+            }
+        }
+
+        private async Task StopPollingAsync()
+        {
+            CancellationTokenSource? cancellation = _pollCancellation;
+            Task? polling = _pollTask;
+            cancellation?.Cancel();
+            try
+            {
+                if (polling != null)
+                    await polling.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellation?.IsCancellationRequested == true)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Single Device polling failed while suspending the view.");
+            }
+            finally
+            {
+                _pollTask = null;
+                _pollCancellation = null;
+                cancellation?.Dispose();
             }
         }
 
@@ -330,6 +406,7 @@ namespace DeepDroidChanger.ViewModels
             if (_isDisposed)
                 return;
 
+            _actionLifetimeCancellation.Cancel();
             FlushPendingDeviceEditsAsync().GetAwaiter().GetResult();
             FlushPendingDeviceProfileAsync().GetAwaiter().GetResult();
             _isDisposed = true;
@@ -339,9 +416,11 @@ namespace DeepDroidChanger.ViewModels
                 device.PropertyChanged -= OnDeviceRowPropertyChanged;
 
             DeviceInfo.PropertyChanged -= OnDeviceInfoPropertyChanged;
-            _deviceActionGuardService.BusyStateChanged -= OnDeviceBusyStateChanged;
+            _deviceActionCoordinatorService.OperationStateChanged -= OnDeviceActionStateChanged;
+            _deviceProcessStateService.ProcessChanged -= OnDeviceProcessChanged;
             _pollCancellation?.Dispose();
             _pollCancellation = null;
+            _actionLifetimeCancellation.Dispose();
         }
 
         private string GetLogText(string resourceKey)
@@ -355,9 +434,7 @@ namespace DeepDroidChanger.ViewModels
             var message = formatArguments.Length == 0
                 ? template
                 : string.Format(template, formatArguments);
-            DeviceRowViewModel currentDevice = _allDeviceRows.FirstOrDefault(
-                row => SerialEquals(row.Serial, device.Serial)) ?? device;
-            currentDevice.SetProcess(message, resourceKey);
+            _deviceProcessStateService.SetProcess(device.Serial, message, resourceKey);
             _logger.LogInformation("Device {Serial} action: {Message}", device.Serial, message);
         }
 
@@ -395,26 +472,213 @@ namespace DeepDroidChanger.ViewModels
 
         private bool IsDeviceBusy(DeviceRowViewModel device)
         {
-            return _deviceActionGuardService.IsBusy(device.Serial);
+            return _deviceActionCoordinatorService.IsBusy(device.Serial);
         }
 
-        private IDisposable? TryAcquireDeviceAction(DeviceRowViewModel device)
+        private async Task<IDeviceActionOperation?> StartOnlineDeviceActionAsync(
+            DeviceRowViewModel? device,
+            DeviceActionKind kind,
+            bool canCancel = true)
         {
-            return _deviceActionGuardService.TryAcquire(device.Serial);
+            if (device == null)
+            {
+                await ShowToolbarLogAsync("Log_SelectDeviceFirst", CancellationToken.None)
+                    .ConfigureAwait(true);
+                return null;
+            }
+
+            if (device.ConnectionStatus != AdbDeviceStatus.Online)
+            {
+                SetDeviceLog(device, "Log_DeviceMustBeOnline");
+                return null;
+            }
+
+            IDeviceActionOperation? operation = TryStartDeviceAction(device, kind, canCancel);
+            if (operation == null)
+                return null;
+
+            try
+            {
+                if (await _deviceListService
+                        .IsDeviceOnlineAsync(device.Serial, operation.CancellationToken)
+                        .ConfigureAwait(true))
+                {
+                    return operation;
+                }
+
+                SetDeviceLog(device, "Log_DeviceMustBeOnline");
+            }
+            catch (OperationCanceledException)
+            {
+                SetOperationCancellationLog(device, operation, GetDeviceActionCanceledLogKey(kind));
+                operation.Dispose();
+                return null;
+            }
+            catch
+            {
+                operation.Dispose();
+                throw;
+            }
+
+            operation.Dispose();
+            return null;
         }
 
-        private void OnDeviceBusyStateChanged(string serial, bool isBusy)
+        private string GetDeviceActionCanceledLogKey(DeviceActionKind kind)
+        {
+            return kind switch
+            {
+                DeviceActionKind.ChangeDevice => "Log_ChangeDeviceCanceled",
+                DeviceActionKind.RandomChangeAndWipe => "Log_ChangeDeviceCanceled",
+                DeviceActionKind.ChangeWithoutWipe => "Log_ChangeWithoutWipeCanceled",
+                DeviceActionKind.Wipe => "Log_WipeWithoutChangeCanceled",
+                DeviceActionKind.RandomDevice => "Log_RandomDeviceCanceled",
+                DeviceActionKind.RandomSim => "Log_RandomSimCanceled",
+                DeviceActionKind.ChangeSim => "Log_ChangeSimCanceled",
+                DeviceActionKind.ChangeLocation => "Log_ChangeLocationCanceled",
+                DeviceActionKind.ChangeTimezone => "Log_ChangeTimezoneCanceled",
+                DeviceActionKind.InstallPackages => "Log_InstallPackageCanceled",
+                DeviceActionKind.DeleteDevice => "Log_DeleteDeviceCanceled",
+                DeviceActionKind.AdvancedChangeConfig => "Log_AdvancedChangeConfigCanceled",
+                DeviceActionKind.UpdateIntegrity => "Log_UpdateIntegrityCanceled",
+                DeviceActionKind.FakeProxy => "Log_FakeProxyCanceled",
+                DeviceActionKind.StopFakeProxy => "Log_StopFakeProxyCanceled",
+                DeviceActionKind.ViewRandomDeviceInfo => "Log_ViewRandomDeviceInfoCanceled",
+                _ => "Log_Ready"
+            };
+        }
+
+        private void SetOperationCancellationLog(
+            DeviceRowViewModel device,
+            IDeviceActionOperation operation,
+            string userStopLogKey)
+        {
+            if (device.ConnectionStatus != AdbDeviceStatus.Online)
+            {
+                SetDeviceLog(device, "Log_DeviceMustBeOnline");
+                return;
+            }
+
+            SetDeviceLog(
+                device,
+                operation.CancellationReason == DeviceActionCancellationReason.UserStop
+                    ? userStopLogKey
+                    : "Log_Ready");
+        }
+
+        private void SetDialogDismissalLog(
+            DeviceRowViewModel device,
+            IDeviceActionOperation operation,
+            string canceledLogKey)
+        {
+            if (operation.CancellationReason == DeviceActionCancellationReason.None
+                && device.ConnectionStatus == AdbDeviceStatus.Online)
+            {
+                SetDeviceLog(device, canceledLogKey);
+                return;
+            }
+
+            SetOperationCancellationLog(device, operation, canceledLogKey);
+        }
+
+        private IDeviceActionOperation? TryStartDeviceAction(
+            DeviceRowViewModel device,
+            DeviceActionKind kind,
+            bool canCancel = true)
+        {
+            IDeviceActionOperation? operation = _deviceActionCoordinatorService.TryStart(
+                device.Serial,
+                kind,
+                canCancel,
+                _actionLifetimeCancellation.Token);
+            if (operation == null)
+                return null;
+
+            lock (_activeActionOperationsLock)
+            {
+                if (_activeActionOperationIds.Count == 0)
+                {
+                    _activeActionOperationsCompletion = new TaskCompletionSource(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+
+                _activeActionOperationIds.Add(operation.OperationId);
+            }
+
+            return operation;
+        }
+
+        private DeviceActionOperationSnapshot? GetSelectedDeviceOperation()
+        {
+            return SelectedDevice == null
+                ? null
+                : _deviceActionCoordinatorService.GetOperation(SelectedDevice.Serial);
+        }
+
+        private string GetExternalSelectedDeviceActionText()
+        {
+            DeviceActionOperationSnapshot? operation = GetSelectedDeviceOperation();
+            if (operation == null || !operation.Kind.IsBatchAction())
+                return string.Empty;
+
+            string format = GetLogText(operation.State == DeviceActionRuntimeState.Stopping
+                ? "ChangeSingleDevice_ExternalActionStoppingFormat"
+                : "ChangeSingleDevice_ExternalActionRunningFormat");
+            return string.Format(
+                format,
+                GetLogText(operation.Kind.GetDisplayResourceKey()));
+        }
+
+        private (int Row, int Column)? GetSelectedDeviceActionButtonPosition()
+        {
+            return ActiveSelectedDeviceActionKind switch
+            {
+                DeviceActionKind.RandomDevice => (0, 0),
+                DeviceActionKind.ChangeDevice => (0, 1),
+                DeviceActionKind.Wipe => (1, 0),
+                DeviceActionKind.ChangeWithoutWipe => (1, 1),
+                DeviceActionKind.RandomSim => (2, 0),
+                DeviceActionKind.ChangeSim => (2, 1),
+                DeviceActionKind.RandomChangeAndWipe => (3, 0),
+                DeviceActionKind.InstallPackages => (3, 1),
+                DeviceActionKind.ChangeLocation => (4, 0),
+                DeviceActionKind.ChangeTimezone => (4, 1),
+                DeviceActionKind.FakeProxy => (5, 0),
+                DeviceActionKind.StopFakeProxy => (5, 1),
+                DeviceActionKind.UpdateIntegrity => (6, 0),
+                _ => null
+            };
+        }
+
+        private void OnDeviceActionStateChanged(DeviceActionOperationSnapshot snapshot)
         {
             if (_isDisposed)
                 return;
 
+            if (snapshot.State == DeviceActionRuntimeState.Idle)
+            {
+                TaskCompletionSource? completion = null;
+                lock (_activeActionOperationsLock)
+                {
+                    if (_activeActionOperationIds.Remove(snapshot.OperationId)
+                        && _activeActionOperationIds.Count == 0)
+                    {
+                        completion = _activeActionOperationsCompletion;
+                        _activeActionOperationsCompletion = null;
+                    }
+                }
+
+                completion?.TrySetResult();
+            }
+
             void ApplyBusyState()
             {
-                foreach (DeviceRowViewModel device in _allDeviceRows.Where(device => SerialEquals(device.Serial, serial)))
+                bool isBusy = snapshot.State != DeviceActionRuntimeState.Idle;
+                foreach (DeviceRowViewModel device in _allDeviceRows.Where(device => SerialEquals(device.Serial, snapshot.Serial)))
                     device.IsActionBusy = isBusy;
 
                 bool selectedDeviceChangedBusy = SelectedDevice != null
-                    && SerialEquals(SelectedDevice.Serial, serial);
+                    && SerialEquals(SelectedDevice.Serial, snapshot.Serial);
                 if (selectedDeviceChangedBusy)
                     NotifyDeviceInteractionChanged();
                 else
@@ -432,9 +696,47 @@ namespace DeepDroidChanger.ViewModels
                 "Failed to update device action busy state.");
         }
 
+        private void OnDeviceProcessChanged(DeviceProcessSnapshot snapshot)
+        {
+            if (_isDisposed)
+                return;
+
+            void ApplyProcessState()
+            {
+                foreach (DeviceRowViewModel device in _allDeviceRows
+                             .Where(device => SerialEquals(device.Serial, snapshot.Serial)))
+                {
+                    device.RestoreProcess(snapshot.Message, snapshot.State);
+                }
+            }
+
+            if (_uiDispatcher.CheckAccess())
+            {
+                ApplyProcessState();
+                return;
+            }
+
+            TrackSilentSave(
+                _uiDispatcher.InvokeAsync(ApplyProcessState),
+                "Failed to update shared device process state.");
+        }
+
         private void NotifyDeviceInteractionChanged()
         {
             OnPropertyChanged(nameof(CanInteractWithSelectedDevice));
+            OnPropertyChanged(nameof(IsSelectedDeviceActionBusy));
+            OnPropertyChanged(nameof(ActiveSelectedDeviceActionKind));
+            OnPropertyChanged(nameof(DisplayedSelectedDeviceActionKind));
+            OnPropertyChanged(nameof(HasExternalSelectedDeviceAction));
+            OnPropertyChanged(nameof(ExternalSelectedDeviceActionText));
+            OnPropertyChanged(nameof(HasActiveSelectedDeviceActionButton));
+            OnPropertyChanged(nameof(ActiveSelectedDeviceActionButtonRow));
+            OnPropertyChanged(nameof(ActiveSelectedDeviceActionButtonColumn));
+            OnPropertyChanged(nameof(IsSelectedDeviceActionRunning));
+            OnPropertyChanged(nameof(IsSelectedDeviceActionStopping));
+            OnPropertyChanged(nameof(CanEditSelectedDeviceConfiguration));
+            OnPropertyChanged(nameof(CanStopSelectedDeviceAction));
+            OnPropertyChanged(nameof(SelectedDeviceActionStopText));
             DeleteDeviceCommand.NotifyCanExecuteChanged();
             RandomDeviceCommand.NotifyCanExecuteChanged();
             ChangeDeviceCommand.NotifyCanExecuteChanged();
@@ -451,6 +753,22 @@ namespace DeepDroidChanger.ViewModels
             InstallApkCommand.NotifyCanExecuteChanged();
             FakeProxyCommand.NotifyCanExecuteChanged();
             StopFakeProxyCommand.NotifyCanExecuteChanged();
+            StopSelectedDeviceActionCommand.NotifyCanExecuteChanged();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanStopSelectedDeviceActionCommandCanExecute))]
+        private void StopSelectedDeviceAction()
+        {
+            DeviceRowViewModel? device = SelectedDevice;
+            if (device == null || !CanStopSelectedDeviceAction)
+                return;
+
+            _deviceActionCoordinatorService.TryRequestCancellation(device.Serial);
+        }
+
+        private bool CanStopSelectedDeviceActionCommandCanExecute()
+        {
+            return CanStopSelectedDeviceAction;
         }
 
         private bool CanAddNewDevices()
@@ -517,60 +835,74 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
         private async Task DeleteDeviceAsync(DeviceRowViewModel? device)
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            try
             {
-                var confirmed = await _deviceActionConfirmationDialogService
-                    .ConfirmDeleteDeviceAsync(device.Name, device.Serial, cancellationToken)
+                await ShowToolbarLogAsync("Log_SelectDeviceFirst", CancellationToken.None)
                     .ConfigureAwait(true);
+                return;
+            }
 
-                if (!confirmed)
-                {
-                    SetDeviceLog(device, "Log_DeleteDeviceCanceled");
-                    return;
-                }
+            SelectSingleDevice(device);
 
-                SetDeviceLog(device, "Log_DeletingDevice");
+            string serial = device.Serial;
+            string name = device.Name;
+            IDeviceActionOperation? operation = TryStartDeviceAction(
+                device,
+                DeviceActionKind.DeleteDevice,
+                canCancel: false);
+            if (operation == null)
+                return;
 
-                await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
+            using (operation)
+            {
+                CancellationToken cancellationToken = operation.CancellationToken;
                 try
                 {
-                    var deleteResult = await _deviceListService
-                        .DeleteSavedDeviceAsync(device.Serial, cancellationToken)
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmDeleteDeviceAsync(name, serial, cancellationToken)
                         .ConfigureAwait(true);
-                    if (!deleteResult.Removed)
+
+                    if (!confirmed)
                     {
-                        SetDeviceLog(device, "Log_DeleteDeviceFailed");
+                        SetDialogDismissalLog(device, operation, "Log_DeleteDeviceCanceled");
                         return;
                     }
 
-                    _randomDeviceProfiles.Remove(device.Serial);
-                    _randomSimProfiles.Remove(device.Serial);
-                    ApplyDeviceListSnapshot(deleteResult.Snapshot);
-                }
-                finally
-                {
-                    _deviceRefreshLock.Release();
-                }
+                    SetDeviceLog(device, "Log_DeletingDevice");
 
-                await ShowToolbarLogAsync("Log_DeleteDeviceSuccess", cancellationToken).ConfigureAwait(true);
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to delete device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_DeleteDeviceFailed");
+                    await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
+                    try
+                    {
+                        var deleteResult = await _deviceListService
+                            .DeleteSavedDeviceAsync(serial, cancellationToken)
+                            .ConfigureAwait(true);
+                        if (!deleteResult.Removed)
+                        {
+                            SetDeviceLog(device, "Log_DeleteDeviceFailed");
+                            return;
+                        }
+
+                        _randomDeviceProfiles.Remove(serial);
+                        _randomSimProfiles.Remove(serial);
+                        ApplyDeviceListSnapshot(deleteResult.Snapshot);
+                    }
+                    finally
+                    {
+                        _deviceRefreshLock.Release();
+                    }
+
+                    await ShowToolbarLogAsync("Log_DeleteDeviceSuccess", cancellationToken)
+                        .ConfigureAwait(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_DeleteDeviceCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to delete device {Serial}.", serial);
+                    SetDeviceLog(device, "Log_DeleteDeviceFailed");
+                }
             }
         }
 
@@ -826,331 +1158,25 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task RandomDeviceAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? selectedDevice = SelectedDevice;
             RandomDeviceRequest request = CreateCurrentRandomDeviceRequest();
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.RandomDevice)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            try
+            using (operation)
             {
-                SetDeviceLog(device, "Log_RandomDevice");
-                var randomResult = await _randomDeviceService
-                    .CreateRandomProfileAsync(request, cancellationToken)
-                    .ConfigureAwait(true);
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-                if (randomResult.Status == RandomDeviceStatus.LoginRequired)
-                {
-                    SetDeviceLog(device, "Log_RandomDeviceLoginRequired");
-                    return;
-                }
-
-                if (randomResult.Status == RandomDeviceStatus.Failed || randomResult.Profile == null)
-                {
-                    SetDeviceLog(device, "Log_RandomDeviceFailed");
-                    return;
-                }
-
-                ApplyRandomDeviceInfo(device.Serial, randomResult.Profile);
-                SetDeviceLog(device, "Log_RandomDeviceSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Unexpected failure while randomizing device info.");
-                SetDeviceLog(device, "Log_RandomDeviceFailed");
-            }
-        }
-
-        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeDeviceAsync()
-        {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? selectedDevice = SelectedDevice;
-            DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
-            if (profile != null)
-                CopyFormValuesToProfile(profile);
-
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            bool changeSimEnabled = IsChangeSimEnabled;
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            if (profile == null)
-            {
-                SetDeviceLog(device, "Log_RandomDeviceRequired");
-                return;
-            }
-
-            SetDeviceLog(device, "Log_ChangeDevice");
-
-            try
-            {
-                bool confirmed = await _deviceActionConfirmationDialogService
-                    .ConfirmChangeAndWipeAsync(
-                        device.Name,
-                        device.Serial,
-                        changeOptions,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                if (!confirmed)
-                {
-                    SetDeviceLog(device, "Log_ChangeDeviceCanceled");
-                    return;
-                }
-
-                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
-                    device,
-                    "Log_ChangeDevice",
-                    "Log_ChangeDeviceSuccess");
-                await _deviceChangeService
-                    .ChangeAsync(
-                        device.Serial,
-                        profile,
-                        changeSimEnabled,
-                        changeOptions,
-                        progress,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-
-                SetDeviceLog(device, "Log_ChangeDeviceSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to change device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_ChangeDeviceFailed");
-            }
-        }
-
-        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task ChangeWithoutWipeAsync()
-        {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? selectedDevice = SelectedDevice;
-            DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
-            if (profile != null)
-                CopyFormValuesToProfile(profile);
-
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            bool changeSimEnabled = IsChangeSimEnabled;
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            if (profile == null)
-            {
-                SetDeviceLog(device, "Log_RandomDeviceRequired");
-                return;
-            }
-
-            try
-            {
-                bool confirmed = await _deviceActionConfirmationDialogService
-                    .ConfirmChangeWithoutWipeAsync(device.Name, device.Serial, cancellationToken)
-                    .ConfigureAwait(true);
-                if (!confirmed)
-                {
-                    SetDeviceLog(device, "Log_ChangeWithoutWipeCanceled");
-                    return;
-                }
-
-                SetDeviceLog(device, "Log_ChangeWithoutWipe");
-                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
-                    device,
-                    "Log_ChangeWithoutWipe",
-                    "Log_ChangeWithoutWipeSuccess");
-                await _deviceChangeService
-                    .ChangeWithoutWipeAsync(
-                        device.Serial,
-                        profile,
-                        changeSimEnabled,
-                        changeOptions,
-                        progress,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                SetDeviceLog(device, "Log_ChangeWithoutWipeSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to change device {Serial} without wiping data.", device.Serial);
-                SetDeviceLog(device, "Log_ChangeWithoutWipeFailed");
-            }
-        }
-
-        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task WipeWithoutChangeAsync()
-        {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? selectedDevice = SelectedDevice;
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            try
-            {
-                bool confirmed = await _deviceActionConfirmationDialogService
-                    .ConfirmWipeWithoutChangeAsync(device.Name, device.Serial, cancellationToken)
-                    .ConfigureAwait(true);
-                if (!confirmed)
-                {
-                    SetDeviceLog(device, "Log_WipeWithoutChangeCanceled");
-                    return;
-                }
-
-                SetDeviceLog(device, "Log_WipeWithoutChange");
-                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
-                    device,
-                    "Log_WipeWithoutChange",
-                    "Log_WipeWithoutChangeSuccess");
-                await _deviceChangeService
-                    .WipeWithoutChangeAsync(
-                        device.Serial,
-                        changeOptions,
-                        progress,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                SetDeviceLog(device, "Log_WipeWithoutChangeSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to wipe device {Serial} without changing identity.", device.Serial);
-                SetDeviceLog(device, "Log_WipeWithoutChangeFailed");
-            }
-        }
-
-        private bool CanOpenAdvancedChangeConfig()
-        {
-            return !UseDefaultChangeMode && CanExecuteSelectedDeviceAction();
-        }
-
-        [RelayCommand(CanExecute = nameof(CanOpenAdvancedChangeConfig), AllowConcurrentExecutions = true)]
-        private async Task OpenAdvancedChangeConfigAsync()
-        {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? selectedDevice = SelectedDevice;
-            bool useDefaultChangeMode = UseDefaultChangeMode;
-            DeviceProfileConfig profileSnapshot = CreateDeviceProfileConfig();
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null || useDefaultChangeMode)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            DeviceChangeOptions optionsSnapshot = DeviceChangeOptionsHelper.CreateNormalizedCopy(
-                profileSnapshot.ChangeOptions,
-                useDefaultMode: false);
-            SetDeviceLog(device, "Log_OpeningDialog");
-            try
-            {
-                AdvancedChangeConfigDialogResult? result = await _advancedChangeConfigDialogService
-                    .ShowAdvancedChangeConfigAsync(
-                        device.Serial,
-                        optionsSnapshot,
-                        profileSnapshot.UseIntegritySecurityPatch,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                if (result == null)
-                {
-                    SetDeviceLog(device, "Log_Ready");
-                    return;
-                }
-
-                profileSnapshot.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
-                    result.Options,
-                    useDefaultMode: false);
-                profileSnapshot.UseIntegritySecurityPatch = result.UseIntegritySecurityPatch;
-                await SaveDeviceProfileAsync(device.Serial, profileSnapshot, cancellationToken)
-                    .ConfigureAwait(true);
-
-                if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, device.Serial))
-                    ApplyStoredDeviceConfig(SelectedDevice);
-
-                SetDeviceLog(device, "Log_AdvancedChangeConfigSaved");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to configure advanced Change Device options for {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_AdvancedChangeConfigFailed");
-            }
-        }
-
-        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task RandomChangeAndWipeDeviceAsync()
-        {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? selectedDevice = SelectedDevice;
-            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
-            bool changeSimEnabled = IsChangeSimEnabled;
-            RandomDeviceRequest randomRequest = CreateCurrentRandomDeviceRequest();
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            try
-            {
-                bool confirmed = await _deviceActionConfirmationDialogService
-                    .ConfirmChangeAndWipeAsync(
-                        device.Name,
-                        device.Serial,
-                        changeOptions,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                if (!confirmed)
-                {
-                    SetDeviceLog(device, "Log_ChangeDeviceCanceled");
-                    return;
-                }
-
-                DeviceInfoApiDevice? profile;
                 try
                 {
                     SetDeviceLog(device, "Log_RandomDevice");
                     var randomResult = await _randomDeviceService
-                        .CreateRandomProfileAsync(randomRequest, cancellationToken)
+                        .CreateRandomProfileAsync(request, cancellationToken)
                         .ConfigureAwait(true);
 
                     if (randomResult.Status == RandomDeviceStatus.LoginRequired)
@@ -1165,24 +1191,66 @@ namespace DeepDroidChanger.ViewModels
                         return;
                     }
 
-                    profile = randomResult.Profile.Clone();
-                    ApplyRandomDeviceInfo(device.Serial, randomResult.Profile);
+                    ApplyRandomDeviceInfo(device.Serial, randomResult.Profile.Clone());
+                    SetDeviceLog(device, "Log_RandomDeviceSuccess");
                 }
                 catch (OperationCanceledException)
                 {
-                    SetDeviceLog(device, "Log_Ready");
-                    return;
+                    SetOperationCancellationLog(device, operation, "Log_RandomDeviceCanceled");
                 }
                 catch (Exception exception)
                 {
                     _logger.LogError(exception, "Unexpected failure while randomizing device info.");
                     SetDeviceLog(device, "Log_RandomDeviceFailed");
-                    return;
                 }
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task ChangeDeviceAsync()
+        {
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
+            if (profile != null)
+                CopyFormValuesToProfile(profile);
+
+            if (selectedDevice != null && profile == null)
+            {
+                SetDeviceLog(selectedDevice, "Log_RandomDeviceRequired");
+                return;
+            }
+
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.ChangeDevice)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
                 SetDeviceLog(device, "Log_ChangeDevice");
 
                 try
                 {
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmChangeAndWipeAsync(
+                            device.Name,
+                            device.Serial,
+                            changeOptions,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+                    if (!confirmed)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_ChangeDeviceCanceled");
+                        return;
+                    }
+
                     IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
                         device,
                         "Log_ChangeDevice",
@@ -1190,7 +1258,7 @@ namespace DeepDroidChanger.ViewModels
                     await _deviceChangeService
                         .ChangeAsync(
                             device.Serial,
-                            profile,
+                            profile!,
                             changeSimEnabled,
                             changeOptions,
                             progress,
@@ -1201,7 +1269,7 @@ namespace DeepDroidChanger.ViewModels
                 }
                 catch (OperationCanceledException)
                 {
-                    SetDeviceLog(device, "Log_Ready");
+                    SetOperationCancellationLog(device, operation, "Log_ChangeDeviceCanceled");
                 }
                 catch (Exception exception)
                 {
@@ -1209,47 +1277,343 @@ namespace DeepDroidChanger.ViewModels
                     SetDeviceLog(device, "Log_ChangeDeviceFailed");
                 }
             }
-            catch (OperationCanceledException)
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task ChangeWithoutWipeAsync()
+        {
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
+            if (profile != null)
+                CopyFormValuesToProfile(profile);
+
+            if (selectedDevice != null && profile == null)
             {
-                SetDeviceLog(device, "Log_Ready");
+                SetDeviceLog(selectedDevice, "Log_RandomDeviceRequired");
+                return;
             }
-            catch (Exception exception)
+
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.ChangeWithoutWipe)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
             {
-                _logger.LogError(exception, "Failed to randomize and change device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_ChangeDeviceFailed");
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
+                try
+                {
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmChangeWithoutWipeAsync(device.Name, device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+                    if (!confirmed)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_ChangeWithoutWipeCanceled");
+                        return;
+                    }
+
+                    SetDeviceLog(device, "Log_ChangeWithoutWipe");
+                    IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
+                        device,
+                        "Log_ChangeWithoutWipe",
+                        "Log_ChangeWithoutWipeSuccess");
+                    await _deviceChangeService
+                        .ChangeWithoutWipeAsync(
+                            device.Serial,
+                            profile!,
+                            changeSimEnabled,
+                            changeOptions,
+                            progress,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_ChangeWithoutWipeSuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_ChangeWithoutWipeCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to change device {Serial} without wiping data.", device.Serial);
+                    SetDeviceLog(device, "Log_ChangeWithoutWipeFailed");
+                }
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task WipeWithoutChangeAsync()
+        {
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.Wipe)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
+                try
+                {
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmWipeWithoutChangeAsync(device.Name, device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+                    if (!confirmed)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_WipeWithoutChangeCanceled");
+                        return;
+                    }
+
+                    SetDeviceLog(device, "Log_WipeWithoutChange");
+                    IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
+                        device,
+                        "Log_WipeWithoutChange",
+                        "Log_WipeWithoutChangeSuccess");
+                    await _deviceChangeService
+                        .WipeWithoutChangeAsync(
+                            device.Serial,
+                            changeOptions,
+                            progress,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_WipeWithoutChangeSuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_WipeWithoutChangeCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to wipe device {Serial} without changing identity.", device.Serial);
+                    SetDeviceLog(device, "Log_WipeWithoutChangeFailed");
+                }
+            }
+        }
+
+        private bool CanOpenAdvancedChangeConfig()
+        {
+            return !UseDefaultChangeMode && CanExecuteSelectedDeviceAction();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanOpenAdvancedChangeConfig), AllowConcurrentExecutions = true)]
+        private async Task OpenAdvancedChangeConfigAsync()
+        {
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            bool useDefaultChangeMode = UseDefaultChangeMode;
+            DeviceProfileConfig profileSnapshot = CreateDeviceProfileConfig();
+            if (useDefaultChangeMode)
+                return;
+
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.AdvancedChangeConfig,
+                    canCancel: false)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+                DeviceChangeOptions optionsSnapshot = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                    profileSnapshot.ChangeOptions,
+                    useDefaultMode: false);
+                SetDeviceLog(device, "Log_OpeningDialog");
+                try
+                {
+                    AdvancedChangeConfigDialogResult? result = await _advancedChangeConfigDialogService
+                        .ShowAdvancedChangeConfigAsync(
+                            device.Serial,
+                            optionsSnapshot,
+                            profileSnapshot.UseIntegritySecurityPatch,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+                    if (result == null)
+                    {
+                        SetDeviceLog(device, "Log_Ready");
+                        return;
+                    }
+
+                    profileSnapshot.ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
+                        result.Options,
+                        useDefaultMode: false);
+                    profileSnapshot.UseIntegritySecurityPatch = result.UseIntegritySecurityPatch;
+                    await SaveDeviceProfileAsync(device.Serial, profileSnapshot, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, device.Serial))
+                        ApplyStoredDeviceConfig(SelectedDevice);
+
+                    SetDeviceLog(device, "Log_AdvancedChangeConfigSaved");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_AdvancedChangeConfigCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to configure advanced Change Device options for {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_AdvancedChangeConfigFailed");
+                }
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task RandomChangeAndWipeDeviceAsync()
+        {
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
+            bool changeSimEnabled = IsChangeSimEnabled;
+            RandomDeviceRequest randomRequest = CreateCurrentRandomDeviceRequest();
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.RandomChangeAndWipe)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
+                try
+                {
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmChangeAndWipeAsync(
+                            device.Name,
+                            device.Serial,
+                            changeOptions,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+                    if (!confirmed)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_ChangeDeviceCanceled");
+                        return;
+                    }
+
+                    DeviceInfoApiDevice? profile;
+                    try
+                    {
+                        SetDeviceLog(device, "Log_RandomDevice");
+                        var randomResult = await _randomDeviceService
+                            .CreateRandomProfileAsync(randomRequest, cancellationToken)
+                            .ConfigureAwait(true);
+
+                        if (randomResult.Status == RandomDeviceStatus.LoginRequired)
+                        {
+                            SetDeviceLog(device, "Log_RandomDeviceLoginRequired");
+                            return;
+                        }
+
+                        if (randomResult.Status == RandomDeviceStatus.Failed || randomResult.Profile == null)
+                        {
+                            SetDeviceLog(device, "Log_RandomDeviceFailed");
+                            return;
+                        }
+
+                        profile = randomResult.Profile.Clone();
+                        ApplyRandomDeviceInfo(device.Serial, randomResult.Profile.Clone());
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        SetOperationCancellationLog(device, operation, "Log_ChangeDeviceCanceled");
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(exception, "Unexpected failure while randomizing device info.");
+                        SetDeviceLog(device, "Log_RandomDeviceFailed");
+                        return;
+                    }
+                    SetDeviceLog(device, "Log_ChangeDevice");
+
+                    try
+                    {
+                        IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(
+                            device,
+                            "Log_ChangeDevice",
+                            "Log_ChangeDeviceSuccess");
+                        await _deviceChangeService
+                            .ChangeAsync(
+                                device.Serial,
+                                profile!,
+                                changeSimEnabled,
+                                changeOptions,
+                                progress,
+                                cancellationToken)
+                            .ConfigureAwait(true);
+
+                        SetDeviceLog(device, "Log_ChangeDeviceSuccess");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        SetOperationCancellationLog(device, operation, "Log_ChangeDeviceCanceled");
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(exception, "Failed to change device {Serial}.", device.Serial);
+                        SetDeviceLog(device, "Log_ChangeDeviceFailed");
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_ChangeDeviceCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to randomize and change device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_ChangeDeviceFailed");
+                }
             }
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task RandomSimAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? selectedDevice = SelectedDevice;
-            CarrierCountryOption? country = SelectedCountry;
-            CarrierOption? carrier = SelectedCarrier;
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            CarrierCountryOption? country = CloneCountryOption(SelectedCountry);
+            CarrierOption? carrier = CloneCarrierOption(SelectedCarrier);
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.RandomSim)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-            try
-            {
-                SetDeviceLog(device, "Log_RandomSim");
-                SimProfile simProfile = _simProfileService.CreateRandomProfile(country, carrier);
-                ApplyRandomSimInfo(device.Serial, simProfile);
-                SetDeviceLog(device, "Log_RandomSimSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to generate random SIM information.");
-                SetDeviceLog(device, "Log_RandomSimFailed");
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    SetDeviceLog(device, "Log_RandomSim");
+                    SimProfile simProfile = _simProfileService.CreateRandomProfile(country, carrier);
+                    ApplyRandomSimInfo(device.Serial, simProfile);
+                    SetDeviceLog(device, "Log_RandomSimSuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_RandomSimCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to generate random SIM information.");
+                    SetDeviceLog(device, "Log_RandomSimFailed");
+                }
             }
         }
 
@@ -1326,7 +1690,6 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task ChangeSimAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
             DeviceRowViewModel? selectedDevice = SelectedDevice;
             SimProfile? sourceProfile = selectedDevice != null
                 && _randomSimProfiles.TryGetValue(selectedDevice.Serial, out SimProfile? profile)
@@ -1335,159 +1698,178 @@ namespace DeepDroidChanger.ViewModels
             SimProfile? editedProfile = sourceProfile == null
                 ? null
                 : CreateEditedSimProfile(sourceProfile);
-            DeviceRowViewModel? device = await GetOnlineDeviceAsync(selectedDevice, cancellationToken).ConfigureAwait(true);
-            if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            if (editedProfile == null)
+            if (selectedDevice != null && editedProfile == null)
             {
-                SetDeviceLog(device, "Log_RandomSimRequired");
+                SetDeviceLog(selectedDevice, "Log_RandomSimRequired");
                 return;
             }
 
-            try
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.ChangeSim)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
             {
-                bool confirmed = await _deviceActionConfirmationDialogService
-                    .ConfirmChangeSimAsync(device.Name, device.Serial, cancellationToken)
-                    .ConfigureAwait(true);
-                if (!confirmed)
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
+                try
                 {
-                    SetDeviceLog(device, "Log_ChangeSimCanceled");
-                    return;
-                }
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmChangeSimAsync(device.Name, device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+                    if (!confirmed)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_ChangeSimCanceled");
+                        return;
+                    }
 
-                SetDeviceLog(device, "Log_ChangeSim");
-                await _deviceChangeService
-                    .ChangeSimAsync(device.Serial, editedProfile, cancellationToken)
-                    .ConfigureAwait(true);
-                _randomSimProfiles[device.Serial] = editedProfile;
-                SetDeviceLog(device, "Log_ChangeSimSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to change SIM information on device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_ChangeSimFailed");
+                    SetDeviceLog(device, "Log_ChangeSim");
+                    await _deviceChangeService
+                        .ChangeSimAsync(device.Serial, editedProfile!, cancellationToken)
+                        .ConfigureAwait(true);
+                    _randomSimProfiles[device.Serial] = editedProfile!;
+                    SetDeviceLog(device, "Log_ChangeSimSuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_ChangeSimCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to change SIM information on device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_ChangeSimFailed");
+                }
             }
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task ChangeLocationAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.ChangeLocation)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            SetDeviceLog(device, "Log_OpeningDialog");
-
-            try
+            using (operation)
             {
-                var dialogResult = await _changeLocationDialogService
-                    .ShowChangeLocationAsync(device.Serial, device.Name, cancellationToken)
-                    .ConfigureAwait(true);
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-                if (dialogResult == null)
+                SetDeviceLog(device, "Log_OpeningDialog");
+
+                try
                 {
-                    SetDeviceLog(device, "Log_ChangeLocationCanceled");
-                    return;
+                    var dialogResult = await _changeLocationDialogService
+                        .ShowChangeLocationAsync(device.Serial, device.Name, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    if (dialogResult == null)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_ChangeLocationCanceled");
+                        return;
+                    }
+
+                    dialogResult = CloneLocationDialogResult(dialogResult);
+
+                    SetDeviceLog(
+                        device,
+                        dialogResult.Mode == ChangeLocationMode.DeviceIp
+                            ? "Log_ResolvingByIp"
+                            : "Log_ApplyingLocation");
+                    DeviceLocationResult locationResult = await _deviceLocationService
+                        .ApplyAsync(device.Serial, dialogResult, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    await SaveLocationConfigAsync(
+                            device.Serial,
+                            dialogResult.Mode,
+                            locationResult.Latitude,
+                            locationResult.Longitude,
+                            locationResult.CountryCode,
+                            locationResult.CityName,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+
+                    SetDeviceLog(device, "Log_ChangeLocationSuccess");
                 }
-
-                SetDeviceLog(
-                    device,
-                    dialogResult.Mode == ChangeLocationMode.DeviceIp
-                        ? "Log_ResolvingByIp"
-                        : "Log_ApplyingLocation");
-                DeviceLocationResult locationResult = await _deviceLocationService
-                    .ApplyAsync(device.Serial, dialogResult, cancellationToken)
-                    .ConfigureAwait(true);
-
-                await SaveLocationConfigAsync(
-                        device.Serial,
-                        dialogResult.Mode,
-                        locationResult.Latitude,
-                        locationResult.Longitude,
-                        locationResult.CountryCode,
-                        locationResult.CityName,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-
-                SetDeviceLog(device, "Log_ChangeLocationSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to change location for device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_ChangeLocationFailed");
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_ChangeLocationCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to change location for device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_ChangeLocationFailed");
+                }
             }
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task ChangeTimezoneAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.ChangeTimezone)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            SetDeviceLog(device, "Log_OpeningDialog");
-
-            try
+            using (operation)
             {
-                var dialogResult = await _changeTimezoneDialogService
-                    .ShowChangeTimezoneAsync(device.Serial, device.Name, cancellationToken)
-                    .ConfigureAwait(true);
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-                if (dialogResult == null)
+                SetDeviceLog(device, "Log_OpeningDialog");
+
+                try
                 {
-                    SetDeviceLog(device, "Log_ChangeTimezoneCanceled");
-                    return;
+                    var dialogResult = await _changeTimezoneDialogService
+                        .ShowChangeTimezoneAsync(device.Serial, device.Name, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    if (dialogResult == null)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_ChangeTimezoneCanceled");
+                        return;
+                    }
+
+                    dialogResult = CloneTimezoneDialogResult(dialogResult);
+
+                    SetDeviceLog(
+                        device,
+                        dialogResult.Mode == ChangeTimezoneMode.DeviceIp
+                            ? "Log_ResolvingByIp"
+                            : "Log_ApplyingTimezone");
+                    string appliedTimezone = await _deviceTimezoneService
+                        .ApplyAsync(device.Serial, dialogResult, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    await SaveTimezoneConfigAsync(
+                            device.Serial,
+                            dialogResult.Mode,
+                            appliedTimezone,
+                            cancellationToken)
+                        .ConfigureAwait(true);
+
+                    SetDeviceLog(device, "Log_ChangeTimezoneSuccess");
                 }
-
-                SetDeviceLog(
-                    device,
-                    dialogResult.Mode == ChangeTimezoneMode.DeviceIp
-                        ? "Log_ResolvingByIp"
-                        : "Log_ApplyingTimezone");
-                string appliedTimezone = await _deviceTimezoneService
-                    .ApplyAsync(device.Serial, dialogResult, cancellationToken)
-                    .ConfigureAwait(true);
-
-                await SaveTimezoneConfigAsync(
-                        device.Serial,
-                        dialogResult.Mode,
-                        appliedTimezone,
-                        cancellationToken)
-                    .ConfigureAwait(true);
-
-                SetDeviceLog(device, "Log_ChangeTimezoneSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to change timezone for device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_ChangeTimezoneFailed");
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_ChangeTimezoneCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to change timezone for device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_ChangeTimezoneFailed");
+                }
             }
         }
 
@@ -1522,15 +1904,30 @@ namespace DeepDroidChanger.ViewModels
                 || !_randomDeviceProfiles.TryGetValue(device.Serial, out DeviceInfoApiDevice? profile))
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
+            DeviceInfoApiDevice profileSnapshot = profile.Clone();
+            IDeviceActionOperation? operation = TryStartDeviceAction(
+                device,
+                DeviceActionKind.ViewRandomDeviceInfo,
+                canCancel: false);
+            if (operation == null)
                 return;
 
-            bool updated = await _randomDeviceInfoDialogService
-                .ShowRandomDeviceInfoAsync(profile, cancellationToken)
-                .ConfigureAwait(true);
-            if (updated)
-                ApplyRandomDeviceInfo(device.Serial, profile);
+            using (operation)
+            {
+                cancellationToken = operation.CancellationToken;
+                try
+                {
+                    bool updated = await _randomDeviceInfoDialogService
+                        .ShowRandomDeviceInfoAsync(profileSnapshot, cancellationToken)
+                        .ConfigureAwait(true);
+                    if (updated)
+                        ApplyRandomDeviceInfo(device.Serial, profileSnapshot);
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_ViewRandomDeviceInfoCanceled");
+                }
+            }
         }
 
         private Task SaveLocationConfigAsync(
@@ -1607,133 +2004,112 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task UpdateIntegrityAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null)
-                return;
-
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            SetDeviceLog(device, "Log_OpeningDialog");
-
-            try
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            StoredDeviceConfig? storedDeviceSnapshot = selectedDevice == null
+                ? null
+                : CreateStoredDeviceConfigSnapshot(selectedDevice.Serial);
+            if (selectedDevice != null && storedDeviceSnapshot == null)
             {
-                var storedDevice = _storedDevices.FirstOrDefault(d => SerialEquals(d.Serial, device.Serial));
-                if (storedDevice == null)
+                SetDeviceLog(selectedDevice, "Log_UpdateIntegrityFailed");
+                return;
+            }
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.UpdateIntegrity)
+                .ConfigureAwait(true);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
+                SetDeviceLog(device, "Log_OpeningDialog");
+
+                try
                 {
+                    var dialogResult = await _updateIntegrityDialogService
+                        .ShowUpdateIntegrityAsync(
+                            device.Serial,
+                            device.Name,
+                            storedDeviceSnapshot!,
+                            (result, saveCancellationToken) => SaveUpdateIntegrityConfigAsync(device, result, saveCancellationToken),
+                            cancellationToken)
+                        .ConfigureAwait(true);
+
+                    if (dialogResult == null)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_UpdateIntegrityCanceled");
+                        return;
+                    }
+
+                    await SaveUpdateIntegrityConfigAsync(device, dialogResult, cancellationToken).ConfigureAwait(true);
+
+                    SetDeviceLog(
+                        device,
+                        dialogResult.UpdateIntegrityEnabled
+                            ? "Log_UpdatingIntegrity"
+                            : "Log_UpdatingKeybox");
+                    await _deviceIntegrityService
+                        .ApplyAsync(device.Serial, dialogResult, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    SetDeviceLog(device, "Log_UpdateIntegritySuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_UpdateIntegrityCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to update integrity for device {Serial}.", device.Serial);
                     SetDeviceLog(device, "Log_UpdateIntegrityFailed");
-                    return;
                 }
-
-                var dialogResult = await _updateIntegrityDialogService
-                    .ShowUpdateIntegrityAsync(
-                        device.Serial,
-                        device.Name,
-                        storedDevice,
-                        (result, saveCancellationToken) => SaveUpdateIntegrityConfigAsync(device, result, saveCancellationToken),
-                        cancellationToken)
-                    .ConfigureAwait(true);
-
-                if (dialogResult == null)
-                {
-                    SetDeviceLog(device, "Log_UpdateIntegrityCanceled");
-                    return;
-                }
-
-                await SaveUpdateIntegrityConfigAsync(device, dialogResult, cancellationToken).ConfigureAwait(true);
-
-                SetDeviceLog(
-                    device,
-                    dialogResult.UpdateIntegrityEnabled
-                        ? "Log_UpdatingIntegrity"
-                        : "Log_UpdatingKeybox");
-                await _deviceIntegrityService
-                    .ApplyAsync(device.Serial, dialogResult, cancellationToken)
-                    .ConfigureAwait(true);
-
-                SetDeviceLog(device, "Log_UpdateIntegritySuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to update integrity for device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_UpdateIntegrityFailed");
             }
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task InstallApkAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.InstallPackages)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            SetDeviceLog(device, "Log_InstallPackageOpening");
-
-            try
+            using (operation)
             {
-                var dialogResult = await _installPackageDialogService
-                    .ShowInstallPackageAsync(device.Serial, device.Name, cancellationToken)
-                    .ConfigureAwait(true);
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-                if (dialogResult == null)
-                {
-                    SetDeviceLog(device, "Log_InstallPackageCanceled");
-                    return;
-                }
+                SetDeviceLog(device, "Log_InstallPackageOpening");
 
-                bool isOnline;
                 try
                 {
-                    isOnline = await _deviceListService
-                        .IsDeviceOnlineAsync(device.Serial, cancellationToken)
+                    var dialogResult = await _installPackageDialogService
+                        .ShowInstallPackageAsync(device.Serial, device.Name, cancellationToken)
                         .ConfigureAwait(true);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogWarning(
-                        exception,
-                        "Live ADB confirmation failed for device {Serial} after install dialog.",
-                        device.Serial);
-                    isOnline = false;
-                }
 
-                if (!isOnline)
-                {
-                    SetDeviceLog(device, "Log_DeviceMustBeOnline");
-                    return;
-                }
+                    if (dialogResult == null)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_InstallPackageCanceled");
+                        return;
+                    }
 
-                int successCount = 0;
-                int totalCount = dialogResult.FilePaths.Count;
-                InstallPackageResult? singlePackageResult = null;
-                foreach (string filePath in dialogResult.FilePaths)
-                {
-                    SetDeviceLog(device, "Log_InstallPackageInstalling");
+                    var request = new InstallPackageRequest(
+                        dialogResult.FilePaths.ToArray(),
+                        new InstallPackageOptions(
+                            dialogResult.Options.GrantPermissions,
+                            dialogResult.Options.AllowDowngrade));
 
-                    InstallPackageResult result;
+                    bool isOnline;
                     try
                     {
-                        result = await _packageInstallService
-                            .InstallAsync(
-                                device.Serial,
-                                filePath,
-                                dialogResult.Options,
-                                cancellationToken)
+                        isOnline = await _deviceListService
+                            .IsDeviceOnlineAsync(device.Serial, cancellationToken)
                             .ConfigureAwait(true);
                     }
                     catch (OperationCanceledException)
@@ -1742,144 +2118,192 @@ namespace DeepDroidChanger.ViewModels
                     }
                     catch (Exception exception)
                     {
-                        _logger.LogError(
+                        _logger.LogWarning(
                             exception,
-                            "Unexpected package installation failure for device {Serial}, file {FilePath}.",
-                            device.Serial,
-                            filePath);
-                        result = new InstallPackageResult(
-                            filePath,
-                            false,
-                            "Log_InstallPackageAdbFailure");
+                            "Live ADB confirmation failed for device {Serial} after install dialog.",
+                            device.Serial);
+                        isOnline = false;
                     }
 
-                    if (result.Success)
-                        successCount++;
-                    if (totalCount == 1)
-                        singlePackageResult = result;
-                }
+                    if (!isOnline)
+                    {
+                        SetDeviceLog(device, "Log_DeviceMustBeOnline");
+                        return;
+                    }
 
-                if (singlePackageResult is { } singleResult)
-                {
-                    SetDeviceLog(
-                        device,
-                        singleResult.MessageResourceKey,
-                        singleResult.MessageArguments.ToArray());
-                }
-                else
-                {
-                    string summaryKey = successCount == totalCount
-                        ? "Log_InstallPackageCompleteFormat"
-                        : successCount > 0
-                            ? "Log_InstallPackagePartialFormat"
-                            : "Log_InstallPackageFailedFormat";
-                    SetDeviceLog(device, summaryKey, successCount, totalCount);
-                }
+                    int successCount = 0;
+                    int totalCount = request.FilePaths.Count;
+                    InstallPackageResult? singlePackageResult = null;
+                    foreach (string filePath in request.FilePaths)
+                    {
+                        SetDeviceLog(device, "Log_InstallPackageInstalling");
 
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to install package for selected device.");
-                SetDeviceLog(device, "Log_InstallPackageAdbFailure");
+                        InstallPackageResult result;
+                        try
+                        {
+                            result = await _packageInstallService
+                                .InstallAsync(
+                                    device.Serial,
+                                    filePath,
+                                    request.Options,
+                                    cancellationToken)
+                                .ConfigureAwait(true);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception)
+                        {
+                            _logger.LogError(
+                                exception,
+                                "Unexpected package installation failure for device {Serial}, file {FilePath}.",
+                                device.Serial,
+                                filePath);
+                            result = new InstallPackageResult(
+                                filePath,
+                                false,
+                                "Log_InstallPackageAdbFailure");
+                        }
+
+                        if (result.Success)
+                            successCount++;
+                        if (totalCount == 1)
+                            singlePackageResult = result;
+                    }
+
+                    if (singlePackageResult is { } singleResult)
+                    {
+                        SetDeviceLog(
+                            device,
+                            singleResult.MessageResourceKey,
+                            singleResult.MessageArguments.ToArray());
+                    }
+                    else
+                    {
+                        string summaryKey = successCount == totalCount
+                            ? "Log_InstallPackageCompleteFormat"
+                            : successCount > 0
+                                ? "Log_InstallPackagePartialFormat"
+                                : "Log_InstallPackageFailedFormat";
+                        SetDeviceLog(device, summaryKey, successCount, totalCount);
+                    }
+
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_InstallPackageCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to install package for selected device.");
+                    SetDeviceLog(device, "Log_InstallPackageAdbFailure");
+                }
             }
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task FakeProxyAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.FakeProxy)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            SetDeviceLog(device, "Log_OpeningDialog");
-
-            try
+            using (operation)
             {
-                var dialogResult = await _fakeProxyDialogService
-                    .ShowFakeProxyDialogAsync(device.Serial, device.Name, cancellationToken)
-                    .ConfigureAwait(true);
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-                if (dialogResult == null)
+                SetDeviceLog(device, "Log_OpeningDialog");
+
+                try
                 {
-                    SetDeviceLog(device, "Log_FakeProxyCanceled");
-                    return;
+                    var dialogResult = await _fakeProxyDialogService
+                        .ShowFakeProxyDialogAsync(device.Serial, device.Name, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    if (dialogResult == null)
+                    {
+                        SetDialogDismissalLog(device, operation, "Log_FakeProxyCanceled");
+                        return;
+                    }
+
+                    SetDeviceLog(device, "Log_StartingProxy");
+
+                    ProxyWorkflowResult workflowResult = await _proxyWorkflowService
+                        .ApplyAsync(device.Serial, dialogResult, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    if (workflowResult.LocationUpdateFailed)
+                    {
+                        SetDeviceLog(device, "Log_ProxyLocationByIpFailed");
+                    }
+
+                    if (workflowResult.TimezoneUpdateFailed)
+                    {
+                        SetDeviceLog(device, "Log_ProxyTimezoneByIpFailed");
+                    }
+
+                    bool postProxyUpdatesSucceeded =
+                        !workflowResult.LocationUpdateFailed && !workflowResult.TimezoneUpdateFailed;
+
+                    SetDeviceLog(
+                        device,
+                        postProxyUpdatesSucceeded
+                            ? "Log_FakeProxySuccess"
+                            : "Log_FakeProxyPartialSuccess");
                 }
-
-                SetDeviceLog(device, "Log_StartingProxy");
-
-                ProxyWorkflowResult workflowResult = await _proxyWorkflowService
-                    .ApplyAsync(device.Serial, dialogResult, cancellationToken)
-                    .ConfigureAwait(true);
-
-                if (workflowResult.LocationUpdateFailed)
+                catch (OperationCanceledException)
                 {
-                    SetDeviceLog(device, "Log_ProxyLocationByIpFailed");
+                    SetOperationCancellationLog(device, operation, "Log_FakeProxyCanceled");
                 }
-
-                if (workflowResult.TimezoneUpdateFailed)
+                catch (Exception exception)
                 {
-                    SetDeviceLog(device, "Log_ProxyTimezoneByIpFailed");
+                    _logger.LogError(exception, "Failed to apply fake proxy for device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_FakeProxyFailed");
                 }
-
-                bool postProxyUpdatesSucceeded =
-                    !workflowResult.LocationUpdateFailed && !workflowResult.TimezoneUpdateFailed;
-
-                SetDeviceLog(
-                    device,
-                    postProxyUpdatesSucceeded
-                        ? "Log_FakeProxySuccess"
-                        : "Log_FakeProxyPartialSuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to apply fake proxy for device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_FakeProxyFailed");
             }
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task StopFakeProxyAsync()
         {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? device = await GetSelectedOnlineDeviceAsync(cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            DeviceRowViewModel? selectedDevice = SelectedDevice;
+            IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
+                    selectedDevice,
+                    DeviceActionKind.StopFakeProxy)
+                .ConfigureAwait(true);
+            if (operation == null)
                 return;
 
-            using IDisposable? actionLease = TryAcquireDeviceAction(device);
-            if (actionLease == null)
-                return;
-
-            SetDeviceLog(device, "Log_StoppingProxy");
-
-            try
+            using (operation)
             {
-                await _adbProxyService
-                    .StopProxyAsync(device.Serial, cancellationToken)
-                    .ConfigureAwait(true);
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
 
-                SetDeviceLog(device, "Log_StopFakeProxySuccess");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(device, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to stop fake proxy for device {Serial}.", device.Serial);
-                SetDeviceLog(device, "Log_StopFakeProxyFailed");
+                SetDeviceLog(device, "Log_StoppingProxy");
+
+                try
+                {
+                    await _adbProxyService
+                        .StopProxyAsync(device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+
+                    SetDeviceLog(device, "Log_StopFakeProxySuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    SetOperationCancellationLog(device, operation, "Log_StopFakeProxyCanceled");
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to stop fake proxy for device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_StopFakeProxyFailed");
+                }
             }
         }
 
@@ -2055,10 +2479,6 @@ namespace DeepDroidChanger.ViewModels
         {
             _isRefreshingRows = true;
             var targetSerial = SelectedDevice?.Serial ?? _settings.SelectedSingleDeviceSerial;
-            var processBySerial = new Dictionary<string, (string Message, DeviceProcessState State)>(
-                StringComparer.OrdinalIgnoreCase);
-            foreach (var device in _allDeviceRows)
-                processBySerial[device.Serial] = (device.Process, device.ProcessState);
 
             try
             {
@@ -2074,8 +2494,6 @@ namespace DeepDroidChanger.ViewModels
                     var storedDevice = storedDevices[index];
                     connectedBySerial.TryGetValue(storedDevice.Serial, out var connectedDevice);
                     var deviceRow = CreateDeviceRow(index + 1, storedDevice, connectedDevice);
-                    if (processBySerial.TryGetValue(deviceRow.Serial, out var previousProcess))
-                        deviceRow.RestoreProcess(previousProcess.Message, previousProcess.State);
 
                     deviceRow.PropertyChanged += OnDeviceRowPropertyChanged;
                     _allDeviceRows.Add(deviceRow);
@@ -2204,7 +2622,9 @@ namespace DeepDroidChanger.ViewModels
             if (args.PropertyName == nameof(DeviceRowViewModel.Type))
             {
                 CancelPendingDeviceEdit(deviceRow.Serial);
-                TrackSilentSave(SaveDeviceRowEditAsync(deviceRow, GetActiveToken()), "Failed to save device row edit.");
+                TrackSilentSave(
+                    SaveDeviceRowEditAsync(CreateDeviceRowEditSnapshot(deviceRow), GetActiveToken()),
+                    "Failed to save device row edit.");
                 ReapplySearchIfActive();
                 return;
             }
@@ -2270,7 +2690,9 @@ namespace DeepDroidChanger.ViewModels
         private void QueueDeviceRowEdit(DeviceRowViewModel deviceRow)
         {
             var cancellation = new CancellationTokenSource();
-            var pendingEdit = new PendingDeviceEdit(deviceRow, cancellation);
+            var pendingEdit = new PendingDeviceEdit(
+                CreateDeviceRowEditSnapshot(deviceRow),
+                cancellation);
 
             lock (_pendingDeviceEditsLock)
             {
@@ -2282,12 +2704,24 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
+        private DeviceRowEditSnapshot CreateDeviceRowEditSnapshot(DeviceRowViewModel deviceRow)
+        {
+            bool includeSelectedCarrierConfig = ReferenceEquals(deviceRow, SelectedDevice);
+            return new DeviceRowEditSnapshot(
+                deviceRow.Serial,
+                deviceRow.Name,
+                deviceRow.Type,
+                includeSelectedCarrierConfig,
+                includeSelectedCarrierConfig ? CloneCountryOption(SelectedCountry) : null,
+                includeSelectedCarrierConfig ? CloneCarrierOption(SelectedCarrier) : null);
+        }
+
         private async Task PersistDeviceRowEditAfterDelayAsync(PendingDeviceEdit pendingEdit)
         {
             try
             {
                 await Task.Delay(DeviceNameSaveDebounceMilliseconds, pendingEdit.Cancellation.Token).ConfigureAwait(false);
-                await SaveDeviceRowEditAsync(pendingEdit.DeviceRow, pendingEdit.Cancellation.Token).ConfigureAwait(false);
+                await SaveDeviceRowEditAsync(pendingEdit.Snapshot, pendingEdit.Cancellation.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (pendingEdit.Cancellation.IsCancellationRequested)
             {
@@ -2296,10 +2730,10 @@ namespace DeepDroidChanger.ViewModels
             {
                 lock (_pendingDeviceEditsLock)
                 {
-                    if (_pendingDeviceEdits.TryGetValue(pendingEdit.DeviceRow.Serial, out var currentEdit)
+                    if (_pendingDeviceEdits.TryGetValue(pendingEdit.Snapshot.Serial, out var currentEdit)
                         && ReferenceEquals(currentEdit, pendingEdit))
                     {
-                        _pendingDeviceEdits.Remove(pendingEdit.DeviceRow.Serial);
+                        _pendingDeviceEdits.Remove(pendingEdit.Snapshot.Serial);
                     }
                 }
 
@@ -2332,7 +2766,7 @@ namespace DeepDroidChanger.ViewModels
 
             await Task.WhenAll(pendingEdits.Select(edit => edit.PersistenceTask)).ConfigureAwait(false);
             foreach (var pendingEdit in pendingEdits)
-                await SaveDeviceRowEditAsync(pendingEdit.DeviceRow, CancellationToken.None).ConfigureAwait(false);
+                await SaveDeviceRowEditAsync(pendingEdit.Snapshot, CancellationToken.None).ConfigureAwait(false);
         }
 
         private void RefreshCountryOptions()
@@ -2583,12 +3017,16 @@ namespace DeepDroidChanger.ViewModels
                 await SaveDeviceProfileAsync(pendingEdit, CancellationToken.None).ConfigureAwait(false);
         }
 
-        private async Task SaveDeviceRowEditAsync(DeviceRowViewModel deviceRow, CancellationToken cancellationToken)
+        private async Task SaveDeviceRowEditAsync(
+            DeviceRowEditSnapshot snapshot,
+            CancellationToken cancellationToken)
         {
-            await SaveDeviceConfigAsync(deviceRow, ReferenceEquals(deviceRow, SelectedDevice), cancellationToken).ConfigureAwait(false);
+            await SaveDeviceConfigAsync(snapshot, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task SaveDeviceConfigAsync(DeviceRowViewModel deviceRow, bool includeSelectedCarrierConfig, CancellationToken cancellationToken)
+        private async Task SaveDeviceConfigAsync(
+            DeviceRowEditSnapshot snapshot,
+            CancellationToken cancellationToken)
         {
             try
             {
@@ -2599,12 +3037,12 @@ namespace DeepDroidChanger.ViewModels
                     await _deviceConfigService
                         .SaveDeviceRowAsync(
                             _storedDevices,
-                            deviceRow.Serial,
-                            deviceRow.Name,
-                            deviceRow.Type,
-                            SelectedCountry,
-                            SelectedCarrier,
-                            includeSelectedCarrierConfig,
+                            snapshot.Serial,
+                            snapshot.Name,
+                            snapshot.Type,
+                            snapshot.Country,
+                            snapshot.Carrier,
+                            snapshot.IncludeSelectedCarrierConfig,
                             cancellationToken)
                         .ConfigureAwait(false);
                 }
@@ -2631,7 +3069,9 @@ namespace DeepDroidChanger.ViewModels
                 connectedDevice,
                 GetConnectionStatusText(connectionStatus),
                 GetLogText("Log_Ready"));
-            deviceRow.IsActionBusy = _deviceActionGuardService.IsBusy(deviceRow.Serial);
+            deviceRow.IsActionBusy = _deviceActionCoordinatorService.IsBusy(deviceRow.Serial);
+            if (_deviceProcessStateService.Get(deviceRow.Serial) is { } process)
+                deviceRow.RestoreProcess(process.Message, process.State);
             return deviceRow;
         }
 
@@ -2873,9 +3313,95 @@ namespace DeepDroidChanger.ViewModels
                 SelectedBrand = SelectedBrand,
                 SelectedAndroidVersion = SelectedAndroidVersion,
                 UseIntegritySecurityPatch = UseDefaultChangeMode || _useIntegritySecurityPatch,
-                Country = SelectedCountry,
-                Carrier = SelectedCarrier
+                Country = CloneCountryOption(SelectedCountry),
+                Carrier = CloneCarrierOption(SelectedCarrier)
             };
+        }
+
+        private static CarrierCountryOption? CloneCountryOption(CarrierCountryOption? country)
+        {
+            return country == null
+                ? null
+                : new CarrierCountryOption(country.CountryIso, country.CountryCode, country.CountryName);
+        }
+
+        private static CarrierOption? CloneCarrierOption(CarrierOption? carrier)
+        {
+            return carrier == null
+                ? null
+                : new CarrierOption(carrier.CarrierName, carrier.Mcc, carrier.Mnc);
+        }
+
+        private static ChangeLocationDialogResult CloneLocationDialogResult(
+            ChangeLocationDialogResult result)
+        {
+            LocationOption? location = result.SelectedLocation;
+            LocationOption? locationCopy = location == null
+                ? null
+                : new LocationOption(
+                    location.CountryCode,
+                    location.CountryName,
+                    location.CityName,
+                    location.Timezone,
+                    location.GmtOffset,
+                    location.Latitude,
+                    location.Longitude);
+            return new ChangeLocationDialogResult(
+                result.Mode,
+                result.Latitude,
+                result.Longitude,
+                locationCopy);
+        }
+
+        private static ChangeTimezoneDialogResult CloneTimezoneDialogResult(
+            ChangeTimezoneDialogResult result)
+        {
+            return new ChangeTimezoneDialogResult(result.Mode, result.Timezone);
+        }
+
+        private static StoredDeviceConfig CloneStoredDeviceConfig(StoredDeviceConfig source)
+        {
+            return new StoredDeviceConfig
+            {
+                Serial = source.Serial,
+                Name = source.Name,
+                Type = source.Type,
+                CountryIso = source.CountryIso,
+                CountryName = source.CountryName,
+                Carrier = source.Carrier,
+                CarrierMcc = source.CarrierMcc,
+                CarrierMnc = source.CarrierMnc,
+                Brand = source.Brand,
+                AndroidVersion = source.AndroidVersion,
+                ChangeSimEnabled = source.ChangeSimEnabled,
+                UseIntegritySecurityPatch = source.UseIntegritySecurityPatch,
+                ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(source.ChangeOptions),
+                UpdateIntegrityFromServer = source.UpdateIntegrityFromServer,
+                UpdateIntegrityFile = source.UpdateIntegrityFile,
+                UpdateKeyboxFile = source.UpdateKeyboxFile,
+                UpdateIntegrityEnabled = source.UpdateIntegrityEnabled,
+                UpdateKeyboxEnabled = source.UpdateKeyboxEnabled,
+                LocationMode = source.LocationMode,
+                LocationLatitude = source.LocationLatitude,
+                LocationLongitude = source.LocationLongitude,
+                LocationCountryCode = source.LocationCountryCode,
+                LocationCityName = source.LocationCityName,
+                TimezoneMode = source.TimezoneMode,
+                Timezone = source.Timezone,
+                ProxyFullString = source.ProxyFullString,
+                ProxyType = source.ProxyType,
+                ProxyChangeLocationByIp = source.ProxyChangeLocationByIp,
+                ProxyChangeTimezoneByIp = source.ProxyChangeTimezoneByIp
+            };
+        }
+
+        private StoredDeviceConfig? CreateStoredDeviceConfigSnapshot(string serial)
+        {
+            StoredDeviceConfig? storedDevice = _storedDevices
+                .FirstOrDefault(device => SerialEquals(device.Serial, serial));
+            return storedDevice == null
+                ? null
+                : CloneStoredDeviceConfig(storedDevice);
         }
 
         private DeviceChangeOptions CreateCurrentChangeOptions()
@@ -2912,15 +3438,23 @@ namespace DeepDroidChanger.ViewModels
             };
         }
 
+        private sealed record DeviceRowEditSnapshot(
+            string Serial,
+            string Name,
+            string Type,
+            bool IncludeSelectedCarrierConfig,
+            CarrierCountryOption? Country,
+            CarrierOption? Carrier);
+
         private sealed class PendingDeviceEdit
         {
-            public PendingDeviceEdit(DeviceRowViewModel deviceRow, CancellationTokenSource cancellation)
+            public PendingDeviceEdit(DeviceRowEditSnapshot snapshot, CancellationTokenSource cancellation)
             {
-                DeviceRow = deviceRow;
+                Snapshot = snapshot;
                 Cancellation = cancellation;
             }
 
-            public DeviceRowViewModel DeviceRow { get; }
+            public DeviceRowEditSnapshot Snapshot { get; }
             public CancellationTokenSource Cancellation { get; }
             public Task PersistenceTask { get; set; } = Task.CompletedTask;
         }

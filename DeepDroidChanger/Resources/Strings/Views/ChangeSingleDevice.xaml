@@ -20,6 +20,12 @@
     <sys:String x:Key="ChangeSingleDevice_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceConfigHeader">Device Configuration</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionSingleHeader">Single Device Actions</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StopAction">Stop</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StoppingAction">Stopping...</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StopActionTooltip">Stop the current device action.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ExternalActionRunningFormat">{0} • Running in Multiple Devices</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ExternalActionStoppingFormat">{0} • Stopping in Multiple Devices</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ExternalActionTooltip">This action is owned by Multiple Devices. Stop it from that screen.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FieldName">Name</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FieldHardware">Hardware</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FieldFingerprint">Fingerprint</sys:String>

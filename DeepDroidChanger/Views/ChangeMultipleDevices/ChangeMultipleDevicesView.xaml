@@ -5,6 +5,7 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              Background="Transparent">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <Thickness x:Key="MultipleDeviceProfilePanelContentMargin">0,0,16,0</Thickness>
 
         <Style x:Key="MultipleDeviceGridRowContextMenuStyle"
@@ -115,6 +116,33 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
+        <Style x:Key="MultipleExternalDeviceActionBadgeStyle"
+               TargetType="Border"
+               BasedOn="{StaticResource DeviceTableBadgeStyle}">
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.DeviceStatusNegativeBackground}"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="MaxWidth" Value="260"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextElement.Foreground"
+                    Value="{DynamicResource Brush.Danger}"/>
+        </Style>
+
+        <Style x:Key="MultipleExternalDeviceActionBadgeTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource DeviceTableBadgeTextStyle}">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextAlignment" Value="Left"/>
+        </Style>
+
+        <Style x:Key="MultipleGlobalBatchStatusStyle"
+               TargetType="Border"
+               BasedOn="{StaticResource DeviceTableBadgeStyle}">
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="MaxWidth" Value="260"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+
         <Style x:Key="MultipleDeviceInfoFormGridStyle"
                TargetType="Grid">
             <Setter Property="VerticalAlignment" Value="Top"/>
@@ -182,6 +210,54 @@
             <Setter Property="materialDesign:ElevationAssist.Elevation"
                     Value="Dp1"/>
         </Style>
+
+        <Style x:Key="MultipleDeviceStopActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource MultipleDeviceActionButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="materialDesign:RippleAssist.Feedback"
+                    Value="{DynamicResource Brush.AccentForeground}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Brush.DangerHover}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.DangerHover}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Brush.DangerPressed}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.DangerPressed}"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MultipleGlobalBatchStopButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource MultipleDeviceStopActionButtonStyle}">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="Padding" Value="8,0"/>
+        </Style>
+
+        <DataTemplate x:Key="MultipleDeviceStopActionContentTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialDesign:PackIcon Kind="Stop"
+                                         Width="16"
+                                         Height="16"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding BatchActionStopText}"
+                           Style="{DynamicResource MultipleDeviceActionButtonTextStyle}"/>
+            </Grid>
+        </DataTemplate>
 
         <Style x:Key="MultipleDeviceActionButtonTextStyle"
                TargetType="TextBlock">
@@ -787,7 +863,7 @@
 
                             <Grid x:Name="BatchChangeConfigurationFormGrid"
                                   Grid.Row="1"
-                                  IsEnabled="{Binding CanOperateSelectedInfoDevice}"
+                                  IsEnabled="{Binding CanEditBatchConfiguration}"
                                   Style="{StaticResource MultipleDeviceInfoFormGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -911,12 +987,47 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="Cog"
                                                          Style="{StaticResource MultipleDeviceSectionIconStyle}"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{DynamicResource ChangeMultipleDevices_ActionsHeader}"
                                            Style="{StaticResource MultipleDeviceSectionTitleTextStyle}"/>
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            HorizontalAlignment="Right">
+                                    <Border
+                                            Visibility="{Binding HasExternalSelectedDeviceAction, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            ToolTip="{DynamicResource ChangeMultipleDevices_ExternalActionTooltip}"
+                                            Style="{StaticResource MultipleExternalDeviceActionBadgeStyle}">
+                                        <TextBlock Text="{Binding ExternalSelectedDeviceActionText}"
+                                                   Style="{StaticResource MultipleExternalDeviceActionBadgeTextStyle}"/>
+                                    </Border>
+                                    <Border
+                                            Visibility="{Binding ShowGlobalBatchStop, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            ToolTip="{DynamicResource ChangeMultipleDevices_GlobalBatchTooltip}"
+                                            Style="{StaticResource MultipleGlobalBatchStatusStyle}">
+                                        <TextBlock Text="{Binding GlobalBatchActionStatusText}"
+                                                   Style="{StaticResource MultipleExternalDeviceActionBadgeTextStyle}"/>
+                                    </Border>
+                                    <Button
+                                            Command="{Binding StopBatchActionCommand}"
+                                            IsEnabled="{Binding CanStopBatchAction}"
+                                            Visibility="{Binding ShowGlobalBatchStop, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            ToolTip="{DynamicResource ChangeMultipleDevices_GlobalBatchTooltip}"
+                                            Style="{StaticResource MultipleGlobalBatchStopButtonStyle}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Stop"
+                                                                     Width="16"
+                                                                     Height="16"
+                                                                     VerticalAlignment="Center"
+                                                                     Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding GlobalBatchStopText}"
+                                                       Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
                             </Grid>
 
                             <Grid x:Name="MultipleDeviceActionsContent"
@@ -1045,6 +1156,16 @@
                                         <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeTimezone}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
+                                <Button Grid.Row="{Binding ActiveBatchActionButtonRow}"
+                                        Grid.Column="{Binding ActiveBatchActionButtonColumn}"
+                                        Panel.ZIndex="1"
+                                        Command="{Binding StopBatchActionCommand}"
+                                        Content="{Binding}"
+                                        ContentTemplate="{StaticResource MultipleDeviceStopActionContentTemplate}"
+                                        IsEnabled="{Binding CanStopBatchAction}"
+                                        Visibility="{Binding ShowSelectedDeviceBatchStop, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_StopActionTooltip}"
+                                        Style="{StaticResource MultipleDeviceStopActionButtonStyle}"/>
                             </Grid>
                         </Grid>
                     </Border>

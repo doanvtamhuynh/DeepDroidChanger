@@ -41,7 +41,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
         deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
-            .Returns(new DeviceListSnapshot(storedDevices, []));
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         var viewModel = CreateViewModel(deviceList, carriers);
@@ -115,6 +117,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
         deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
             .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         var viewModel = CreateViewModel(deviceList, carriers);
@@ -444,14 +448,15 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             WifiMacAddress = "00:11:22:33:44:55"
         };
         randomDeviceInfoDialog.ShowRandomDeviceInfoAsync(
-                generatedProfile,
+                Arg.Is<DeviceInfoApiDevice>(profile => profile.Name == "Generated device"),
                 Arg.Any<CancellationToken>())
-            .Returns(_ =>
+            .Returns(callInfo =>
             {
-                generatedProfile.Name = "Edited device";
-                generatedProfile.Model = "Edited model";
-                generatedProfile.Brand = "edited brand";
-                generatedProfile.Release = "14";
+                DeviceInfoApiDevice profile = callInfo.Arg<DeviceInfoApiDevice>();
+                profile.Name = "Edited device";
+                profile.Model = "Edited model";
+                profile.Brand = "edited brand";
+                profile.Release = "14";
                 return true;
             });
         randomDevice.CreateRandomProfileAsync(
@@ -493,7 +498,11 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await deviceConfig.DidNotReceiveWithAnyArgs().SaveDeviceProfileAsync(
             default!, default!, default!, default);
         await randomDeviceInfoDialog.Received(1).ShowRandomDeviceInfoAsync(
-            generatedProfile,
+            Arg.Is<DeviceInfoApiDevice>(profile =>
+                profile.Name == "Edited device"
+                && profile.Model == "Edited model"
+                && profile.Brand == "edited brand"
+                && profile.Release == "14"),
             Arg.Any<CancellationToken>());
         viewModel.Dispose();
     }
@@ -711,6 +720,98 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             Arg.Any<CancellationToken>());
         await viewModel.DeactivateAsync();
         viewModel.Dispose();
+    }
+
+    [TestMethod]
+    public async Task ChangeDevice_CapturesSubmitSnapshotBeforeUiValuesChange()
+    {
+        StoredDeviceConfig storedDevice = new()
+        {
+            Serial = "A",
+            Name = "Phone",
+            Type = "Phone",
+            ChangeSimEnabled = true,
+            ChangeOptions = new DeviceChangeOptions
+            {
+                UseDefaultMode = false,
+                ChangeAndroidId = true,
+                ChangeMacAddress = false
+            }
+        };
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns([storedDevice]);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
+            .Returns(new DeviceListSnapshot(
+                [storedDevice],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new RandomDeviceResult(
+                RandomDeviceStatus.Created,
+                new DeviceInfoApiDevice { Model = "Before model", Brand = "Before brand" }));
+        var confirmationStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseConfirmation = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        IDeviceActionConfirmationDialogService confirmation =
+            Substitute.For<IDeviceActionConfirmationDialogService>();
+        DeviceChangeOptions? confirmedOptions = null;
+        confirmation.ConfirmChangeAndWipeAsync(
+                "Phone",
+                "A",
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                confirmedOptions = callInfo.ArgAt<DeviceChangeOptions>(2);
+                confirmationStarted.TrySetResult();
+                return releaseConfirmation.Task;
+            });
+        IDeviceChangeService deviceChange = Substitute.For<IDeviceChangeService>();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceActionConfirmation: confirmation,
+            deviceChange: deviceChange);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        viewModel.DeviceInfo.Model = "Before model";
+        viewModel.SelectedBrand = "Before brand";
+
+        Task action = viewModel.ChangeDeviceCommand.ExecuteAsync(null);
+        await confirmationStarted.Task;
+
+        viewModel.DeviceInfo.Model = "After model";
+        viewModel.SelectedBrand = "After brand";
+        viewModel.UseDefaultChangeMode = true;
+        viewModel.IsChangeSimEnabled = false;
+        releaseConfirmation.SetResult(true);
+        await action;
+
+        Assert.IsNotNull(confirmedOptions);
+        Assert.IsFalse(confirmedOptions!.UseDefaultMode);
+        Assert.IsTrue(confirmedOptions.ChangeAndroidId);
+        Assert.IsFalse(confirmedOptions.ChangeMacAddress);
+        await deviceChange.Received(1).ChangeAsync(
+            "A",
+            Arg.Is<DeviceInfoApiDevice>(profile =>
+                profile.Model == "Before model"
+                && profile.Brand == "Before brand"),
+            true,
+            Arg.Is<DeviceChangeOptions>(options =>
+                !options.UseDefaultMode
+                && options.ChangeAndroidId
+                && !options.ChangeMacAddress),
+            Arg.Any<IProgress<DeviceChangeStage>>(),
+            Arg.Any<CancellationToken>());
+
+        await viewModel.DeactivateAsync();
     }
 
     [TestMethod]
@@ -972,7 +1073,9 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
         deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>())
-            .Returns(new DeviceListSnapshot(storedDevices, []));
+            .Returns(new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
@@ -991,6 +1094,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.InitializeAsync(CancellationToken.None);
 
         await viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        viewModel.ApplyDeviceListSnapshot(new DeviceListSnapshot(storedDevices, []));
         var processLogs = new List<string>();
         Assert.IsNotNull(viewModel.SelectedDevice);
         viewModel.SelectedDevice.PropertyChanged += (_, args) =>
@@ -1831,14 +1935,16 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
-        IDeviceActionGuardService actionGuard = Substitute.For<IDeviceActionGuardService>();
-        actionGuard.IsBusy("A").Returns(false);
-        actionGuard.TryAcquire("A").Returns((IDisposable?)null);
+        IDeviceActionCoordinatorService actionCoordinator = Substitute.For<IDeviceActionCoordinatorService>();
+        actionCoordinator.IsBusy("A").Returns(false);
+        actionCoordinator
+            .TryStart("A", DeviceActionKind.RandomDevice, true, Arg.Any<CancellationToken>())
+            .Returns((IDeviceActionOperation?)null);
         using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            deviceActionGuard: actionGuard);
+            deviceActionCoordinator: actionCoordinator);
 
         await viewModel.InitializeAsync(CancellationToken.None);
         DeviceRowViewModel device = viewModel.Devices.Single();
@@ -2013,11 +2119,11 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
                 ]));
         ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
         carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
-        IDeviceActionGuardService deviceActionGuard = new DeviceActionGuardService();
+        IDeviceActionCoordinatorService deviceActionCoordinator = new DeviceActionCoordinatorService();
         using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
             deviceList,
             carriers,
-            deviceActionGuard: deviceActionGuard);
+            deviceActionCoordinator: deviceActionCoordinator);
         await viewModel.InitializeAsync(CancellationToken.None);
 
         DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
@@ -2031,7 +2137,10 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         viewModel.DeleteDeviceCommand.CanExecuteChanged += (_, _) => deleteCanExecuteChanged++;
         viewModel.RandomDeviceCommand.CanExecuteChanged += (_, _) => randomDeviceCanExecuteChanged++;
 
-        using IDisposable busyDeviceLease = deviceActionGuard.TryAcquire("B")!;
+        using IDeviceActionOperation busyDeviceLease = deviceActionCoordinator.TryStart(
+            "B",
+            DeviceActionKind.ChangeDevice,
+            canCancel: true)!;
         Assert.IsTrue(deviceB.IsActionBusy);
         Assert.IsGreaterThan(0, deleteCanExecuteChanged);
         Assert.IsFalse(viewModel.DeleteDeviceCommand.CanExecute(deviceB));
@@ -2477,11 +2586,11 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         dialog.ShowInstallPackageAsync("A", "Phone", Arg.Any<CancellationToken>())
             .Returns((InstallPackageRequest?)null);
         IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
-        var guard = new DeviceActionGuardService();
+        var coordinator = new DeviceActionCoordinatorService();
         using var viewModel = CreateViewModel(
             deviceList,
             carriers,
-            deviceActionGuard: guard,
+            deviceActionCoordinator: coordinator,
             installPackageDialog: dialog,
             packageInstall: packageInstall);
         await viewModel.InitializeAsync(CancellationToken.None);
@@ -2493,7 +2602,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .InstallAsync(default!, default!, default!, default);
         Assert.AreEqual("Log_InstallPackageCanceled", viewModel.Devices[0].Process);
         Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices[0].ProcessState);
-        Assert.IsFalse(guard.IsBusy("A"));
+        Assert.IsFalse(coordinator.IsBusy("A"));
         await viewModel.DeactivateAsync();
     }
 
@@ -2535,9 +2644,21 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.InstallApkCommand.ExecuteAsync(null);
 
         await packageInstall.Received(1)
-            .InstallAsync("A", "first.apk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "A",
+                "first.apk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         await packageInstall.Received(1)
-            .InstallAsync("A", "second.xapk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "A",
+                "second.xapk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         Assert.AreEqual("Log_InstallPackagePartialFormat", viewModel.Devices[0].Process);
         Assert.AreEqual(DeviceProcessState.Failed, viewModel.Devices[0].ProcessState);
         await viewModel.DeactivateAsync();
@@ -3150,7 +3271,402 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         viewModel.Dispose();
     }
 
-    private static ChangeSingleDeviceViewModel CreateViewModel(
+    [TestMethod]
+    public async Task StopRandomDevice_UsesUserStopResultAndKeepsBusyUntilWorkerUnwinds()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workerCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken workerToken = default;
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                workerToken = callInfo.Arg<CancellationToken>();
+                workerToken.Register(() => workerCompletion.TrySetCanceled(workerToken));
+                workerStarted.TrySetResult();
+                return workerCompletion.Task;
+            });
+        var coordinator = new DeviceActionCoordinatorService();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceActionCoordinator: coordinator);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task action = viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await workerStarted.Task;
+
+        Assert.AreEqual(DeviceActionKind.RandomDevice, viewModel.ActiveSelectedDeviceActionKind);
+        Assert.IsTrue(viewModel.HasActiveSelectedDeviceActionButton);
+        Assert.AreEqual(0, viewModel.ActiveSelectedDeviceActionButtonRow);
+        Assert.AreEqual(0, viewModel.ActiveSelectedDeviceActionButtonColumn);
+        Assert.IsTrue(viewModel.CanStopSelectedDeviceAction);
+        viewModel.StopSelectedDeviceActionCommand.Execute(null);
+
+        Assert.IsTrue(workerToken.IsCancellationRequested);
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionStopping);
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionBusy);
+        Assert.IsFalse(viewModel.CanStopSelectedDeviceAction);
+        await action;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_RandomDeviceCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        Assert.IsFalse(viewModel.IsSelectedDeviceActionBusy);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopRandomSim_DuringOnlinePreflightUsesRandomSimCanceledResult()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(deviceList, carriers);
+        var preflightStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var preflightCompletion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        deviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => preflightCompletion.TrySetCanceled(token));
+                preflightStarted.TrySetResult();
+                return preflightCompletion.Task;
+            });
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task action = viewModel.RandomSimCommand.ExecuteAsync(null);
+        await preflightStarted.Task;
+        Assert.AreEqual(DeviceActionKind.RandomSim, viewModel.ActiveSelectedDeviceActionKind);
+
+        viewModel.StopSelectedDeviceActionCommand.Execute(null);
+        await action;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_RandomSimCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task SelectedSerialOwnedByMultipleBatch_IsBusyButCannotBeStoppedFromSingle()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var coordinator = new DeviceActionCoordinatorService();
+        var processState = new DeviceProcessStateService();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceActionCoordinator: coordinator,
+            processState: processState);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        using IDeviceActionOperation batchOperation = coordinator.TryStart(
+            "A",
+            DeviceActionKind.BatchChangeDevice,
+            canCancel: true)!;
+        processState.SetProcess("A", "Changing from Multiple", "Log_ChangeDevice");
+
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionBusy);
+        Assert.IsFalse(viewModel.CanEditSelectedDeviceConfiguration);
+        Assert.AreEqual(DeviceActionKind.BatchChangeDevice, viewModel.ActiveSelectedDeviceActionKind);
+        Assert.AreEqual(DeviceActionKind.ChangeDevice, viewModel.DisplayedSelectedDeviceActionKind);
+        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
+        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Multiple Devices");
+        Assert.AreEqual("Changing from Multiple", viewModel.Devices.Single().Process);
+        Assert.IsFalse(viewModel.CanStopSelectedDeviceAction);
+        Assert.IsFalse(viewModel.StopSelectedDeviceActionCommand.CanExecute(null));
+        Assert.IsFalse(viewModel.HasActiveSelectedDeviceActionButton);
+
+        await viewModel.SuspendAsync();
+        Assert.AreEqual(DeviceActionRuntimeState.Running, coordinator.GetOperation("A")!.State);
+        Assert.AreEqual(DeviceActionCancellationReason.None, coordinator.GetOperation("A")!.CancellationReason);
+        processState.SetProcess("A", "Changed successfully", "Log_ChangeDeviceSuccess");
+        batchOperation.Dispose();
+
+        Assert.AreEqual("Changed successfully", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, viewModel.Devices.Single().ProcessState);
+        Assert.IsFalse(viewModel.IsSelectedDeviceActionBusy);
+        Assert.IsFalse(viewModel.HasExternalSelectedDeviceAction);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task RandomChangeAndWipe_UsesDistinctCoordinatorKindAndButtonPosition()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var confirmationOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var confirmationResult = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        IDeviceActionConfirmationDialogService confirmation = CreateDeviceActionConfirmationDialogService();
+        confirmation.ConfirmChangeAndWipeAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<DeviceChangeOptions>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                confirmationOpened.TrySetResult();
+                return confirmationResult.Task;
+            });
+        var coordinator = new DeviceActionCoordinatorService();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceActionConfirmation: confirmation,
+            deviceActionCoordinator: coordinator);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task action = viewModel.RandomChangeAndWipeDeviceCommand.ExecuteAsync(null);
+        await confirmationOpened.Task;
+
+        Assert.AreEqual(
+            DeviceActionKind.RandomChangeAndWipe,
+            coordinator.GetOperation("A")!.Kind);
+        Assert.AreEqual(3, viewModel.ActiveSelectedDeviceActionButtonRow);
+        Assert.AreEqual(0, viewModel.ActiveSelectedDeviceActionButtonColumn);
+
+        confirmationResult.SetResult(false);
+        await action;
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task DeactivateAsync_CancelsRunningActionAsExternalAndReturnsReady()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workerCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => workerCompletion.TrySetCanceled(token));
+                workerStarted.TrySetResult();
+                return workerCompletion.Task;
+            });
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task action = viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await workerStarted.Task;
+        await viewModel.DeactivateAsync();
+        await action;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_Ready", device.Process);
+        Assert.AreEqual(DeviceProcessState.Ready, device.ProcessState);
+    }
+
+    [TestMethod]
+    public async Task SuspendAsync_DoesNotCancelRunningSingleActionOrResetPresentation()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workerCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken workerToken = default;
+        IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
+        randomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                workerToken = callInfo.Arg<CancellationToken>();
+                workerToken.Register(() => workerCompletion.TrySetCanceled(workerToken));
+                workerStarted.TrySetResult();
+                return workerCompletion.Task;
+            });
+        var coordinator = new DeviceActionCoordinatorService();
+        var processState = new DeviceProcessStateService();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            randomDevice: randomDevice,
+            deviceActionCoordinator: coordinator,
+            processState: processState);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task action = viewModel.RandomDeviceCommand.ExecuteAsync(null);
+        await workerStarted.Task;
+        Guid operationId = coordinator.GetOperation("A")!.OperationId;
+        await viewModel.SuspendAsync();
+
+        DeviceActionOperationSnapshot operation = coordinator.GetOperation("A")!;
+        Assert.AreEqual(DeviceActionRuntimeState.Running, operation.State);
+        Assert.AreEqual(DeviceActionCancellationReason.None, operation.CancellationReason);
+        Assert.IsFalse(workerToken.IsCancellationRequested);
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionBusy);
+        Assert.AreEqual(DeviceActionKind.RandomDevice, viewModel.ActiveSelectedDeviceActionKind);
+        Assert.IsTrue(viewModel.HasActiveSelectedDeviceActionButton);
+        Assert.AreEqual("Log_RandomDevice", viewModel.Devices.Single().Process);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Assert.AreEqual(operationId, coordinator.GetOperation("A")!.OperationId);
+        Assert.IsFalse(workerToken.IsCancellationRequested);
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionBusy);
+        Assert.IsTrue(viewModel.HasActiveSelectedDeviceActionButton);
+        Assert.IsTrue(viewModel.CanStopSelectedDeviceAction);
+
+        viewModel.StopSelectedDeviceActionCommand.Execute(null);
+        await action;
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task SharedProcessState_UpdatesSuspendedSingleProjectionAndSurvivesRowRecreation()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        var snapshot = new DeviceListSnapshot(
+            storedDevices,
+            [new AdbDevice("A", AdbDeviceStatus.Online)]);
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(snapshot);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var processState = new DeviceProcessStateService();
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            processState: processState);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SuspendAsync();
+
+        processState.SetProcess("A", "Changing while hidden", "Log_ChangeDevice");
+        DeviceRowViewModel originalRow = viewModel.Devices.Single();
+        Assert.AreEqual("Changing while hidden", originalRow.Process);
+        Assert.AreEqual(DeviceProcessState.InProgress, originalRow.ProcessState);
+
+        viewModel.ApplyDeviceListSnapshot(snapshot);
+        DeviceRowViewModel recreatedRow = viewModel.Devices.Single();
+        Assert.AreNotSame(originalRow, recreatedRow);
+        Assert.AreEqual("Changing while hidden", recreatedRow.Process);
+        Assert.AreEqual(DeviceProcessState.InProgress, recreatedRow.ProcessState);
+
+        processState.SetProcess("A", "Changed while hidden", "Log_ChangeDeviceSuccess");
+        Assert.AreEqual("Changed while hidden", recreatedRow.Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, recreatedRow.ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopWipe_WhileConfirmationIsOpenKeepsBusyUntilDialogUnwinds()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        IDeviceListService deviceList = Substitute.For<IDeviceListService>();
+        deviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        deviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(
+            new DeviceListSnapshot(storedDevices, [new AdbDevice("A", AdbDeviceStatus.Online)]));
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        var confirmationOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var confirmationResult = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        IDeviceActionConfirmationDialogService confirmation = CreateDeviceActionConfirmationDialogService();
+        confirmation.ConfirmWipeWithoutChangeAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                confirmationOpened.TrySetResult();
+                return confirmationResult.Task;
+            });
+        using ChangeSingleDeviceViewModel viewModel = CreateViewModel(
+            deviceList,
+            carriers,
+            deviceActionConfirmation: confirmation);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task action = viewModel.WipeWithoutChangeCommand.ExecuteAsync(null);
+        await confirmationOpened.Task;
+        viewModel.StopSelectedDeviceActionCommand.Execute(null);
+
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionStopping);
+        Assert.IsTrue(viewModel.IsSelectedDeviceActionBusy);
+        confirmationResult.SetResult(false);
+        await action;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_WipeWithoutChangeCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        Assert.IsFalse(viewModel.IsSelectedDeviceActionBusy);
+        await viewModel.DeactivateAsync();
+    }
+
+    internal static ChangeSingleDeviceViewModel CreateViewModel(
         IDeviceListService deviceList,
         ICarrierDataService carriers,
         IDeviceConfigService? deviceConfig = null,
@@ -3161,7 +3677,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IDeviceActionConfirmationDialogService? deviceActionConfirmation = null,
         IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
         IDeviceChangeService? deviceChange = null,
-        IDeviceActionGuardService? deviceActionGuard = null,
+        IDeviceActionCoordinatorService? deviceActionCoordinator = null,
         IDeviceViewerDialogService? deviceViewerDialog = null,
         IDeviceActionService? deviceAction = null,
         IFakeProxyDialogService? fakeProxyDialog = null,
@@ -3169,7 +3685,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         ISettingsService? settingsService = null,
         AppSettings? settings = null,
         IInstallPackageDialogService? installPackageDialog = null,
-        IPackageInstallService? packageInstall = null)
+        IPackageInstallService? packageInstall = null,
+        IDeviceProcessStateService? processState = null)
     {
         deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
@@ -3211,7 +3728,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceConfig ?? Substitute.For<IDeviceConfigService>(),
             randomDevice ?? Substitute.For<IRandomDeviceService>(),
             simProfileService ?? Substitute.For<ISimProfileService>(),
-            deviceActionGuard ?? new DeviceActionGuardService(),
+            deviceActionCoordinator ?? new DeviceActionCoordinatorService(),
+            processState ?? new DeviceProcessStateService(),
             deviceAction ?? Substitute.For<IDeviceActionService>(),
             deviceChange ?? Substitute.For<IDeviceChangeService>(),
             CreateLocalizationService(),
@@ -3226,7 +3744,14 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
         localization.GetString(Arg.Any<string>())
-            .Returns(callInfo => callInfo.Arg<string>() == "ChangeSingleDevice_NewDeviceCount" ? "New: {0}" : callInfo.Arg<string>());
+            .Returns(callInfo => callInfo.Arg<string>() switch
+            {
+                "ChangeSingleDevice_NewDeviceCount" => "New: {0}",
+                "ChangeSingleDevice_ExternalActionRunningFormat" => "{0} • Running in Multiple Devices",
+                "ChangeSingleDevice_ExternalActionStoppingFormat" => "{0} • Stopping in Multiple Devices",
+                "DeviceAction_Name_ChangeDevice" => "Change & Wipe Device",
+                _ => callInfo.Arg<string>()
+            });
         return localization;
     }
 

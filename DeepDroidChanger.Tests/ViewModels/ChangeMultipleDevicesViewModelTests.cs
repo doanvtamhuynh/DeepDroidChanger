@@ -53,7 +53,14 @@ public sealed class ChangeMultipleDevicesViewModelTests
             .Returns(Task.FromResult(true));
         context.LocationService.ApplyCatalogLocationAsync(
                 "A",
-                selectedLocation,
+                Arg.Is<LocationOption>(location =>
+                    location.CountryCode == selectedLocation.CountryCode
+                    && location.CountryName == selectedLocation.CountryName
+                    && location.CityName == selectedLocation.CityName
+                    && location.Timezone == selectedLocation.Timezone
+                    && location.GmtOffset == selectedLocation.GmtOffset
+                    && location.Latitude == selectedLocation.Latitude
+                    && location.Longitude == selectedLocation.Longitude),
                 Arg.Any<CancellationToken>())
             .Returns(new DeviceLocationResult("10.7123", "106.6456", "VN", "Ho Chi Minh City"));
 
@@ -79,7 +86,17 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await context.LocationDialog.Received(1)
             .ShowChangeLocationBatchAsync(1, Arg.Any<CancellationToken>());
         await context.LocationService.Received(1)
-            .ApplyCatalogLocationAsync("A", selectedLocation, Arg.Any<CancellationToken>());
+            .ApplyCatalogLocationAsync(
+                "A",
+                Arg.Is<LocationOption>(location =>
+                    location.CountryCode == selectedLocation.CountryCode
+                    && location.CountryName == selectedLocation.CountryName
+                    && location.CityName == selectedLocation.CityName
+                    && location.Timezone == selectedLocation.Timezone
+                    && location.GmtOffset == selectedLocation.GmtOffset
+                    && location.Latitude == selectedLocation.Latitude
+                    && location.Longitude == selectedLocation.Longitude),
+                Arg.Any<CancellationToken>());
         await context.LocationService.DidNotReceive()
             .ApplyCatalogLocationAsync("B", Arg.Any<LocationOption>(), Arg.Any<CancellationToken>());
         Assert.AreEqual(2, onlineChecksForA);
@@ -150,12 +167,19 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 selectedLocation));
         context.LocationService.ApplyCatalogLocationAsync(
                 "B",
-                selectedLocation,
+                Arg.Is<LocationOption>(location =>
+                    location.CountryCode == selectedLocation.CountryCode
+                    && location.CountryName == selectedLocation.CountryName
+                    && location.CityName == selectedLocation.CityName
+                    && location.Timezone == selectedLocation.Timezone
+                    && location.GmtOffset == selectedLocation.GmtOffset
+                    && location.Latitude == selectedLocation.Latitude
+                    && location.Longitude == selectedLocation.Longitude),
                 Arg.Any<CancellationToken>())
             .Returns(new DeviceLocationResult("10.7123", "106.6456", "VN", "Ho Chi Minh City"));
 
         await viewModel.InitializeAsync(CancellationToken.None);
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "B");
 
         await viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
@@ -165,7 +189,17 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await context.LocationService.DidNotReceive()
             .ApplyCatalogLocationAsync("A", Arg.Any<LocationOption>(), Arg.Any<CancellationToken>());
         await context.LocationService.Received(1)
-            .ApplyCatalogLocationAsync("B", selectedLocation, Arg.Any<CancellationToken>());
+            .ApplyCatalogLocationAsync(
+                "B",
+                Arg.Is<LocationOption>(location =>
+                    location.CountryCode == selectedLocation.CountryCode
+                    && location.CountryName == selectedLocation.CountryName
+                    && location.CityName == selectedLocation.CityName
+                    && location.Timezone == selectedLocation.Timezone
+                    && location.GmtOffset == selectedLocation.GmtOffset
+                    && location.Latitude == selectedLocation.Latitude
+                    && location.Longitude == selectedLocation.Longitude),
+                Arg.Any<CancellationToken>());
         await context.DeviceList.DidNotReceive()
             .IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>());
         Assert.AreEqual("Log_Ready", viewModel.Devices.Single(device => device.Serial == "A").Process);
@@ -202,7 +236,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
             .Returns("Asia/Ho_Chi_Minh");
 
         await viewModel.InitializeAsync(CancellationToken.None);
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "B");
 
         await viewModel.ChangeSelectedTimezonesCommand.ExecuteAsync(null);
@@ -249,13 +283,238 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await dialogOpened.Task;
 
         Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
-        Assert.IsNull(context.DeviceActionGuard.TryAcquire("A"));
+        Assert.IsNull(context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true));
 
         dialogResult.SetResult(null);
         await operation;
 
         Assert.AreEqual("Log_ChangeLocationCanceled", viewModel.Devices.Single().Process);
         Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices.Single().ProcessState);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopBatchAction_TransitionsToStoppingAndReleasesAfterDialogUnwinds()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var dialogOpened = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogResult = new TaskCompletionSource<ChangeLocationDialogResult?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.LocationDialog.ShowChangeLocationBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => dialogResult.TrySetResult(null));
+                dialogOpened.TrySetResult();
+                return dialogResult.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
+        await dialogOpened.Task;
+
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Running, viewModel.BatchActionState);
+        Assert.AreEqual(DeviceActionKind.BatchChangeLocation, viewModel.ActiveBatchActionKind);
+        Assert.IsTrue(viewModel.HasActiveBatchActionButton);
+        Assert.AreEqual(4, viewModel.ActiveBatchActionButtonRow);
+        Assert.AreEqual(0, viewModel.ActiveBatchActionButtonColumn);
+        Assert.IsTrue(viewModel.StopBatchActionCommand.CanExecute(null));
+        Assert.IsFalse(viewModel.CanEditSharedBatchConfiguration);
+        viewModel.StopBatchActionCommand.Execute(null);
+
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Stopping, viewModel.BatchActionState);
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        Assert.AreEqual(
+            DeviceActionCancellationReason.UserStop,
+            context.DeviceActionGuard.GetOperation("A")!.CancellationReason);
+        Assert.IsFalse(viewModel.StopBatchActionCommand.CanExecute(null));
+
+        await operation;
+
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Idle, viewModel.BatchActionState);
+        Assert.IsNull(viewModel.ActiveBatchActionKind);
+        Assert.AreEqual("Log_ChangeLocationCanceled", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, viewModel.Devices.Single().ProcessState);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
+        Assert.IsTrue(viewModel.CanEditSharedBatchConfiguration);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopBatchAction_RandomDeviceUsesActionSpecificCanceledResult()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workerCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => workerCompletion.TrySetCanceled(token));
+                workerStarted.TrySetResult();
+                return workerCompletion.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await workerStarted.Task;
+
+        Assert.AreEqual(DeviceActionKind.BatchRandomDevice, viewModel.ActiveBatchActionKind);
+        Assert.AreEqual(0, viewModel.ActiveBatchActionButtonRow);
+        Assert.AreEqual(0, viewModel.ActiveBatchActionButtonColumn);
+        viewModel.StopBatchActionCommand.Execute(null);
+        await operation;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_RandomDeviceCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopBatchAction_RandomSimUsesActionSpecificCanceledResult()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var preflightStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var preflightCompletion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.DeviceList.IsDeviceOnlineAsync("A", Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => preflightCompletion.TrySetCanceled(token));
+                preflightStarted.TrySetResult();
+                return preflightCompletion.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.RandomSelectedSimsCommand.ExecuteAsync(null);
+        await preflightStarted.Task;
+
+        Assert.AreEqual(DeviceActionKind.BatchRandomSim, viewModel.ActiveBatchActionKind);
+        viewModel.StopBatchActionCommand.Execute(null);
+        await operation;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_RandomSimCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopBatchAction_WhileWipeConfirmationIsOpenPersistsCanceledResult()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var confirmationOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var confirmationResult = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.ActionConfirmation.ConfirmMultipleAsync(
+                MultipleDeviceBatchAction.WipeWithoutChange,
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => confirmationResult.TrySetCanceled(token));
+                confirmationOpened.TrySetResult();
+                return confirmationResult.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.WipeSelectedDevicesWithoutChangeCommand.ExecuteAsync(null);
+        await confirmationOpened.Task;
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Stopping, viewModel.BatchActionState);
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        await operation;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_WipeWithoutChangeCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Idle, viewModel.BatchActionState);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopBatchAction_WhileWorkerRuns_PersistsCanceledLog()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Ready" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var selectedLocation = new LocationOption(
+            "VN",
+            "Vietnam",
+            "Ho Chi Minh City",
+            "Asia/Ho_Chi_Minh",
+            "+07:00",
+            10.75,
+            106.6667);
+        context.LocationDialog.ShowChangeLocationBatchAsync(
+                1,
+                Arg.Any<CancellationToken>())
+            .Returns(new ChangeLocationDialogResult(
+                ChangeLocationMode.Config,
+                string.Empty,
+                string.Empty,
+                selectedLocation));
+        var applyStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var applyCompletion = new TaskCompletionSource<DeviceLocationResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.LocationService.ApplyCatalogLocationAsync(
+                Arg.Any<string>(),
+                Arg.Any<LocationOption>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => applyCompletion.TrySetCanceled(token));
+                applyStarted.TrySetResult();
+                return applyCompletion.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task operation = viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
+        await applyStarted.Task;
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        await operation;
+
+        DeviceRowViewModel device = viewModel.Devices.Single();
+        Assert.AreEqual("Log_ChangeLocationCanceled", device.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, device.ProcessState);
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Idle, viewModel.BatchActionState);
         Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
         await viewModel.DeactivateAsync();
     }
@@ -290,7 +549,14 @@ public sealed class ChangeMultipleDevicesViewModelTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         context.LocationService.ApplyCatalogLocationAsync(
                 "A",
-                selectedLocation,
+                Arg.Is<LocationOption>(location =>
+                    location.CountryCode == selectedLocation.CountryCode
+                    && location.CountryName == selectedLocation.CountryName
+                    && location.CityName == selectedLocation.CityName
+                    && location.Timezone == selectedLocation.Timezone
+                    && location.GmtOffset == selectedLocation.GmtOffset
+                    && location.Latitude == selectedLocation.Latitude
+                    && location.Longitude == selectedLocation.Longitude),
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -329,7 +595,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
 
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "A");
 
         Assert.IsFalse(viewModel.ChangeSelectedLocationsCommand.CanExecute(null));
@@ -340,8 +606,11 @@ public sealed class ChangeMultipleDevicesViewModelTests
     [TestMethod]
     public async Task SelectedInfoDeviceChange_NotifiesAllSharedBatchCommandsInBothDirections()
     {
-        IDeviceActionGuardService deviceActionGuard = new DeviceActionGuardService();
-        using IDisposable busyDeviceLease = deviceActionGuard.TryAcquire("A")!;
+        IDeviceActionCoordinatorService deviceActionCoordinator = new DeviceActionCoordinatorService();
+        using IDeviceActionOperation busyDeviceLease = deviceActionCoordinator.TryStart(
+            "A",
+            DeviceActionKind.ChangeDevice,
+            canCancel: true)!;
         TestContext context = CreateContext(
             CreateSnapshot(
                 [
@@ -353,7 +622,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
                     new AdbDevice("B", AdbDeviceStatus.Online)
                 ]),
             new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] },
-            deviceActionGuard: deviceActionGuard);
+            deviceActionCoordinator: deviceActionCoordinator);
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -399,7 +668,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
         AssertSharedGuardState(true, "enabled after selecting a free info device");
 
         var notificationsBeforeBusy = notifications.ToDictionary(pair => pair.Key, pair => pair.Value);
-        using IDisposable secondBusyDeviceLease = deviceActionGuard.TryAcquire("B")!;
+        using IDeviceActionOperation secondBusyDeviceLease = deviceActionCoordinator.TryStart(
+            "B",
+            DeviceActionKind.ChangeDevice,
+            canCancel: true)!;
         AssertSharedGuardState(false, "disabled when the selected info device becomes busy");
         foreach ((string name, System.Windows.Input.ICommand command) in sharedGuardCommands)
         {
@@ -525,7 +797,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InitializeAsync(CancellationToken.None);
         Task operation = viewModel.ChangeSelectedLocationsCommand.ExecuteAsync(null);
         await onlineCheckStarted.Task;
-        using IDisposable competingLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable competingLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         onlineCheckResult.SetResult(true);
         await operation;
 
@@ -556,7 +828,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
             new AppSettings { SelectedMultipleDeviceSerials = ["A", "B", "C", "D"] });
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("B")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("B", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
 
         context.DeviceList.IsDeviceOnlineAsync(
                 Arg.Any<string>(),
@@ -671,7 +943,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InitializeAsync(CancellationToken.None);
         Task operation = viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
         await onlineCheckStarted.Task;
-        using IDisposable competingLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable competingLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         onlineCheckResult.SetResult(true);
 
         await operation;
@@ -703,7 +975,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
             new AppSettings { SelectedMultipleDeviceSerials = ["A", "B", "C", "D"] });
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("B")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("B", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         context.DeviceList.IsDeviceOnlineAsync(
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
@@ -754,8 +1026,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         Assert.IsTrue(context.DeviceActionGuard.IsBusy("C"));
         Assert.IsTrue(context.DeviceActionGuard.IsBusy("D"));
-        Assert.IsNull(context.DeviceActionGuard.TryAcquire("C"));
-        Assert.IsNull(context.DeviceActionGuard.TryAcquire("D"));
+        Assert.IsNull(context.DeviceActionGuard.TryStart("C", DeviceActionKind.BatchChangeDevice, canCancel: true));
+        Assert.IsNull(context.DeviceActionGuard.TryStart("D", DeviceActionKind.BatchChangeDevice, canCancel: true));
 
         dialogResult.SetResult(null);
         await operation;
@@ -968,13 +1240,37 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
 
         await context.PackageInstall.Received(1)
-            .InstallAsync("A", "one.apk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "A",
+                "one.apk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         await context.PackageInstall.Received(1)
-            .InstallAsync("A", "two.xapk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "A",
+                "two.xapk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         await context.PackageInstall.Received(1)
-            .InstallAsync("B", "one.apk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "B",
+                "one.apk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         await context.PackageInstall.Received(1)
-            .InstallAsync("B", "two.xapk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "B",
+                "two.xapk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         Assert.AreEqual("complete 2/2", viewModel.Devices.Single(device => device.Serial == "A").Process);
         Assert.AreEqual("complete 2/2", viewModel.Devices.Single(device => device.Serial == "B").Process);
         await viewModel.DeactivateAsync();
@@ -1177,7 +1473,13 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
 
         await context.PackageInstall.Received(1)
-            .InstallAsync("A", "two.apk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "A",
+                "two.apk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         Assert.AreEqual("partial 1/2", viewModel.Devices.Single().Process);
         await viewModel.DeactivateAsync();
     }
@@ -1246,9 +1548,21 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InstallSelectedPackagesCommand.ExecuteAsync(null);
 
         await context.PackageInstall.Received(1)
-            .InstallAsync("A", "two.apk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "A",
+                "two.apk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         await context.PackageInstall.Received(1)
-            .InstallAsync("B", "two.apk", request.Options, Arg.Any<CancellationToken>());
+            .InstallAsync(
+                "B",
+                "two.apk",
+                Arg.Is<InstallPackageOptions>(options =>
+                    options.GrantPermissions == request.Options.GrantPermissions
+                    && options.AllowDowngrade == request.Options.AllowDowngrade),
+                Arg.Any<CancellationToken>());
         Assert.AreEqual("failed 0/2", viewModel.Devices.Single(device => device.Serial == "A").Process);
         Assert.AreEqual("complete 2/2", viewModel.Devices.Single(device => device.Serial == "B").Process);
         await viewModel.DeactivateAsync();
@@ -1698,7 +2012,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InitializeAsync(CancellationToken.None);
 
         DeviceRowViewModel device = viewModel.Devices.Single();
-        IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
 
         Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
         Assert.IsTrue(viewModel.ViewDeviceInfoCommand.CanExecute(device));
@@ -1756,7 +2070,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InitializeAsync(CancellationToken.None);
 
         DeviceRowViewModel device = viewModel.Devices.Single();
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         Task refresh = viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
 
         Assert.IsTrue(device.IsContextMenuStateLoading);
@@ -1788,7 +2102,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
         Assert.IsTrue(viewModel.Devices.All(device => device.Process == "Log_Ready"));
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
 
         viewModel.ToggleSelectAllDevicesCommand.Execute(null);
 
@@ -2008,8 +2322,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
             });
         int deviceAGuardAcquiredCount = 0;
         int deviceAGuardReleasedCount = 0;
-        context.DeviceActionGuard.BusyStateChanged += (serial, isBusy) =>
+        context.DeviceActionGuard.OperationStateChanged += snapshot =>
         {
+            string serial = snapshot.Serial;
+            bool isBusy = snapshot.State != DeviceActionRuntimeState.Idle;
             if (!string.Equals(serial, "A", StringComparison.OrdinalIgnoreCase))
                 return;
 
@@ -2029,15 +2345,16 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Assert.AreEqual(1, deviceAGuardAcquiredCount);
         Assert.AreEqual(0, deviceAGuardReleasedCount);
         Assert.IsTrue(deviceA.IsActionBusy);
+        Assert.AreEqual(
+            DeviceActionKind.BatchRandomChangeAndWipe,
+            context.DeviceActionGuard.GetOperation("A")!.Kind);
+        Assert.AreEqual(DeviceActionKind.BatchRandomChangeAndWipe, viewModel.ActiveBatchActionKind);
+        Assert.AreEqual(3, viewModel.ActiveBatchActionButtonRow);
+        Assert.AreEqual(0, viewModel.ActiveBatchActionButtonColumn);
 
         viewModel.ToggleDeviceSelectionCommand.Execute(deviceB);
         viewModel.SelectedInfoDevice = deviceB;
-        Task readyDeviceAction = viewModel.RandomChangeAndWipeSelectedDevicesCommand.ExecuteAsync(null);
-        await deviceBChangeStarted.Task;
-
-        Assert.AreEqual(2, randomInvocationCount);
-        Assert.AreEqual(1, deviceAGuardAcquiredCount);
-        Assert.AreEqual(0, deviceAGuardReleasedCount);
+        Assert.IsFalse(viewModel.RandomChangeAndWipeSelectedDevicesCommand.CanExecute(null));
         Assert.IsTrue(deviceA.IsActionBusy);
         await context.DeviceChange.Received(1).ChangeAsync(
             "A",
@@ -2049,10 +2366,17 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         deviceAChangeCompletion.SetResult();
         await runningAction;
-        await readyDeviceAction;
 
         Assert.AreEqual(1, deviceAGuardReleasedCount);
         Assert.IsFalse(deviceA.IsActionBusy);
+
+        viewModel.ToggleDeviceSelectionCommand.Execute(deviceA);
+        Assert.IsTrue(viewModel.RandomChangeAndWipeSelectedDevicesCommand.CanExecute(null));
+        Task readyDeviceAction = viewModel.RandomChangeAndWipeSelectedDevicesCommand.ExecuteAsync(null);
+        await deviceBChangeStarted.Task;
+        Assert.AreEqual(2, randomInvocationCount);
+        Assert.IsFalse(deviceA.IsActionBusy);
+        await readyDeviceAction;
         await viewModel.DeactivateAsync();
     }
 
@@ -2101,7 +2425,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
     [TestMethod]
     public async Task RandomChangeAndWipeSelectedDevices_DoesNotReleaseExistingChangeGuard()
     {
-        var guard = new ControllableDeviceActionGuard();
+        var coordinator = new ControllableDeviceActionCoordinator();
         TestContext context = CreateContext(
             CreateSnapshot(
                 [
@@ -2113,7 +2437,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
                     new AdbDevice("B", AdbDeviceStatus.Online)
                 ]),
             new AppSettings { SelectedMultipleDeviceSerials = ["A"] },
-            deviceActionGuard: guard);
+            deviceActionCoordinator: coordinator);
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         context.RandomDevice.CreateRandomProfileAsync(
                 Arg.Any<RandomDeviceRequest>(),
@@ -2123,7 +2447,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 new DeviceInfoApiDevice { Model = "Random profile" })));
         var deviceAStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var deviceACompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var deviceBStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         int deviceAInvocationCount = 0;
         context.DeviceChange.ChangeAsync(
                 Arg.Any<string>(),
@@ -2138,7 +2461,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
                     deviceAStarted,
                     deviceACompletion.Task,
                     () => Interlocked.Increment(ref deviceAInvocationCount)),
-                "B" => StartBatchAction(deviceBStarted, Task.CompletedTask),
                 _ => throw new InvalidOperationException("Unexpected device serial.")
             });
 
@@ -2150,13 +2472,11 @@ public sealed class ChangeMultipleDevicesViewModelTests
         DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
         DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
         Assert.IsTrue(deviceA.IsActionBusy);
-        guard.ForceRelease("A");
+        coordinator.ForceRelease("A");
         Assert.IsTrue(deviceA.IsActionBusy);
         viewModel.ToggleDeviceSelectionCommand.Execute(deviceB);
         viewModel.SelectedInfoDevice = deviceB;
-
-        Task readyDeviceAction = viewModel.RandomChangeAndWipeSelectedDevicesCommand.ExecuteAsync(null);
-        await deviceBStarted.Task;
+        Assert.IsFalse(viewModel.RandomChangeAndWipeSelectedDevicesCommand.CanExecute(null));
 
         Assert.IsTrue(deviceA.IsActionBusy);
         Assert.AreEqual(1, deviceAInvocationCount);
@@ -2167,17 +2487,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
             Arg.Any<DeviceChangeOptions>(),
             Arg.Any<IProgress<DeviceChangeStage>>(),
             Arg.Any<CancellationToken>());
-        await context.DeviceChange.Received(1).ChangeAsync(
-            "B",
-            Arg.Any<DeviceInfoApiDevice>(),
-            Arg.Any<bool>(),
-            Arg.Any<DeviceChangeOptions>(),
-            Arg.Any<IProgress<DeviceChangeStage>>(),
-            Arg.Any<CancellationToken>());
-
         deviceACompletion.SetResult();
         await runningAction;
-        await readyDeviceAction;
         Assert.IsFalse(deviceA.IsActionBusy);
         await viewModel.DeactivateAsync();
     }
@@ -2249,27 +2560,19 @@ public sealed class ChangeMultipleDevicesViewModelTests
         viewModel.ToggleDeviceSelectionCommand.Execute(deviceC);
         viewModel.SelectedInfoDevice = deviceC;
         Assert.IsTrue(viewModel.CanInteractWithSelectedInfoDevice);
+        Assert.IsFalse(viewModel.CanEditBatchConfiguration);
+        Assert.IsFalse(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
+
+        completions["A"].SetResult();
+        completions["B"].SetResult();
+        await firstBatch;
         Assert.IsTrue(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
 
         Task secondBatch = viewModel.ChangeSelectedDevicesCommand.ExecuteAsync(null);
         await started["C"].Task;
-        await context.DeviceChange.Received(1).ChangeAsync(
-            "C",
-            Arg.Any<DeviceInfoApiDevice>(),
-            Arg.Any<bool>(),
-            Arg.Any<DeviceChangeOptions>(),
-            Arg.Any<IProgress<DeviceChangeStage>>(),
-            Arg.Any<CancellationToken>());
         Assert.IsTrue(deviceC.IsActionBusy);
-        Assert.IsTrue(deviceA.IsActionBusy);
-        Assert.IsTrue(deviceB.IsActionBusy);
-
-        completions["A"].SetResult();
-        completions["B"].SetResult();
         completions["C"].SetResult();
-        await firstBatch;
         await secondBatch;
-        Assert.IsTrue(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
 
         viewModel.SelectedInfoDevice = deviceA;
         Assert.AreEqual("Random profile", viewModel.DeviceInfo.Model);
@@ -2322,6 +2625,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         DeviceRowViewModel offlineDevice = viewModel.Devices.Single(device => device.Serial == "A");
         viewModel.SelectedInfoDevice = offlineDevice;
+        Assert.IsFalse(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
+        completion.SetResult();
+        await firstAction;
+        viewModel.ToggleDeviceSelectionCommand.Execute(onlineDevice);
         Assert.IsTrue(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
         await viewModel.ChangeSelectedDevicesWithoutWipeCommand.ExecuteAsync(null);
         await viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
@@ -2350,8 +2657,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
             "Log_DeviceMustBeOnline", offlineDevice.Process);
         Assert.AreEqual(DeviceProcessState.Failed, offlineDevice.ProcessState);
 
-        completion.SetResult();
-        await firstAction;
         Assert.IsTrue(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
         Assert.IsTrue(viewModel.ChangeSelectedDevicesWithoutWipeCommand.CanExecute(null));
         Assert.IsTrue(viewModel.WipeSelectedDevicesWithoutChangeCommand.CanExecute(null));
@@ -2405,8 +2710,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.InitializeAsync(CancellationToken.None);
         await viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
         var deviceAReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        context.DeviceActionGuard.BusyStateChanged += (serial, isBusy) =>
+        context.DeviceActionGuard.OperationStateChanged += snapshot =>
         {
+            string serial = snapshot.Serial;
+            bool isBusy = snapshot.State != DeviceActionRuntimeState.Idle;
             if (serial == "A" && !isBusy)
                 deviceAReleased.TrySetResult();
         };
@@ -2418,26 +2725,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
         Assert.IsFalse(deviceA.IsActionBusy);
         Assert.IsTrue(deviceB.IsActionBusy);
-        Assert.IsTrue(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
-
-        await viewModel.ChangeSelectedDevicesCommand.ExecuteAsync(null);
-
-        await context.DeviceChange.Received(2).ChangeAsync(
-            "A",
-            Arg.Any<DeviceInfoApiDevice>(),
-            Arg.Any<bool>(),
-            Arg.Any<DeviceChangeOptions>(),
-            Arg.Any<IProgress<DeviceChangeStage>>(),
-            Arg.Any<CancellationToken>());
-        await context.DeviceChange.Received(1).ChangeAsync(
-            "B",
-            Arg.Any<DeviceInfoApiDevice>(),
-            Arg.Any<bool>(),
-            Arg.Any<DeviceChangeOptions>(),
-            Arg.Any<IProgress<DeviceChangeStage>>(),
-            Arg.Any<CancellationToken>());
-        Assert.IsFalse(deviceA.IsActionBusy);
-        Assert.IsTrue(deviceB.IsActionBusy);
+        Assert.IsFalse(viewModel.ChangeSelectedDevicesCommand.CanExecute(null));
 
         deviceBCompletion.SetResult();
         await firstBatch;
@@ -2447,7 +2735,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         await viewModel.ChangeSelectedDevicesCommand.ExecuteAsync(null);
 
-        await context.DeviceChange.Received(3).ChangeAsync(
+        await context.DeviceChange.Received(2).ChangeAsync(
             "A",
             Arg.Any<DeviceInfoApiDevice>(),
             Arg.Any<bool>(),
@@ -2500,8 +2788,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         await viewModel.InitializeAsync(CancellationToken.None);
         var deviceAReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        context.DeviceActionGuard.BusyStateChanged += (serial, isBusy) =>
+        context.DeviceActionGuard.OperationStateChanged += snapshot =>
         {
+            string serial = snapshot.Serial;
+            bool isBusy = snapshot.State != DeviceActionRuntimeState.Idle;
             if (serial == "A" && !isBusy)
                 deviceAReleased.TrySetResult();
         };
@@ -2513,19 +2803,15 @@ public sealed class ChangeMultipleDevicesViewModelTests
         DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
         Assert.IsFalse(deviceA.IsActionBusy);
         Assert.IsTrue(deviceB.IsActionBusy);
-        Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
-
-        await viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
-
-        Assert.AreEqual(3, invocationCount);
-        Assert.IsFalse(deviceA.IsActionBusy);
-        Assert.IsTrue(deviceB.IsActionBusy);
+        Assert.IsFalse(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
 
         deviceBCompletion.SetResult(new RandomDeviceResult(
             RandomDeviceStatus.Created,
             new DeviceInfoApiDevice { Model = "Profile B" }));
         await firstBatch;
         Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
+        viewModel.ToggleDeviceSelectionCommand.Execute(deviceB);
+        await viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
         Assert.AreEqual(3, invocationCount);
         Assert.IsFalse(deviceA.IsActionBusy);
         viewModel.SelectedInfoDevice = deviceA;
@@ -2591,20 +2877,22 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         viewModel.ToggleDeviceSelectionCommand.Execute(deviceB);
         viewModel.SelectedInfoDevice = deviceB;
-        Task secondBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
-        await deviceBStarted.Task;
-
-        Assert.IsFalse(deviceAToken.IsCancellationRequested);
-        Assert.IsFalse(deviceBToken.IsCancellationRequested);
-        Assert.IsFalse(firstBatch.IsCompleted);
+        Assert.IsFalse(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
         Assert.IsTrue(deviceA.IsActionBusy);
-        Assert.IsTrue(deviceB.IsActionBusy);
+        Assert.IsFalse(deviceB.IsActionBusy);
 
         deviceACompletion.SetResult(new RandomDeviceResult(
             RandomDeviceStatus.Created,
             new DeviceInfoApiDevice { Model = "Profile A" }));
         await firstBatch;
         Assert.IsFalse(deviceA.IsActionBusy);
+        Assert.IsFalse(deviceB.IsActionBusy);
+
+        viewModel.ToggleDeviceSelectionCommand.Execute(deviceA);
+        Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
+        Task secondBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await deviceBStarted.Task;
+        Assert.IsFalse(deviceBToken.IsCancellationRequested);
         Assert.IsTrue(deviceB.IsActionBusy);
 
         deviceBCompletion.SetResult(new RandomDeviceResult(
@@ -2734,16 +3022,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         viewModel.ToggleDeviceSelectionCommand.Execute(deviceC);
         viewModel.SelectedInfoDevice = deviceC;
-        Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
-        Task newDeviceBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
-        await thirdStarted.Task;
-        Assert.IsTrue(deviceC.IsActionBusy);
-        Assert.IsTrue(deviceA.IsActionBusy);
-        Assert.IsTrue(deviceB.IsActionBusy);
+        Assert.IsFalse(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
 
-        thirdCompletion.SetResult(new RandomDeviceResult(
-            RandomDeviceStatus.Created,
-            new DeviceInfoApiDevice { Model = "Profile C" }));
         firstCompletion.SetResult(new RandomDeviceResult(
             RandomDeviceStatus.Created,
             new DeviceInfoApiDevice { Model = "Profile A" }));
@@ -2751,6 +3031,17 @@ public sealed class ChangeMultipleDevicesViewModelTests
             RandomDeviceStatus.Created,
             new DeviceInfoApiDevice { Model = "Profile B" }));
         await initialBatch;
+
+        viewModel.ToggleDeviceSelectionCommand.Execute(deviceA);
+        viewModel.ToggleDeviceSelectionCommand.Execute(deviceB);
+        Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
+        Task newDeviceBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await thirdStarted.Task;
+        Assert.IsTrue(deviceC.IsActionBusy);
+
+        thirdCompletion.SetResult(new RandomDeviceResult(
+            RandomDeviceStatus.Created,
+            new DeviceInfoApiDevice { Model = "Profile C" }));
         await newDeviceBatch;
         Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
         Assert.IsFalse(deviceC.IsActionBusy);
@@ -2800,9 +3091,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
     }
 
     [TestMethod]
-    public async Task RandomSelectedDevices_QueuesReadyTargetWhileOtherTargetsAreBusy()
+    public async Task RandomSelectedDevices_QueuesFifthTargetAtBatchThrottleLimit()
     {
-        StoredDeviceConfig[] initialDevices = Enumerable.Range(1, 4)
+        StoredDeviceConfig[] initialDevices = Enumerable.Range(1, 5)
             .Select(index => new StoredDeviceConfig { Serial = $"D{index}", Name = $"Device {index}" })
             .ToArray();
         TestContext context = CreateContext(
@@ -2833,17 +3124,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Task firstBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
         await Task.WhenAll(started.Take(4).Select(source => source.Task));
 
-        viewModel.ApplyDeviceListSnapshot(CreateSnapshot(
-            [.. initialDevices, new StoredDeviceConfig { Serial = "D5", Name = "Device 5" }],
-            [
-                .. initialDevices.Select(device => new AdbDevice(device.Serial, AdbDeviceStatus.Online)),
-                new AdbDevice("D5", AdbDeviceStatus.Online)
-            ]));
-        viewModel.ToggleDeviceSelectionCommand.Execute(
-            viewModel.Devices.Single(device => device.Serial == "D5"));
-        viewModel.SelectedInfoDevice = viewModel.Devices.Single(device => device.Serial == "D5");
-        Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
-        Task secondBatch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
         Assert.IsFalse(started[4].Task.IsCompleted);
         Assert.AreEqual(4, invocationCount);
 
@@ -2861,9 +3141,107 @@ public sealed class ChangeMultipleDevicesViewModelTests
         }
 
         await firstBatch;
-        await secondBatch;
         Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
         Assert.AreEqual(5, invocationCount);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopRandomSelectedDevices_CancelsQueuedTargetBeforeItStarts()
+    {
+        StoredDeviceConfig[] devices = Enumerable.Range(1, 5)
+            .Select(index => new StoredDeviceConfig { Serial = $"D{index}", Name = $"Device {index}" })
+            .ToArray();
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                devices,
+                devices.Select(device => new AdbDevice(device.Serial, AdbDeviceStatus.Online)).ToArray()),
+            new AppSettings { SelectedMultipleDeviceSerials = devices.Select(device => device.Serial).ToList() });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        TaskCompletionSource[] started = Enumerable.Range(0, 4)
+            .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        TaskCompletionSource<RandomDeviceResult>[] completions = Enumerable.Range(0, 4)
+            .Select(_ => new TaskCompletionSource<RandomDeviceResult>(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        int invocationCount = 0;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                int index = Interlocked.Increment(ref invocationCount) - 1;
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => completions[index].TrySetCanceled(token));
+                started[index].TrySetResult();
+                return completions[index].Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await Task.WhenAll(started.Select(source => source.Task));
+        Assert.AreEqual(4, invocationCount);
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        await batch;
+
+        Assert.AreEqual(4, invocationCount);
+        DeviceRowViewModel queued = viewModel.Devices.Single(device => device.Serial == "D5");
+        Assert.AreEqual("Log_RandomDeviceCanceled", queued.Process);
+        Assert.AreEqual(DeviceProcessState.Canceled, queued.ProcessState);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("D5"));
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task StopRandomSelectedDevices_PreservesAlreadyCompletedTargetSuccess()
+    {
+        StoredDeviceConfig[] devices =
+        [
+            new() { Serial = "A", Name = "Completed" },
+            new() { Serial = "B", Name = "Running" }
+        ];
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                devices,
+                devices.Select(device => new AdbDevice(device.Serial, AdbDeviceStatus.Online)).ToArray()),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var runningStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runningCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        int invocationCount = 0;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                if (Interlocked.Increment(ref invocationCount) == 1)
+                {
+                    return Task.FromResult(new RandomDeviceResult(
+                        RandomDeviceStatus.Created,
+                        new DeviceInfoApiDevice { Model = "Completed profile" }));
+                }
+
+                CancellationToken token = callInfo.Arg<CancellationToken>();
+                token.Register(() => runningCompletion.TrySetCanceled(token));
+                runningStarted.TrySetResult();
+                return runningCompletion.Task;
+            });
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await runningStarted.Task;
+
+        DeviceRowViewModel completed = viewModel.Devices.Single(device => device.Serial == "A");
+        Assert.AreEqual(DeviceProcessState.Succeeded, completed.ProcessState);
+        viewModel.StopBatchActionCommand.Execute(null);
+        await batch;
+
+        Assert.AreEqual("Log_RandomDeviceSuccess", completed.Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, completed.ProcessState);
+        DeviceRowViewModel stopped = viewModel.Devices.Single(device => device.Serial == "B");
+        Assert.AreEqual(DeviceProcessState.Canceled, stopped.ProcessState);
         await viewModel.DeactivateAsync();
     }
 
@@ -2896,8 +3274,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 return StartRandom(started[index], completions[index].Task);
             });
         var queuedTargetReleased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        context.DeviceActionGuard.BusyStateChanged += (serial, isBusy) =>
+        context.DeviceActionGuard.OperationStateChanged += snapshot =>
         {
+            string serial = snapshot.Serial;
+            bool isBusy = snapshot.State != DeviceActionRuntimeState.Idle;
             if (serial == "D5" && !isBusy)
                 queuedTargetReleased.TrySetResult();
         };
@@ -3190,6 +3570,10 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         Assert.AreEqual("Edited in dialog", viewModel.DeviceInfo.Model);
 
+        viewModel.SelectedInfoDevice = null;
+        viewModel.SelectedInfoDevice = viewModel.Devices.Single();
+        Assert.AreEqual("Edited in dialog", viewModel.DeviceInfo.Model);
+
         viewModel.DeviceInfo.Model = "Edited inline";
         await viewModel.ViewRandomDeviceInfoCommand.ExecuteAsync(null);
         CollectionAssert.AreEqual(
@@ -3222,7 +3606,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 new DeviceInfoApiDevice { Model = "Profile B", Serial = "B" })));
 
         await viewModel.InitializeAsync(CancellationToken.None);
-        using IDisposable busyLease = context.DeviceActionGuard.TryAcquire("A")!;
+        using IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
         await viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
 
         viewModel.ApplyDeviceListSnapshot(CreateSnapshot(
@@ -3440,7 +3824,9 @@ public sealed class ChangeMultipleDevicesViewModelTests
             Name = "Before",
             Type = "sargo"
         };
-        TestContext context = CreateContext(CreateSnapshot([stored], []));
+        TestContext context = CreateContext(
+            CreateSnapshot([stored], []),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
         using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -3615,12 +4001,454 @@ public sealed class ChangeMultipleDevicesViewModelTests
         await viewModel.DeactivateAsync();
     }
 
+    [TestMethod]
+    public async Task SuspendAsync_DoesNotCancelRunningBatchOrResetBatchPresentation()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Phone" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workerCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken workerToken = default;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                workerToken = callInfo.Arg<CancellationToken>();
+                workerToken.Register(() => workerCompletion.TrySetCanceled(workerToken));
+                workerStarted.TrySetResult();
+                return workerCompletion.Task;
+            });
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await workerStarted.Task;
+        Guid operationId = context.DeviceActionGuard.GetOperation("A")!.OperationId;
+        await viewModel.SuspendAsync();
+
+        DeviceActionOperationSnapshot operation = context.DeviceActionGuard.GetOperation("A")!;
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Running, viewModel.BatchActionState);
+        Assert.AreEqual(DeviceActionKind.BatchRandomDevice, viewModel.ActiveBatchActionKind);
+        Assert.IsTrue(viewModel.HasActiveBatchActionButton);
+        Assert.AreEqual(DeviceActionRuntimeState.Running, operation.State);
+        Assert.AreEqual(DeviceActionCancellationReason.None, operation.CancellationReason);
+        Assert.IsFalse(workerToken.IsCancellationRequested);
+        Assert.IsTrue(context.DeviceActionGuard.IsBusy("A"));
+        Assert.AreEqual("Log_RandomDevice", viewModel.Devices.Single().Process);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        Assert.AreEqual(operationId, context.DeviceActionGuard.GetOperation("A")!.OperationId);
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Running, viewModel.BatchActionState);
+        Assert.AreEqual(DeviceActionKind.BatchRandomDevice, viewModel.ActiveBatchActionKind);
+        Assert.IsTrue(viewModel.HasActiveBatchActionButton);
+        Assert.IsTrue(viewModel.CanStopBatchAction);
+        Assert.IsFalse(workerToken.IsCancellationRequested);
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        await batch;
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task DeactivateAsync_CancelsAndAwaitsRunningBatchAsExternal()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Phone" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var workerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var workerCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken workerToken = default;
+        DeviceActionOperationSnapshot? stoppingOperation = null;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                workerToken = callInfo.Arg<CancellationToken>();
+                workerToken.Register(() => workerCompletion.TrySetCanceled(workerToken));
+                workerStarted.TrySetResult();
+                return workerCompletion.Task;
+            });
+        context.DeviceActionGuard.OperationStateChanged += snapshot =>
+        {
+            if (snapshot.Serial == "A" && snapshot.State == DeviceActionRuntimeState.Stopping)
+                stoppingOperation = snapshot;
+        };
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await workerStarted.Task;
+        await viewModel.DeactivateAsync();
+        await batch;
+
+        Assert.IsTrue(workerToken.IsCancellationRequested);
+        Assert.IsNotNull(stoppingOperation);
+        Assert.AreEqual(DeviceActionCancellationReason.External, stoppingOperation.CancellationReason);
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Idle, viewModel.BatchActionState);
+        Assert.IsFalse(context.DeviceActionGuard.IsBusy("A"));
+        Assert.AreEqual("Log_Ready", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Ready, viewModel.Devices.Single().ProcessState);
+    }
+
+    [TestMethod]
+    public async Task SingleOwnedDeviceAndMultipleBatch_ShowStopOnlyForMultipleOwnedTargets()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Alpha" },
+            new() { Serial = "B", Name = "Beta" },
+            new() { Serial = "C", Name = "Gamma" }
+        ];
+        DeviceListSnapshot snapshot = CreateSnapshot(
+            storedDevices,
+            [
+                new AdbDevice("A", AdbDeviceStatus.Online),
+                new AdbDevice("B", AdbDeviceStatus.Online),
+                new AdbDevice("C", AdbDeviceStatus.Online)
+            ]);
+        var coordinator = new DeviceActionCoordinatorService();
+        using IDeviceActionOperation singleOperation = coordinator.TryStart(
+            "A",
+            DeviceActionKind.ChangeDevice,
+            canCancel: true)!;
+        var processState = new DeviceProcessStateService();
+        processState.SetProcess("A", "Changing A from Single", "Log_ChangeDevice");
+        TestContext context = CreateContext(
+            snapshot,
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B", "C"] },
+            deviceActionCoordinator: coordinator,
+            processState: processState);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var started = Enumerable.Range(0, 2)
+            .Select(_ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        var completions = Enumerable.Range(0, 2)
+            .Select(_ => new TaskCompletionSource<RandomDeviceResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously))
+            .ToArray();
+        var batchStopping = new List<DeviceActionOperationSnapshot>();
+        coordinator.OperationStateChanged += snapshotState =>
+        {
+            if (snapshotState.Serial is "B" or "C"
+                && snapshotState.State == DeviceActionRuntimeState.Stopping)
+            {
+                lock (batchStopping)
+                    batchStopping.Add(snapshotState);
+            }
+        };
+        int invocationCount = 0;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                int index = Interlocked.Increment(ref invocationCount) - 1;
+                return StartRandom(started[index], completions[index].Task);
+            });
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        DeviceRowViewModel deviceC = viewModel.Devices.Single(device => device.Serial == "C");
+        viewModel.SelectedInfoDevice = deviceB;
+
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await Task.WhenAll(started.Select(source => source.Task));
+
+        Guid singleOperationId = singleOperation.OperationId;
+        Assert.AreEqual(2, invocationCount);
+        Assert.AreEqual(DeviceActionKind.ChangeDevice, coordinator.GetOperation("A")!.Kind);
+        Assert.AreEqual(DeviceActionKind.BatchRandomDevice, coordinator.GetOperation("B")!.Kind);
+        Assert.AreEqual(DeviceActionKind.BatchRandomDevice, coordinator.GetOperation("C")!.Kind);
+        Assert.IsTrue(viewModel.CanStopBatchAction);
+
+        viewModel.SelectedInfoDevice = deviceB;
+        Assert.IsTrue(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.IsTrue(viewModel.HasSelectedInfoDeviceBatchStopButton);
+        Assert.IsTrue(viewModel.ShowSelectedDeviceBatchStop);
+        Assert.IsFalse(viewModel.ShowGlobalBatchStop);
+        Assert.IsFalse(viewModel.HasExternalSelectedDeviceAction);
+
+        viewModel.SelectedInfoDevice = deviceC;
+        Assert.IsTrue(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.IsTrue(viewModel.ShowSelectedDeviceBatchStop);
+
+        viewModel.SelectedInfoDevice = deviceA;
+        Assert.IsFalse(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.IsFalse(viewModel.HasSelectedInfoDeviceBatchStopButton);
+        Assert.IsFalse(viewModel.ShowSelectedDeviceBatchStop);
+        Assert.IsTrue(viewModel.ShowGlobalBatchStop);
+        Assert.IsFalse(viewModel.HasActiveBatchActionButton);
+        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
+        Assert.AreEqual(DeviceActionKind.ChangeDevice, viewModel.DisplayedSelectedDeviceActionKind);
+        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Single Device");
+        StringAssert.Contains(viewModel.GlobalBatchActionStatusText, "Running");
+        Assert.AreEqual("Stop Batch", viewModel.GlobalBatchStopText);
+        Assert.AreEqual("Changing A from Single", deviceA.Process);
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        Assert.AreEqual(DeviceActionCancellationReason.None, coordinator.GetOperation("A")!.CancellationReason);
+        Assert.AreEqual(singleOperationId, coordinator.GetOperation("A")!.OperationId);
+        Assert.AreEqual(DeviceActionRuntimeState.Running, coordinator.GetOperation("A")!.State);
+        lock (batchStopping)
+        {
+            Assert.IsTrue(batchStopping.Any(operation =>
+                operation.Serial == "B"
+                && operation.CancellationReason == DeviceActionCancellationReason.UserStop));
+            Assert.IsTrue(batchStopping.Any(operation =>
+                operation.Serial == "C"
+                && operation.CancellationReason == DeviceActionCancellationReason.UserStop));
+        }
+        Assert.IsFalse(viewModel.ShowSelectedDeviceBatchStop);
+        Assert.IsTrue(viewModel.ShowGlobalBatchStop);
+        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Running in Single Device");
+        StringAssert.Contains(viewModel.GlobalBatchActionStatusText, "Stopping");
+        Assert.AreEqual("Stopping Batch...", viewModel.GlobalBatchStopText);
+
+        completions[0].TrySetCanceled();
+        completions[1].TrySetCanceled();
+        await batch;
+        Assert.IsFalse(coordinator.IsBusy("B"));
+        Assert.IsFalse(coordinator.IsBusy("C"));
+        Assert.IsTrue(coordinator.IsBusy("A"));
+        Assert.IsFalse(viewModel.ShowGlobalBatchStop);
+        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
+        Assert.AreEqual(DeviceActionRuntimeState.Running, coordinator.GetOperation("A")!.State);
+        Assert.AreEqual(DeviceActionCancellationReason.None, coordinator.GetOperation("A")!.CancellationReason);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task SkippedSingleOwnedDeviceDoesNotJoinBatchAfterItCompletes()
+    {
+        DeviceListSnapshot snapshot = CreateSnapshot(
+            [
+                new StoredDeviceConfig { Serial = "A", Name = "Alpha" },
+                new StoredDeviceConfig { Serial = "B", Name = "Beta" }
+            ],
+            [
+                new AdbDevice("A", AdbDeviceStatus.Online),
+                new AdbDevice("B", AdbDeviceStatus.Online)
+            ]);
+        var coordinator = new DeviceActionCoordinatorService();
+        using IDeviceActionOperation singleOperation = coordinator.TryStart(
+            "A",
+            DeviceActionKind.ChangeDevice,
+            canCancel: true)!;
+        var processState = new DeviceProcessStateService();
+        processState.SetProcess("A", "Changing A from Single", "Log_ChangeDevice");
+        TestContext context = CreateContext(
+            snapshot,
+            new AppSettings { SelectedMultipleDeviceSerials = ["A", "B"] },
+            deviceActionCoordinator: coordinator,
+            processState: processState);
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var batchStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var batchCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => StartRandom(batchStarted, batchCompletion.Task));
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel deviceA = viewModel.Devices.Single(device => device.Serial == "A");
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        viewModel.SelectedInfoDevice = deviceB;
+
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await batchStarted.Task;
+        Assert.IsTrue(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.AreEqual(DeviceActionKind.ChangeDevice, coordinator.GetOperation("A")!.Kind);
+        Assert.AreEqual(DeviceActionKind.BatchRandomDevice, coordinator.GetOperation("B")!.Kind);
+
+        singleOperation.Dispose();
+        viewModel.SelectedInfoDevice = deviceA;
+        Assert.IsFalse(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.IsFalse(viewModel.ShowSelectedDeviceBatchStop);
+        Assert.IsTrue(viewModel.ShowGlobalBatchStop);
+        Assert.IsTrue(viewModel.CanStopBatchAction);
+        Assert.AreEqual("Changing A from Single", deviceA.Process);
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        batchCompletion.TrySetCanceled();
+        await batch;
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task CompletedBatchTargetLosesStopOverlayWhileAnotherTargetRuns()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [
+                    new StoredDeviceConfig { Serial = "B", Name = "Beta" },
+                    new StoredDeviceConfig { Serial = "C", Name = "Gamma" }
+                ],
+                [
+                    new AdbDevice("B", AdbDeviceStatus.Online),
+                    new AdbDevice("C", AdbDeviceStatus.Online)
+                ]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["B", "C"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        var bStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var bCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var cCompletion = new TaskCompletionSource<RandomDeviceResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var bIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.DeviceActionGuard.OperationStateChanged += snapshot =>
+        {
+            if (snapshot.Serial == "B" && snapshot.State == DeviceActionRuntimeState.Idle)
+                bIdle.TrySetResult();
+        };
+        int invocationCount = 0;
+        context.RandomDevice.CreateRandomProfileAsync(
+                Arg.Any<RandomDeviceRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(_ => Interlocked.Increment(ref invocationCount) switch
+            {
+                1 => StartRandom(bStarted, bCompletion.Task),
+                2 => StartRandom(cStarted, cCompletion.Task),
+                _ => throw new InvalidOperationException("Unexpected Random Device invocation.")
+            });
+        await viewModel.InitializeAsync(CancellationToken.None);
+        DeviceRowViewModel deviceB = viewModel.Devices.Single(device => device.Serial == "B");
+        DeviceRowViewModel deviceC = viewModel.Devices.Single(device => device.Serial == "C");
+        viewModel.SelectedInfoDevice = deviceB;
+
+        Task batch = viewModel.RandomSelectedDevicesCommand.ExecuteAsync(null);
+        await Task.WhenAll(bStarted.Task, cStarted.Task);
+        Assert.IsTrue(viewModel.ShowSelectedDeviceBatchStop);
+
+        bCompletion.SetResult(new RandomDeviceResult(
+            RandomDeviceStatus.Created,
+            new DeviceInfoApiDevice { Model = "Completed B", Serial = "B" }));
+        Task completionSignal = await Task.WhenAny(
+            bIdle.Task,
+            Task.Delay(TimeSpan.FromSeconds(2)));
+        Assert.AreSame(bIdle.Task, completionSignal, "B did not leave the active batch target set.");
+
+        viewModel.SelectedInfoDevice = deviceB;
+        Assert.IsFalse(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.IsFalse(viewModel.ShowSelectedDeviceBatchStop);
+        Assert.IsTrue(viewModel.ShowGlobalBatchStop);
+        Assert.IsTrue(viewModel.CanStopBatchAction);
+
+        viewModel.SelectedInfoDevice = deviceC;
+        Assert.IsTrue(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
+        Assert.IsTrue(viewModel.ShowSelectedDeviceBatchStop);
+        Assert.IsFalse(viewModel.ShowGlobalBatchStop);
+
+        viewModel.StopBatchActionCommand.Execute(null);
+        cCompletion.TrySetCanceled();
+        await batch;
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task SingleOwnedAction_IsReadOnlyInMultipleAndCompletesWhileSuspended()
+    {
+        TestContext context = CreateContext(
+            CreateSnapshot(
+                [new StoredDeviceConfig { Serial = "A", Name = "Phone" }],
+                [new AdbDevice("A", AdbDeviceStatus.Online)]),
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] });
+        using ChangeMultipleDevicesViewModel viewModel = context.ViewModel;
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        using IDeviceActionOperation operation = context.DeviceActionGuard.TryStart(
+            "A",
+            DeviceActionKind.ChangeDevice,
+            canCancel: true)!;
+        context.ProcessState.SetProcess("A", "Changing from Single", "Log_ChangeDevice");
+
+        Assert.IsTrue(viewModel.Devices.Single().IsActionBusy);
+        Assert.AreEqual(DeviceActionKind.ChangeDevice, viewModel.DisplayedSelectedDeviceActionKind);
+        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
+        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Single Device");
+        Assert.AreEqual("Changing from Single", viewModel.Devices.Single().Process);
+        Assert.AreEqual(MultipleDeviceBatchRuntimeState.Idle, viewModel.BatchActionState);
+        Assert.IsFalse(viewModel.HasActiveBatchActionButton);
+        Assert.IsFalse(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
+
+        await viewModel.SuspendAsync();
+        Assert.AreEqual(DeviceActionCancellationReason.None, operation.CancellationReason);
+        context.ProcessState.SetProcess("A", "Changed successfully", "Log_ChangeDeviceSuccess");
+        operation.Dispose();
+
+        Assert.AreEqual("Changed successfully", viewModel.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, viewModel.Devices.Single().ProcessState);
+        Assert.IsFalse(viewModel.Devices.Single().IsActionBusy);
+        Assert.IsFalse(viewModel.HasExternalSelectedDeviceAction);
+        await viewModel.DeactivateAsync();
+    }
+
+    [TestMethod]
+    public async Task SharedProcessState_ProjectsSameLogAndTerminalStateIntoBothScreens()
+    {
+        StoredDeviceConfig[] storedDevices =
+        [
+            new() { Serial = "A", Name = "Phone", Type = "Phone" }
+        ];
+        var snapshot = CreateSnapshot(
+            storedDevices,
+            [new AdbDevice("A", AdbDeviceStatus.Online)]);
+        var processState = new DeviceProcessStateService();
+        var coordinator = new DeviceActionCoordinatorService();
+        TestContext multipleContext = CreateContext(
+            snapshot,
+            new AppSettings { SelectedMultipleDeviceSerials = ["A"] },
+            deviceActionCoordinator: coordinator,
+            processState: processState);
+        using ChangeMultipleDevicesViewModel multiple = multipleContext.ViewModel;
+
+        IDeviceListService singleDeviceList = Substitute.For<IDeviceListService>();
+        singleDeviceList.LoadStoredDevicesAsync(Arg.Any<CancellationToken>()).Returns(storedDevices);
+        singleDeviceList.LoadSnapshotAsync(Arg.Any<CancellationToken>()).Returns(snapshot);
+        ICarrierDataService carriers = Substitute.For<ICarrierDataService>();
+        carriers.GetCarrierProfilesAsync(Arg.Any<CancellationToken>()).Returns([]);
+        using ChangeSingleDeviceViewModel single =
+            ChangeSingleDeviceViewModelLifecycleTests.CreateViewModel(
+                singleDeviceList,
+                carriers,
+                deviceActionCoordinator: coordinator,
+                processState: processState);
+
+        processState.SetProcess("A", "Changing on both screens", "Log_ChangeDevice");
+        await single.InitializeAsync(CancellationToken.None);
+        await multiple.InitializeAsync(CancellationToken.None);
+
+        Assert.AreEqual("Changing on both screens", single.Devices.Single().Process);
+        Assert.AreEqual("Changing on both screens", multiple.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.InProgress, single.Devices.Single().ProcessState);
+        Assert.AreEqual(DeviceProcessState.InProgress, multiple.Devices.Single().ProcessState);
+
+        processState.SetProcess("A", "Success on both screens", "Log_ChangeDeviceSuccess");
+        Assert.AreEqual("Success on both screens", single.Devices.Single().Process);
+        Assert.AreEqual("Success on both screens", multiple.Devices.Single().Process);
+        Assert.AreEqual(DeviceProcessState.Succeeded, single.Devices.Single().ProcessState);
+        Assert.AreEqual(DeviceProcessState.Succeeded, multiple.Devices.Single().ProcessState);
+
+        await single.DeactivateAsync();
+        await multiple.DeactivateAsync();
+    }
+
     private static TestContext CreateContext(
         DeviceListSnapshot snapshot,
         AppSettings? settings = null,
         MultipleDeviceConfiguration? configuration = null,
-        IDeviceActionGuardService? deviceActionGuard = null,
-        ILogger<ChangeMultipleDevicesViewModel>? logger = null)
+        IDeviceActionCoordinatorService? deviceActionCoordinator = null,
+        ILogger<ChangeMultipleDevicesViewModel>? logger = null,
+        IDeviceProcessStateService? processState = null)
     {
         IAddDevicesDialogService addDialog = Substitute.For<IAddDevicesDialogService>();
         IAdvancedChangeConfigDialogService advancedDialog =
@@ -3669,7 +4497,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IDeviceListService deviceList = Substitute.For<IDeviceListService>();
         deviceList.IsDeviceOnlineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
-        deviceActionGuard ??= new DeviceActionGuardService();
+        deviceActionCoordinator ??= new DeviceActionCoordinatorService();
+        processState ??= new DeviceProcessStateService();
         IRandomDeviceInfoDialogService randomInfoDialog =
             Substitute.For<IRandomDeviceInfoDialogService>();
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
@@ -3700,6 +4529,14 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 "Log_InstallPackagePartialFormat" => "partial {0}/{1}",
                 "Log_InstallPackageFailedFormat" => "failed {0}/{1}",
                 "Log_InstallPackageAdbFailureCodeFormat" => "ADB failed: {0}",
+                "ChangeMultipleDevices_ExternalActionRunningFormat" => "{0} • Running in Single Device",
+                "ChangeMultipleDevices_ExternalActionStoppingFormat" => "{0} • Stopping in Single Device",
+                "ChangeMultipleDevices_GlobalBatchRunningFormat" => "{0} batch • Running",
+                "ChangeMultipleDevices_GlobalBatchStoppingFormat" => "{0} batch • Stopping",
+                "ChangeMultipleDevices_StopBatch" => "Stop Batch",
+                "ChangeMultipleDevices_StoppingBatch" => "Stopping Batch...",
+                "DeviceAction_Name_RandomDevice" => "Random Device",
+                "DeviceAction_Name_ChangeDevice" => "Change & Wipe Device",
                 _ => callInfo.Arg<string>()
             });
         IMultipleDeviceConfigService multipleConfig =
@@ -3717,7 +4554,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
             deviceChange,
             deviceConfig,
             deviceList,
-            deviceActionGuard,
+            deviceActionCoordinator,
+            processState,
             localization,
             multipleConfig,
             randomInfoDialog,
@@ -3750,7 +4588,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
             randomDevice,
             randomInfoDialog,
             simProfile,
-            deviceActionGuard,
+            deviceActionCoordinator,
+            processState,
             deviceAction,
             locationService,
             timezoneService,
@@ -3782,7 +4621,8 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IRandomDeviceService RandomDevice,
         IRandomDeviceInfoDialogService RandomInfoDialog,
         ISimProfileService SimProfile,
-        IDeviceActionGuardService DeviceActionGuard,
+        IDeviceActionCoordinatorService DeviceActionGuard,
+        IDeviceProcessStateService ProcessState,
         IDeviceActionService DeviceAction,
         IDeviceLocationService LocationService,
         IDeviceTimezoneService TimezoneService,
@@ -3827,55 +4667,55 @@ public sealed class ChangeMultipleDevicesViewModelTests
         }
     }
 
-    private sealed class ControllableDeviceActionGuard : IDeviceActionGuardService
+    private sealed class ControllableDeviceActionCoordinator : IDeviceActionCoordinatorService
     {
-        private readonly object _syncRoot = new();
-        private readonly HashSet<string> _busySerials = new(StringComparer.OrdinalIgnoreCase);
+        private readonly IDeviceActionCoordinatorService _inner = new DeviceActionCoordinatorService();
+        private readonly Dictionary<string, IDeviceActionOperation> _manualOperations =
+            new(StringComparer.OrdinalIgnoreCase);
 
-        public event Action<string, bool>? BusyStateChanged;
-
-        public bool IsBusy(string serial)
+        public event Action<DeviceActionOperationSnapshot>? OperationStateChanged
         {
-            lock (_syncRoot)
-                return _busySerials.Contains(serial);
+            add => _inner.OperationStateChanged += value;
+            remove => _inner.OperationStateChanged -= value;
         }
 
-        public IDisposable? TryAcquire(string serial)
+        public bool IsBusy(string serial) => _inner.IsBusy(serial);
+
+        public DeviceActionOperationSnapshot? GetOperation(string serial) => _inner.GetOperation(serial);
+
+        public IDeviceActionOperation? TryStart(
+            string serial,
+            DeviceActionKind kind,
+            bool canCancel,
+            CancellationToken externalCancellationToken = default)
         {
-            lock (_syncRoot)
+            IDeviceActionOperation? operation = _inner.TryStart(
+                serial,
+                kind,
+                canCancel,
+                externalCancellationToken);
+            if (operation != null)
             {
-                if (!_busySerials.Add(serial))
-                    return null;
+                lock (_manualOperations)
+                    _manualOperations[serial] = operation;
             }
 
-            BusyStateChanged?.Invoke(serial, true);
-            return new CallbackDisposable(() => Release(serial));
+            return operation;
         }
+
+        public bool TryRequestCancellation(string serial) => _inner.TryRequestCancellation(serial);
 
         public void ForceRelease(string serial)
         {
-            Release(serial);
-        }
-
-        private void Release(string serial)
-        {
-            bool removed;
-            lock (_syncRoot)
-                removed = _busySerials.Remove(serial);
-
-            if (removed)
-                BusyStateChanged?.Invoke(serial, false);
-        }
-
-        private sealed class CallbackDisposable(Action callback) : IDisposable
-        {
-            private Action? _callback = callback;
-
-            public void Dispose()
+            IDeviceActionOperation? operation;
+            lock (_manualOperations)
             {
-                Interlocked.Exchange(ref _callback, null)?.Invoke();
+                _manualOperations.Remove(serial, out operation);
             }
+
+            operation?.Dispose();
         }
+
     }
 
     private sealed class BlockingPollingService : IPollingService
