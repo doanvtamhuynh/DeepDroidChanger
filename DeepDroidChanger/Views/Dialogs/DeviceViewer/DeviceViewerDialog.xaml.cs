@@ -11,9 +11,12 @@ namespace DeepDroidChanger.Views
     public sealed partial class DeviceViewerDialog : Window
     {
         private const double FallbackDeviceAspectRatio = 9.0 / 20.0;
+        private const double ExpandedActionsPanelWidth = 315;
+        private const double CollapsedActionsRailWidth = 52;
         private bool _boundsChangedPending;
         private bool _visibilityChangedPending;
         private bool _readyPending;
+        private DeviceViewerViewModel? _deviceViewerViewModel;
 
         public DeviceViewerDialog()
         {
@@ -24,6 +27,7 @@ namespace DeepDroidChanger.Views
             StateChanged += OnWindowStateChanged;
             IsVisibleChanged += OnWindowIsVisibleChanged;
             DeviceViewerBounds.SizeChanged += OnDeviceViewerBoundsSizeChanged;
+            DataContextChanged += OnDataContextChanged;
         }
 
         public event EventHandler? ViewerBoundsReady;
@@ -85,6 +89,40 @@ namespace DeepDroidChanger.Views
         {
             RefreshStreamLayout();
             QueueViewerBoundsReady();
+        }
+
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (_deviceViewerViewModel != null)
+                _deviceViewerViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+            _deviceViewerViewModel = e.NewValue as DeviceViewerViewModel;
+            if (_deviceViewerViewModel == null)
+                return;
+
+            _deviceViewerViewModel.PropertyChanged += OnViewModelPropertyChanged;
+            ApplyActionsPanelLayout(_deviceViewerViewModel.IsActionsPanelExpanded);
+        }
+
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(DeviceViewerViewModel.IsActionsPanelExpanded))
+                ApplyActionsPanelLayout(_deviceViewerViewModel?.IsActionsPanelExpanded == true);
+        }
+
+        private void ApplyActionsPanelLayout(bool isExpanded)
+        {
+            var previousWidth = ActionsColumn.Width.IsAbsolute
+                ? ActionsColumn.Width.Value
+                : ExpandedActionsPanelWidth;
+            var nextWidth = isExpanded ? ExpandedActionsPanelWidth : CollapsedActionsRailWidth;
+
+            ActionsColumn.Width = new GridLength(nextWidth);
+            if (!double.IsNaN(Width))
+                Width = Math.Max(MinWidth, Width + nextWidth - previousWidth);
+
+            UpdateLayout();
+            RefreshStreamLayout();
         }
 
         private void OnWindowLocationChanged(object? sender, EventArgs e)
@@ -200,6 +238,9 @@ namespace DeepDroidChanger.Views
             StateChanged -= OnWindowStateChanged;
             IsVisibleChanged -= OnWindowIsVisibleChanged;
             DeviceViewerBounds.SizeChanged -= OnDeviceViewerBoundsSizeChanged;
+            DataContextChanged -= OnDataContextChanged;
+            if (_deviceViewerViewModel != null)
+                _deviceViewerViewModel.PropertyChanged -= OnViewModelPropertyChanged;
             base.OnClosing(e);
         }
     }

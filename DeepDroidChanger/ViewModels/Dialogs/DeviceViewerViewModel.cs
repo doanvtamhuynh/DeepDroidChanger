@@ -39,6 +39,9 @@ namespace DeepDroidChanger.ViewModels
         private bool _isWaitingForDevice;
 
         [ObservableProperty]
+        private bool _isActionsPanelExpanded;
+
+        [ObservableProperty]
         private string _deviceStatusText = string.Empty;
 
         [ObservableProperty]
@@ -74,6 +77,12 @@ namespace DeepDroidChanger.ViewModels
             _adbIpGeolocationService = adbIpGeolocationService;
             _localizationService = localizationService;
             _logger = logger;
+        }
+
+        [RelayCommand]
+        private void ToggleActionsPanel()
+        {
+            IsActionsPanelExpanded = !IsActionsPanelExpanded;
         }
 
         partial void OnIsStreamLoadingChanged(bool value)

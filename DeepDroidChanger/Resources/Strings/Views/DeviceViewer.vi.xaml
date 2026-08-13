@@ -15,6 +15,8 @@
     <system:String x:Key="DeviceViewerVolumeDown">Giảm âm lượng</system:String>
     <system:String x:Key="DeviceViewerScreenshot">Chụp màn hình</system:String>
     <system:String x:Key="DeviceViewerActions">Thao tác</system:String>
+    <system:String x:Key="DeviceViewerExpandActions">Mở rộng thao tác</system:String>
+    <system:String x:Key="DeviceViewerCollapseActions">Thu gọn thao tác</system:String>
     <system:String x:Key="DeviceViewerInputText">NHẬP VĂN BẢN</system:String>
     <system:String x:Key="DeviceViewerInputTextHint">Nhập văn bản gửi tới thiết bị...</system:String>
     <system:String x:Key="DeviceViewerSend">Gửi</system:String>

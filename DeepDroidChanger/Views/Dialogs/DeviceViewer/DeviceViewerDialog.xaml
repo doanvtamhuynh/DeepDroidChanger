@@ -9,10 +9,10 @@
         xmlns:viewModels="clr-namespace:DeepDroidChanger.ViewModels"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Width="893"
-        Height="700"
-        MinWidth="833"
-        MinHeight="640"
+        Width="590"
+        Height="660"
+        MinWidth="324"
+        MinHeight="660"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Brush.WindowBackground}"
@@ -358,48 +358,9 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <materialDesign:PackIcon Kind="Cellphone"
-                                                 Style="{StaticResource DeviceViewerIconStyle}"
-                                                 Margin="0,0,8,0"/>
-                        <TextBlock Text="{DynamicResource DeviceViewerManagerTitle}"
-                                   Style="{StaticResource DeviceViewerTitleTextStyle}"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                        <Border Style="{StaticResource DeviceViewerInfoPillStyle}"
-                                Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Usb"
-                                                         Style="{StaticResource DeviceViewerIconStyle}"
-                                                         Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding DeviceName}"
-                                           Style="{StaticResource DeviceViewerSmallTextStyle}"/>
-                                <TextBlock Text="{DynamicResource DeviceViewerDeviceSeparator}"
-                                           Style="{StaticResource DeviceViewerMutedTextStyle}"/>
-                                <TextBlock Text="{Binding Serial}"
-                                           Style="{StaticResource DeviceViewerSmallTextStyle}"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Style="{StaticResource DeviceViewerInfoPillStyle}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Wifi"
-                                                         Style="{StaticResource DeviceViewerIconStyle}"
-                                                         Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding DeviceIpText}"
-                                           Style="{StaticResource DeviceViewerInfoPillTextStyle}"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-
-                    <Border Grid.Column="2"
+                    <Border Grid.Column="0"
                             VerticalAlignment="Center"
                             Padding="12,4"
                             Style="{DynamicResource DeviceViewerStatusPillStyle}">
@@ -412,7 +373,7 @@
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="315"/>
+                    <ColumnDefinition x:Name="ActionsColumn" Width="315"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0" Background="{DynamicResource Brush.WindowBackground}">
@@ -542,25 +503,61 @@
                         Style="{StaticResource DeviceViewerPanelBorderStyle}"
                         BorderThickness="1,0,0,0">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="34"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                        <Grid x:Name="ExpandedActionsPanel">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsActionsPanelExpanded}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="34"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                        <Border Grid.Row="0" Style="{StaticResource DeviceViewerTitleBarStyle}">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <materialDesign:PackIcon Kind="LightningBolt"
-                                                         Style="{StaticResource DeviceViewerIconStyle}"
-                                                         Margin="0,0,7,0"/>
-                                <TextBlock Text="{DynamicResource DeviceViewerActions}"
-                                           Style="{StaticResource DeviceViewerTitleTextStyle}"/>
-                            </StackPanel>
-                        </Border>
+                            <Border Grid.Row="0" Style="{StaticResource DeviceViewerTitleBarStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                        <ScrollViewer Grid.Row="1"
-                                      VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel Margin="12,10">
+                                    <StackPanel Grid.Column="0"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <materialDesign:PackIcon Kind="LightningBolt"
+                                                                 Style="{StaticResource DeviceViewerIconStyle}"
+                                                                 Margin="0,0,7,0"/>
+                                        <TextBlock Text="{DynamicResource DeviceViewerActions}"
+                                                   Style="{StaticResource DeviceViewerTitleTextStyle}"/>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="1"
+                                            Width="32"
+                                            Height="28"
+                                            Margin="6,0,0,0"
+                                            Padding="0"
+                                            Background="{DynamicResource Brush.SurfacePressed}"
+                                            BorderBrush="{DynamicResource Brush.Border}"
+                                            Foreground="{DynamicResource Brush.TextPrimary}"
+                                            Style="{StaticResource FlatButtonStyle}"
+                                            Command="{Binding ToggleActionsPanelCommand}"
+                                            ToolTip="{DynamicResource DeviceViewerCollapseActions}">
+                                        <materialDesign:PackIcon Kind="ChevronDoubleLeft"
+                                                                 Width="16"
+                                                                 Height="16"
+                                                                 Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <ScrollViewer Grid.Row="1"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Margin="12,10">
                                 <StackPanel Margin="0,0,0,14">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Keyboard"
@@ -577,12 +574,13 @@
                                              Style="{StaticResource DeviceViewerInputStyle}"
                                              materialDesign:HintAssist.Hint="{DynamicResource DeviceViewerInputTextHint}"/>
                                     <Grid Margin="0,6,0,0">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="6"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        <Button Grid.Row="0"
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="6"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Button Grid.Column="0"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
                                                 Command="{Binding SendInputTextCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}">
@@ -594,7 +592,8 @@
                                                            Style="{StaticResource DeviceViewerButtonTextStyle}"/>
                                             </StackPanel>
                                         </Button>
-                                        <Button Grid.Row="2"
+
+                                        <Button Grid.Column="2"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
                                                 Command="{Binding EnterCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}">
@@ -704,8 +703,66 @@
                                         </Button>
                                     </UniformGrid>
                                 </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+
+                        <Grid x:Name="CollapsedActionsRail">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsActionsPanelExpanded}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Top"
+                                        Margin="0,6">
+                                <Button Width="34"
+                                        Height="28"
+                                        Margin="0,0,0,8"
+                                        Padding="0"
+                                        Background="{DynamicResource Brush.SurfacePressed}"
+                                        BorderBrush="{DynamicResource Brush.Border}"
+                                        Foreground="{DynamicResource Brush.TextPrimary}"
+                                        Style="{StaticResource FlatButtonStyle}"
+                                        Command="{Binding ToggleActionsPanelCommand}"
+                                        ToolTip="{DynamicResource DeviceViewerExpandActions}">
+                                    <materialDesign:PackIcon Kind="ChevronDoubleRight"
+                                                             Width="16"
+                                                             Height="16"
+                                                             Foreground="{DynamicResource Brush.TextPrimary}"/>
+                                </Button>
+
+                                <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
+                                        Command="{Binding VolumeDownCommand}"
+                                        ToolTip="{DynamicResource DeviceViewerVolumeDown}">
+                                    <materialDesign:PackIcon Kind="VolumeMinus"
+                                                             Style="{StaticResource DeviceViewerButtonIconStyle}"/>
+                                </Button>
+                                <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
+                                        Command="{Binding VolumeUpCommand}"
+                                        ToolTip="{DynamicResource DeviceViewerVolumeUp}">
+                                    <materialDesign:PackIcon Kind="VolumePlus"
+                                                             Style="{StaticResource DeviceViewerButtonIconStyle}"/>
+                                </Button>
+                                <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
+                                        Command="{Binding ScreenshotCommand}"
+                                        ToolTip="{DynamicResource DeviceViewerScreenshot}">
+                                    <materialDesign:PackIcon Kind="Camera"
+                                                             Style="{StaticResource DeviceViewerButtonIconStyle}"/>
+                                </Button>
+                                <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
+                                        Command="{Binding PowerCommand}"
+                                        ToolTip="{DynamicResource DeviceViewerPower}">
+                                    <materialDesign:PackIcon Kind="Power"
+                                                             Style="{StaticResource DeviceViewerButtonIconStyle}"/>
+                                </Button>
                             </StackPanel>
-                        </ScrollViewer>
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>
