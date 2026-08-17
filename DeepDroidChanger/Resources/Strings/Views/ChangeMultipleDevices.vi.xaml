@@ -26,15 +26,10 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionsHeader">Multiple Device Actions</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StopAction">Dừng</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StoppingAction">Đang dừng...</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_StopActionTooltip">Dừng tác vụ hiện tại.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StopActionTooltip">Dừng tác vụ hiện tại của thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ExternalActionRunningFormat">{0} • Đang chạy ở Một thiết bị</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ExternalActionStoppingFormat">{0} • Đang dừng ở Một thiết bị</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ExternalActionTooltip">Tác vụ này thuộc màn hình Một thiết bị. Hãy dừng tác vụ tại màn hình đó.</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_GlobalBatchRunningFormat">{0} nhóm • Đang chạy</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_GlobalBatchStoppingFormat">{0} nhóm • Đang dừng</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_StopBatch">Dừng tác vụ nhóm</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_StoppingBatch">Đang dừng tác vụ nhóm...</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_GlobalBatchTooltip">Dừng tác vụ nhóm Multiple Device đang chạy.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_InfoDeviceSelectorName">Thông tin thiết bị đã chọn</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_InfoDeviceSelectorHint">Chọn thiết bị đã tick</sys:String>
