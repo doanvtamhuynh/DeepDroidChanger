@@ -21,4 +21,22 @@ public sealed class DeviceViewerDialogLayoutTests
         Assert.AreEqual(613d, expandedWidth);
         Assert.AreEqual(350d, collapsedWidth);
     }
+
+    [TestMethod]
+    public void CalculateAspectFitSize_PreservesPortraitRatioWithinContainer()
+    {
+        var size = DeviceViewerDialog.CalculateAspectFitSize(1000, 600, 9d / 20d);
+
+        Assert.AreEqual(270d, size.Width, 0.001d);
+        Assert.AreEqual(600d, size.Height, 0.001d);
+    }
+
+    [TestMethod]
+    public void CalculateAspectFitSize_UsesContainerWidthWhenItIsLimiting()
+    {
+        var size = DeviceViewerDialog.CalculateAspectFitSize(270, 1000, 9d / 20d);
+
+        Assert.AreEqual(270d, size.Width, 0.001d);
+        Assert.AreEqual(600d, size.Height, 0.001d);
+    }
 }

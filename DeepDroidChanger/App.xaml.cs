@@ -139,8 +139,6 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceChangeService, DeviceChangeService>();
         services.AddSingleton<IXapkPackageService, XapkPackageService>();
         services.AddSingleton<IPackageInstallService, PackageInstallService>();
-        services.AddSingleton<IDeviceViewerStreamService, DeviceViewerStreamService>();
-
         services.AddSingleton<IDeviceRandomProfileService, DeviceRandomProfileService>();
         services.AddSingleton<ISimProfileService, SimProfileService>();
         services.AddSingleton<IDeviceListService, DeviceListService>();
@@ -151,8 +149,6 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceProcessStateService, DeviceProcessStateService>();
         services.AddSingleton<IDeviceActionService, DeviceActionService>();
         services.AddSingleton<IProxyWorkflowService, ProxyWorkflowService>();
-        services.AddSingleton<IDeviceViewerCoordinatorService, DeviceViewerCoordinatorService>();
-
         services.AddTransient<IAddDevicesDialogService, AddDevicesDialogService>();
         services.AddTransient<ILoginDialogService, LoginDialogService>();
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();

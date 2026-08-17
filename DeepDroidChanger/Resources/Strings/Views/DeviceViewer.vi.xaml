@@ -2,11 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="DeviceViewer_WindowTitleFormat">Xem thiết bị - {0} ({1})</system:String>
-    <system:String x:Key="DeviceViewer_StatusChecking">Đang kiểm tra...</system:String>
-    <system:String x:Key="DeviceViewer_StatusConnected">Đã kết nối</system:String>
-    <system:String x:Key="DeviceViewer_StatusDisconnected">Mất kết nối</system:String>
-    <system:String x:Key="DeviceViewerManagerTitle">Xem thiết bị</system:String>
-    <system:String x:Key="DeviceViewerDeviceSeparator"> - </system:String>
+    <system:String x:Key="DeviceViewerStatusUnavailable">Trình xem không khả dụng</system:String>
+    <system:String x:Key="DeviceViewerInteractionDisabled">Tương tác với thiết bị đã bị vô hiệu hóa</system:String>
     <system:String x:Key="DeviceViewerBack">Quay lại</system:String>
     <system:String x:Key="DeviceViewerHome">Màn hình chính</system:String>
     <system:String x:Key="DeviceViewerRecent">Gần đây</system:String>
@@ -23,7 +20,5 @@
     <system:String x:Key="DeviceViewerEnter">Bấm Enter</system:String>
     <system:String x:Key="DeviceViewerAdbShell">ADB SHELL</system:String>
     <system:String x:Key="DeviceViewerShellCommandHint">Nhập lệnh shell...</system:String>
-    <system:String x:Key="DeviceViewerLoadingStream">Đang khởi động scrcpy...</system:String>
-    <system:String x:Key="DeviceViewerStreamError">Không thể khởi động scrcpy.</system:String>
     <system:String x:Key="DeviceViewerDeviceControls">ĐIỀU KHIỂN THIẾT BỊ</system:String>
 </ResourceDictionary>

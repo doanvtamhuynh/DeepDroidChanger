@@ -14,9 +14,6 @@ public sealed class AdbToolPathResolver
     private readonly Lazy<string> _fastbootPath = new(() => Resolve(
         AssetConstants.Tools.PlatformToolsDirectoryName,
         AssetConstants.Tools.FastbootExecutableName));
-    private readonly Lazy<string> _scrcpyPath = new(() => Resolve(
-        AssetConstants.Tools.ViewScreenDirectoryName,
-        AssetConstants.Tools.ScrcpyExecutableName));
 
     public string GetAdbPath()
     {
@@ -26,11 +23,6 @@ public sealed class AdbToolPathResolver
     public string GetFastbootPath()
     {
         return _fastbootPath.Value;
-    }
-
-    public string GetScrcpyPath()
-    {
-        return _scrcpyPath.Value;
     }
 
     private static string Resolve(string directoryName, string executableName)

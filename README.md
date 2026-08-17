@@ -1,6 +1,6 @@
 # DeepDroidChanger
 
-DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đổi cấu hình thiết bị Android qua ADB. Dự án sử dụng .NET 10, MVVM, dependency injection và service abstraction; Android Platform Tools cùng scrcpy được đóng gói trong `DeepDroidChanger/Assets/Tools`.
+DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đổi cấu hình thiết bị Android qua ADB. Dự án sử dụng .NET 10, MVVM, dependency injection và service abstraction; Android Platform Tools được đóng gói trong `DeepDroidChanger/Assets/Tools`.
 
 > [!WARNING]
 > **Change Device là thao tác phá hủy dữ liệu.** Flow mặc định xóa dữ liệu package, tài khoản và nhiều trạng thái hệ thống trước khi áp dụng profile mới rồi reboot. Chỉ dùng trên thiết bị đã backup, có ADB root và ROM/module tương thích.
@@ -98,9 +98,9 @@ Cleanup không ghép hàng trăm package/path vào một command dài. Tool ch�
 
 ### Device Viewer
 
-- Mở và quản lý phiên scrcpy riêng theo thiết bị.
-- Resize giữ đúng tỉ lệ, reconnect/restart stream và dừng process khi đóng.
-- Back, Home, Recent, Power, Volume, Enter, screenshot, gửi text và chạy ADB shell.
+- Mở và quản lý dialog xem thiết bị riêng theo từng serial.
+- Giữ resize theo tỉ lệ, thu gọn/mở rộng panel thao tác và kích hoạt lại dialog đang mở.
+- Giao diện viewer hiện là placeholder; các thao tác điều khiển thiết bị đang bị vô hiệu hóa.
 
 ## Chức năng chưa hoàn thiện
 
@@ -266,4 +266,4 @@ Tài liệu liên quan:
 - Material Design in XAML Toolkit.
 - MSTest và NSubstitute.
 - Amazon Cognito authentication.
-- ADB, fastboot, scrcpy và SOCKS5 proxy integration.
+- ADB, fastboot và SOCKS5 proxy integration.

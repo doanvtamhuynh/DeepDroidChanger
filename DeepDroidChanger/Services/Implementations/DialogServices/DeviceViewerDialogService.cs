@@ -1,5 +1,4 @@
 using System.Windows;
-using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
 using DeepDroidChanger.Views;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +10,7 @@ public sealed class DeviceViewerDialogService : IDeviceViewerDialogService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<DeviceViewerDialogService> _logger;
-    private readonly DeviceViewerRegistry<DeviceViewerRuntime> _activeViewers = new();
+    private readonly DeviceViewerRegistry<DeviceViewerEntry> _activeViewers = new();
 
     public DeviceViewerDialogService(
         IServiceScopeFactory scopeFactory,
@@ -29,46 +28,46 @@ public sealed class DeviceViewerDialogService : IDeviceViewerDialogService
 
         return _activeViewers.GetOrCreateAsync(
             serial,
-            runtime => runtime.IsLive,
+            entry => entry.IsLive,
             () => CreateViewerAsync(serial, name, cancellationToken),
             ActivateViewerAsync,
             cancellationToken);
     }
 
-    private async Task<DeviceViewerRuntime> CreateViewerAsync(
+    private async Task<DeviceViewerEntry> CreateViewerAsync(
         string serial,
         string name,
         CancellationToken cancellationToken)
     {
-        var scope = _scopeFactory.CreateScope();
+        IServiceScope scope = _scopeFactory.CreateScope();
         try
         {
-            var runtime = await Application.Current.Dispatcher.InvokeAsync(() =>
+            DeviceViewerEntry entry = await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var viewModel = scope.ServiceProvider.GetRequiredService<DeviceViewerViewModel>();
+                DeviceViewerViewModel viewModel = scope.ServiceProvider
+                    .GetRequiredService<DeviceViewerViewModel>();
                 viewModel.Initialize(serial, name);
 
-                var window = scope.ServiceProvider.GetRequiredService<DeviceViewerDialog>();
+                DeviceViewerDialog window = scope.ServiceProvider
+                    .GetRequiredService<DeviceViewerDialog>();
                 window.DataContext = viewModel;
                 if (Application.Current.MainWindow is { IsVisible: true } owner)
                     window.Owner = owner;
 
-                return new DeviceViewerRuntime(
-                    window,
-                    viewModel,
-                    serial,
-                    scope,
-                    scope.ServiceProvider.GetRequiredService<IDeviceViewerStreamService>(),
-                    scope.ServiceProvider.GetRequiredService<IDeviceViewerCoordinatorService>(),
-                    scope.ServiceProvider.GetRequiredService<IAdbDeviceTrackerService>(),
-                    scope.ServiceProvider.GetRequiredService<ILogger<DeviceViewerRuntime>>(),
-                    runtime => _activeViewers.Remove(serial, runtime));
+                var created = new DeviceViewerEntry(window, scope);
+                window.Closed += (_, _) =>
+                {
+                    created.MarkClosed();
+                    _activeViewers.Remove(serial, created);
+                };
+                return created;
             }).Task.ConfigureAwait(false);
 
-            await Application.Current.Dispatcher.InvokeAsync(runtime.Window.Show).Task.ConfigureAwait(false);
-            return runtime;
+            await Application.Current.Dispatcher.InvokeAsync(entry.Window.Show)
+                .Task.ConfigureAwait(false);
+            return entry;
         }
         catch (Exception exception)
         {
@@ -78,20 +77,42 @@ public sealed class DeviceViewerDialogService : IDeviceViewerDialogService
         }
     }
 
-    private static Task ActivateViewerAsync(DeviceViewerRuntime runtime)
+    private static Task ActivateViewerAsync(DeviceViewerEntry entry)
     {
         return Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            if (!runtime.IsLive)
+            if (!entry.IsLive)
                 return;
 
-            if (runtime.Window.WindowState == WindowState.Minimized)
-                runtime.Window.WindowState = WindowState.Normal;
+            if (entry.Window.WindowState == WindowState.Minimized)
+                entry.Window.WindowState = WindowState.Normal;
 
-            if (!runtime.Window.IsVisible)
-                runtime.Window.Show();
+            if (!entry.Window.IsVisible)
+                entry.Window.Show();
 
-            runtime.Window.Activate();
+            entry.Window.Activate();
         }).Task;
+    }
+
+    private sealed class DeviceViewerEntry
+    {
+        private readonly IServiceScope _scope;
+        private int _closed;
+
+        public DeviceViewerEntry(DeviceViewerDialog window, IServiceScope scope)
+        {
+            Window = window;
+            _scope = scope;
+        }
+
+        public DeviceViewerDialog Window { get; }
+
+        public bool IsLive => Volatile.Read(ref _closed) == 0;
+
+        public void MarkClosed()
+        {
+            if (Interlocked.Exchange(ref _closed, 1) == 0)
+                _scope.Dispose();
+        }
     }
 }

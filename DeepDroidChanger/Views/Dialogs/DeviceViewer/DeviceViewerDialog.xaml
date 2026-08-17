@@ -38,18 +38,6 @@
             M 14,30 L 106,30 L 106,196 L 14,196 Z
         </PathGeometry>
 
-        <PathGeometry x:Key="ArrowUpGeometry">
-            M 60,60 L 60,140
-            M 60,60 L 44,80
-            M 60,60 L 76,80
-        </PathGeometry>
-
-        <PathGeometry x:Key="ArrowDownGeometry">
-            M 72,90 L 72,170
-            M 72,170 L 56,150
-            M 72,170 L 88,150
-        </PathGeometry>
-
         <sys:Double x:Key="DeviceViewerTitleBarMinHeight">40</sys:Double>
         <sys:Double x:Key="DeviceViewerStatusBarMinHeight">22</sys:Double>
 
@@ -235,34 +223,17 @@
             <Setter Property="materialDesign:HintAssist.Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
         </Style>
 
-        <Style x:Key="DeviceViewerStreamStatusStyle" TargetType="TextBlock"
-               BasedOn="{StaticResource DeviceViewerMutedTextStyle}">
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="DeviceViewerStreamErrorStyle" TargetType="TextBlock"
-               BasedOn="{StaticResource DeviceViewerStreamStatusStyle}">
-            <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}"/>
-        </Style>
-
         <Style x:Key="DeviceViewerStatusBarTextStyle" TargetType="TextBlock"
                BasedOn="{StaticResource DeviceViewerSmallTextStyle}">
             <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
         </Style>
 
-        <Style x:Key="DeviceViewerDisconnectedOverlayStyle" TargetType="Grid">
-            <Setter Property="Background" Value="{DynamicResource Brush.DeviceViewerStream}"/>
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsWaitingForDevice}" Value="True">
-                    <Setter Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-            </Style.Triggers>
+        <Style x:Key="DeviceViewerPlaceholderStyle" TargetType="Grid">
+            <Setter Property="Background" Value="{DynamicResource Brush.DeviceViewerCanvas}"/>
+            <Setter Property="Visibility" Value="Visible"/>
         </Style>
 
-        <Style x:Key="DeviceViewerDisconnectedIconContainerStyle" TargetType="Canvas">
+        <Style x:Key="DeviceViewerPlaceholderIconContainerStyle" TargetType="Canvas">
             <Setter Property="Width" Value="120"/>
             <Setter Property="Height" Value="240"/>
         </Style>
@@ -286,61 +257,11 @@
             <Setter Property="Canvas.Top" Value="210"/>
         </Style>
 
-        <Style x:Key="DeviceViewerArrowUpStyle" TargetType="Path">
-            <Setter Property="Data" Value="{StaticResource ArrowUpGeometry}"/>
-            <Setter Property="Stroke" Value="{DynamicResource Brush.DeviceViewerGlyph}"/>
-            <Setter Property="StrokeThickness" Value="8"/>
-            <Setter Property="StrokeStartLineCap" Value="Round"/>
-            <Setter Property="StrokeEndLineCap" Value="Round"/>
-            <Setter Property="StrokeLineJoin" Value="Round"/>
-            <Setter Property="Fill" Value="Transparent"/>
-        </Style>
-
-        <Style x:Key="DeviceViewerArrowDownStyle" TargetType="Path">
-            <Setter Property="Data" Value="{StaticResource ArrowDownGeometry}"/>
-            <Setter Property="Stroke" Value="{DynamicResource Brush.DeviceViewerGlyph}"/>
-            <Setter Property="StrokeThickness" Value="8"/>
-            <Setter Property="StrokeStartLineCap" Value="Round"/>
-            <Setter Property="StrokeEndLineCap" Value="Round"/>
-            <Setter Property="StrokeLineJoin" Value="Round"/>
-            <Setter Property="Fill" Value="Transparent"/>
-        </Style>
-
-        <Style x:Key="DeviceViewerDisconnectedBadgeStyle" TargetType="Border">
-            <Setter Property="Width" Value="44"/>
-            <Setter Property="Height" Value="44"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Circle}"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
-
-            <Setter Property="Canvas.Left" Value="84"/>
-            <Setter Property="Canvas.Top" Value="204"/>
-        </Style>
-
-        <Style x:Key="DeviceViewerDisconnectedXStyle" TargetType="Path">
-            <Setter Property="Data" Value="M 10,10 L 34,34 M 34,10 L 10,34"/>
-            <Setter Property="Stroke" Value="{DynamicResource Brush.DeviceViewerGlyph}"/>
-            <Setter Property="StrokeThickness" Value="5"/>
-            <Setter Property="StrokeStartLineCap" Value="Round"/>
-            <Setter Property="StrokeEndLineCap" Value="Round"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
         <Style x:Key="DeviceViewerStatusPillStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Warning}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsDeviceConnected}" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsDeviceDisconnected}" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
     </Window.Resources>
     <Border Style="{StaticResource DeviceViewerRootBorderStyle}">
@@ -364,7 +285,7 @@
                             VerticalAlignment="Center"
                             Padding="12,4"
                             Style="{DynamicResource DeviceViewerStatusPillStyle}">
-                        <TextBlock Text="{Binding DeviceStatusText}"
+                        <TextBlock Text="{DynamicResource DeviceViewerStatusUnavailable}"
                                    Style="{StaticResource DeviceViewerSmallTextStyle}"/>
                     </Border>
                 </Grid>
@@ -383,74 +304,28 @@
                         <RowDefinition Height="58"/>
                     </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0" x:Name="StreamContainer" SizeChanged="StreamContainer_SizeChanged" Background="{DynamicResource Brush.DeviceViewerStream}">
-                        <Border x:Name="StreamFrame"
+                    <Grid Grid.Row="0" x:Name="ViewerContainer" SizeChanged="ViewerContainer_SizeChanged" Background="{DynamicResource Brush.DeviceViewerCanvas}">
+                        <Border x:Name="ViewerFrame"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Background="{DynamicResource Brush.DeviceViewerStream}"
+                                Background="{DynamicResource Brush.DeviceViewerCanvas}"
                                 BorderBrush="{DynamicResource Brush.Border}"
                                 BorderThickness="1"
                                 CornerRadius="{StaticResource Radius.Small}"
                                 ClipToBounds="True">
                             <Grid>
-                                <Border x:Name="DeviceViewerBounds"
-                                        Background="{DynamicResource Brush.DeviceViewerStream}"/>
-
                                 <Grid IsHitTestVisible="False"
-                                      Background="{DynamicResource Brush.DeviceViewerStream}"
-                                      Visibility="Collapsed">
-                                    <Grid.Style>
-                                        <Style TargetType="Grid">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsStreamLoading}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Grid.Style>
-                                    <TextBlock Text="{DynamicResource DeviceViewerLoadingStream}"
-                                               Style="{StaticResource DeviceViewerStreamStatusStyle}"/>
-                                </Grid>
-
-                                <Grid IsHitTestVisible="False"
-                                      Background="{DynamicResource Brush.DeviceViewerStream}"
-                                      Visibility="Collapsed">
-                                    <Grid.Style>
-                                        <Style TargetType="Grid">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasStreamError}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Grid.Style>
-                                    <TextBlock Text="{DynamicResource DeviceViewerStreamError}"
-                                               Style="{StaticResource DeviceViewerStreamErrorStyle}"/>
-                                </Grid>
-
-                                <Grid IsHitTestVisible="False"
-                                      Style="{StaticResource DeviceViewerDisconnectedOverlayStyle}">
+                                      Style="{StaticResource DeviceViewerPlaceholderStyle}">
                                     <Viewbox Width="100" Height="200"
                                              HorizontalAlignment="Center"
                                              VerticalAlignment="Center"
                                              Stretch="Uniform">
-                                        <Canvas Style="{StaticResource DeviceViewerDisconnectedIconContainerStyle}">
-
+                                        <Canvas Style="{StaticResource DeviceViewerPlaceholderIconContainerStyle}">
                                             <Path Style="{StaticResource DeviceViewerPhoneBodyStyle}"/>
 
                                             <Path Style="{StaticResource DeviceViewerPhoneScreenStyle}"/>
 
                                             <Ellipse Style="{StaticResource DeviceViewerPhoneHomeStyle}"/>
-
-                                            <Path Style="{StaticResource DeviceViewerArrowUpStyle}"/>
-
-                                            <Path Style="{StaticResource DeviceViewerArrowDownStyle}"/>
-
-                                            <Border Style="{StaticResource DeviceViewerDisconnectedBadgeStyle}">
-                                                <Path Style="{StaticResource DeviceViewerDisconnectedXStyle}"/>
-                                            </Border>
 
                                         </Canvas>
                                     </Viewbox>
@@ -464,7 +339,7 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center">
                         <Button Style="{StaticResource DeviceViewerNavButtonStyle}"
-                                Command="{Binding RecentCommand}"
+                                IsEnabled="False"
                                 ToolTip="{DynamicResource Shared_TooltipAction}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ViewGrid"
@@ -475,7 +350,7 @@
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DeviceViewerNavButtonStyle}"
-                                Command="{Binding HomeCommand}"
+                                IsEnabled="False"
                                 ToolTip="{DynamicResource Shared_TooltipAction}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Home"
@@ -486,7 +361,7 @@
                             </StackPanel>
                         </Button>
                         <Button Style="{StaticResource DeviceViewerNavButtonStyle}"
-                                Command="{Binding BackCommand}"
+                                IsEnabled="False"
                                 ToolTip="{DynamicResource Shared_TooltipAction}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ArrowLeft"
@@ -555,6 +430,7 @@
                             </Border>
 
                             <ScrollViewer Grid.Row="1"
+                                          IsEnabled="False"
                                           VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
                                 <StackPanel Margin="12,10">
@@ -569,7 +445,6 @@
                                     <TextBox Height="74"
                                              AcceptsReturn="True"
                                              TextWrapping="Wrap"
-                                             Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              ToolTip="{DynamicResource Shared_TooltipTextInput}"
                                              Style="{StaticResource DeviceViewerInputStyle}"
                                              materialDesign:HintAssist.Hint="{DynamicResource DeviceViewerInputTextHint}"/>
@@ -582,7 +457,6 @@
 
                                         <Button Grid.Column="0"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding SendInputTextCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Send"
@@ -595,7 +469,6 @@
 
                                         <Button Grid.Column="2"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding EnterCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="KeyboardReturn"
@@ -619,7 +492,6 @@
                                     <TextBox Height="74"
                                              AcceptsReturn="True"
                                              TextWrapping="Wrap"
-                                             Text="{Binding ShellCommand, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              ToolTip="{DynamicResource Shared_TooltipTextInput}"
                                              Style="{StaticResource DeviceViewerInputStyle}"
                                              materialDesign:HintAssist.Hint="{DynamicResource DeviceViewerShellCommandHint}"/>
@@ -629,7 +501,6 @@
                                         </Grid.ColumnDefinitions>
                                         <Button Grid.Column="0"
                                                 Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding RunShellCommandCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Send"
@@ -654,7 +525,6 @@
                                     </StackPanel>
                                     <UniformGrid Columns="2" Margin="0,6,0,0">
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding VolumeDownCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="0,0,4,6">
                                             <StackPanel Orientation="Horizontal">
@@ -666,7 +536,6 @@
                                             </StackPanel>
                                         </Button>
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding VolumeUpCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="4,0,0,6">
                                             <StackPanel Orientation="Horizontal">
@@ -678,7 +547,6 @@
                                             </StackPanel>
                                         </Button>
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding ScreenshotCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="0,0,4,6">
                                             <StackPanel Orientation="Horizontal">
@@ -690,7 +558,6 @@
                                             </StackPanel>
                                         </Button>
                                         <Button Style="{StaticResource DeviceViewerActionButtonStyle}"
-                                                Command="{Binding PowerCommand}"
                                                 ToolTip="{DynamicResource Shared_TooltipAction}"
                                                 Margin="4,0,0,0">
                                             <StackPanel Orientation="Horizontal">
@@ -738,25 +605,25 @@
                                 </Button>
 
                                 <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
-                                        Command="{Binding VolumeDownCommand}"
+                                        IsEnabled="False"
                                         ToolTip="{DynamicResource DeviceViewerVolumeDown}">
                                     <materialDesign:PackIcon Kind="VolumeMinus"
                                                              Style="{StaticResource DeviceViewerButtonIconStyle}"/>
                                 </Button>
                                 <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
-                                        Command="{Binding VolumeUpCommand}"
+                                        IsEnabled="False"
                                         ToolTip="{DynamicResource DeviceViewerVolumeUp}">
                                     <materialDesign:PackIcon Kind="VolumePlus"
                                                              Style="{StaticResource DeviceViewerButtonIconStyle}"/>
                                 </Button>
                                 <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
-                                        Command="{Binding ScreenshotCommand}"
+                                        IsEnabled="False"
                                         ToolTip="{DynamicResource DeviceViewerScreenshot}">
                                     <materialDesign:PackIcon Kind="Camera"
                                                              Style="{StaticResource DeviceViewerButtonIconStyle}"/>
                                 </Button>
                                 <Button Style="{StaticResource DeviceViewerLeftButtonStyle}"
-                                        Command="{Binding PowerCommand}"
+                                        IsEnabled="False"
                                         ToolTip="{DynamicResource DeviceViewerPower}">
                                     <materialDesign:PackIcon Kind="Power"
                                                              Style="{StaticResource DeviceViewerButtonIconStyle}"/>
@@ -776,7 +643,7 @@
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
-                        <TextBlock Text="{Binding StreamLogText}"
+                        <TextBlock Text="{DynamicResource DeviceViewerInteractionDisabled}"
                                    Style="{StaticResource DeviceViewerStatusBarTextStyle}"/>
                     </StackPanel>
                 </Grid>

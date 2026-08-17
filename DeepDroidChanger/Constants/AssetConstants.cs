@@ -23,10 +23,8 @@ public static class AssetConstants
     {
         public const string RootRelativePath = "Assets/Tools";
         public const string PlatformToolsDirectoryName = "platform-tools";
-        public const string ViewScreenDirectoryName = "viewscreen";
         public const string AdbExecutableName = "adb.exe";
         public const string FastbootExecutableName = "fastboot.exe";
-        public const string ScrcpyExecutableName = "scrcpy.exe";
     }
 
     public static class RuntimeData

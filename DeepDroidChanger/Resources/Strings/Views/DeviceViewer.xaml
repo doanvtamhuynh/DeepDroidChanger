@@ -2,11 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="DeviceViewer_WindowTitleFormat">View Device - {0} ({1})</system:String>
-    <system:String x:Key="DeviceViewer_StatusChecking">Checking...</system:String>
-    <system:String x:Key="DeviceViewer_StatusConnected">Connected</system:String>
-    <system:String x:Key="DeviceViewer_StatusDisconnected">Disconnected</system:String>
-    <system:String x:Key="DeviceViewerManagerTitle">View Device</system:String>
-    <system:String x:Key="DeviceViewerDeviceSeparator"> - </system:String>
+    <system:String x:Key="DeviceViewerStatusUnavailable">Viewer unavailable</system:String>
+    <system:String x:Key="DeviceViewerInteractionDisabled">Device interaction is disabled</system:String>
     <system:String x:Key="DeviceViewerBack">Back</system:String>
     <system:String x:Key="DeviceViewerHome">Home</system:String>
     <system:String x:Key="DeviceViewerRecent">Recent</system:String>
@@ -23,7 +20,5 @@
     <system:String x:Key="DeviceViewerEnter">Press Enter</system:String>
     <system:String x:Key="DeviceViewerAdbShell">ADB SHELL</system:String>
     <system:String x:Key="DeviceViewerShellCommandHint">Enter shell command...</system:String>
-    <system:String x:Key="DeviceViewerLoadingStream">Starting scrcpy stream...</system:String>
-    <system:String x:Key="DeviceViewerStreamError">Scrcpy stream failed to start.</system:String>
     <system:String x:Key="DeviceViewerDeviceControls">DEVICE CONTROLS</system:String>
 </ResourceDictionary>

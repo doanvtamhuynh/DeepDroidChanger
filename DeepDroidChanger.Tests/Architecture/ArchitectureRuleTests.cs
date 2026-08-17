@@ -195,7 +195,6 @@ public sealed class ArchitectureRuleTests
             "AdbServices",
             "AdbDevice.cs",
             "AdbDeviceStatus.cs",
-            "DeviceViewerStreamBounds.cs",
             "GooglePackageState.cs",
             "InstallPackageOptions.cs",
             "InstallPackageResult.cs",

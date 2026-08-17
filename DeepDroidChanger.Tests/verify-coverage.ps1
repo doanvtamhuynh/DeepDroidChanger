@@ -53,7 +53,6 @@ $criticalClasses = @(
     'DeepDroidChanger.Authentication.Internal.AccountAuthenticationService',
     'DeepDroidChanger.Services.DeviceIntegrityService',
     'DeepDroidChanger.Services.DeviceRandomProfileService',
-    'DeepDroidChanger.Services.DeviceViewerCoordinatorService',
     'DeepDroidChanger.Services.PackageInstallService',
     'DeepDroidChanger.Services.ProxyService',
     'DeepDroidChanger.Services.RandomDeviceService',
