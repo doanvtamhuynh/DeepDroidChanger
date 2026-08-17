@@ -74,7 +74,6 @@
     <sys:String x:Key="ChangeSingleDevice_ActionInstallApk">Install APK/XAPK</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionFakeProxy">Fake Proxy</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionStopFakeProxy">Stop Fake Proxy</sys:String>
-    <sys:String x:Key="ChangeSingleDevice_ActionViewDevice">View Device</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionViewAllDeviceInfo">View All Info</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuDeleteDevice">Delete Device</sys:String>
     <sys:String x:Key="ChangeSingleDevice_RowMenuRebootDevice">Reboot Device</sys:String>

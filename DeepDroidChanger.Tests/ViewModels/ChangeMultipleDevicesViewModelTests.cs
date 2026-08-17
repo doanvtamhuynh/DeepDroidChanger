@@ -1967,7 +1967,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         DeviceRowViewModel device = viewModel.Devices.Single();
 
-        Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
         Assert.IsTrue(viewModel.ViewDeviceInfoCommand.CanExecute(device));
         Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(device));
         Assert.IsTrue(viewModel.ToggleGmsCommand.CanExecute(device));
@@ -2014,7 +2013,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         DeviceRowViewModel device = viewModel.Devices.Single();
         IDisposable busyLease = context.DeviceActionGuard.TryStart("A", DeviceActionKind.BatchChangeDevice, canCancel: true)!;
 
-        Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
         Assert.IsTrue(viewModel.ViewDeviceInfoCommand.CanExecute(device));
         Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(device));
         Assert.IsTrue(viewModel.ToggleGmsCommand.CanExecute(device));
@@ -2023,15 +2021,12 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Assert.IsTrue(viewModel.RebootDeviceCommand.CanExecute(device));
         Assert.IsFalse(viewModel.DeleteDeviceCommand.CanExecute(device));
 
-        await viewModel.ViewDeviceCommand.ExecuteAsync(device);
         await viewModel.RefreshContextMenuStateCommand.ExecuteAsync(device);
         await viewModel.RebootDeviceCommand.ExecuteAsync(device);
         await viewModel.ToggleGmsCommand.ExecuteAsync(device);
         await viewModel.TogglePlayStoreCommand.ExecuteAsync(device);
         await viewModel.ToggleWifiCommand.ExecuteAsync(device);
 
-        await context.ViewerDialog.Received(1)
-            .ShowDeviceViewerAsync("A", "Busy", Arg.Any<CancellationToken>());
         await context.DeviceAction.Received(1)
             .RebootAsync("A", Arg.Any<CancellationToken>());
         await context.DeviceAction.Received(1)
@@ -2075,7 +2070,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         Assert.IsTrue(device.IsContextMenuStateLoading);
         Assert.IsFalse(device.CanToggleContextMenuActions);
-        Assert.IsTrue(viewModel.ViewDeviceCommand.CanExecute(device));
         Assert.IsTrue(viewModel.CopySerialCommand.CanExecute(device));
         Assert.IsTrue(viewModel.RebootDeviceCommand.CanExecute(device));
         Assert.IsFalse(viewModel.DeleteDeviceCommand.CanExecute(device));
@@ -4467,7 +4461,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IDeviceTimezoneService timezoneService = Substitute.For<IDeviceTimezoneService>();
         IChangeLocationDialogService locationDialog = Substitute.For<IChangeLocationDialogService>();
         IChangeTimezoneDialogService timezoneDialog = Substitute.For<IChangeTimezoneDialogService>();
-        IDeviceViewerDialogService viewerDialog = Substitute.For<IDeviceViewerDialogService>();
         IInstallPackageDialogService installPackageDialog = Substitute.For<IInstallPackageDialogService>();
         IPackageInstallService packageInstall = Substitute.For<IPackageInstallService>();
         carrierData.GetCarrierProfilesAsync(Arg.Any<CancellationToken>())
@@ -4571,7 +4564,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
             timezoneService,
             locationDialog,
             timezoneDialog,
-            viewerDialog,
             installPackageDialog,
             packageInstall);
         return new TestContext(
@@ -4595,7 +4587,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
             timezoneService,
             locationDialog,
             timezoneDialog,
-            viewerDialog,
             installPackageDialog,
             packageInstall);
     }
@@ -4628,7 +4619,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         IDeviceTimezoneService TimezoneService,
         IChangeLocationDialogService LocationDialog,
         IChangeTimezoneDialogService TimezoneDialog,
-        IDeviceViewerDialogService ViewerDialog,
         IInstallPackageDialogService InstallPackageDialog,
         IPackageInstallService PackageInstall);
 

@@ -208,26 +208,6 @@ public sealed class LocalizationServiceResourceTests
     }
 
     [TestMethod]
-    public void DeviceViewerDictionaries_UseSharedViewDeviceTitle()
-    {
-        string stringsDirectory = Path.Combine(
-            GetSolutionRoot(),
-            "DeepDroidChanger",
-            "Resources",
-            "Strings",
-            "Views");
-        IReadOnlyDictionary<string, string> english = LoadResources(
-            [Path.Combine(stringsDirectory, "DeviceViewer.xaml")]);
-        IReadOnlyDictionary<string, string> vietnamese = LoadResources(
-            [Path.Combine(stringsDirectory, "DeviceViewer.vi.xaml")]);
-
-        Assert.AreEqual("View Device - {0} ({1})", english["DeviceViewer_WindowTitleFormat"]);
-        Assert.AreEqual("View Device", english["DeviceViewerManagerTitle"]);
-        Assert.AreEqual("Xem thi\u1ebft b\u1ecb - {0} ({1})", vietnamese["DeviceViewer_WindowTitleFormat"]);
-        Assert.AreEqual("Xem thi\u1ebft b\u1ecb", vietnamese["DeviceViewerManagerTitle"]);
-    }
-
-    [TestMethod]
     public void ChangeSingleDeviceDictionaries_ExposeClearDeviceInfoFieldLabels()
     {
         string stringsDirectory = Path.Combine(

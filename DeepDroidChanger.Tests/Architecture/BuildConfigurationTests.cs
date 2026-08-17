@@ -31,8 +31,6 @@ public sealed class BuildConfigurationTests
         [
             "Assets/Tools/platform-tools/adb.exe",
             "Assets/Tools/platform-tools/fastboot.exe",
-            "Assets/Tools/viewscreen/scrcpy.exe",
-            "Assets/Tools/viewscreen/scrcpy-server",
         ];
         string[] missing = requiredRelativePaths
             .Where(relativePath => !File.Exists(Path.Combine(

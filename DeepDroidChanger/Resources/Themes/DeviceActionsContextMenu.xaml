@@ -23,25 +23,6 @@
     <ContextMenu x:Key="DeviceActionsContextMenu"
                  x:Shared="False"
                  Style="{DynamicResource DeviceActionsContextMenuStyle}">
-        <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
-            <MenuItem.Header>
-                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <materialDesign:PackIcon Kind="Cellphone"
-                                             Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
-                    <TextBlock Grid.Column="1"
-                               Text="{DynamicResource ChangeSingleDevice_ActionViewDevice}"
-                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
-                </Grid>
-            </MenuItem.Header>
-        </MenuItem>
-
         <MenuItem Command="{Binding PlacementTarget.Tag.ViewDeviceInfoCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   Style="{DynamicResource DeviceActionsContextMenuItemStyle}">

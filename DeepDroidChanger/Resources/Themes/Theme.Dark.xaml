@@ -27,10 +27,6 @@
     <Color x:Key="Color.DangerHover">#EF4444</Color>
     <Color x:Key="Color.DangerPressed">#DC2626</Color>
     <Color x:Key="Color.Overlay">#99000000</Color>
-    <Color x:Key="Color.DeviceViewerCanvas">#000000</Color>
-    <Color x:Key="Color.DeviceViewerBody">#64748B</Color>
-    <Color x:Key="Color.DeviceViewerScreen">#020617</Color>
-    <Color x:Key="Color.DeviceViewerGlyph">#F8FAFC</Color>
     <Color x:Key="Color.BadgeInfoBackground">#1B2A4A</Color>
     <Color x:Key="Color.BadgeInfoForeground">#3B82F6</Color>
     <Color x:Key="Color.DeviceStatusPositiveForeground">#6BE298</Color>
@@ -68,10 +64,6 @@
     <SolidColorBrush x:Key="Brush.DangerHover" Color="{StaticResource Color.DangerHover}"/>
     <SolidColorBrush x:Key="Brush.DangerPressed" Color="{StaticResource Color.DangerPressed}"/>
     <SolidColorBrush x:Key="Brush.Overlay" Color="{StaticResource Color.Overlay}"/>
-    <SolidColorBrush x:Key="Brush.DeviceViewerCanvas" Color="{StaticResource Color.DeviceViewerCanvas}"/>
-    <SolidColorBrush x:Key="Brush.DeviceViewerBody" Color="{StaticResource Color.DeviceViewerBody}"/>
-    <SolidColorBrush x:Key="Brush.DeviceViewerScreen" Color="{StaticResource Color.DeviceViewerScreen}"/>
-    <SolidColorBrush x:Key="Brush.DeviceViewerGlyph" Color="{StaticResource Color.DeviceViewerGlyph}"/>
     <SolidColorBrush x:Key="Brush.BadgeInfoBackground" Color="{StaticResource Color.BadgeInfoBackground}"/>
     <SolidColorBrush x:Key="Brush.BadgeInfoForeground" Color="{StaticResource Color.BadgeInfoForeground}"/>
     <SolidColorBrush x:Key="Brush.DeviceStatusPositiveForeground" Color="{StaticResource Color.DeviceStatusPositiveForeground}"/>

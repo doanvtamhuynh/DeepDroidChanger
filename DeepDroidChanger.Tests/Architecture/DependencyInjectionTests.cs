@@ -53,9 +53,7 @@ public sealed class DependencyInjectionTests
         AssertLifetime<ChangeMultipleDevicesViewModel>(services, ServiceLifetime.Singleton);
         AssertLifetime<MainWindow>(services, ServiceLifetime.Singleton);
         AssertLifetime<ILoginDialogService>(services, ServiceLifetime.Transient);
-        AssertLifetime<IDeviceViewerDialogService>(services, ServiceLifetime.Singleton);
         AssertLifetime<LoginViewModel>(services, ServiceLifetime.Transient);
-        AssertLifetime<DeviceViewerViewModel>(services, ServiceLifetime.Transient);
     }
 
     [TestMethod]

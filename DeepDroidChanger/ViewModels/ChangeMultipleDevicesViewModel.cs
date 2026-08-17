@@ -32,7 +32,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
     private readonly IInstallPackageDialogService _installPackageDialogService;
     private readonly IPackageInstallService _packageInstallService;
-    private readonly IDeviceViewerDialogService _deviceViewerDialogService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
     private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
@@ -162,7 +161,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceTimezoneService deviceTimezoneService,
         IChangeLocationDialogService changeLocationDialogService,
         IChangeTimezoneDialogService changeTimezoneDialogService,
-        IDeviceViewerDialogService deviceViewerDialogService,
         IInstallPackageDialogService installPackageDialogService,
         IPackageInstallService packageInstallService)
     {
@@ -182,7 +180,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _changeTimezoneDialogService = changeTimezoneDialogService;
         _installPackageDialogService = installPackageDialogService;
         _packageInstallService = packageInstallService;
-        _deviceViewerDialogService = deviceViewerDialogService;
         _localizationService = localizationService;
         _multipleDeviceConfigService = multipleDeviceConfigService;
         _randomDeviceInfoDialogService = randomDeviceInfoDialogService;
@@ -1449,32 +1446,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         finally
         {
             _deviceRefreshLock.Release();
-        }
-    }
-
-    [RelayCommand(AllowConcurrentExecutions = true)]
-    private async Task ViewDeviceAsync(DeviceRowViewModel? device)
-    {
-        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
-        if (device == null)
-            return;
-
-        try
-        {
-            SetDeviceLog(device, "Log_OpeningDialog");
-            await _deviceViewerDialogService
-                .ShowDeviceViewerAsync(device.Serial, device.Name, CancellationToken.None)
-                .ConfigureAwait(true);
-            SetDeviceLog(device, "Log_Ready");
-        }
-        catch (OperationCanceledException)
-        {
-            SetDeviceLog(device, "Log_Ready");
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "Failed to open device viewer for {Serial}.", device.Serial);
-            SetDeviceLog(device, "Log_Ready");
         }
     }
 

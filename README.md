@@ -21,7 +21,7 @@ DeepDroidChanger là ứng dụng WPF trên Windows để quản lý và thay đ
 - Thêm nhiều thiết bị từ danh sách ADB, gán loại thiết bị và lưu theo serial.
 - Chọn một thiết bị tại một thời điểm; lọc theo trạng thái kết nối hoặc Active/Inactive.
 - Sửa Name/Type trực tiếp trong bảng, lưu thiết bị đang chọn và tỉ lệ cột.
-- Reboot, xem thông tin, mở Device Viewer và xóa thiết bị có xác nhận.
+- Reboot, xem thông tin và xóa thiết bị có xác nhận.
 - Hiển thị trạng thái/tiến trình của action trên từng dòng thiết bị.
 
 ### Random Device và SIM
@@ -95,12 +95,6 @@ Cleanup không ghép hàng trăm package/path vào một command dài. Tool ch�
 - Tùy chọn auto-grant permission và cho phép downgrade.
 - Hỗ trợ split APK, OBB và dọn thư mục giải nén tạm.
 - Chặn path traversal trong XAPK và ánh xạ các lỗi ADB/install thường gặp.
-
-### Device Viewer
-
-- Mở và quản lý dialog xem thiết bị riêng theo từng serial.
-- Giữ resize theo tỉ lệ, thu gọn/mở rộng panel thao tác và kích hoạt lại dialog đang mở.
-- Giao diện viewer hiện là placeholder; các thao tác điều khiển thiết bị đang bị vô hiệu hóa.
 
 ## Chức năng chưa hoàn thiện
 

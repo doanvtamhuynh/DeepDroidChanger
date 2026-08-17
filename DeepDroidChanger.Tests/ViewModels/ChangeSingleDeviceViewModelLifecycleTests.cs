@@ -1997,7 +1997,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         var invocationCount = 0;
         IRandomDeviceService randomDevice = Substitute.For<IRandomDeviceService>();
         IDeviceActionService deviceAction = Substitute.For<IDeviceActionService>();
-        IDeviceViewerDialogService deviceViewerDialog = Substitute.For<IDeviceViewerDialogService>();
         deviceAction.GetGooglePackageStateAsync("A", Arg.Any<CancellationToken>())
             .Returns(new GooglePackageState(false, false));
         deviceAction.GetWifiEnabledAsync("A", Arg.Any<CancellationToken>())
@@ -2019,7 +2018,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             deviceList,
             carriers,
             randomDevice: randomDevice,
-            deviceViewerDialog: deviceViewerDialog,
             deviceAction: deviceAction);
         await viewModel.InitializeAsync(CancellationToken.None);
 
@@ -2058,14 +2056,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .SetPlayStoreEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
         await deviceAction.Received(1)
             .SetWifiEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
-        await viewModel.ViewDeviceCommand.ExecuteAsync(deviceA);
-        await deviceViewerDialog.Received(1).ShowDeviceViewerAsync(
-            "A",
-            "Phone A",
-            Arg.Any<CancellationToken>());
-        Assert.AreEqual("Log_Ready", deviceA.Process);
-        Assert.AreEqual(DeviceProcessState.Ready, deviceA.ProcessState);
-
         int changeDeviceCanExecuteChanged = 0;
         viewModel.ChangeDeviceCommand.CanExecuteChanged += (_, _) => changeDeviceCanExecuteChanged++;
         viewModel.SelectedDevice = deviceB;
@@ -2827,7 +2817,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         DeviceRowViewModel? targetDevice = viewModel.SelectedDevice;
         return new Dictionary<string, bool>
         {
-            [nameof(ChangeSingleDeviceViewModel.ViewDeviceCommand)] = viewModel.ViewDeviceCommand.CanExecute(targetDevice),
             [nameof(ChangeSingleDeviceViewModel.ViewDeviceInfoCommand)] = viewModel.ViewDeviceInfoCommand.CanExecute(targetDevice),
             [nameof(ChangeSingleDeviceViewModel.CopySerialCommand)] = viewModel.CopySerialCommand.CanExecute(targetDevice),
             [nameof(ChangeSingleDeviceViewModel.ToggleGmsCommand)] = viewModel.ToggleGmsCommand.CanExecute(targetDevice),
@@ -3678,7 +3667,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         IAdvancedChangeConfigDialogService? advancedChangeConfig = null,
         IDeviceChangeService? deviceChange = null,
         IDeviceActionCoordinatorService? deviceActionCoordinator = null,
-        IDeviceViewerDialogService? deviceViewerDialog = null,
         IDeviceActionService? deviceAction = null,
         IFakeProxyDialogService? fakeProxyDialog = null,
         IProxyWorkflowService? proxyWorkflowService = null,
@@ -3720,7 +3708,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             Substitute.For<IDeviceIntegrityService>(),
             installPackageDialog ?? Substitute.For<IInstallPackageDialogService>(),
             packageInstall ?? Substitute.For<IPackageInstallService>(),
-            deviceViewerDialog ?? Substitute.For<IDeviceViewerDialogService>(),
             deviceActionConfirmation ?? CreateDeviceActionConfirmationDialogService(),
             advancedChangeConfig ?? Substitute.For<IAdvancedChangeConfigDialogService>(),
             randomDeviceInfoDialog ?? Substitute.For<IRandomDeviceInfoDialogService>(),

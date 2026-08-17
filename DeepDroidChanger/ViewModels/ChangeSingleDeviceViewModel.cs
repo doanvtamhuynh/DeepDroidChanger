@@ -28,7 +28,6 @@ namespace DeepDroidChanger.ViewModels
         private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IInstallPackageDialogService _installPackageDialogService;
         private readonly IPackageInstallService _packageInstallService;
-        private readonly IDeviceViewerDialogService _deviceViewerDialogService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
         private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
         private readonly IRandomDeviceInfoDialogService _randomDeviceInfoDialogService;
@@ -107,7 +106,6 @@ namespace DeepDroidChanger.ViewModels
             IDeviceIntegrityService deviceIntegrityService,
             IInstallPackageDialogService installPackageDialogService,
             IPackageInstallService packageInstallService,
-            IDeviceViewerDialogService deviceViewerDialogService,
             IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
             IAdvancedChangeConfigDialogService advancedChangeConfigDialogService,
             IRandomDeviceInfoDialogService randomDeviceInfoDialogService,
@@ -139,7 +137,6 @@ namespace DeepDroidChanger.ViewModels
             _deviceIntegrityService = deviceIntegrityService;
             _installPackageDialogService = installPackageDialogService;
             _packageInstallService = packageInstallService;
-            _deviceViewerDialogService = deviceViewerDialogService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
             _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
             _randomDeviceInfoDialogService = randomDeviceInfoDialogService;
@@ -2304,35 +2301,6 @@ namespace DeepDroidChanger.ViewModels
                     _logger.LogError(exception, "Failed to stop fake proxy for device {Serial}.", device.Serial);
                     SetDeviceLog(device, "Log_StopFakeProxyFailed");
                 }
-            }
-        }
-
-        [RelayCommand(AllowConcurrentExecutions = true)]
-        private async Task ViewDeviceAsync(DeviceRowViewModel? device)
-        {
-            CancellationToken cancellationToken = CancellationToken.None;
-            DeviceRowViewModel? targetDevice = await GetOnlineDeviceAsync(
-                    device ?? SelectedDevice,
-                    cancellationToken)
-                .ConfigureAwait(true);
-            if (targetDevice == null)
-                return;
-
-            SetDeviceLog(targetDevice, "Log_OpeningDialog");
-
-            try
-            {
-                await _deviceViewerDialogService.ShowDeviceViewerAsync(targetDevice.Serial, targetDevice.Name, cancellationToken).ConfigureAwait(true);
-                SetDeviceLog(targetDevice, "Log_Ready");
-            }
-            catch (OperationCanceledException)
-            {
-                SetDeviceLog(targetDevice, "Log_Ready");
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to open device viewer for device {Serial}.", targetDevice.Serial);
-                SetDeviceLog(targetDevice, "Log_Ready");
             }
         }
 

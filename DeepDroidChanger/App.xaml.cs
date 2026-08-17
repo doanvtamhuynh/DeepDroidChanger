@@ -157,7 +157,6 @@ public sealed partial class App : Application
         services.AddTransient<IDeviceActionConfirmationDialogService, DeviceActionConfirmationDialogService>();
         services.AddTransient<IAdvancedChangeConfigDialogService, AdvancedChangeConfigDialogService>();
         services.AddTransient<IRandomDeviceInfoDialogService, RandomDeviceInfoDialogService>();
-        services.AddSingleton<IDeviceViewerDialogService, DeviceViewerDialogService>();
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
         services.AddTransient<IInstallPackageDialogService, InstallPackageDialogService>();
@@ -177,7 +176,6 @@ public sealed partial class App : Application
         services.AddTransient<ConfirmationDialogViewModel>();
         services.AddTransient<AdvancedChangeConfigViewModel>();
         services.AddTransient<RandomDeviceInfoViewModel>();
-        services.AddTransient<DeviceViewerViewModel>();
         services.AddTransient<FakeProxyViewModel>();
         services.AddTransient<UpdateIntegrityViewModel>();
         services.AddTransient<InstallPackageViewModel>();
@@ -190,7 +188,6 @@ public sealed partial class App : Application
         services.AddTransient<ConfirmationDialog>();
         services.AddTransient<AdvancedChangeConfigDialog>();
         services.AddTransient<RandomDeviceInfoDialog>();
-        services.AddTransient<DeviceViewerDialog>();
         services.AddTransient<FakeProxyDialog>();
         services.AddTransient<UpdateIntegrityDialog>();
         services.AddTransient<InstallPackageDialog>();
