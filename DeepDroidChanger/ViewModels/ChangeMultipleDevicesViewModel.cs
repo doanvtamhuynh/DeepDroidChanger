@@ -508,11 +508,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return !IsLoadingDevices;
     }
 
-    private bool CanExecuteContextDeviceAction(DeviceRowViewModel? device)
-    {
-        return device == null || !IsDeviceBusy(device);
-    }
-
     [RelayCommand]
     private void ToggleDeviceSelection(DeviceRowViewModel? device)
     {
@@ -545,17 +540,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private bool CanRunSelectedDeviceBatchAction()
     {
-        return _allDeviceRows.Any(device =>
-            device.IsSelected
-            && (device.ConnectionStatus == AdbDeviceStatus.Online || IsDeviceBusy(device)));
+        return _allDeviceRows.Any(device => device.IsSelected);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task RandomSelectedDevicesAsync(CancellationToken commandCancellationToken)
+    private Task RandomSelectedDevicesAsync()
     {
-        return StartTrackedBatchWorkflow(
-            workflowCancellation => RunRandomSelectedDevicesAsync(workflowCancellation),
-            commandCancellationToken);
+        return StartTrackedBatchWorkflow(RunRandomSelectedDevicesAsync);
     }
 
     private async Task RunRandomSelectedDevicesAsync(CancellationToken batchToken)
@@ -638,75 +629,68 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedDevicesAsync(CancellationToken commandCancellationToken)
+    private Task ChangeSelectedDevicesAsync()
     {
         return StartTrackedBatchWorkflow(
             workflowCancellation => RunSelectedDeviceBatchActionAsync(
                 MultipleDeviceBatchAction.ChangeAndWipe,
-                workflowCancellation),
-            commandCancellationToken);
+                workflowCancellation));
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task RandomChangeAndWipeSelectedDevicesAsync(CancellationToken commandCancellationToken)
+    private Task RandomChangeAndWipeSelectedDevicesAsync()
     {
-        return StartTrackedBatchWorkflow(
-            RunRandomChangeAndWipeSelectedDevicesAsync,
-            commandCancellationToken);
+        return StartTrackedBatchWorkflow(RunRandomChangeAndWipeSelectedDevicesAsync);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedDevicesWithoutWipeAsync(CancellationToken commandCancellationToken)
+    private Task ChangeSelectedDevicesWithoutWipeAsync()
     {
         return StartTrackedBatchWorkflow(
             workflowCancellation => RunSelectedDeviceBatchActionAsync(
                 MultipleDeviceBatchAction.ChangeWithoutWipe,
-                workflowCancellation),
-            commandCancellationToken);
+                workflowCancellation));
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task WipeSelectedDevicesWithoutChangeAsync(CancellationToken commandCancellationToken)
+    private Task WipeSelectedDevicesWithoutChangeAsync()
     {
         return StartTrackedBatchWorkflow(
             workflowCancellation => RunSelectedDeviceBatchActionAsync(
                 MultipleDeviceBatchAction.WipeWithoutChange,
-                workflowCancellation),
-            commandCancellationToken);
+                workflowCancellation));
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task RandomSelectedSimsAsync(CancellationToken commandCancellationToken)
+    private Task RandomSelectedSimsAsync()
     {
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedDeviceBatchActionAsync(null, workflowCancellation),
-            commandCancellationToken);
+            workflowCancellation => RunSelectedDeviceBatchActionAsync(null, workflowCancellation));
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedSimsAsync(CancellationToken commandCancellationToken)
+    private Task ChangeSelectedSimsAsync()
     {
         return StartTrackedBatchWorkflow(
             workflowCancellation => RunSelectedDeviceBatchActionAsync(
                 MultipleDeviceBatchAction.ChangeSim,
-                workflowCancellation),
-            commandCancellationToken);
+                workflowCancellation));
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedLocationsAsync(CancellationToken cancellationToken)
+    private Task ChangeSelectedLocationsAsync()
     {
-        return StartLocationTimezoneWorkflowAsync(isLocation: true, cancellationToken);
+        return StartLocationTimezoneWorkflowAsync(isLocation: true);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task ChangeSelectedTimezonesAsync(CancellationToken cancellationToken)
+    private Task ChangeSelectedTimezonesAsync()
     {
-        return StartLocationTimezoneWorkflowAsync(isLocation: false, cancellationToken);
+        return StartLocationTimezoneWorkflowAsync(isLocation: false);
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task InstallSelectedPackagesAsync(CancellationToken cancellationToken)
+    private Task InstallSelectedPackagesAsync()
     {
         DeviceRowViewModel[] selectedDevices = _allDeviceRows
             .Where(device => device.IsSelected)
@@ -717,17 +701,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return StartTrackedBatchWorkflow(
             workflowCancellation => RunSelectedInstallPackageWorkflowAsync(
                 selectedDevices,
-                workflowCancellation),
-            cancellationToken);
+                workflowCancellation));
     }
 
-    private Task StartLocationTimezoneWorkflowAsync(
-        bool isLocation,
-        CancellationToken commandCancellationToken)
+    private Task StartLocationTimezoneWorkflowAsync(bool isLocation)
     {
         return StartTrackedBatchWorkflow(
-            cancellationToken => RunSelectedLocationOrTimezoneAsync(isLocation, cancellationToken),
-            commandCancellationToken);
+            cancellationToken => RunSelectedLocationOrTimezoneAsync(isLocation, cancellationToken));
     }
 
     private async Task RunSelectedLocationOrTimezoneAsync(
@@ -1004,11 +984,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     private Task StartTrackedBatchWorkflow(
-        Func<CancellationToken, Task> workflow,
-        CancellationToken commandCancellationToken)
+        Func<CancellationToken, Task> workflow)
     {
         var workflowCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            commandCancellationToken,
             _actionLifetimeCancellation.Token);
         var completion = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1464,7 +1442,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RefreshContextMenuStateAsync(DeviceRowViewModel? device)
     {
-        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
+        device = await GetContextOnlineDeviceAsync(
+                device,
+                logOffline: false)
+            .ConfigureAwait(true);
         if (device == null)
             return;
 
@@ -1615,15 +1596,24 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanExecuteContextDeviceAction), AllowConcurrentExecutions = true)]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task DeleteDeviceAsync(DeviceRowViewModel? device)
     {
         if (device == null)
             return;
 
+        if (IsDeviceBusy(device))
+        {
+            ShowBusyActionLog(device);
+            return;
+        }
+
         using IDeviceActionOperation? operation = TryStartContextAction(device);
         if (operation == null)
+        {
+            ShowBusyActionLog(device);
             return;
+        }
 
         string serial = device.Serial;
         string name = device.Name;
@@ -1672,20 +1662,17 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private async Task<DeviceRowViewModel?> GetContextOnlineDeviceAsync(DeviceRowViewModel? device)
+    private async Task<DeviceRowViewModel?> GetContextOnlineDeviceAsync(
+        DeviceRowViewModel? device,
+        bool logOffline = true)
     {
         if (device == null)
             return null;
 
-        if (IsDeviceBusy(device))
-        {
-            ShowBusyActionLog(device);
-            return null;
-        }
-
         if (device.ConnectionStatus != AdbDeviceStatus.Online)
         {
-            SetDeviceLog(device, "Log_DeviceMustBeOnline");
+            if (logOffline)
+                SetDeviceLog(device, "Log_DeviceMustBeOnline");
             return null;
         }
 
@@ -1705,7 +1692,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         if (isOnline)
             return device;
 
-        SetDeviceLog(device, "Log_DeviceMustBeOnline");
+        if (logOffline)
+            SetDeviceLog(device, "Log_DeviceMustBeOnline");
+
         return null;
     }
 

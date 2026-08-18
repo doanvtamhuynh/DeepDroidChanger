@@ -457,12 +457,6 @@ namespace DeepDroidChanger.ViewModels
             return SelectedDevice != null;
         }
 
-        private bool CanExecuteDeviceAction(DeviceRowViewModel? device)
-        {
-            DeviceRowViewModel? targetDevice = device ?? SelectedDevice;
-            return targetDevice == null || !IsDeviceBusy(targetDevice);
-        }
-
         private bool IsDeviceBusy(DeviceRowViewModel device)
         {
             return _deviceActionCoordinatorService.IsBusy(device.Serial);
@@ -748,7 +742,6 @@ namespace DeepDroidChanger.ViewModels
                     NotifyDeviceInteractionChanged();
                 else
                 {
-                    DeleteDeviceCommand.NotifyCanExecuteChanged();
                     StopDeviceActionCommand.NotifyCanExecuteChanged();
                 }
             }
@@ -803,7 +796,6 @@ namespace DeepDroidChanger.ViewModels
             OnPropertyChanged(nameof(CanEditSelectedDeviceConfiguration));
             OnPropertyChanged(nameof(CanStopSelectedDeviceAction));
             OnPropertyChanged(nameof(SelectedDeviceActionStopText));
-            DeleteDeviceCommand.NotifyCanExecuteChanged();
             RandomDeviceCommand.NotifyCanExecuteChanged();
             ChangeDeviceCommand.NotifyCanExecuteChanged();
             ChangeWithoutWipeCommand.NotifyCanExecuteChanged();
@@ -913,13 +905,19 @@ namespace DeepDroidChanger.ViewModels
             SelectSingleDevice(ReferenceEquals(SelectedDevice, device) ? null : device);
         }
 
-        [RelayCommand(CanExecute = nameof(CanExecuteDeviceAction), AllowConcurrentExecutions = true)]
+        [RelayCommand(AllowConcurrentExecutions = true)]
         private async Task DeleteDeviceAsync(DeviceRowViewModel? device)
         {
             if (device == null)
             {
                 await ShowToolbarLogAsync("Log_SelectDeviceFirst", CancellationToken.None)
                     .ConfigureAwait(true);
+                return;
+            }
+
+            if (IsDeviceBusy(device))
+            {
+                ShowBusyActionLog(device);
                 return;
             }
 
@@ -932,7 +930,10 @@ namespace DeepDroidChanger.ViewModels
                 DeviceActionKind.DeleteDevice,
                 canCancel: false);
             if (operation == null)
+            {
+                ShowBusyActionLog(device);
                 return;
+            }
 
             using (operation)
             {
@@ -991,7 +992,7 @@ namespace DeepDroidChanger.ViewModels
         private async Task RebootDeviceAsync(DeviceRowViewModel? device)
         {
             CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            device = await GetContextOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1048,7 +1049,7 @@ namespace DeepDroidChanger.ViewModels
         private async Task RefreshGooglePackageStateAsync(DeviceRowViewModel? device)
         {
             CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            device = await GetContextOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);            
             if (device == null)
                 return;
 
@@ -1073,7 +1074,11 @@ namespace DeepDroidChanger.ViewModels
         private async Task RefreshContextMenuStateAsync(DeviceRowViewModel? device)
         {
             CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            device = await GetContextOnlineDeviceAsync(
+                    device,
+                    cancellationToken,
+                    logOffline: false)
+                .ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1103,12 +1108,6 @@ namespace DeepDroidChanger.ViewModels
 
                 if (wifiStateTask.IsCompletedSuccessfully)
                     device.IsWifiEnabled = wifiStateTask.Result;
-
-                if (!googlePackageStateTask.IsCompletedSuccessfully
-                    || !wifiStateTask.IsCompletedSuccessfully)
-                {
-                    SetDeviceLog(device, "Log_ContextMenuStateFailed");
-                }
             }
             finally
             {
@@ -1133,7 +1132,7 @@ namespace DeepDroidChanger.ViewModels
             bool isGms,
             CancellationToken cancellationToken)
         {
-            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            device = await GetContextOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1198,7 +1197,8 @@ namespace DeepDroidChanger.ViewModels
         private async Task ToggleWifiAsync(DeviceRowViewModel? device)
         {
             CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            device = await GetContextOnlineDeviceAsync(device, cancellationToken)
+                .ConfigureAwait(true);
             if (device == null)
                 return;
 
@@ -1231,7 +1231,7 @@ namespace DeepDroidChanger.ViewModels
         private async Task ViewDeviceInfoAsync(DeviceRowViewModel? device)
         {
             CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
+            device = await GetContextOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return;
         }
@@ -1819,6 +1819,52 @@ namespace DeepDroidChanger.ViewModels
             }
 
             SetDeviceLog(device, "Log_DeviceMustBeOnline");
+            return null;
+        }
+
+        private async Task<DeviceRowViewModel?> GetContextOnlineDeviceAsync(
+            DeviceRowViewModel? device,
+            CancellationToken cancellationToken,
+            bool logOffline = true)
+        {
+            if (device == null)
+                return null;
+
+            SelectSingleDevice(device);
+
+            if (device.ConnectionStatus != AdbDeviceStatus.Online)
+            {
+                if (logOffline)
+                    SetDeviceLog(device, "Log_DeviceMustBeOnline");
+                return null;
+            }
+
+            bool isOnline;
+            try
+            {
+                isOnline = await _deviceListService
+                    .IsDeviceOnlineAsync(device.Serial, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Live context-menu ADB preflight failed for device {Serial}.",
+                    device.Serial);
+                isOnline = false;
+            }
+
+            if (isOnline)
+                return device;
+
+            if (logOffline)
+                SetDeviceLog(device, "Log_DeviceMustBeOnline");
+
             return null;
         }
 
