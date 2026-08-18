@@ -24,10 +24,6 @@
     <sys:String x:Key="AdvancedChangeConfig_UserPackages">Package người dùng</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_AvailablePackages">Package có sẵn</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_SelectedWipePackages">Package sẽ wipe</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_AddSelectedPackage">Thêm package đã chọn</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_RemoveSelectedPackage">Bỏ package đã chọn</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_AddAllPackages">Thêm tất cả package</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_RemoveAllPackages">Bỏ tất cả package</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_LoadPackagesPrompt">Chọn nguồn package rồi nhấn Load package.</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_LoadingPackages">Đang lấy package từ thiết bị đã kết nối…</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_LoadedPackages">Đã load {0} package.</sys:String>

@@ -4409,8 +4409,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Assert.IsTrue(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
         Assert.IsTrue(viewModel.HasSelectedInfoDeviceBatchStopButton);
         Assert.IsTrue(viewModel.ShowSelectedDeviceBatchStop);
-        Assert.IsFalse(viewModel.HasExternalSelectedDeviceAction);
-
         viewModel.SelectedInfoDevice = deviceC;
         Assert.IsTrue(viewModel.IsSelectedInfoDeviceActiveBatchTarget);
         Assert.IsTrue(viewModel.ShowSelectedDeviceBatchStop);
@@ -4420,9 +4418,7 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Assert.IsFalse(viewModel.HasSelectedInfoDeviceBatchStopButton);
         Assert.IsFalse(viewModel.ShowSelectedDeviceBatchStop);
         Assert.IsFalse(viewModel.HasActiveBatchActionButton);
-        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
         Assert.AreEqual(DeviceActionKind.ChangeDevice, viewModel.DisplayedSelectedDeviceActionKind);
-        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Single Device");
         Assert.AreEqual("Log_DeviceActionAlreadyRunningFormat", deviceA.Process);
 
         viewModel.SelectedInfoDevice = deviceB;
@@ -4447,7 +4443,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Assert.IsFalse(coordinator.IsBusy("C"));
         Assert.IsTrue(coordinator.IsBusy("A"));
         viewModel.SelectedInfoDevice = deviceA;
-        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
         Assert.AreEqual(DeviceActionRuntimeState.Running, coordinator.GetOperation("A")!.State);
         Assert.AreEqual(DeviceActionCancellationReason.None, coordinator.GetOperation("A")!.CancellationReason);
         await viewModel.DeactivateAsync();
@@ -4615,8 +4610,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
 
         Assert.IsTrue(viewModel.Devices.Single().IsActionBusy);
         Assert.AreEqual(DeviceActionKind.ChangeDevice, viewModel.DisplayedSelectedDeviceActionKind);
-        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
-        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Single Device");
         Assert.AreEqual("Changing from Single", viewModel.Devices.Single().Process);
         Assert.IsFalse(viewModel.HasActiveBatchActionButton);
         Assert.IsTrue(viewModel.RandomSelectedDevicesCommand.CanExecute(null));
@@ -4629,7 +4622,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
         Assert.AreEqual("Changed successfully", viewModel.Devices.Single().Process);
         Assert.AreEqual(DeviceProcessState.Succeeded, viewModel.Devices.Single().ProcessState);
         Assert.IsFalse(viewModel.Devices.Single().IsActionBusy);
-        Assert.IsFalse(viewModel.HasExternalSelectedDeviceAction);
         await viewModel.DeactivateAsync();
     }
 
@@ -4769,8 +4761,6 @@ public sealed class ChangeMultipleDevicesViewModelTests
                 "Log_InstallPackagePartialFormat" => "partial {0}/{1}",
                 "Log_InstallPackageFailedFormat" => "failed {0}/{1}",
                 "Log_InstallPackageAdbFailureCodeFormat" => "ADB failed: {0}",
-                "ChangeMultipleDevices_ExternalActionRunningFormat" => "{0} • Running in Single Device",
-                "ChangeMultipleDevices_ExternalActionStoppingFormat" => "{0} • Stopping in Single Device",
                 "DeviceAction_Name_RandomDevice" => "Random Device",
                 "DeviceAction_Name_ChangeDevice" => "Change & Wipe Device",
                 _ => callInfo.Arg<string>()

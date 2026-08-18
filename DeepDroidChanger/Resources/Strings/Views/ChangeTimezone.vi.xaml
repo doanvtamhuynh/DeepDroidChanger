@@ -6,9 +6,6 @@
     <sys:String x:Key="ChangeTimezone_ModeGroupHeader">Chế độ</sys:String>
     <sys:String x:Key="ChangeTimezone_ModeData">Theo dữ liệu</sys:String>
     <sys:String x:Key="ChangeTimezone_ModeDeviceIp">Theo IP thiết bị</sys:String>
-    <sys:String x:Key="ChangeTimezone_CountryLabel">Quốc gia</sys:String>
-    <sys:String x:Key="ChangeTimezone_CountrySearchHint">Tìm quốc gia...</sys:String>
-    <sys:String x:Key="ChangeTimezone_TimezoneLabel">Timezone</sys:String>
     <sys:String x:Key="ChangeTimezone_SearchHint">Tìm timezone...</sys:String>
     <sys:String x:Key="ChangeTimezone_SaveButton">Áp dụng</sys:String>
     <sys:String x:Key="ChangeTimezone_BatchDeviceInfo">Áp dụng cho {0} thiết bị</sys:String>

@@ -3,11 +3,9 @@
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="ChangeLocation_WindowTitle">Đổi Location</system:String>
     <system:String x:Key="ChangeLocation_ModeGroupHeader">Chế độ</system:String>
-    <system:String x:Key="ChangeLocation_ModeConfig">Thủ công</system:String>
+    <system:String x:Key="ChangeTimezone_ModeData">Theo dữ liệu</system:String>
     <system:String x:Key="ChangeLocation_ModeDeviceIp">Theo IP thiết bị</system:String>
-    <system:String x:Key="ChangeLocation_CountryLabel">Quốc gia</system:String>
     <system:String x:Key="ChangeLocation_CountrySearchHint">Tìm quốc gia...</system:String>
-    <system:String x:Key="ChangeLocation_LocationLabel">Location / Thành phố</system:String>
     <system:String x:Key="ChangeLocation_LatitudeLabel">Vĩ độ (Latitude)</system:String>
     <system:String x:Key="ChangeLocation_LatitudeHint">Từ -90 đến 90, ví dụ: 21.0285</system:String>
     <system:String x:Key="ChangeLocation_LongitudeLabel">Kinh độ (Longitude)</system:String>

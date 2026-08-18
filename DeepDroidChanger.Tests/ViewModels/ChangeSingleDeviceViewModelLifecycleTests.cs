@@ -3396,8 +3396,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsFalse(viewModel.CanEditSelectedDeviceConfiguration);
         Assert.AreEqual(DeviceActionKind.BatchChangeDevice, viewModel.ActiveSelectedDeviceActionKind);
         Assert.AreEqual(DeviceActionKind.ChangeDevice, viewModel.DisplayedSelectedDeviceActionKind);
-        Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
-        StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Multiple Devices");
         Assert.AreEqual("Changing from Multiple", viewModel.Devices.Single().Process);
         Assert.IsTrue(viewModel.CanStopSelectedDeviceAction);
         Assert.IsTrue(viewModel.StopSelectedDeviceActionCommand.CanExecute(null));
@@ -3412,7 +3410,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.AreEqual("Changed successfully", viewModel.Devices.Single().Process);
         Assert.AreEqual(DeviceProcessState.Succeeded, viewModel.Devices.Single().ProcessState);
         Assert.IsFalse(viewModel.IsSelectedDeviceActionBusy);
-        Assert.IsFalse(viewModel.HasExternalSelectedDeviceAction);
         await viewModel.DeactivateAsync();
     }
 
@@ -3739,8 +3736,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             .Returns(callInfo => callInfo.Arg<string>() switch
             {
                 "ChangeSingleDevice_NewDeviceCount" => "New: {0}",
-                "ChangeSingleDevice_ExternalActionRunningFormat" => "{0} • Running in Multiple Devices",
-                "ChangeSingleDevice_ExternalActionStoppingFormat" => "{0} • Stopping in Multiple Devices",
                 "DeviceAction_Name_ChangeDevice" => "Change & Wipe Device",
                 _ => callInfo.Arg<string>()
             });

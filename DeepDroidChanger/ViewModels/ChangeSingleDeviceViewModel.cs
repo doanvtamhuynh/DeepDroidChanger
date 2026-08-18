@@ -192,10 +192,6 @@ namespace DeepDroidChanger.ViewModels
             GetSelectedDeviceOperation()?.Kind;
         public DeviceActionKind? DisplayedSelectedDeviceActionKind =>
             GetSelectedDeviceOperation()?.Kind.ToLogicalActionKind();
-        public bool HasExternalSelectedDeviceAction =>
-            GetSelectedDeviceOperation() is { } operation && operation.Kind.IsBatchAction();
-        public string ExternalSelectedDeviceActionText =>
-            GetExternalSelectedDeviceActionText();
         public bool HasActiveSelectedDeviceActionButton =>
             GetSelectedDeviceActionButtonPosition().HasValue;
         public int ActiveSelectedDeviceActionButtonRow =>
@@ -681,20 +677,6 @@ namespace DeepDroidChanger.ViewModels
                 : _deviceActionCoordinatorService.GetOperation(SelectedDevice.Serial);
         }
 
-        private string GetExternalSelectedDeviceActionText()
-        {
-            DeviceActionOperationSnapshot? operation = GetSelectedDeviceOperation();
-            if (operation == null || !operation.Kind.IsBatchAction())
-                return string.Empty;
-
-            string format = GetLogText(operation.State == DeviceActionRuntimeState.Stopping
-                ? "ChangeSingleDevice_ExternalActionStoppingFormat"
-                : "ChangeSingleDevice_ExternalActionRunningFormat");
-            return string.Format(
-                format,
-                GetLogText(operation.Kind.GetDisplayResourceKey()));
-        }
-
         private (int Row, int Column)? GetSelectedDeviceActionButtonPosition()
         {
             return ActiveSelectedDeviceActionKind switch
@@ -813,8 +795,6 @@ namespace DeepDroidChanger.ViewModels
             OnPropertyChanged(nameof(IsSelectedDeviceActionBusy));
             OnPropertyChanged(nameof(ActiveSelectedDeviceActionKind));
             OnPropertyChanged(nameof(DisplayedSelectedDeviceActionKind));
-            OnPropertyChanged(nameof(HasExternalSelectedDeviceAction));
-            OnPropertyChanged(nameof(ExternalSelectedDeviceActionText));
             OnPropertyChanged(nameof(HasActiveSelectedDeviceActionButton));
             OnPropertyChanged(nameof(ActiveSelectedDeviceActionButtonRow));
             OnPropertyChanged(nameof(ActiveSelectedDeviceActionButtonColumn));

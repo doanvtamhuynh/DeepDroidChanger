@@ -226,8 +226,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             OnPropertyChanged(nameof(CanInteractWithSelectedInfoDevice));
             OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
             OnPropertyChanged(nameof(DisplayedSelectedDeviceActionKind));
-            OnPropertyChanged(nameof(HasExternalSelectedDeviceAction));
-            OnPropertyChanged(nameof(ExternalSelectedDeviceActionText));
             NotifyBatchPresentationChanged();
             NotifyBatchActionCanExecuteChanged();
             ViewRandomDeviceInfoCommand.NotifyCanExecuteChanged();
@@ -242,12 +240,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     public DeviceActionKind? DisplayedSelectedDeviceActionKind =>
         GetSelectedInfoDeviceOperation()?.Kind.ToLogicalActionKind();
-
-    public bool HasExternalSelectedDeviceAction =>
-        GetSelectedInfoDeviceOperation() is { } operation && !operation.Kind.IsBatchAction();
-
-    public string ExternalSelectedDeviceActionText =>
-        GetExternalSelectedDeviceActionText();
 
     public DeviceActionKind? SelectedBatchActionKind =>
         GetSelectedInfoDeviceBatchOperation()?.Kind;
@@ -3068,20 +3060,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private string GetExternalSelectedDeviceActionText()
-    {
-        DeviceActionOperationSnapshot? operation = GetSelectedInfoDeviceOperation();
-        if (operation == null || operation.Kind.IsBatchAction())
-            return string.Empty;
-
-        string format = GetLogText(operation.State == DeviceActionRuntimeState.Stopping
-            ? "ChangeMultipleDevices_ExternalActionStoppingFormat"
-            : "ChangeMultipleDevices_ExternalActionRunningFormat");
-        return string.Format(
-            format,
-            GetLogText(operation.Kind.GetDisplayResourceKey()));
-    }
-
     private string GetLogText(string resourceKey)
     {
         return _localizationService.GetString(resourceKey);
@@ -3442,8 +3420,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         OnPropertyChanged(nameof(CanInteractWithSelectedInfoDevice));
         OnPropertyChanged(nameof(CanOperateSelectedInfoDevice));
         OnPropertyChanged(nameof(DisplayedSelectedDeviceActionKind));
-        OnPropertyChanged(nameof(HasExternalSelectedDeviceAction));
-        OnPropertyChanged(nameof(ExternalSelectedDeviceActionText));
         NotifyBatchPresentationChanged();
         AddNewDevicesCommand.NotifyCanExecuteChanged();
         OpenAdvancedChangeConfigCommand.NotifyCanExecuteChanged();

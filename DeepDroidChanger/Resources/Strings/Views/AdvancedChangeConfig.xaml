@@ -24,10 +24,6 @@
     <sys:String x:Key="AdvancedChangeConfig_UserPackages">User packages</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_AvailablePackages">Available packages</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_SelectedWipePackages">Packages to wipe</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_AddSelectedPackage">Add selected package</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_RemoveSelectedPackage">Remove selected package</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_AddAllPackages">Add all loaded packages</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_RemoveAllPackages">Remove all selected packages</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_LoadPackagesPrompt">Choose a package source, then press Load packages.</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_LoadingPackages">Loading packages from the connected device…</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_LoadedPackages">Loaded {0} package(s).</sys:String>
