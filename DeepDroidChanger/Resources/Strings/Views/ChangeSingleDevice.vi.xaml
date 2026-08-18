@@ -9,7 +9,6 @@
     <sys:String x:Key="ChangeSingleDevice_AddNewDevices">Thêm thiết bị</sys:String>
     <sys:String x:Key="ChangeSingleDevice_NewDeviceCount">Thiết bị mới: {0}</sys:String>
     <sys:String x:Key="ChangeSingleDevice_NotAvailable">Không có</sys:String>
-    <sys:String x:Key="ChangeSingleDevice_ColumnIndex">STT</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnSelected">Chọn</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnSerial">Serial</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnName">Tên</sys:String>
@@ -17,6 +16,7 @@
     <sys:String x:Key="ChangeSingleDevice_ColumnActive">Kích hoạt</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnStatus">Trạng thái</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnProcess">Tiến trình</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ColumnStop">Dừng</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceConfigHeader">Device Configuration</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionSingleHeader">Single Device Actions</sys:String>

@@ -8,5 +8,12 @@ namespace DeepDroidChanger.Services
             string deviceSerial,
             string deviceName,
             CancellationToken cancellationToken);
+
+        Task<FakeProxyDialogResult?> ShowFakeProxyDialogAsync(
+            string deviceSerial,
+            string deviceName,
+            StoredDeviceConfig? configurationSnapshot,
+            CancellationToken cancellationToken)
+            => ShowFakeProxyDialogAsync(deviceSerial, deviceName, cancellationToken);
     }
 }

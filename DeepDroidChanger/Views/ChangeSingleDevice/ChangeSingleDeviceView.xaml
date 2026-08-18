@@ -63,6 +63,14 @@
             <Setter Property="Padding" Value="0"/>
         </Style>
 
+        <Style x:Key="ChangeSingleDeviceStopCellStyle"
+               TargetType="DataGridCell"
+               BasedOn="{StaticResource ChangeSingleDeviceCellStretchStyle}">
+            <!-- The Stop button owns the two-pixel inset explicitly. Keeping the cell
+                 padding at zero avoids doubling the inset when a theme template binds it. -->
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
         <Style x:Key="ChangeSingleDeviceSelectionButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource {x:Type Button}}">
@@ -99,13 +107,29 @@
                TargetType="Border"
                BasedOn="{StaticResource DeviceSectionBorderStyle}">
             <Setter Property="Padding"
-                    Value="10,8"/>
+                    Value="10,12,10,8"/>
         </Style>
 
         <Style x:Key="DeviceSectionHeaderGridStyle"
                TargetType="Grid">
-            <Setter Property="Margin"
-                    Value="0,0,0,10"/>
+            <!-- Keep every panel header at the tallest standard control height so
+                 each separator lands on the same horizontal line. -->
+            <Setter Property="Height"
+                    Value="{StaticResource Metric.ControlHeight}"/>
+            <!-- Leave a five-pixel breathing space between the title and line. -->
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <Style x:Key="DeviceSectionHeaderSeparatorStyle"
+               TargetType="Border">
+            <Setter Property="Height"
+                    Value="{StaticResource Metric.BorderThickness}"/>
+            <Setter Property="Background"
+                    Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="HorizontalAlignment"
+                    Value="Stretch"/>
+            <Setter Property="VerticalAlignment"
+                    Value="Bottom"/>
         </Style>
 
         <Style x:Key="DeviceSectionIconStyle"
@@ -248,6 +272,8 @@
             <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
             <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="materialDesign:RippleAssist.Feedback"
                     Value="{DynamicResource Brush.AccentForeground}"/>
             <Style.Triggers>
@@ -264,23 +290,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
-        <DataTemplate x:Key="DeviceStopActionContentTemplate">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <materialDesign:PackIcon Kind="Stop"
-                                         Width="16"
-                                         Height="16"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                <TextBlock Grid.Column="1"
-                           Text="{Binding SelectedDeviceActionStopText}"
-                           Style="{DynamicResource DeviceActionButtonTextStyle}"/>
-            </Grid>
-        </DataTemplate>
 
         <Style x:Key="DeviceActionButtonTextStyle"
                TargetType="TextBlock">
@@ -446,17 +455,6 @@
                   behaviors:DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommand="{Binding SaveSingleDeviceColumnRatiosCommand}"
                   Style="{StaticResource ChangeSingleDeviceGridStyle}">
             <DataGrid.Columns>
-                <DataGridTextColumn Binding="{Binding Index}"
-                                    behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Index"
-                                    Width="0.55*"
-                                    MinWidth="72"
-                                    IsReadOnly="True"
-                                    ElementStyle="{StaticResource DataGridCenterCellTextStyle}">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnIndex}"
-                                   Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
                 <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Selected"
                                         Width="0.55*"
                                         MinWidth="72"
@@ -580,6 +578,51 @@
                                    Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
+                <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Stop"
+                                        Width="84"
+                                        MinWidth="84"
+                                        CellStyle="{StaticResource ChangeSingleDeviceStopCellStyle}"
+                                        IsReadOnly="True">
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock Text="{DynamicResource ChangeSingleDevice_ColumnStop}"
+                                   Style="{StaticResource DataGridColumnHeaderTextStyle}"/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.StopDeviceActionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding}"
+                                    Visibility="{Binding HasActionStopButton, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                    IsEnabled="{Binding CanStopAction}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_StopActionTooltip}"
+                                    Padding="2"
+                                    Margin="2"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Style="{StaticResource DeviceStopActionButtonStyle}">
+                                <Grid HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="Stop"
+                                                             Width="14"
+                                                             Height="14"
+                                                             Foreground="{DynamicResource Brush.AccentForeground}"
+                                                             VerticalAlignment="Center"
+                                                             Margin="0,0,4,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{DynamicResource ChangeSingleDevice_StopAction}"
+                                               TextAlignment="Center"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
@@ -603,10 +646,12 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
                             <Grid x:Name="DeviceInfoHeaderGrid"
+                                  Grid.Row="0"
                                   Style="{StaticResource DeviceSectionHeaderGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -637,7 +682,11 @@
                                 </Button>
                             </Grid>
 
-                            <Grid Grid.Row="1"
+                            <Border Grid.Row="1"
+                                    Style="{StaticResource DeviceSectionHeaderSeparatorStyle}"/>
+
+                            <Grid Grid.Row="2"
+                                  Margin="0,5,0,0"
                                   IsEnabled="{Binding CanEditSelectedDeviceConfiguration}"
                                   Style="{StaticResource DeviceInfoFormGridStyle}">
                                 <Grid.ColumnDefinitions>
@@ -784,10 +833,12 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
                             <Grid x:Name="DeviceConfigHeaderGrid"
+                                  Grid.Row="0"
                                   Style="{StaticResource DeviceSectionHeaderGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -818,8 +869,12 @@
                                 </Button>
                             </Grid>
 
+                            <Border Grid.Row="1"
+                                    Style="{StaticResource DeviceSectionHeaderSeparatorStyle}"/>
+
                             <Grid x:Name="DeviceConfigFormGrid"
-                                  Grid.Row="1"
+                                  Grid.Row="2"
+                                  Margin="0,5,0,0"
                                   IsEnabled="{Binding CanEditSelectedDeviceConfiguration}"
                                   Style="{StaticResource DeviceInfoFormGridStyle}">
                                 <Grid.ColumnDefinitions>
@@ -935,10 +990,12 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <Grid Style="{StaticResource DeviceSectionHeaderGridStyle}">
+                            <Grid Grid.Row="0"
+                                  Style="{StaticResource DeviceSectionHeaderGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -949,17 +1006,14 @@
                                 <TextBlock Grid.Column="1"
                                            Text="{DynamicResource ChangeSingleDevice_ActionSingleHeader}"
                                            Style="{StaticResource DeviceSectionTitleTextStyle}"/>
-                                <Border Grid.Column="2"
-                                        Visibility="{Binding HasExternalSelectedDeviceAction, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                        ToolTip="{DynamicResource ChangeSingleDevice_ExternalActionTooltip}"
-                                        Style="{StaticResource ExternalDeviceActionBadgeStyle}">
-                                    <TextBlock Text="{Binding ExternalSelectedDeviceActionText}"
-                                               Style="{StaticResource ExternalDeviceActionBadgeTextStyle}"/>
-                                </Border>
                             </Grid>
 
+                            <Border Grid.Row="1"
+                                    Style="{StaticResource DeviceSectionHeaderSeparatorStyle}"/>
+
                             <Grid x:Name="DeviceActionGrid"
-                                  Grid.Row="1">
+                                  Grid.Row="2"
+                                  Margin="0,5,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -1242,16 +1296,6 @@
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
-                            <Button Grid.Row="{Binding ActiveSelectedDeviceActionButtonRow}"
-                                    Grid.Column="{Binding ActiveSelectedDeviceActionButtonColumn}"
-                                    Panel.ZIndex="1"
-                                    Command="{Binding StopSelectedDeviceActionCommand}"
-                                    Content="{Binding}"
-                                    ContentTemplate="{StaticResource DeviceStopActionContentTemplate}"
-                                    IsEnabled="{Binding CanStopSelectedDeviceAction}"
-                                    Visibility="{Binding HasActiveSelectedDeviceActionButton, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                    ToolTip="{DynamicResource ChangeSingleDevice_StopActionTooltip}"
-                                    Style="{StaticResource DeviceStopActionButtonStyle}"/>
                             </Grid>
                         </Grid>
                     </Border>

@@ -9,7 +9,6 @@
     <sys:String x:Key="ChangeSingleDevice_AddNewDevices">Add Devices</sys:String>
     <sys:String x:Key="ChangeSingleDevice_NewDeviceCount">New devices: {0}</sys:String>
     <sys:String x:Key="ChangeSingleDevice_NotAvailable">N/A</sys:String>
-    <sys:String x:Key="ChangeSingleDevice_ColumnIndex">Index</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnSelected">Select</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnSerial">Serial</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnName">Name</sys:String>
@@ -17,6 +16,7 @@
     <sys:String x:Key="ChangeSingleDevice_ColumnActive">Active</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnStatus">Status</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ColumnProcess">Process</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ColumnStop">Stop</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceInfoHeader">Device Info</sys:String>
     <sys:String x:Key="ChangeSingleDevice_DeviceConfigHeader">Device Configuration</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionSingleHeader">Single Device Actions</sys:String>

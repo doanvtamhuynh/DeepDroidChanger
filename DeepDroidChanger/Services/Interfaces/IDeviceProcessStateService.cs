@@ -22,4 +22,14 @@ public interface IDeviceProcessStateService
     DeviceProcessSnapshot? Get(string serial);
 
     void SetProcess(string serial, string message, string resourceKey);
+
+    /// <summary>
+    /// Shows a short-lived presentation message without replacing the
+    /// authoritative process state.
+    /// </summary>
+    void ShowTemporaryProcess(
+        string serial,
+        string message,
+        string resourceKey,
+        TimeSpan duration);
 }

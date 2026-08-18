@@ -23,6 +23,20 @@ namespace DeepDroidChanger.Services
             string deviceName,
             CancellationToken cancellationToken)
         {
+            return await ShowFakeProxyDialogAsync(
+                    deviceSerial,
+                    deviceName,
+                    configurationSnapshot: null,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        public async Task<FakeProxyDialogResult?> ShowFakeProxyDialogAsync(
+            string deviceSerial,
+            string deviceName,
+            StoredDeviceConfig? configurationSnapshot,
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
 
             _logger.LogDebug("Opening Fake Proxy dialog for device {Serial}.", deviceSerial);
@@ -31,7 +45,7 @@ namespace DeepDroidChanger.Services
             var viewModel = scope.ServiceProvider.GetRequiredService<FakeProxyViewModel>();
             viewModel.DeviceSerial = deviceSerial;
             viewModel.DeviceName = deviceName;
-            await viewModel.InitializeAsync(cancellationToken).ConfigureAwait(true);
+            await viewModel.InitializeAsync(configurationSnapshot, cancellationToken).ConfigureAwait(true);
 
             try
             {
@@ -43,6 +57,9 @@ namespace DeepDroidChanger.Services
                 {
                     window.DialogResult = result;
                 };
+
+                using CancellationTokenRegistration cancellationRegistration =
+                    DialogCancellation.RegisterClose(window, cancellationToken);
 
                 var dialogResult = window.ShowDialog() ?? false;
                 cancellationToken.ThrowIfCancellationRequested();

@@ -23,11 +23,26 @@ namespace DeepDroidChanger.Services
             string deviceName,
             CancellationToken cancellationToken)
         {
-            return await ShowAsync(
+            return await ShowChangeTimezoneAsync(
                     deviceSerial,
                     deviceName,
+                    configurationSnapshot: null,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        public async Task<ChangeTimezoneDialogResult?> ShowChangeTimezoneAsync(
+            string deviceSerial,
+            string deviceName,
+            StoredDeviceConfig? configurationSnapshot,
+            CancellationToken cancellationToken)
+        {
+            return await ShowAsync(
+                    deviceSerial: deviceSerial,
+                    deviceName: deviceName,
                     isBatchMode: false,
                     targetCount: 0,
+                    configurationSnapshot: configurationSnapshot,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(true);
         }
@@ -37,10 +52,11 @@ namespace DeepDroidChanger.Services
             CancellationToken cancellationToken)
         {
             return await ShowAsync(
-                    string.Empty,
-                    string.Empty,
+                    deviceSerial: string.Empty,
+                    deviceName: string.Empty,
                     isBatchMode: true,
-                    targetCount,
+                    targetCount: targetCount,
+                    configurationSnapshot: null,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(true);
         }
@@ -50,6 +66,7 @@ namespace DeepDroidChanger.Services
             string deviceName,
             bool isBatchMode,
             int targetCount,
+            StoredDeviceConfig? configurationSnapshot,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -66,7 +83,7 @@ namespace DeepDroidChanger.Services
             viewModel.BatchTargetCount = targetCount;
             viewModel.DeviceSerial = deviceSerial;
             viewModel.DeviceName = deviceName;
-            await viewModel.InitializeAsync(cancellationToken).ConfigureAwait(true);
+            await viewModel.InitializeAsync(configurationSnapshot, cancellationToken).ConfigureAwait(true);
 
             try
             {

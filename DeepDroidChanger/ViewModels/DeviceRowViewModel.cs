@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Services;
 
 namespace DeepDroidChanger.ViewModels;
 
@@ -14,6 +15,9 @@ public sealed class DeviceRowViewModel : ObservableObject
     private DeviceProcessState _processState;
     private AdbDeviceStatus _connectionStatus;
     private bool _isActionBusy;
+    private bool _hasActionStopButton;
+    private bool _canStopAction;
+    private bool _isActionStopping;
     private bool _isGmsDisabled;
     private bool _isPlayStoreDisabled;
     private bool _isWifiEnabled;
@@ -111,6 +115,36 @@ public sealed class DeviceRowViewModel : ObservableObject
     }
 
     public bool CanEdit => !IsActionBusy;
+
+    public bool HasActionStopButton
+    {
+        get => _hasActionStopButton;
+        private set => SetProperty(ref _hasActionStopButton, value);
+    }
+
+    public bool CanStopAction
+    {
+        get => _canStopAction;
+        private set => SetProperty(ref _canStopAction, value);
+    }
+
+    public bool IsActionStopping
+    {
+        get => _isActionStopping;
+        private set => SetProperty(ref _isActionStopping, value);
+    }
+
+    internal void RestoreAction(DeviceActionOperationSnapshot? operation)
+    {
+        IsActionBusy = operation != null;
+        HasActionStopButton = operation?.CanCancel == true;
+        CanStopAction = operation is
+        {
+            State: DeviceActionRuntimeState.Running,
+            CanCancel: true
+        };
+        IsActionStopping = operation?.State == DeviceActionRuntimeState.Stopping;
+    }
 
     internal void UpdateSnapshot(
         int index,

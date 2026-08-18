@@ -28,6 +28,7 @@ namespace DeepDroidChanger.ViewModels
         private bool _selectionChangedSinceLastCoordinatesCommand;
         private string _lastCountryCode = string.Empty;
         private string _lastCityName = string.Empty;
+        private StoredDeviceConfig? _configurationSnapshot;
 
         [ObservableProperty]
         private string _deviceSerial = string.Empty;
@@ -102,6 +103,16 @@ namespace DeepDroidChanger.ViewModels
 
         public Task InitializeAsync(CancellationToken cancellationToken)
         {
+            _configurationSnapshot = null;
+            cancellationToken.ThrowIfCancellationRequested();
+            return LoadDataAsync(cancellationToken);
+        }
+
+        public Task InitializeAsync(
+            StoredDeviceConfig? configurationSnapshot,
+            CancellationToken cancellationToken)
+        {
+            _configurationSnapshot = configurationSnapshot;
             cancellationToken.ThrowIfCancellationRequested();
             return LoadDataAsync(cancellationToken);
         }
@@ -407,9 +418,13 @@ namespace DeepDroidChanger.ViewModels
         {
             try
             {
-                var devices = await _deviceStoreService.LoadAsync(cancellationToken).ConfigureAwait(true);
-                var config = devices.FirstOrDefault(device =>
-                    string.Equals(device.Serial, DeviceSerial, StringComparison.OrdinalIgnoreCase));
+                StoredDeviceConfig? config = _configurationSnapshot;
+                if (config == null)
+                {
+                    var devices = await _deviceStoreService.LoadAsync(cancellationToken).ConfigureAwait(true);
+                    config = devices.FirstOrDefault(device =>
+                        string.Equals(device.Serial, DeviceSerial, StringComparison.OrdinalIgnoreCase));
+                }
                 if (config != null)
                 {
                     if (Enum.TryParse<ChangeLocationMode>(config.LocationMode, ignoreCase: true, out var mode))

@@ -35,22 +35,39 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         }
     }
 
+    public IReadOnlyList<DeviceActionSessionSnapshot> GetActiveSessions()
+    {
+        lock (_syncRoot)
+        {
+            return _activeOperations.Values
+                .GroupBy(operation => operation.SessionId)
+                .Select(CreateSessionSnapshot)
+                .OrderBy(session => session.Operations.Min(operation => operation.OperationId))
+                .ToArray();
+        }
+    }
+
     public IDeviceActionOperation? TryStart(
         string serial,
         DeviceActionKind kind,
         bool canCancel,
-        CancellationToken externalCancellationToken = default)
+        CancellationToken externalCancellationToken = default,
+        Guid? sessionId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         if (externalCancellationToken.IsCancellationRequested)
             return null;
 
         string normalizedSerial = NormalizeSerial(serial);
+        Guid effectiveSessionId = sessionId.GetValueOrDefault();
+        if (effectiveSessionId == Guid.Empty)
+            effectiveSessionId = Guid.NewGuid();
         var operation = new ActiveDeviceAction(
             this,
             normalizedSerial,
             kind,
             canCancel,
+            effectiveSessionId,
             externalCancellationToken);
 
         bool shouldPublish;
@@ -90,6 +107,31 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             operation,
             DeviceActionCancellationReason.UserStop,
             honorCanCancel: true);
+    }
+
+    public bool TryRequestSessionCancellation(Guid sessionId)
+    {
+        if (sessionId == Guid.Empty)
+            return false;
+
+        ActiveDeviceAction[] operations;
+        lock (_syncRoot)
+        {
+            operations = _activeOperations.Values
+                .Where(operation => operation.SessionId == sessionId)
+                .ToArray();
+        }
+
+        bool canceled = false;
+        foreach (ActiveDeviceAction operation in operations)
+        {
+            canceled |= RequestCancellation(
+                operation,
+                DeviceActionCancellationReason.UserStop,
+                honorCanCancel: true);
+        }
+
+        return canceled;
     }
 
     internal void Release(ActiveDeviceAction operation)
@@ -205,6 +247,29 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         }
     }
 
+    private static DeviceActionSessionSnapshot CreateSessionSnapshot(
+        IEnumerable<ActiveDeviceAction> operations)
+    {
+        DeviceActionOperationSnapshot[] snapshots = operations
+            .Select(operation => operation.CreateSnapshot())
+            .OrderBy(snapshot => snapshot.Serial, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        DeviceActionOperationSnapshot first = snapshots[0];
+        DeviceActionRuntimeState state = snapshots.Any(snapshot =>
+            snapshot.State == DeviceActionRuntimeState.Running)
+            ? DeviceActionRuntimeState.Running
+            : DeviceActionRuntimeState.Stopping;
+        bool canCancel = snapshots.Any(snapshot =>
+            snapshot.State == DeviceActionRuntimeState.Running
+            && snapshot.CanCancel);
+        return new DeviceActionSessionSnapshot(
+            first.SessionId,
+            first.Kind.ToLogicalActionKind(),
+            state,
+            canCancel,
+            snapshots);
+    }
+
     private static string NormalizeSerial(string serial)
     {
         return serial.Trim();
@@ -226,12 +291,14 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             string serial,
             DeviceActionKind kind,
             bool canCancel,
+            Guid sessionId,
             CancellationToken externalCancellationToken)
         {
             _owner = owner;
             Serial = serial;
             Kind = kind;
             CanCancel = canCancel;
+            SessionId = sessionId;
             _externalCancellationToken = externalCancellationToken;
             _cancellation = new CancellationTokenSource();
             OperationId = Guid.NewGuid();
@@ -240,6 +307,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         public string Serial { get; }
         public DeviceActionKind Kind { get; }
         public Guid OperationId { get; }
+        public Guid SessionId { get; }
         public DeviceActionRuntimeState State => (DeviceActionRuntimeState)Volatile.Read(ref _state);
         public bool CanCancel { get; }
         public DeviceActionCancellationReason CancellationReason =>
@@ -316,7 +384,8 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
                 OperationId,
                 State,
                 CanCancel,
-                CancellationReason);
+                CancellationReason,
+                SessionId);
         }
     }
 }

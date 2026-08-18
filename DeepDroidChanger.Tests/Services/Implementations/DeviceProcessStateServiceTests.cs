@@ -72,6 +72,23 @@ public sealed class DeviceProcessStateServiceTests
     }
 
     [TestMethod]
+    public void Ready_ClearsTemporaryRunningMessage()
+    {
+        var service = new DeviceProcessStateService();
+        service.SetProcess("A", "Changing", "Log_ChangeDevice");
+        service.ShowTemporaryProcess(
+            "A",
+            "Already running",
+            "Log_DeviceActionAlreadyRunningFormat",
+            TimeSpan.FromSeconds(3));
+
+        service.SetProcess("A", "Ready", "Log_Ready");
+
+        Assert.AreEqual("Ready", service.Get("A")!.Message);
+        Assert.AreEqual(DeviceProcessState.Ready, service.Get("A")!.State);
+    }
+
+    [TestMethod]
     public void DifferentSerials_AreIndependent()
     {
         var service = new DeviceProcessStateService();

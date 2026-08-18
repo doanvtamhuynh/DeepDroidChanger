@@ -37,6 +37,8 @@ public sealed class AdvancedChangeConfigViewModelTests
     {
         IDevicePackageService packageService = Substitute.For<IDevicePackageService>();
         packageService.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.system" });
+        packageService.GetUserInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
             .Returns(new[] { "com.example.two", "com.example.one" });
         AdvancedChangeConfigViewModel viewModel = CreateViewModel(packageService);
         viewModel.Initialize(
@@ -47,10 +49,10 @@ public sealed class AdvancedChangeConfigViewModelTests
         await viewModel.LoadPackagesCommand.ExecuteAsync(null);
 
         CollectionAssert.AreEqual(
-            new[] { "com.example.one", "com.example.two" },
+            new[] { "com.example.one", "com.example.system", "com.example.two" },
             viewModel.AvailablePackages.ToArray());
         await packageService.Received(1).GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>());
-        await packageService.DidNotReceiveWithAnyArgs().GetUserInstalledPackagesAsync(default!, default);
+        await packageService.Received(1).GetUserInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -73,10 +75,92 @@ public sealed class AdvancedChangeConfigViewModelTests
     }
 
     [TestMethod]
+    public async Task LoadPackages_AllScope_UsesInstalledPackagesFromFirstDeviceAndUsersFromEveryDevice()
+    {
+        IDevicePackageService packageService = Substitute.For<IDevicePackageService>();
+        packageService.GetInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.system", "com.example.first", "com.example.duplicate" });
+        packageService.GetUserInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.first", "com.example.duplicate" });
+        packageService.GetUserInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.second", "com.example.duplicate" });
+        AdvancedChangeConfigViewModel viewModel = CreateViewModel(packageService);
+        viewModel.Initialize(
+            new[] { "FIRST", "SECOND" },
+            new DeviceChangeOptions { ClearAllPackages = false });
+        viewModel.ClearSelectedPackages = true;
+
+        await viewModel.LoadPackagesCommand.ExecuteAsync(null);
+
+        CollectionAssert.AreEqual(
+            new[] { "com.example.duplicate", "com.example.first", "com.example.second", "com.example.system" },
+            viewModel.AvailablePackages.ToArray());
+        await packageService.Received(1).GetInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>());
+        await packageService.DidNotReceive().GetInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>());
+        await packageService.Received(1).GetUserInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>());
+        await packageService.Received(1).GetUserInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task LoadPackages_AllScope_FallsBackWhenFirstDeviceCannotListInstalledPackages()
+    {
+        IDevicePackageService packageService = Substitute.For<IDevicePackageService>();
+        packageService.GetInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<string>>(
+                new InvalidOperationException("first device disconnected")));
+        packageService.GetInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.system" });
+        packageService.GetUserInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.first" });
+        packageService.GetUserInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.second" });
+        AdvancedChangeConfigViewModel viewModel = CreateViewModel(packageService);
+        viewModel.Initialize(
+            new[] { "FIRST", "SECOND" },
+            new DeviceChangeOptions { ClearAllPackages = false });
+        viewModel.ClearSelectedPackages = true;
+
+        await viewModel.LoadPackagesCommand.ExecuteAsync(null);
+
+        CollectionAssert.AreEqual(
+            new[] { "com.example.first", "com.example.second", "com.example.system" },
+            viewModel.AvailablePackages.ToArray());
+        await packageService.Received(1).GetInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>());
+        await packageService.Received(1).GetInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task LoadPackages_UserScope_UsesThirdPartyPackagesFromEverySelectedDevice()
+    {
+        IDevicePackageService packageService = Substitute.For<IDevicePackageService>();
+        packageService.GetUserInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.first" });
+        packageService.GetUserInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.second" });
+        AdvancedChangeConfigViewModel viewModel = CreateViewModel(packageService);
+        viewModel.Initialize(
+            new[] { "FIRST", "SECOND" },
+            new DeviceChangeOptions { ClearAllPackages = false });
+        viewModel.ClearSelectedPackages = true;
+        viewModel.SelectedPackageScope = viewModel.PackageScopes.Single(option => option.Scope == PackageListScope.User);
+
+        await viewModel.LoadPackagesCommand.ExecuteAsync(null);
+
+        CollectionAssert.AreEqual(
+            new[] { "com.example.first", "com.example.second" },
+            viewModel.AvailablePackages.ToArray());
+        await packageService.DidNotReceiveWithAnyArgs().GetInstalledPackagesAsync(default!, default);
+        await packageService.Received(1).GetUserInstalledPackagesAsync("FIRST", Arg.Any<CancellationToken>());
+        await packageService.Received(1).GetUserInstalledPackagesAsync("SECOND", Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
     public async Task LoadPackages_Failure_ClearsPackagesShowsFailureAndWritesDiagnosticLog()
     {
         IDevicePackageService packageService = Substitute.For<IDevicePackageService>();
         packageService.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<string>>(new InvalidOperationException("adb failed")));
+        packageService.GetUserInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<string>>(new InvalidOperationException("adb failed")));
         var logger = new TestLogger<AdvancedChangeConfigViewModel>();
         AdvancedChangeConfigViewModel viewModel = CreateViewModel(packageService, logger);
@@ -100,7 +184,9 @@ public sealed class AdvancedChangeConfigViewModelTests
     {
         IDevicePackageService packageService = Substitute.For<IDevicePackageService>();
         packageService.GetInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
-            .Returns(new[] { "com.example.one", "com.example.two" });
+            .Returns(new[] { "com.example.one" });
+        packageService.GetUserInstalledPackagesAsync("SERIAL", Arg.Any<CancellationToken>())
+            .Returns(new[] { "com.example.two" });
         AdvancedChangeConfigViewModel viewModel = CreateViewModel(packageService);
         viewModel.Initialize(
             "SERIAL",

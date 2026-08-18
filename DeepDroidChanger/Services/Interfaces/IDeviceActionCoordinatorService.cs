@@ -122,7 +122,18 @@ public sealed record DeviceActionOperationSnapshot(
     Guid OperationId,
     DeviceActionRuntimeState State,
     bool CanCancel,
-    DeviceActionCancellationReason CancellationReason);
+    DeviceActionCancellationReason CancellationReason,
+    Guid SessionId);
+
+/// <summary>
+/// Immutable presentation data for one logical action invocation.
+/// </summary>
+public sealed record DeviceActionSessionSnapshot(
+    Guid SessionId,
+    DeviceActionKind Kind,
+    DeviceActionRuntimeState State,
+    bool CanCancel,
+    IReadOnlyList<DeviceActionOperationSnapshot> Operations);
 
 /// <summary>
 /// Handle owned by the workflow that acquired a device operation.
@@ -132,6 +143,7 @@ public interface IDeviceActionOperation : IDisposable
     string Serial { get; }
     DeviceActionKind Kind { get; }
     Guid OperationId { get; }
+    Guid SessionId { get; }
     DeviceActionRuntimeState State { get; }
     bool CanCancel { get; }
     DeviceActionCancellationReason CancellationReason { get; }
@@ -154,11 +166,22 @@ public interface IDeviceActionCoordinatorService
 
     DeviceActionOperationSnapshot? GetOperation(string serial);
 
+    /// <summary>
+    /// Returns all currently active logical action sessions.
+    /// </summary>
+    IReadOnlyList<DeviceActionSessionSnapshot> GetActiveSessions() => [];
+
     IDeviceActionOperation? TryStart(
         string serial,
         DeviceActionKind kind,
         bool canCancel,
-        CancellationToken externalCancellationToken = default);
+        CancellationToken externalCancellationToken = default,
+        Guid? sessionId = null);
 
     bool TryRequestCancellation(string serial);
+
+    /// <summary>
+    /// Requests cancellation for every cancellable operation in a session.
+    /// </summary>
+    bool TryRequestSessionCancellation(Guid sessionId) => false;
 }

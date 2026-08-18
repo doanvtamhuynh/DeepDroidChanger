@@ -24,6 +24,7 @@
     <sys:String x:Key="Log_RandomDeviceLoginRequired">Vui lòng đăng nhập lại trước khi tạo thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomDeviceRequired">Vui lòng tạo thông tin thiết bị ngẫu nhiên trước</sys:String>
     <sys:String x:Key="Log_DeviceMustBeOnline">Thiết bị phải đang Online</sys:String>
+    <sys:String x:Key="Log_DeviceActionAlreadyRunningFormat">Thiết bị đang chạy tác vụ {0}</sys:String>
     <sys:String x:Key="Log_ChangeDevice">Đang mở xác nhận đổi thiết bị</sys:String>
     <sys:String x:Key="Log_ChangeDeviceCanceled">Đã hủy đổi thiết bị</sys:String>
     <sys:String x:Key="Log_ChangeDevicePreparing">Đang kiểm tra quyền ADB root</sys:String>

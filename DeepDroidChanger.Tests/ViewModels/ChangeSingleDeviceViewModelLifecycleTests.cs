@@ -1841,7 +1841,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task RandomSim_WhileRandomDeviceIsRunning_IsDisabledUntilActionCompletes()
+    public async Task RandomSim_WhileRandomDeviceIsRunning_ShowsBusyLogUntilActionCompletes()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -1886,7 +1886,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsFalse(viewModel.CanInteractWithSelectedDevice);
         Assert.IsTrue(viewModel.SelectedDevice!.IsActionBusy);
         Assert.IsFalse(viewModel.SelectedDevice.CanEdit);
-        Assert.IsFalse(viewModel.RandomSimCommand.CanExecute(null));
+        Assert.IsTrue(viewModel.RandomSimCommand.CanExecute(null));
         Assert.IsGreaterThan(0, randomSimCanExecuteChanged);
         await viewModel.RandomSimCommand.ExecuteAsync(null);
         simProfileService.DidNotReceiveWithAnyArgs().CreateRandomProfile(default, default);
@@ -2030,11 +2030,13 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsTrue(deviceA.IsActionBusy);
         Assert.IsFalse(deviceA.CanEdit);
         Assert.IsFalse(viewModel.CanInteractWithSelectedDevice);
-        Assert.IsFalse(viewModel.RandomDeviceCommand.CanExecute(null));
-        Assert.IsFalse(viewModel.RandomSimCommand.CanExecute(null));
+        Assert.IsTrue(viewModel.RandomDeviceCommand.CanExecute(null));
+        Assert.IsTrue(viewModel.RandomSimCommand.CanExecute(null));
         Dictionary<string, bool> busyDeviceActionStates = GetGuardedActionStates(viewModel);
         Assert.IsTrue(
-            busyDeviceActionStates.All(pair => !pair.Value),
+            busyDeviceActionStates
+                .Where(pair => pair.Key != nameof(ChangeSingleDeviceViewModel.OpenAdvancedChangeConfigCommand))
+                .All(pair => pair.Value),
             CreateActionStateMessage(busyDeviceActionStates));
         Dictionary<string, bool> busyContextMenuStates = GetContextMenuActionStates(viewModel);
         Assert.IsTrue(
@@ -2049,12 +2051,12 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         await viewModel.ToggleGmsCommand.ExecuteAsync(deviceA);
         await viewModel.TogglePlayStoreCommand.ExecuteAsync(deviceA);
         await viewModel.ToggleWifiCommand.ExecuteAsync(deviceA);
-        await deviceAction.Received(1).RebootAsync("A", Arg.Any<CancellationToken>());
-        await deviceAction.Received(1)
+        await deviceAction.DidNotReceive().RebootAsync("A", Arg.Any<CancellationToken>());
+        await deviceAction.DidNotReceive()
             .SetGmsEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
-        await deviceAction.Received(1)
+        await deviceAction.DidNotReceive()
             .SetPlayStoreEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
-        await deviceAction.Received(1)
+        await deviceAction.DidNotReceive()
             .SetWifiEnabledAsync("A", Arg.Any<bool>(), Arg.Any<CancellationToken>());
         int changeDeviceCanExecuteChanged = 0;
         viewModel.ChangeDeviceCommand.CanExecuteChanged += (_, _) => changeDeviceCanExecuteChanged++;
@@ -2865,7 +2867,11 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
             "SOCKS5",
             proxyChangeLocationByIp: true,
             proxyChangeTimezoneByIp: true);
-        fakeProxyDialog.ShowFakeProxyDialogAsync("A", "Phone", Arg.Any<CancellationToken>())
+        fakeProxyDialog.ShowFakeProxyDialogAsync(
+                "A",
+                "Phone",
+                Arg.Any<StoredDeviceConfig?>(),
+                Arg.Any<CancellationToken>())
             .Returns(fakeProxyResult);
 
         IProxyWorkflowService proxyWorkflowService = Substitute.For<IProxyWorkflowService>();
@@ -3308,7 +3314,6 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
 
         Assert.IsTrue(workerToken.IsCancellationRequested);
         Assert.IsTrue(viewModel.IsSelectedDeviceActionStopping);
-        Assert.IsTrue(viewModel.IsSelectedDeviceActionBusy);
         Assert.IsFalse(viewModel.CanStopSelectedDeviceAction);
         await action;
 
@@ -3360,7 +3365,7 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
     }
 
     [TestMethod]
-    public async Task SelectedSerialOwnedByMultipleBatch_IsBusyButCannotBeStoppedFromSingle()
+    public async Task SelectedSerialOwnedByMultipleBatch_CanBeStoppedFromSingle()
     {
         StoredDeviceConfig[] storedDevices =
         [
@@ -3394,8 +3399,8 @@ public sealed class ChangeSingleDeviceViewModelLifecycleTests
         Assert.IsTrue(viewModel.HasExternalSelectedDeviceAction);
         StringAssert.Contains(viewModel.ExternalSelectedDeviceActionText, "Multiple Devices");
         Assert.AreEqual("Changing from Multiple", viewModel.Devices.Single().Process);
-        Assert.IsFalse(viewModel.CanStopSelectedDeviceAction);
-        Assert.IsFalse(viewModel.StopSelectedDeviceActionCommand.CanExecute(null));
+        Assert.IsTrue(viewModel.CanStopSelectedDeviceAction);
+        Assert.IsTrue(viewModel.StopSelectedDeviceActionCommand.CanExecute(null));
         Assert.IsFalse(viewModel.HasActiveSelectedDeviceActionButton);
 
         await viewModel.SuspendAsync();

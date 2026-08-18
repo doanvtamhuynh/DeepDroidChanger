@@ -10,6 +10,8 @@ public sealed class DeviceProcessStateService : IDeviceProcessStateService
     private readonly object _syncRoot = new();
     private readonly Dictionary<string, DeviceProcessSnapshot> _processBySerial =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TemporaryProcess> _temporaryBySerial =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<DeviceProcessSnapshot> _pendingNotifications = new();
     private bool _isPublishingNotifications;
 
@@ -22,7 +24,11 @@ public sealed class DeviceProcessStateService : IDeviceProcessStateService
 
         lock (_syncRoot)
         {
-            return _processBySerial.TryGetValue(NormalizeSerial(serial), out DeviceProcessSnapshot? snapshot)
+            string normalizedSerial = NormalizeSerial(serial);
+            if (_temporaryBySerial.TryGetValue(normalizedSerial, out TemporaryProcess? temporary))
+                return temporary.Snapshot;
+
+            return _processBySerial.TryGetValue(normalizedSerial, out DeviceProcessSnapshot? snapshot)
                 ? snapshot
                 : null;
         }
@@ -55,7 +61,77 @@ public sealed class DeviceProcessStateService : IDeviceProcessStateService
                 resourceKey,
                 nextState);
             _processBySerial[normalizedSerial] = snapshot;
-            shouldPublish = EnqueueNotificationLocked(snapshot);
+            if (_temporaryBySerial.TryGetValue(normalizedSerial, out TemporaryProcess? temporary)
+                && (IsTerminal(nextState) || nextState == DeviceProcessState.Ready))
+            {
+                _temporaryBySerial.Remove(normalizedSerial);
+            }
+
+            shouldPublish = !_temporaryBySerial.ContainsKey(normalizedSerial)
+                && EnqueueNotificationLocked(snapshot);
+        }
+
+        PublishPendingNotifications(shouldPublish);
+    }
+
+    public void ShowTemporaryProcess(
+        string serial,
+        string message,
+        string resourceKey,
+        TimeSpan duration)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceKey);
+        if (duration <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(duration));
+
+        string normalizedSerial = NormalizeSerial(serial);
+        var temporary = new TemporaryProcess(
+            Guid.NewGuid(),
+            new DeviceProcessSnapshot(
+                normalizedSerial,
+                message,
+                resourceKey,
+                DeviceProcessState.InProgress));
+        bool shouldPublish;
+        lock (_syncRoot)
+        {
+            _temporaryBySerial[normalizedSerial] = temporary;
+            shouldPublish = EnqueueNotificationLocked(temporary.Snapshot);
+        }
+
+        PublishPendingNotifications(shouldPublish);
+        _ = ExpireTemporaryProcessAsync(normalizedSerial, temporary.Id, duration);
+    }
+
+    private async Task ExpireTemporaryProcessAsync(
+        string serial,
+        Guid temporaryId,
+        TimeSpan duration)
+    {
+        try
+        {
+            await Task.Delay(duration).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        bool shouldPublish = false;
+        DeviceProcessSnapshot? snapshot = null;
+        lock (_syncRoot)
+        {
+            if (!_temporaryBySerial.TryGetValue(serial, out TemporaryProcess? current)
+                || current.Id != temporaryId)
+            {
+                return;
+            }
+
+            _temporaryBySerial.Remove(serial);
+            if (_processBySerial.TryGetValue(serial, out snapshot))
+                shouldPublish = EnqueueNotificationLocked(snapshot);
         }
 
         PublishPendingNotifications(shouldPublish);
@@ -149,8 +225,17 @@ public sealed class DeviceProcessStateService : IDeviceProcessStateService
         return DeviceProcessState.InProgress;
     }
 
+    private static bool IsTerminal(DeviceProcessState state)
+    {
+        return state is DeviceProcessState.Succeeded
+            or DeviceProcessState.Failed
+            or DeviceProcessState.Canceled;
+    }
+
     private static string NormalizeSerial(string serial)
     {
         return serial.Trim();
     }
+
+    private sealed record TemporaryProcess(Guid Id, DeviceProcessSnapshot Snapshot);
 }

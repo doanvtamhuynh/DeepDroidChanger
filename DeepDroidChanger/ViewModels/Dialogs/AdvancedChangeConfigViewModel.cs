@@ -15,6 +15,7 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
     private readonly ILogger<AdvancedChangeConfigViewModel> _logger;
     private IReadOnlyList<string> _loadedPackages = [];
     private string _deviceSerial = string.Empty;
+    private IReadOnlyList<string> _deviceSerials = [];
 
     [ObservableProperty]
     private bool _changeAndroidId;
@@ -106,10 +107,26 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         DeviceChangeOptions options,
         bool useIntegritySecurityPatch = true)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(deviceSerial);
+        Initialize([deviceSerial], options, useIntegritySecurityPatch, isMultiple: false);
+    }
+
+    public void Initialize(
+        IReadOnlyList<string> deviceSerials,
+        DeviceChangeOptions options,
+        bool useIntegritySecurityPatch = true,
+        bool isMultiple = true)
+    {
+        ArgumentNullException.ThrowIfNull(deviceSerials);
+        if (deviceSerials.Count == 0 || deviceSerials.Any(string.IsNullOrWhiteSpace))
+            throw new ArgumentException("At least one device serial is required.", nameof(deviceSerials));
         ArgumentNullException.ThrowIfNull(options);
 
-        _deviceSerial = deviceSerial;
+        _deviceSerials = deviceSerials
+            .Where(serial => !string.IsNullOrWhiteSpace(serial))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        _deviceSerial = _deviceSerials[0];
+        _ = isMultiple;
         ChangeAndroidId = options.ChangeAndroidId;
         ChangeMacAddress = options.ChangeMacAddress;
         UpdateIntegrity = options.UpdateIntegrity;
@@ -177,13 +194,8 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         PackageLoadStatus = _localizationService.GetString("AdvancedChangeConfig_LoadingPackages");
         try
         {
-            _loadedPackages = scope.Scope == PackageListScope.User
-                ? await _packageService
-                    .GetUserInstalledPackagesAsync(_deviceSerial, cancellationToken)
-                    .ConfigureAwait(true)
-                : await _packageService
-                    .GetInstalledPackagesAsync(_deviceSerial, cancellationToken)
-                    .ConfigureAwait(true);
+            _loadedPackages = await LoadPackagesForScopeAsync(scope.Scope, cancellationToken)
+                .ConfigureAwait(true);
             RefreshAvailablePackages();
             PackageLoadStatus = string.Format(
                 _localizationService.GetString("AdvancedChangeConfig_LoadedPackages"),
@@ -207,6 +219,63 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         {
             IsLoadingPackages = false;
         }
+    }
+
+    private async Task<IReadOnlyList<string>> LoadPackagesForScopeAsync(
+        PackageListScope scope,
+        CancellationToken cancellationToken)
+    {
+        var packages = new HashSet<string>(StringComparer.Ordinal);
+        bool packageQuerySucceeded = false;
+        if (scope == PackageListScope.All)
+        {
+            foreach (string serial in _deviceSerials)
+            {
+                try
+                {
+                    packages.UnionWith(await _packageService
+                        .GetInstalledPackagesAsync(serial, cancellationToken)
+                        .ConfigureAwait(true));
+                    packageQuerySucceeded = true;
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Failed to list installed packages for device {Serial}.",
+                        serial);
+                }
+            }
+        }
+
+        foreach (string serial in _deviceSerials)
+        {
+            try
+            {
+                packages.UnionWith(await _packageService
+                    .GetUserInstalledPackagesAsync(serial, cancellationToken)
+                    .ConfigureAwait(true));
+                packageQuerySucceeded = true;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Failed to list user packages for device {Serial}.", serial);
+            }
+        }
+
+        if (packages.Count == 0 && !packageQuerySucceeded)
+            throw new InvalidOperationException("No package list could be loaded from the selected devices.");
+
+        return packages.OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     private bool CanLoadPackages()

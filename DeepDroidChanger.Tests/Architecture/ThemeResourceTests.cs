@@ -60,7 +60,7 @@ public sealed partial class ThemeResourceTests
     }
 
     [TestMethod]
-    public void MultipleDeviceInfoSelector_ReadOnlyDisplayBindingsAreOneWay()
+    public void MultipleDeviceView_UsesRunningActionsPanelWithoutDeviceInfoSelector()
     {
         string path = Path.Combine(
             GetSolutionRoot(),
@@ -70,8 +70,169 @@ public sealed partial class ThemeResourceTests
             "ChangeMultipleDevicesView.xaml");
         string xaml = File.ReadAllText(path);
 
-        StringAssert.Contains(xaml, "<Run Text=\"{Binding Name, Mode=OneWay}\"/>");
-        StringAssert.Contains(xaml, "<Run Text=\"{Binding Serial, Mode=OneWay}\"/>");
+        StringAssert.Contains(xaml, "x:Name=\"RunningActionsPanel\"");
+        StringAssert.Contains(xaml, "ItemsSource=\"{Binding RunningActions}\"");
+        Assert.DoesNotContain("SelectedInfoDevice", xaml);
+    }
+
+    [TestMethod]
+    public void DeviceTables_DoNotExposeIndexColumn()
+    {
+        string projectRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
+        string[] paths =
+        [
+            Path.Combine(projectRoot, "Views", "ChangeSingleDevice", "ChangeSingleDeviceView.xaml"),
+            Path.Combine(projectRoot, "Views", "ChangeMultipleDevices", "ChangeMultipleDevicesView.xaml")
+        ];
+
+        foreach (string path in paths)
+        {
+            string xaml = File.ReadAllText(path);
+            Assert.DoesNotContain("ColumnKey=\"Index\"", xaml);
+            Assert.DoesNotContain("Binding=\"{Binding Index}\"", xaml);
+            StringAssert.Contains(xaml, "ColumnKey=\"Selected\"");
+        }
+    }
+
+    [TestMethod]
+    public void StopButtons_UseCenteredIconContentAndRequestedSizing()
+    {
+        string projectRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
+        string singleXaml = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Views",
+            "ChangeSingleDevice",
+            "ChangeSingleDeviceView.xaml"));
+        string multipleXaml = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Views",
+            "ChangeMultipleDevices",
+            "ChangeMultipleDevicesView.xaml"));
+
+        foreach (string xaml in new[] { singleXaml, multipleXaml })
+        {
+            StringAssert.Contains(xaml, "Kind=\"Stop\"");
+            StringAssert.Contains(xaml, "Padding=\"2\"");
+            StringAssert.Contains(xaml, "HorizontalAlignment=\"Stretch\"");
+            StringAssert.Contains(xaml, "HorizontalContentAlignment=\"Center\"");
+            StringAssert.Contains(xaml, "VerticalContentAlignment=\"Center\"");
+        }
+
+        StringAssert.Contains(
+            GetStopColumnBlock(singleXaml),
+            "CellStyle=\"{StaticResource ChangeSingleDeviceStopCellStyle}\"");
+        StringAssert.Contains(
+            GetStopColumnBlock(singleXaml),
+            "<Grid HorizontalAlignment=\"Center\"");
+        StringAssert.Contains(GetStopColumnBlock(singleXaml), "Padding=\"2\"");
+        StringAssert.Contains(GetStopColumnBlock(singleXaml), "Margin=\"2\"");
+        StringAssert.Contains(
+            GetStopColumnBlock(multipleXaml),
+            "CellStyle=\"{StaticResource MultipleDeviceStopCellStyle}\"");
+        StringAssert.Contains(
+            GetStopColumnBlock(multipleXaml),
+            "<Grid HorizontalAlignment=\"Center\"");
+        StringAssert.Contains(GetStopColumnBlock(multipleXaml), "Padding=\"2\"");
+        StringAssert.Contains(GetStopColumnBlock(multipleXaml), "Margin=\"2\"");
+        Assert.IsTrue(
+            singleXaml.Split("DeviceSectionHeaderSeparatorStyle", StringSplitOptions.None).Length >= 4);
+        Assert.IsTrue(
+            multipleXaml.Split("MultipleDeviceSectionHeaderSeparatorStyle", StringSplitOptions.None).Length >= 4);
+        StringAssert.Contains(multipleXaml, "Width=\"118\"");
+    }
+
+    [TestMethod]
+    public void SectionHeaders_UseSharedHeightAndFivePixelContentGap()
+    {
+        string projectRoot = Path.Combine(GetSolutionRoot(), "DeepDroidChanger");
+        string singleXaml = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Views",
+            "ChangeSingleDevice",
+            "ChangeSingleDeviceView.xaml"));
+        string multipleXaml = File.ReadAllText(Path.Combine(
+            projectRoot,
+            "Views",
+            "ChangeMultipleDevices",
+            "ChangeMultipleDevicesView.xaml"));
+
+        AssertSectionHeaderLayout(
+            singleXaml,
+            "DeviceSectionHeaderGridStyle",
+            "DeviceSectionHeaderSeparatorStyle");
+        AssertSectionHeaderLayout(
+            multipleXaml,
+            "MultipleDeviceSectionHeaderGridStyle",
+            "MultipleDeviceSectionHeaderSeparatorStyle");
+    }
+
+    [TestMethod]
+    public void RunningActionsList_UsesMutedCardsAndAccentActionText()
+    {
+        string path = Path.Combine(
+            GetSolutionRoot(),
+            "DeepDroidChanger",
+            "Views",
+            "ChangeMultipleDevices",
+            "ChangeMultipleDevicesView.xaml");
+        string xaml = File.ReadAllText(path);
+        string normalizedXaml = Regex.Replace(xaml, @"\s+", " ");
+
+        StringAssert.Contains(normalizedXaml, "x:Key=\"RunningActionListBoxItemStyle\"");
+        StringAssert.Contains(normalizedXaml, "ItemContainerStyle=\"{StaticResource RunningActionListBoxItemStyle}\"");
+        StringAssert.Contains(normalizedXaml, "Property=\"Background\" Value=\"{DynamicResource Brush.Surface}\"");
+        StringAssert.Contains(normalizedXaml, "Property=\"BorderBrush\" Value=\"{DynamicResource Brush.Border}\"");
+        StringAssert.Contains(normalizedXaml, "BorderThickness=\"{TemplateBinding BorderThickness}\"");
+        StringAssert.Contains(normalizedXaml, "x:Key=\"RunningActionNameTextStyle\"");
+        StringAssert.Contains(normalizedXaml, "Value=\"{DynamicResource Brush.Warning}\"");
+        StringAssert.Contains(normalizedXaml, "Text=\"{Binding ActionName}\"");
+        StringAssert.Contains(normalizedXaml, "Text=\"{Binding DeviceSummary}\"");
+
+        int baseTextStyleIndex = normalizedXaml.IndexOf(
+            "x:Key=\"MultipleDeviceActionButtonTextStyle\"",
+            StringComparison.Ordinal);
+        int actionNameStyleIndex = normalizedXaml.IndexOf(
+            "x:Key=\"RunningActionNameTextStyle\"",
+            StringComparison.Ordinal);
+        Assert.IsTrue(
+            baseTextStyleIndex >= 0 && actionNameStyleIndex > baseTextStyleIndex,
+            "RunningActionNameTextStyle must be declared after its BasedOn style so WPF can resolve the StaticResource at load time.");
+    }
+
+    private static void AssertSectionHeaderLayout(
+        string xaml,
+        string headerStyleKey,
+        string separatorStyleKey)
+    {
+        StringAssert.Contains(xaml, $"x:Key=\"{headerStyleKey}\"");
+        StringAssert.Contains(xaml, "Value=\"{StaticResource Metric.ControlHeight}\"");
+        StringAssert.Contains(xaml, "Value=\"0,0,0,5\"");
+        StringAssert.Contains(xaml, "Value=\"10,12,10,8\"");
+        Assert.AreEqual(
+            3,
+            CountOccurrences(xaml, $"Style=\"{{StaticResource {separatorStyleKey}}}\""));
+        Assert.AreEqual(3, CountOccurrences(xaml, "Margin=\"0,5,0,0\""));
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        int count = 0;
+        int offset = 0;
+        while ((offset = text.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
+    }
+
+    private static string GetStopColumnBlock(string xaml)
+    {
+        int start = xaml.IndexOf("ColumnKey=\"Stop\"", StringComparison.Ordinal);
+        int end = xaml.IndexOf("</DataGridTemplateColumn>", start, StringComparison.Ordinal);
+        Assert.IsTrue(start >= 0 && end > start, "Stop DataGrid column block was not found.");
+        return xaml[start..end];
     }
 
     [TestMethod]

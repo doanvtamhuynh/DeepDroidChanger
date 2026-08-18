@@ -14,6 +14,7 @@ namespace DeepDroidChanger.ViewModels
         private const int NewDevicePollSeconds = 3;
         private const int DeviceNameSaveDebounceMilliseconds = 300;
         private const string DefaultCountryIso = "us";
+        private static readonly TimeSpan BusyActionLogDuration = TimeSpan.FromSeconds(3);
 
         private readonly IAddDevicesDialogService _addDevicesDialogService;
         private readonly ICarrierDataService _carrierDataService;
@@ -212,8 +213,7 @@ namespace DeepDroidChanger.ViewModels
             {
                 State: DeviceActionRuntimeState.Running,
                 CanCancel: true
-            } operation
-            && !operation.Kind.IsBatchAction();
+            };
         public string SelectedDeviceActionStopText =>
             _localizationService.GetString(IsSelectedDeviceActionStopping
                 ? "ChangeSingleDevice_StoppingAction"
@@ -458,7 +458,7 @@ namespace DeepDroidChanger.ViewModels
 
         private bool CanExecuteSelectedDeviceAction()
         {
-            return CanInteractWithSelectedDevice;
+            return SelectedDevice != null;
         }
 
         private bool CanExecuteDeviceAction(DeviceRowViewModel? device)
@@ -484,6 +484,19 @@ namespace DeepDroidChanger.ViewModels
                 return null;
             }
 
+            // The configuration snapshot is loaded asynchronously before this method is called.
+            // Do not start an action if the user changed the Single Device selection while it was
+            // loading; otherwise the captured device could receive the newly selected device's
+            // mutable form values.
+            if (SelectedDevice == null || !SerialEquals(SelectedDevice.Serial, device.Serial))
+                return null;
+
+            if (IsDeviceBusy(device))
+            {
+                ShowBusyActionLog(device);
+                return null;
+            }
+
             if (device.ConnectionStatus != AdbDeviceStatus.Online)
             {
                 SetDeviceLog(device, "Log_DeviceMustBeOnline");
@@ -492,7 +505,10 @@ namespace DeepDroidChanger.ViewModels
 
             IDeviceActionOperation? operation = TryStartDeviceAction(device, kind, canCancel);
             if (operation == null)
+            {
+                ShowBusyActionLog(device);
                 return null;
+            }
 
             try
             {
@@ -519,6 +535,59 @@ namespace DeepDroidChanger.ViewModels
 
             operation.Dispose();
             return null;
+        }
+
+        private async Task RefreshSingleActionConfigurationSnapshotAsync(string serial)
+        {
+            try
+            {
+                await FlushPendingDeviceEditsAsync().ConfigureAwait(false);
+                await FlushPendingDeviceProfileAsync().ConfigureAwait(false);
+                IReadOnlyList<StoredDeviceConfig> storedDevices =
+                    await _deviceListService.LoadStoredDevicesAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                await RunOnUiContextAsync(() =>
+                {
+                    _storedDevices = storedDevices.ToList();
+                    if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, serial))
+                        ApplyStoredDeviceConfig(SelectedDevice);
+                })
+                    .ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Failed to refresh the action configuration snapshot for device {Serial}; using the in-memory snapshot.",
+                    serial);
+            }
+        }
+
+        private void ShowBusyActionLog(DeviceRowViewModel device)
+        {
+            DeviceActionOperationSnapshot? operation =
+                _deviceActionCoordinatorService.GetOperation(device.Serial);
+            if (operation == null)
+                return;
+
+            string message = string.Format(
+                GetLogText("Log_DeviceActionAlreadyRunningFormat"),
+                GetLogText(operation.Kind.GetDisplayResourceKey()));
+            if (_deviceProcessStateService.Get(device.Serial) == null)
+            {
+                _deviceProcessStateService.SetProcess(
+                    device.Serial,
+                    GetLogText("Log_Ready"),
+                    "Log_Ready");
+            }
+            _deviceProcessStateService.ShowTemporaryProcess(
+                device.Serial,
+                message,
+                "Log_DeviceActionAlreadyRunningFormat",
+                BusyActionLogDuration);
+            _logger.LogInformation("Single Device {Serial} action attempt while {Action} is running.",
+                device.Serial,
+                operation.Kind);
         }
 
         private string GetDeviceActionCanceledLogKey(DeviceActionKind kind)
@@ -670,16 +739,36 @@ namespace DeepDroidChanger.ViewModels
 
             void ApplyBusyState()
             {
-                bool isBusy = snapshot.State != DeviceActionRuntimeState.Idle;
+                bool isBusy = _deviceActionCoordinatorService.IsBusy(snapshot.Serial);
                 foreach (DeviceRowViewModel device in _allDeviceRows.Where(device => SerialEquals(device.Serial, snapshot.Serial)))
-                    device.IsActionBusy = isBusy;
+                {
+                    device.RestoreAction(
+                        isBusy
+                            ? _deviceActionCoordinatorService.GetOperation(snapshot.Serial)
+                            : null);
+                }
+
+                if (!isBusy
+                    && _deviceProcessStateService.Get(snapshot.Serial) is
+                    {
+                        State: DeviceProcessState.InProgress
+                    })
+                {
+                    _deviceProcessStateService.SetProcess(
+                        snapshot.Serial,
+                        GetLogText("Log_Ready"),
+                        "Log_Ready");
+                }
 
                 bool selectedDeviceChangedBusy = SelectedDevice != null
                     && SerialEquals(SelectedDevice.Serial, snapshot.Serial);
                 if (selectedDeviceChangedBusy)
                     NotifyDeviceInteractionChanged();
                 else
+                {
                     DeleteDeviceCommand.NotifyCanExecuteChanged();
+                    StopDeviceActionCommand.NotifyCanExecuteChanged();
+                }
             }
 
             if (_uiDispatcher.CheckAccess())
@@ -751,6 +840,7 @@ namespace DeepDroidChanger.ViewModels
             FakeProxyCommand.NotifyCanExecuteChanged();
             StopFakeProxyCommand.NotifyCanExecuteChanged();
             StopSelectedDeviceActionCommand.NotifyCanExecuteChanged();
+            StopDeviceActionCommand.NotifyCanExecuteChanged();
         }
 
         [RelayCommand(CanExecute = nameof(CanStopSelectedDeviceActionCommandCanExecute))]
@@ -766,6 +856,20 @@ namespace DeepDroidChanger.ViewModels
         private bool CanStopSelectedDeviceActionCommandCanExecute()
         {
             return CanStopSelectedDeviceAction;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanStopDeviceActionCommandCanExecute))]
+        private void StopDeviceAction(DeviceRowViewModel? device)
+        {
+            if (device == null || !device.CanStopAction)
+                return;
+
+            _deviceActionCoordinatorService.TryRequestCancellation(device.Serial);
+        }
+
+        private static bool CanStopDeviceActionCommandCanExecute(DeviceRowViewModel? device)
+        {
+            return device?.CanStopAction == true;
         }
 
         private bool CanAddNewDevices()
@@ -1156,6 +1260,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task RandomDeviceAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             RandomDeviceRequest request = CreateCurrentRandomDeviceRequest();
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
@@ -1207,6 +1318,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task ChangeDeviceAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
             if (profile != null)
                 CopyFormValuesToProfile(profile);
@@ -1280,6 +1398,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task ChangeWithoutWipeAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             DeviceInfoApiDevice? profile = CreateRandomDeviceProfileSnapshot(selectedDevice);
             if (profile != null)
                 CopyFormValuesToProfile(profile);
@@ -1347,6 +1472,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task WipeWithoutChangeAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
@@ -1399,14 +1531,21 @@ namespace DeepDroidChanger.ViewModels
 
         private bool CanOpenAdvancedChangeConfig()
         {
-            return !UseDefaultChangeMode && CanExecuteSelectedDeviceAction();
+            return !UseDefaultChangeMode
+                && CanExecuteSelectedDeviceAction()
+                && (SelectedDevice == null || !IsDeviceBusy(SelectedDevice));
         }
 
         [RelayCommand(CanExecute = nameof(CanOpenAdvancedChangeConfig), AllowConcurrentExecutions = true)]
         private async Task OpenAdvancedChangeConfigAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             bool useDefaultChangeMode = UseDefaultChangeMode;
+            List<StoredDeviceConfig>? configurationSnapshotList = selectedDevice == null
+                ? null
+                : CreateStoredDevicesSnapshot();
             DeviceProfileConfig profileSnapshot = CreateDeviceProfileConfig();
             if (useDefaultChangeMode)
                 return;
@@ -1446,7 +1585,11 @@ namespace DeepDroidChanger.ViewModels
                         result.Options,
                         useDefaultMode: false);
                     profileSnapshot.UseIntegritySecurityPatch = result.UseIntegritySecurityPatch;
-                    await SaveDeviceProfileAsync(device.Serial, profileSnapshot, cancellationToken)
+                    await SaveDeviceProfileAsync(
+                            device.Serial,
+                            profileSnapshot,
+                            cancellationToken,
+                            configurationSnapshotList)
                         .ConfigureAwait(true);
 
                     if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, device.Serial))
@@ -1470,6 +1613,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task RandomChangeAndWipeDeviceAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             DeviceChangeOptions changeOptions = CreateCurrentChangeOptions();
             bool changeSimEnabled = IsChangeSimEnabled;
             RandomDeviceRequest randomRequest = CreateCurrentRandomDeviceRequest();
@@ -1580,6 +1730,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task RandomSimAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             CarrierCountryOption? country = CloneCountryOption(SelectedCountry);
             CarrierOption? carrier = CloneCarrierOption(SelectedCarrier);
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
@@ -1624,6 +1781,12 @@ namespace DeepDroidChanger.ViewModels
                 return null;
             }
 
+            if (IsDeviceBusy(device))
+            {
+                ShowBusyActionLog(device);
+                return null;
+            }
+
             SelectSingleDevice(device);
             return device;
         }
@@ -1640,6 +1803,12 @@ namespace DeepDroidChanger.ViewModels
             device = await GetDeviceAsync(device, cancellationToken).ConfigureAwait(true);
             if (device == null)
                 return null;
+
+            if (IsDeviceBusy(device))
+            {
+                ShowBusyActionLog(device);
+                return null;
+            }
 
             if (device.ConnectionStatus != AdbDeviceStatus.Online)
             {
@@ -1688,6 +1857,13 @@ namespace DeepDroidChanger.ViewModels
         private async Task ChangeSimAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             SimProfile? sourceProfile = selectedDevice != null
                 && _randomSimProfiles.TryGetValue(selectedDevice.Serial, out SimProfile? profile)
                 ? profile
@@ -1747,6 +1923,19 @@ namespace DeepDroidChanger.ViewModels
         private async Task ChangeLocationAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
+            List<StoredDeviceConfig>? configurationSnapshotList = selectedDevice == null
+                ? null
+                : CreateStoredDevicesSnapshot();
+            StoredDeviceConfig? configurationSnapshot = selectedDevice == null
+                ? null
+                : CreateStoredDeviceConfigSnapshot(configurationSnapshotList!, selectedDevice.Serial);
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
                     DeviceActionKind.ChangeLocation)
@@ -1764,7 +1953,11 @@ namespace DeepDroidChanger.ViewModels
                 try
                 {
                     var dialogResult = await _changeLocationDialogService
-                        .ShowChangeLocationAsync(device.Serial, device.Name, cancellationToken)
+                        .ShowChangeLocationAsync(
+                            device.Serial,
+                            device.Name,
+                            configurationSnapshot,
+                            cancellationToken)
                         .ConfigureAwait(true);
 
                     if (dialogResult == null)
@@ -1791,7 +1984,8 @@ namespace DeepDroidChanger.ViewModels
                             locationResult.Longitude,
                             locationResult.CountryCode,
                             locationResult.CityName,
-                            cancellationToken)
+                            cancellationToken,
+                            configurationSnapshotList)
                         .ConfigureAwait(true);
 
                     SetDeviceLog(device, "Log_ChangeLocationSuccess");
@@ -1812,6 +2006,19 @@ namespace DeepDroidChanger.ViewModels
         private async Task ChangeTimezoneAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
+            List<StoredDeviceConfig>? configurationSnapshotList = selectedDevice == null
+                ? null
+                : CreateStoredDevicesSnapshot();
+            StoredDeviceConfig? configurationSnapshot = selectedDevice == null
+                ? null
+                : CreateStoredDeviceConfigSnapshot(configurationSnapshotList!, selectedDevice.Serial);
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
                     DeviceActionKind.ChangeTimezone)
@@ -1829,7 +2036,11 @@ namespace DeepDroidChanger.ViewModels
                 try
                 {
                     var dialogResult = await _changeTimezoneDialogService
-                        .ShowChangeTimezoneAsync(device.Serial, device.Name, cancellationToken)
+                        .ShowChangeTimezoneAsync(
+                            device.Serial,
+                            device.Name,
+                            configurationSnapshot,
+                            cancellationToken)
                         .ConfigureAwait(true);
 
                     if (dialogResult == null)
@@ -1853,7 +2064,8 @@ namespace DeepDroidChanger.ViewModels
                             device.Serial,
                             dialogResult.Mode,
                             appliedTimezone,
-                            cancellationToken)
+                            cancellationToken,
+                            configurationSnapshotList)
                         .ConfigureAwait(true);
 
                     SetDeviceLog(device, "Log_ChangeTimezoneSuccess");
@@ -1870,14 +2082,21 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        private async Task SaveUpdateIntegrityConfigAsync(DeviceRowViewModel deviceRow, UpdateIntegrityDialogResult result, CancellationToken cancellationToken)
+        private async Task SaveUpdateIntegrityConfigAsync(
+            DeviceRowViewModel deviceRow,
+            UpdateIntegrityDialogResult result,
+            CancellationToken cancellationToken,
+            IList<StoredDeviceConfig>? configurationSnapshot = null)
         {
             await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                await _deviceConfigService
-                    .SaveUpdateIntegrityConfigAsync(_storedDevices, deviceRow.Serial, result, cancellationToken)
+                IList<StoredDeviceConfig> targetConfiguration = configurationSnapshot ?? _storedDevices;
+                bool updated = await _deviceConfigService
+                    .SaveUpdateIntegrityConfigAsync(targetConfiguration, deviceRow.Serial, result, cancellationToken)
                     .ConfigureAwait(true);
+                if (updated && configurationSnapshot != null)
+                    MergeStoredDeviceSnapshot(configurationSnapshot, deviceRow.Serial);
             }
             finally
             {
@@ -1951,14 +2170,16 @@ namespace DeepDroidChanger.ViewModels
             string longitude,
             string countryCode,
             string cityName,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IList<StoredDeviceConfig>? configurationSnapshot = null)
         {
             await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                await _deviceConfigService
+                IList<StoredDeviceConfig> targetConfiguration = configurationSnapshot ?? _storedDevices;
+                bool updated = await _deviceConfigService
                     .SaveLocationConfigAsync(
-                        _storedDevices,
+                        targetConfiguration,
                         serial,
                         mode,
                         latitude,
@@ -1966,7 +2187,9 @@ namespace DeepDroidChanger.ViewModels
                         countryCode,
                         cityName,
                         cancellationToken)
-                    .ConfigureAwait(true);
+                        .ConfigureAwait(true);
+                if (updated && configurationSnapshot != null)
+                    MergeStoredDeviceSnapshot(configurationSnapshot, serial);
             }
             finally
             {
@@ -1978,19 +2201,23 @@ namespace DeepDroidChanger.ViewModels
             string serial,
             ChangeTimezoneMode mode,
             string timezone,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IList<StoredDeviceConfig>? configurationSnapshot = null)
         {
             await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                await _deviceConfigService
+                IList<StoredDeviceConfig> targetConfiguration = configurationSnapshot ?? _storedDevices;
+                bool updated = await _deviceConfigService
                     .SaveTimezoneConfigAsync(
-                        _storedDevices,
+                        targetConfiguration,
                         serial,
                         mode,
                         timezone,
                         cancellationToken)
-                    .ConfigureAwait(true);
+                        .ConfigureAwait(true);
+                if (updated && configurationSnapshot != null)
+                    MergeStoredDeviceSnapshot(configurationSnapshot, serial);
             }
             finally
             {
@@ -2002,9 +2229,19 @@ namespace DeepDroidChanger.ViewModels
         private async Task UpdateIntegrityAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
+            List<StoredDeviceConfig>? configurationSnapshotList = selectedDevice == null
+                ? null
+                : CreateStoredDevicesSnapshot();
             StoredDeviceConfig? storedDeviceSnapshot = selectedDevice == null
                 ? null
-                : CreateStoredDeviceConfigSnapshot(selectedDevice.Serial);
+                : CreateStoredDeviceConfigSnapshot(configurationSnapshotList!, selectedDevice.Serial);
             if (selectedDevice != null && storedDeviceSnapshot == null)
             {
                 SetDeviceLog(selectedDevice, "Log_UpdateIntegrityFailed");
@@ -2031,7 +2268,11 @@ namespace DeepDroidChanger.ViewModels
                             device.Serial,
                             device.Name,
                             storedDeviceSnapshot!,
-                            (result, saveCancellationToken) => SaveUpdateIntegrityConfigAsync(device, result, saveCancellationToken),
+                            (result, saveCancellationToken) => SaveUpdateIntegrityConfigAsync(
+                                device,
+                                result,
+                                saveCancellationToken,
+                                configurationSnapshotList),
                             cancellationToken)
                         .ConfigureAwait(true);
 
@@ -2041,7 +2282,12 @@ namespace DeepDroidChanger.ViewModels
                         return;
                     }
 
-                    await SaveUpdateIntegrityConfigAsync(device, dialogResult, cancellationToken).ConfigureAwait(true);
+                    await SaveUpdateIntegrityConfigAsync(
+                            device,
+                            dialogResult,
+                            cancellationToken,
+                            configurationSnapshotList)
+                        .ConfigureAwait(true);
 
                     SetDeviceLog(
                         device,
@@ -2070,6 +2316,8 @@ namespace DeepDroidChanger.ViewModels
         private async Task InstallApkAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
                     DeviceActionKind.InstallPackages)
@@ -2203,6 +2451,16 @@ namespace DeepDroidChanger.ViewModels
         private async Task FakeProxyAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null && IsDeviceBusy(selectedDevice))
+            {
+                ShowBusyActionLog(selectedDevice);
+                return;
+            }
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
+            StoredDeviceConfig? configurationSnapshot = selectedDevice == null
+                ? null
+                : CreateStoredDeviceConfigSnapshot(selectedDevice.Serial);
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
                     DeviceActionKind.FakeProxy)
@@ -2220,7 +2478,11 @@ namespace DeepDroidChanger.ViewModels
                 try
                 {
                     var dialogResult = await _fakeProxyDialogService
-                        .ShowFakeProxyDialogAsync(device.Serial, device.Name, cancellationToken)
+                        .ShowFakeProxyDialogAsync(
+                            device.Serial,
+                            device.Name,
+                            configurationSnapshot,
+                            cancellationToken)
                         .ConfigureAwait(true);
 
                     if (dialogResult == null)
@@ -2270,6 +2532,8 @@ namespace DeepDroidChanger.ViewModels
         private async Task StopFakeProxyAsync()
         {
             DeviceRowViewModel? selectedDevice = SelectedDevice;
+            if (selectedDevice != null)
+                await RefreshSingleActionConfigurationSnapshotAsync(selectedDevice.Serial).ConfigureAwait(true);
             IDeviceActionOperation? operation = await StartOnlineDeviceActionAsync(
                     selectedDevice,
                     DeviceActionKind.StopFakeProxy)
@@ -2937,20 +3201,24 @@ namespace DeepDroidChanger.ViewModels
         private async Task SaveDeviceProfileAsync(
             string serial,
             DeviceProfileConfig profile,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IList<StoredDeviceConfig>? configurationSnapshot = null)
         {
             try
             {
                 await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try
                 {
-                    await _deviceConfigService
+                    IList<StoredDeviceConfig> targetConfiguration = configurationSnapshot ?? _storedDevices;
+                    bool updated = await _deviceConfigService
                         .SaveDeviceProfileAsync(
-                            _storedDevices,
+                            targetConfiguration,
                             serial,
                             profile,
                             cancellationToken)
                         .ConfigureAwait(false);
+                    if (updated && configurationSnapshot != null)
+                        MergeStoredDeviceSnapshot(configurationSnapshot, serial);
                 }
                 finally
                 {
@@ -3037,7 +3305,7 @@ namespace DeepDroidChanger.ViewModels
                 connectedDevice,
                 GetConnectionStatusText(connectionStatus),
                 GetLogText("Log_Ready"));
-            deviceRow.IsActionBusy = _deviceActionCoordinatorService.IsBusy(deviceRow.Serial);
+            deviceRow.RestoreAction(_deviceActionCoordinatorService.GetOperation(deviceRow.Serial));
             if (_deviceProcessStateService.Get(deviceRow.Serial) is { } process)
                 deviceRow.RestoreProcess(process.Message, process.State);
             return deviceRow;
@@ -3363,9 +3631,41 @@ namespace DeepDroidChanger.ViewModels
             };
         }
 
+        private List<StoredDeviceConfig> CreateStoredDevicesSnapshot()
+        {
+            return _storedDevices
+                .Select(CloneStoredDeviceConfig)
+                .ToList();
+        }
+
+        private void MergeStoredDeviceSnapshot(
+            IList<StoredDeviceConfig> snapshot,
+            string serial)
+        {
+            StoredDeviceConfig? updated = snapshot
+                .FirstOrDefault(device => SerialEquals(device.Serial, serial));
+            if (updated == null)
+                return;
+
+            StoredDeviceConfig? current = _storedDevices
+                .FirstOrDefault(device => SerialEquals(device.Serial, serial));
+            if (current == null)
+                return;
+
+            int index = _storedDevices.IndexOf(current);
+            _storedDevices[index] = CloneStoredDeviceConfig(updated);
+        }
+
         private StoredDeviceConfig? CreateStoredDeviceConfigSnapshot(string serial)
         {
-            StoredDeviceConfig? storedDevice = _storedDevices
+            return CreateStoredDeviceConfigSnapshot(_storedDevices, serial);
+        }
+
+        private static StoredDeviceConfig? CreateStoredDeviceConfigSnapshot(
+            IReadOnlyList<StoredDeviceConfig> storedDevices,
+            string serial)
+        {
+            StoredDeviceConfig? storedDevice = storedDevices
                 .FirstOrDefault(device => SerialEquals(device.Serial, serial));
             return storedDevice == null
                 ? null
