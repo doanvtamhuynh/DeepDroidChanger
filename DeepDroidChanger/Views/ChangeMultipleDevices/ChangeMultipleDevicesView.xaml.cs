@@ -1,10 +1,12 @@
 using DeepDroidChanger.ViewModels;
 using Microsoft.Extensions.Logging;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace DeepDroidChanger.Views
 {
@@ -33,6 +35,7 @@ namespace DeepDroidChanger.Views
                 return;
 
             _isActive = true;
+            _viewModel.RunningActions.CollectionChanged += OnRunningActionsCollectionChanged;
             var viewCancellation = new CancellationTokenSource();
             _viewCancellation = viewCancellation;
             try
@@ -49,6 +52,7 @@ namespace DeepDroidChanger.Views
                 {
                     _viewCancellation = null;
                     _isActive = false;
+                    _viewModel.RunningActions.CollectionChanged -= OnRunningActionsCollectionChanged;
                     viewCancellation.Dispose();
                 }
             }
@@ -60,6 +64,7 @@ namespace DeepDroidChanger.Views
                 return;
 
             _isActive = false;
+            _viewModel.RunningActions.CollectionChanged -= OnRunningActionsCollectionChanged;
             CancellationTokenSource? viewCancellation = _viewCancellation;
             _viewCancellation = null;
             try
@@ -78,6 +83,36 @@ namespace DeepDroidChanger.Views
             {
                 viewCancellation?.Dispose();
             }
+        }
+
+        private void OnRunningActionsCollectionChanged(
+            object? sender,
+            NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action != NotifyCollectionChangedAction.Remove &&
+                e.Action != NotifyCollectionChangedAction.Replace &&
+                e.Action != NotifyCollectionChangedAction.Reset)
+            {
+                return;
+            }
+
+            double verticalOffset =
+                MultipleDeviceProfilePanelScrollViewer.VerticalOffset;
+
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Loaded,
+                new Action(() =>
+                {
+                    if (!_isActive)
+                        return;
+
+                    double targetOffset = Math.Min(
+                        verticalOffset,
+                        MultipleDeviceProfilePanelScrollViewer.ScrollableHeight);
+
+                    MultipleDeviceProfilePanelScrollViewer
+                        .ScrollToVerticalOffset(targetOffset);
+                }));
         }
 
         private void OnDeviceGridPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)

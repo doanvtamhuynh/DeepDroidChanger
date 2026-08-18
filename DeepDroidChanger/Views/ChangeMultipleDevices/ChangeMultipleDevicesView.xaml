@@ -731,6 +731,8 @@
                                                     Command="{Binding DataContext.StopRunningActionCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
                                                     CommandParameter="{Binding}"
                                                     IsEnabled="{Binding CanStop}"
+                                                    Focusable="False"
+                                                    KeyboardNavigation.IsTabStop="False"
                                                     ToolTip="{DynamicResource ChangeMultipleDevices_StopRunningActionTooltip}"
                                                     Width="118"
                                                     HorizontalContentAlignment="Center"
