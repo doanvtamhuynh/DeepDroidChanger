@@ -53,6 +53,74 @@ namespace DeepDroidChanger.Services
             return CreateFailure(filePath, "Log_InstallPackageUnsupportedFile");
         }
 
+        public async Task<InstallPackageSetResult> InstallManyAsync(
+            string serial,
+            IReadOnlyList<string> filePaths,
+            InstallPackageOptions options,
+            CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            ArgumentNullException.ThrowIfNull(filePaths);
+            ArgumentNullException.ThrowIfNull(options);
+            if (filePaths.Count == 0)
+                throw new ArgumentException("At least one package file is required.", nameof(filePaths));
+
+            var results = new List<InstallPackageResult>(filePaths.Count);
+            foreach (string filePath in filePaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    results.Add(await InstallAsync(
+                            serial,
+                            filePath,
+                            options,
+                            cancellationToken)
+                        .ConfigureAwait(false));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(
+                        exception,
+                        "Unexpected package installation failure for device {Serial}, file {FilePath}.",
+                        serial,
+                        filePath);
+                    results.Add(CreateFailure(filePath, "Log_InstallPackageAdbFailure"));
+                }
+            }
+
+            return CreateInstallPackageSetResult(results);
+        }
+
+        private static InstallPackageSetResult CreateInstallPackageSetResult(
+            IReadOnlyList<InstallPackageResult> results)
+        {
+            IReadOnlyList<InstallPackageResult> immutableResults = Array.AsReadOnly(results.ToArray());
+            int totalCount = immutableResults.Count;
+            int successCount = immutableResults.Count(result => result.Success);
+            string messageResourceKey = totalCount == 1
+                ? immutableResults[0].MessageResourceKey
+                : successCount == totalCount
+                    ? "Log_InstallPackageCompleteFormat"
+                    : successCount > 0
+                        ? "Log_InstallPackagePartialFormat"
+                        : "Log_InstallPackageFailedFormat";
+            IReadOnlyList<object> messageArguments = totalCount == 1
+                ? immutableResults[0].MessageArguments
+                : [successCount, totalCount];
+
+            return new InstallPackageSetResult(
+                immutableResults,
+                successCount,
+                totalCount,
+                messageResourceKey,
+                messageArguments);
+        }
+
         private async Task<InstallPackageResult> InstallApkAsync(
             string serial,
             string apkPath,
