@@ -77,6 +77,41 @@ namespace DeepDroidChanger
 
             _isCloseCleanupInProgress = true;
 
+            ApplicationShutdownDecision decision;
+            try
+            {
+                decision = await _viewModel.PrepareShutdownAsync(CancellationToken.None)
+                    .ConfigureAwait(true);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to prepare active device actions for shutdown.");
+                _isCloseCleanupInProgress = false;
+                return;
+            }
+
+            if (decision == ApplicationShutdownDecision.Canceled)
+            {
+                _isCloseCleanupInProgress = false;
+                return;
+            }
+
+            if (decision == ApplicationShutdownDecision.ForceExit)
+            {
+                try
+                {
+                    await _viewModel.SaveSettingsAsync(CancellationToken.None).ConfigureAwait(true);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to save settings before forced application exit.");
+                }
+
+                _logger.LogCritical("Device actions did not stop within the shutdown timeout; forcing application exit.");
+                Environment.Exit(0);
+                return;
+            }
+
             await DeactivateViewModelAsync(
                     _changeSingleDeviceViewModel.DeactivateAsync,
                     "Single Device")

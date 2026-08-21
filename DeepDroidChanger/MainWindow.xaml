@@ -14,6 +14,7 @@
         FontFamily="{StaticResource Metric.FontFamily}">
 
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     <Style x:Key="SidebarTabStyle"
                TargetType="Button">
             <Setter Property="Height"
@@ -847,6 +848,28 @@
         <Border Grid.Column="1"
                 Background="{DynamicResource Brush.WindowBackground}">
             <ContentControl x:Name="MainContent"/>
+        </Border>
+
+        <Border Grid.ColumnSpan="2"
+                Background="{DynamicResource Brush.Overlay}"
+                Visibility="{Binding IsShutdownInProgress, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{DynamicResource Brush.Surface}"
+                    BorderBrush="{DynamicResource Brush.Border}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource Radius.Medium}"
+                    Padding="{StaticResource Spacing.CardPadding}">
+                <StackPanel MinWidth="280">
+                    <ProgressBar IsIndeterminate="True"
+                                 Style="{StaticResource DialogLinearProgressBarStyle}"/>
+                    <TextBlock Margin="0,14,0,0"
+                               Text="{DynamicResource MainWindow_ShutdownStopping}"
+                               HorizontalAlignment="Center"
+                               FontSize="{StaticResource Metric.FontSize.Body}"
+                               FontWeight="SemiBold"/>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>

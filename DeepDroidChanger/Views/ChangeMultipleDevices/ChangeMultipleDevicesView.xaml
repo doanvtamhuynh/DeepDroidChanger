@@ -84,7 +84,7 @@
             <Setter Property="Padding" Value="14,12"/>
         </Style>
 
-        <Style x:Key="MultipleDeviceInfoSectionBorderStyle"
+        <Style x:Key="MultipleDevicePanelBorderStyle"
                TargetType="Border"
                BasedOn="{StaticResource MultipleDeviceSectionBorderStyle}">
             <Setter Property="Margin" Value="0,0,12,0"/>
@@ -195,7 +195,7 @@
             </Setter>
         </Style>
 
-        <Style x:Key="MultipleDeviceInfoFormGridStyle"
+        <Style x:Key="MultipleDeviceConfigurationFormGridStyle"
                TargetType="Grid">
             <Setter Property="VerticalAlignment" Value="Top"/>
         </Style>
@@ -302,7 +302,7 @@
                     Value="{DynamicResource Brush.Warning}"/>
         </Style>
 
-        <Style x:Key="MultipleDeviceInfoDetailsButtonStyle"
+        <Style x:Key="MultipleDeviceAdvancedConfigButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource MultipleDeviceActionButtonStyle}">
             <Setter Property="Margin" Value="8,0,0,0"/>
@@ -423,7 +423,7 @@
                 <Button x:Name="MultipleAddDevicesButton"
                         Grid.Column="0"
                         Command="{Binding AddNewDevicesCommand}"
-                        ToolTip="{DynamicResource Shared_TooltipAction}"
+                        ToolTip="{DynamicResource ChangeMultipleDevices_AddDevicesTooltip}"
                         Style="{StaticResource MultipleDeviceLoadButtonStyle}">
                     <StackPanel Style="{StaticResource MultipleDeviceLoadButtonContentStyle}">
                         <materialDesign:PackIcon Kind="Plus"
@@ -455,7 +455,7 @@
                                   Content="{DynamicResource ChangeMultipleDevices_SelectAllDevices}"
                                   IsChecked="{Binding AllDevicesSelectionState, Mode=OneWay}"
                                   Command="{Binding ToggleSelectAllDevicesCommand}"
-                                  ToolTip="{DynamicResource Shared_TooltipSelectRow}"
+                                  ToolTip="{DynamicResource ChangeMultipleDevices_SelectAllDevicesTooltip}"
                                   Style="{StaticResource MultipleDeviceSelectAllCheckBoxStyle}"/>
                     </Border>
                     <TextBlock Text="{DynamicResource ChangeMultipleDevices_FilterLabel}"
@@ -492,7 +492,7 @@
                   PreviewMouseRightButtonDown="OnDeviceGridPreviewMouseRightButtonDown"
                       behaviors:DeviceTableColumnLayoutBehavior.PersistColumnRatios="True"
                       behaviors:DeviceTableColumnLayoutBehavior.ColumnRatios="{Binding DeviceTableColumnRatios}"
-                      behaviors:DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommand="{Binding SaveMultipleDeviceColumnRatiosCommand}"
+                      behaviors:DeviceTableColumnLayoutBehavior.SaveColumnRatiosCommand="{Binding SaveMultipleDevicesColumnRatiosCommand}"
                       Style="{StaticResource MultipleDeviceGridStyle}">
                 <DataGrid.Columns>
                     <DataGridTemplateColumn behaviors:DeviceTableColumnLayoutBehavior.ColumnKey="Selected"
@@ -505,7 +505,7 @@
                         </DataGridTemplateColumn.Header>
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                <Button Command="{Binding DataContext.ToggleMultipleDevicesSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                         CommandParameter="{Binding}"
                                         AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_ColumnSelected}"
                                         ToolTip="{DynamicResource Shared_TooltipSelectRow}"
@@ -687,7 +687,7 @@
 
                     <Border x:Name="RunningActionsPanel"
                             Grid.Column="0"
-                            Style="{StaticResource MultipleDeviceInfoSectionBorderStyle}">
+                            Style="{StaticResource MultipleDevicePanelBorderStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -725,6 +725,9 @@
                                             <StackPanel ToolTip="{Binding DeviceTooltip}">
                                                 <TextBlock Text="{Binding ActionName}"
                                                            Style="{StaticResource RunningActionNameTextStyle}"/>
+                                                <TextBlock Text="{Binding SourceName}"
+                                                           Foreground="{DynamicResource Brush.TextSecondary}"
+                                                           FontSize="{StaticResource Metric.FontSize.Small}"/>
                                                 <TextBlock Text="{Binding DeviceSummary}" TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                             <Button Grid.Column="1"
@@ -767,7 +770,7 @@
 
                     <Border x:Name="MultipleDeviceConfigurationPanel"
                             Grid.Column="1"
-                            Style="{StaticResource MultipleDeviceInfoSectionBorderStyle}">
+                            Style="{StaticResource MultipleDevicePanelBorderStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -789,10 +792,10 @@
                                            Style="{StaticResource MultipleDeviceSectionTitleTextStyle}"/>
                                 <Button x:Name="MultipleAdvancedChangeConfigButton"
                                         Grid.Column="2"
-                                        Command="{Binding OpenAdvancedChangeConfigCommand}"
+                                        Command="{Binding OpenMultipleDevicesAdvancedConfigCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_AdvancedConfigTooltip}"
                                         ToolTipService.ShowOnDisabled="True"
-                                        Style="{StaticResource MultipleDeviceInfoDetailsButtonStyle}">
+                                        Style="{StaticResource MultipleDeviceAdvancedConfigButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -813,7 +816,7 @@
                             <Grid x:Name="MultipleDeviceConfigurationFormGrid"
                                   Grid.Row="2"
                                   Margin="0,5,0,0"
-                                  Style="{StaticResource MultipleDeviceInfoFormGridStyle}">
+                                  Style="{StaticResource MultipleDeviceConfigurationFormGridStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -967,7 +970,7 @@
 
                                 <Button Grid.Row="0"
                                         Grid.Column="0"
-                                        Command="{Binding RandomSelectedDevicesCommand}"
+                                        Command="{Binding RandomizeMultipleDevicesInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomSelectedTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -978,7 +981,7 @@
                                 </Button>
                                 <Button Grid.Row="0"
                                         Grid.Column="1"
-                                        Command="{Binding ChangeSelectedDevicesCommand}"
+                                        Command="{Binding ChangeAndWipeMultipleDevicesCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeAndWipeTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -989,7 +992,7 @@
                                 </Button>
                                 <Button Grid.Row="1"
                                         Grid.Column="0"
-                                        Command="{Binding WipeSelectedDevicesWithoutChangeCommand}"
+                                        Command="{Binding WipeMultipleDevicesWithoutChangeCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionWipeWithoutChangeTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1000,7 +1003,7 @@
                                 </Button>
                                 <Button Grid.Row="1"
                                         Grid.Column="1"
-                                        Command="{Binding ChangeSelectedDevicesWithoutWipeCommand}"
+                                        Command="{Binding ChangeMultipleDevicesWithoutWipeCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeWithoutWipeTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1011,7 +1014,7 @@
                                 </Button>
                                 <Button Grid.Row="2"
                                         Grid.Column="0"
-                                        Command="{Binding RandomSelectedSimsCommand}"
+                                        Command="{Binding RandomizeMultipleDevicesSimInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomSimTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1022,7 +1025,7 @@
                                 </Button>
                                 <Button Grid.Row="2"
                                         Grid.Column="1"
-                                        Command="{Binding ChangeSelectedSimsCommand}"
+                                        Command="{Binding ChangeMultipleDevicesSimInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeSimTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1033,7 +1036,7 @@
                                 </Button>
                                 <Button Grid.Row="3"
                                         Grid.Column="0"
-                                        Command="{Binding RandomChangeAndWipeSelectedDevicesCommand}"
+                                        Command="{Binding RandomizeChangeAndWipeMultipleDevicesCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1044,7 +1047,7 @@
                                 </Button>
                                 <Button Grid.Row="3"
                                         Grid.Column="1"
-                                        Command="{Binding InstallSelectedPackagesCommand}"
+                                        Command="{Binding InstallPackagesOnMultipleDevicesCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionInstallApkTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1057,7 +1060,7 @@
                                 </Button>
                                 <Button Grid.Row="4"
                                         Grid.Column="0"
-                                        Command="{Binding ChangeSelectedLocationsCommand}"
+                                        Command="{Binding ChangeMultipleDevicesLocationCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeLocationTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
@@ -1068,7 +1071,7 @@
                                 </Button>
                                 <Button Grid.Row="4"
                                         Grid.Column="1"
-                                        Command="{Binding ChangeSelectedTimezonesCommand}"
+                                        Command="{Binding ChangeMultipleDevicesTimezoneCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeTimezoneTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>

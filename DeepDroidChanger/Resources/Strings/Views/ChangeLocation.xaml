@@ -3,7 +3,7 @@
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="ChangeLocation_WindowTitle">Change Location</system:String>
     <system:String x:Key="ChangeLocation_ModeGroupHeader">Change Mode</system:String>
-    <system:String x:Key="ChangeTimezone_ModeData">Use location data</system:String>
+    <system:String x:Key="ChangeLocation_ModeData">Use location data</system:String>
     <system:String x:Key="ChangeLocation_ModeDeviceIp">Use device IP</system:String>
     <system:String x:Key="ChangeLocation_CountrySearchHint">Search country...</system:String>
     <system:String x:Key="ChangeLocation_LatitudeLabel">Latitude</system:String>

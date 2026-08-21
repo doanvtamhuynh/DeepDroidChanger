@@ -2,6 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="ChangeMultipleDevices_AddDevices">Add Devices</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_AddDevicesTooltip">Add devices to the saved device list.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_SelectAllDevicesTooltip">Select or deselect all devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_NewDeviceCount">New devices: {0}</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_NotAvailable">N/A</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterLabel">Filter:</sys:String>
@@ -27,22 +29,22 @@
     <sys:String x:Key="ChangeMultipleDevices_RunningActionsHeader">Running Actions</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StopAction">Stop</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StoppingAction">Stopping...</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_StopActionTooltip">Stop the selected device's current action.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StopActionTooltip">Stop this device's current action.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StopRunningActionTooltip">Stop this action for all listed devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelected">Random Device</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelectedTooltip">Generate random device information for selected devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSelectedTooltip">Generate random device information for the selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipe">Change &amp; Wipe Device</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipeTooltip">Change selected devices' information and wipe app data.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeAndWipeTooltip">Change the selected devices' information and wipe app data.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipe">Random, Change &amp; Wipe</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip">Generate random information, then change and wipe selected devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip">Generate random information, then change and wipe the selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChange">Wipe Without Change</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChangeTooltip">Wipe app data on selected devices without changing their information.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionWipeWithoutChangeTooltip">Wipe app data on the selected devices without changing their information.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipe">Change Without Wipe</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipeTooltip">Change selected devices' information without wiping app data.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeWithoutWipeTooltip">Change the selected devices' information without wiping app data.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSim">Random SIM</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSimTooltip">Generate random SIM information for selected devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionRandomSimTooltip">Generate random SIM information for the selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeSim">Change SIM</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeSimTooltip">Apply generated SIM information to selected devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeSimTooltip">Apply generated SIM information to the selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeCaption">Change &amp; Wipe {0} Devices?</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeMessage">This will change device information and wipe data on {0} selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeWarning">This action restarts devices and removes app data.</sys:String>
@@ -63,14 +65,14 @@
     <sys:String x:Key="ChangeMultipleDevices_OptionChangeSim">Change SIM</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_OptionDefaultMode">Change and Wipe default</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_AdvancedConfig">Advanced Config</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_AdvancedConfigTooltip">Select at least one online device and disable default mode to configure advanced options.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_AdvancedConfigTooltip">Configure advanced options for the selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOnline">Online</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusUnauthorized">Unauthorized</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocation">Change Location</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezone">Change Timezone</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocationTooltip">Apply a Location to the selected online devices.</sys:String>
-    <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Apply a Timezone to the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocationTooltip">Apply a location to the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Apply a timezone to the selected online devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApk">Install APK/XAPK</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApkTooltip">Install selected APK/XAPK files on the selected online devices.</sys:String>
 </ResourceDictionary>

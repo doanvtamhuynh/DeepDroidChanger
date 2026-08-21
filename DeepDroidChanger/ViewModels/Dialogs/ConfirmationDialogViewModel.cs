@@ -53,6 +53,7 @@ public sealed partial class ConfirmationDialogViewModel : ObservableObject
             ConfirmationDialogIcon.Wipe => PackIconKind.DeleteSweep,
             ConfirmationDialogIcon.Sim => PackIconKind.SimCard,
             ConfirmationDialogIcon.Delete => PackIconKind.Delete,
+            ConfirmationDialogIcon.Warning => PackIconKind.AlertOutline,
             _ => PackIconKind.HelpCircleOutline
         };
     }

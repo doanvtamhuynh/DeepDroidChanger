@@ -18,21 +18,30 @@ namespace DeepDroidChanger.ViewModels
         private readonly ILocalizationService _localizationService;
         private readonly IThemeService _themeService;
         private readonly ISettingsService _settingsService;
+        private readonly IDeviceActionCoordinatorService? _deviceActionCoordinatorService;
+        private readonly IConfirmationDialogService? _confirmationDialogService;
         private bool _isSidebarCollapsed;
         private bool _isDevicesManagerSubmenuOpen;
         private bool _isDevicesManagerFlyoutOpen;
         private AppView _activeView;
 
+        [ObservableProperty]
+        private bool _isShutdownInProgress;
+
         public MainViewModel(
             AppSettings settings,
             ILocalizationService localizationService,
             IThemeService themeService,
-            ISettingsService settingsService)
+            ISettingsService settingsService,
+            IDeviceActionCoordinatorService? deviceActionCoordinatorService = null,
+            IConfirmationDialogService? confirmationDialogService = null)
         {
             _settings = settings;
             _localizationService = localizationService;
             _themeService = themeService;
             _settingsService = settingsService;
+            _deviceActionCoordinatorService = deviceActionCoordinatorService;
+            _confirmationDialogService = confirmationDialogService;
 
             Language = _localizationService.NormalizeLanguage(_settings.Language ?? "en");
             Theme = _themeService.NormalizeTheme(_settings.Theme ?? "Dark");
@@ -232,6 +241,61 @@ namespace DeepDroidChanger.ViewModels
         {
             if (IsSidebarCollapsed)
                 IsDevicesManagerFlyoutOpen = false;
+        }
+
+        public async Task<ApplicationShutdownDecision> PrepareShutdownAsync(
+            CancellationToken cancellationToken)
+        {
+            IDeviceActionCoordinatorService? coordinator = _deviceActionCoordinatorService;
+            if (coordinator == null)
+                return ApplicationShutdownDecision.ReadyToClose;
+
+            IReadOnlyList<DeviceActionSessionSnapshot> activeSessions = coordinator.GetActiveSessions();
+            if (activeSessions.Count == 0)
+            {
+                return ApplicationShutdownDecision.ReadyToClose;
+            }
+
+            if (_confirmationDialogService == null)
+                return ApplicationShutdownDecision.Canceled;
+
+            bool confirmed = await _confirmationDialogService.ShowConfirmationAsync(
+                    new ConfirmationDialogOptions
+                    {
+                        Caption = _localizationService.GetString("MainWindow_ShutdownActiveActionsCaption"),
+                        Message = string.Format(
+                            _localizationService.GetString("MainWindow_ShutdownActiveActionsMessage"),
+                            activeSessions.Count),
+                        WarningMessage = _localizationService.GetString("MainWindow_ShutdownActiveActionsWarning"),
+                        ConfirmButtonText = _localizationService.GetString("MainWindow_ShutdownStopAndExit"),
+                        CancelButtonText = _localizationService.GetString("MainWindow_ShutdownKeepWorking"),
+                        Icon = ConfirmationDialogIcon.Warning
+                    },
+                    cancellationToken)
+                .ConfigureAwait(true);
+            if (!confirmed)
+                return ApplicationShutdownDecision.Canceled;
+
+            IsShutdownInProgress = true;
+            coordinator.RequestShutdownCancellation();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            try
+            {
+                await coordinator.WaitForIdleAsync(timeout.Token)
+                    .ConfigureAwait(true);
+                return ApplicationShutdownDecision.ReadyToClose;
+            }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested
+                                                   && !cancellationToken.IsCancellationRequested)
+            {
+                return ApplicationShutdownDecision.ForceExit;
+            }
+            catch
+            {
+                IsShutdownInProgress = false;
+                throw;
+            }
         }
 
         private void SynchronizeDevicesManagerMenuState()

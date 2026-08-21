@@ -13,4 +13,10 @@
     <sys:String x:Key="Nav_ToggleSidebarTooltip">Expand or collapse the navigation sidebar without changing the current workspace.</sys:String>
     <sys:String x:Key="Nav_LanguageTooltip">Switch the application language between the available localizations.</sys:String>
     <sys:String x:Key="Nav_ThemeTooltip">Switch the application color theme.</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownActiveActionsCaption">Actions are still running</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownActiveActionsMessage">{0} action session(s) are still running. Stop all actions and exit?</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownActiveActionsWarning">Stopping can leave an in-progress device change only partially complete.</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownStopAndExit">Stop actions and exit</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownKeepWorking">Keep working</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownStopping">Stopping running actions…</sys:String>
 </ResourceDictionary>

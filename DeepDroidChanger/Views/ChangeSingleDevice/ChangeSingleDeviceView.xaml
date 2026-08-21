@@ -376,7 +376,7 @@
 
             <Button Grid.Column="0"
                     Command="{Binding AddNewDevicesCommand}"
-                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                    ToolTip="{DynamicResource ChangeSingleDevice_AddDevicesTooltip}"
                     Style="{StaticResource DeviceLoadButtonStyle}">
                 <StackPanel Style="{StaticResource DeviceLoadButtonContentStyle}">
                     <materialDesign:PackIcon Kind="Plus"
@@ -446,10 +446,10 @@
                     </DataGridTemplateColumn.Header>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Command="{Binding DataContext.ToggleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            <Button Command="{Binding DataContext.ToggleSingleDeviceSelectionCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                     CommandParameter="{Binding}"
                                     AutomationProperties.Name="{DynamicResource ChangeSingleDevice_ColumnSelected}"
-                    ToolTip="{DynamicResource Shared_TooltipSelectRow}"
+                                    ToolTip="{DynamicResource Shared_TooltipSelectRow}"
                                     Style="{StaticResource ChangeSingleDeviceSelectionButtonStyle}">
                                 <CheckBox IsChecked="{Binding IsSelected, Mode=OneWay}"
                                           IsHitTestVisible="False"
@@ -646,8 +646,8 @@
                                            Style="{StaticResource DeviceSectionTitleTextStyle}"/>
                                 <Button x:Name="ViewAllDeviceInfoButton"
                                         Grid.Column="2"
-                                        Command="{Binding ViewRandomDeviceInfoCommand}"
-                                        ToolTip="{DynamicResource Shared_TooltipAction}"
+                                        Command="{Binding ViewSingleDeviceRandomizedInfoCommand}"
+                                        ToolTip="{DynamicResource ChangeSingleDevice_ActionViewAllDeviceInfoTooltip}"
                                         Style="{StaticResource DeviceInfoDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -833,7 +833,7 @@
                                            Style="{StaticResource DeviceSectionTitleTextStyle}"/>
                                 <Button x:Name="AdvancedChangeConfigButton"
                                         Grid.Column="2"
-                                        Command="{Binding OpenAdvancedChangeConfigCommand}"
+                                        Command="{Binding OpenSingleDeviceAdvancedConfigCommand}"
                                         ToolTip="{DynamicResource ChangeSingleDevice_AdvancedConfigTooltip}"
                                         Style="{StaticResource DeviceInfoDetailsButtonStyle}">
                                     <Grid>
@@ -1012,7 +1012,7 @@
                             <Button x:Name="RandomDeviceButton"
                                     Grid.Row="0"
                                     Grid.Column="0"
-                                    Command="{Binding RandomDeviceCommand}"
+                                    Command="{Binding RandomizeSingleDeviceInfoCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomDeviceTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1033,7 +1033,7 @@
                             <Button x:Name="ChangeWithoutWipeButton"
                                     Grid.Row="1"
                                     Grid.Column="1"
-                                    Command="{Binding ChangeWithoutWipeCommand}"
+                                    Command="{Binding ChangeSingleDeviceWithoutWipeCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeWithoutWipeTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1055,7 +1055,7 @@
                             <Button x:Name="ChangeDeviceButton"
                                     Grid.Row="0"
                                     Grid.Column="1"
-                                    Command="{Binding ChangeDeviceCommand}"
+                                    Command="{Binding ChangeAndWipeSingleDeviceCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeDeviceTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1076,7 +1076,7 @@
                             <Button x:Name="WipeWithoutChangeButton"
                                     Grid.Row="1"
                                     Grid.Column="0"
-                                    Command="{Binding WipeWithoutChangeCommand}"
+                                    Command="{Binding WipeSingleDeviceWithoutChangeCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionWipeWithoutChangeTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1096,7 +1096,7 @@
                             </Button>
                             <Button Grid.Row="3"
                                     Grid.Column="0"
-                                    Command="{Binding RandomChangeAndWipeDeviceCommand}"
+                                    Command="{Binding RandomizeChangeAndWipeSingleDeviceCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomChangeAndWipeTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1117,7 +1117,7 @@
                             <Button x:Name="RandomSimButton"
                                     Grid.Row="2"
                                     Grid.Column="0"
-                                    Command="{Binding RandomSimCommand}"
+                                    Command="{Binding RandomizeSingleDeviceSimInfoCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomSimTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1138,7 +1138,7 @@
                             <Button x:Name="ChangeSimButton"
                                     Grid.Row="2"
                                     Grid.Column="1"
-                                    Command="{Binding ChangeSimCommand}"
+                                    Command="{Binding ChangeSingleDeviceSimInfoCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeSimTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
@@ -1158,8 +1158,8 @@
                             </Button>
                             <Button Grid.Row="4"
                                     Grid.Column="0"
-                                    Command="{Binding ChangeLocationCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Command="{Binding ChangeSingleDeviceLocationCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeLocationTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1178,8 +1178,8 @@
                             </Button>
                             <Button Grid.Row="4"
                                     Grid.Column="1"
-                                    Command="{Binding ChangeTimezoneCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Command="{Binding ChangeSingleDeviceTimezoneCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeTimezoneTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1198,8 +1198,8 @@
                             </Button>
                             <Button Grid.Row="6"
                                     Grid.Column="0"
-                                    Command="{Binding UpdateIntegrityCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Command="{Binding UpdateSingleDeviceIntegrityCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionUpdateIntegrityTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1218,8 +1218,8 @@
                             </Button>
                             <Button Grid.Row="3"
                                     Grid.Column="1"
-                                    Command="{Binding InstallApkCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Command="{Binding InstallPackagesOnSingleDeviceCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionInstallApkTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1238,8 +1238,8 @@
                             </Button>
                             <Button Grid.Row="5"
                                     Grid.Column="0"
-                                    Command="{Binding FakeProxyCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Command="{Binding StartSingleDeviceFakeProxyCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionFakeProxyTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -1258,8 +1258,8 @@
                             </Button>
                             <Button Grid.Row="5"
                                     Grid.Column="1"
-                                    Command="{Binding StopFakeProxyCommand}"
-                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Command="{Binding StopSingleDeviceFakeProxyCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionStopFakeProxyTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>

@@ -63,29 +63,29 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
     }
 
     public async Task<bool> ConfirmMultipleAsync(
-        MultipleDeviceBatchAction action,
+        DeviceActionKind action,
         int deviceCount,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(deviceCount);
         (string captionKey, string messageKey, string warningKey, ConfirmationDialogIcon icon) = action switch
         {
-            MultipleDeviceBatchAction.ChangeAndWipe => (
+            DeviceActionKind.ChangeDevice or DeviceActionKind.RandomChangeAndWipe => (
                 "ChangeMultipleDevices_ConfirmChangeAndWipeCaption",
                 "ChangeMultipleDevices_ConfirmChangeAndWipeMessage",
                 "ChangeMultipleDevices_ConfirmChangeAndWipeWarning",
                 ConfirmationDialogIcon.ChangeDevice),
-            MultipleDeviceBatchAction.ChangeWithoutWipe => (
+            DeviceActionKind.ChangeWithoutWipe => (
                 "ChangeMultipleDevices_ConfirmChangeWithoutWipeCaption",
                 "ChangeMultipleDevices_ConfirmChangeWithoutWipeMessage",
                 "ChangeMultipleDevices_ConfirmChangeWithoutWipeWarning",
                 ConfirmationDialogIcon.ChangeDevice),
-            MultipleDeviceBatchAction.WipeWithoutChange => (
+            DeviceActionKind.Wipe => (
                 "ChangeMultipleDevices_ConfirmWipeWithoutChangeCaption",
                 "ChangeMultipleDevices_ConfirmWipeWithoutChangeMessage",
                 "ChangeMultipleDevices_ConfirmWipeWithoutChangeWarning",
                 ConfirmationDialogIcon.Wipe),
-            MultipleDeviceBatchAction.ChangeSim => (
+            DeviceActionKind.ChangeSim => (
                 "ChangeMultipleDevices_ConfirmChangeSimCaption",
                 "ChangeMultipleDevices_ConfirmChangeSimMessage",
                 "ChangeMultipleDevices_ConfirmChangeSimWarning",

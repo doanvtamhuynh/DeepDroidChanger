@@ -9,6 +9,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
     private readonly Dictionary<string, ActiveDeviceAction> _activeOperations =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<DeviceActionOperationSnapshot> _pendingNotifications = new();
+    private TaskCompletionSource? _idleCompletion;
     private bool _isPublishingNotifications;
 
     public event Action<DeviceActionOperationSnapshot>? OperationStateChanged;
@@ -52,7 +53,8 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         DeviceActionKind kind,
         bool canCancel,
         CancellationToken externalCancellationToken = default,
-        Guid? sessionId = null)
+        Guid? sessionId = null,
+        DeviceActionSource source = DeviceActionSource.Unknown)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         if (externalCancellationToken.IsCancellationRequested)
@@ -68,6 +70,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             kind,
             canCancel,
             effectiveSessionId,
+            source,
             externalCancellationToken);
 
         bool shouldPublish;
@@ -77,6 +80,24 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             {
                 operation.DisposeResources();
                 return null;
+            }
+
+            ActiveDeviceAction? sessionOperation = _activeOperations.Values
+                .FirstOrDefault(candidate => candidate.SessionId == effectiveSessionId);
+            if (sessionOperation != null
+                && (sessionOperation.Source != source
+                    || sessionOperation.Kind.ToLogicalActionKind() != kind.ToLogicalActionKind()))
+            {
+                operation.DisposeResources();
+                throw new ArgumentException(
+                    "Operations in one session must share source and logical action kind.",
+                    nameof(sessionId));
+            }
+
+            if (_activeOperations.Count == 0)
+            {
+                _idleCompletion = new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
             _activeOperations.Add(normalizedSerial, operation);
@@ -134,9 +155,38 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         return canceled;
     }
 
+    public void RequestShutdownCancellation()
+    {
+        ActiveDeviceAction[] operations;
+        lock (_syncRoot)
+            operations = _activeOperations.Values.ToArray();
+
+        foreach (ActiveDeviceAction operation in operations)
+        {
+            _ = RequestCancellation(
+                operation,
+                DeviceActionCancellationReason.UserStop,
+                honorCanCancel: false);
+        }
+    }
+
+    public Task WaitForIdleAsync(CancellationToken cancellationToken)
+    {
+        Task idleTask;
+        lock (_syncRoot)
+        {
+            idleTask = _activeOperations.Count == 0
+                ? Task.CompletedTask
+                : _idleCompletion?.Task ?? Task.CompletedTask;
+        }
+
+        return idleTask.WaitAsync(cancellationToken);
+    }
+
     internal void Release(ActiveDeviceAction operation)
     {
         bool shouldPublish;
+        TaskCompletionSource? idleCompletion = null;
         lock (_syncRoot)
         {
             bool removed = _activeOperations.TryGetValue(operation.Serial, out ActiveDeviceAction? current)
@@ -148,8 +198,15 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
 
             _activeOperations.Remove(operation.Serial);
             operation.SetState(DeviceActionRuntimeState.Idle);
+            if (_activeOperations.Count == 0)
+            {
+                idleCompletion = _idleCompletion;
+                _idleCompletion = null;
+            }
             shouldPublish = EnqueueNotificationLocked(operation.CreateSnapshot());
         }
+
+        idleCompletion?.TrySetResult();
 
         try
         {
@@ -267,6 +324,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             first.Kind.ToLogicalActionKind(),
             state,
             canCancel,
+            first.Source,
             snapshots);
     }
 
@@ -292,6 +350,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             DeviceActionKind kind,
             bool canCancel,
             Guid sessionId,
+            DeviceActionSource source,
             CancellationToken externalCancellationToken)
         {
             _owner = owner;
@@ -299,6 +358,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             Kind = kind;
             CanCancel = canCancel;
             SessionId = sessionId;
+            Source = source;
             _externalCancellationToken = externalCancellationToken;
             _cancellation = new CancellationTokenSource();
             OperationId = Guid.NewGuid();
@@ -308,6 +368,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         public DeviceActionKind Kind { get; }
         public Guid OperationId { get; }
         public Guid SessionId { get; }
+        public DeviceActionSource Source { get; }
         public DeviceActionRuntimeState State => (DeviceActionRuntimeState)Volatile.Read(ref _state);
         public bool CanCancel { get; }
         public DeviceActionCancellationReason CancellationReason =>
@@ -385,7 +446,8 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
                 State,
                 CanCancel,
                 CancellationReason,
-                SessionId);
+                SessionId,
+                Source);
         }
     }
 }

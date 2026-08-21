@@ -6,5 +6,6 @@ public enum ConfirmationDialogIcon
     ChangeDevice,
     Wipe,
     Sim,
-    Delete
+    Delete,
+    Warning
 }

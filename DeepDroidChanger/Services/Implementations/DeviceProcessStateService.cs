@@ -93,7 +93,7 @@ public sealed class DeviceProcessStateService : IDeviceProcessStateService
                 normalizedSerial,
                 message,
                 resourceKey,
-                DeviceProcessState.InProgress));
+                GetProcessState(resourceKey)));
         bool shouldPublish;
         lock (_syncRoot)
         {

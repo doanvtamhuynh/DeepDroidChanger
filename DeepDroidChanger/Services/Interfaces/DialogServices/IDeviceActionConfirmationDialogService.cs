@@ -16,7 +16,7 @@ public interface IDeviceActionConfirmationDialogService
         CancellationToken cancellationToken);
 
     Task<bool> ConfirmMultipleAsync(
-        MultipleDeviceBatchAction action,
+        DeviceActionKind action,
         int deviceCount,
         CancellationToken cancellationToken);
 

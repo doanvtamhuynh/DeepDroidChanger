@@ -13,4 +13,10 @@
     <sys:String x:Key="Nav_ToggleSidebarTooltip">Mở rộng hoặc thu gọn thanh điều hướng mà không thay đổi khu vực đang làm việc.</sys:String>
     <sys:String x:Key="Nav_LanguageTooltip">Chuyển ngôn ngữ ứng dụng giữa các bản địa hóa hiện có.</sys:String>
     <sys:String x:Key="Nav_ThemeTooltip">Chuyển giao diện màu của ứng dụng.</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownActiveActionsCaption">Tác vụ vẫn đang chạy</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownActiveActionsMessage">Còn {0} phiên tác vụ đang chạy. Dừng tất cả tác vụ và thoát?</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownActiveActionsWarning">Việc dừng có thể khiến thao tác đang đổi thiết bị chỉ hoàn tất một phần.</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownStopAndExit">Dừng tác vụ và thoát</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownKeepWorking">Tiếp tục sử dụng</sys:String>
+    <sys:String x:Key="MainWindow_ShutdownStopping">Đang dừng các tác vụ…</sys:String>
 </ResourceDictionary>

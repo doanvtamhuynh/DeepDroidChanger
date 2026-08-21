@@ -69,7 +69,7 @@ public sealed partial class App : Application
         }
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
         if (_host is not null)
         {
@@ -77,7 +77,11 @@ public sealed partial class App : Application
             ILogger<App>? logger = host.Services.GetService<ILogger<App>>();
             try
             {
-                await host.StopAsync().ConfigureAwait(true);
+                // WPF does not await an async OnExit override. The MainWindow
+                // has already waited for device actions (or explicitly forced
+                // the exit timeout) at this point, so complete host teardown
+                // deterministically before the process terminates.
+                host.StopAsync().GetAwaiter().GetResult();
             }
             catch (Exception exception)
             {
@@ -147,8 +151,11 @@ public sealed partial class App : Application
         services.AddSingleton<IRandomDeviceService, RandomDeviceService>();
         services.AddSingleton<IDeviceActionCoordinatorService, DeviceActionCoordinatorService>();
         services.AddSingleton<IDeviceProcessStateService, DeviceProcessStateService>();
+        services.AddSingleton<IDeviceActionEligibilityService, DeviceActionEligibilityService>();
+        services.AddSingleton<IDeviceActionFeedbackService, DeviceActionFeedbackService>();
         services.AddSingleton<IDeviceActionService, DeviceActionService>();
         services.AddSingleton<IProxyWorkflowService, ProxyWorkflowService>();
+        services.AddSingleton<IClipboardService, ClipboardService>();
         services.AddTransient<IAddDevicesDialogService, AddDevicesDialogService>();
         services.AddTransient<ILoginDialogService, LoginDialogService>();
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();

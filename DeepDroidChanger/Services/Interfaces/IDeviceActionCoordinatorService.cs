@@ -16,7 +16,6 @@ public enum DeviceActionKind
     ChangeTimezone,
     InstallPackages,
     DeleteDevice,
-    AdvancedChangeConfig,
     UpdateIntegrity,
     FakeProxy,
     StopFakeProxy,
@@ -71,6 +70,31 @@ public static class DeviceActionKindExtensions
         };
     }
 
+    /// <summary>
+    /// Maps a logical Multiple Device action to the coordinator kind used by
+    /// each serial-scoped batch target.
+    /// </summary>
+    public static DeviceActionKind ToBatchActionKind(this DeviceActionKind kind)
+    {
+        if (kind.IsBatchAction())
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "A logical action kind is required.");
+
+        return kind switch
+        {
+            DeviceActionKind.RandomDevice => DeviceActionKind.BatchRandomDevice,
+            DeviceActionKind.RandomChangeAndWipe => DeviceActionKind.BatchRandomChangeAndWipe,
+            DeviceActionKind.ChangeDevice => DeviceActionKind.BatchChangeDevice,
+            DeviceActionKind.ChangeWithoutWipe => DeviceActionKind.BatchChangeWithoutWipe,
+            DeviceActionKind.Wipe => DeviceActionKind.BatchWipe,
+            DeviceActionKind.RandomSim => DeviceActionKind.BatchRandomSim,
+            DeviceActionKind.ChangeSim => DeviceActionKind.BatchChangeSim,
+            DeviceActionKind.ChangeLocation => DeviceActionKind.BatchChangeLocation,
+            DeviceActionKind.ChangeTimezone => DeviceActionKind.BatchChangeTimezone,
+            DeviceActionKind.InstallPackages => DeviceActionKind.BatchInstallPackages,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
+        };
+    }
+
     public static string GetDisplayResourceKey(this DeviceActionKind kind)
     {
         return kind.ToLogicalActionKind() switch
@@ -86,7 +110,6 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.ChangeTimezone => "DeviceAction_Name_ChangeTimezone",
             DeviceActionKind.InstallPackages => "DeviceAction_Name_InstallPackages",
             DeviceActionKind.DeleteDevice => "DeviceAction_Name_DeleteDevice",
-            DeviceActionKind.AdvancedChangeConfig => "DeviceAction_Name_AdvancedChangeConfig",
             DeviceActionKind.UpdateIntegrity => "DeviceAction_Name_UpdateIntegrity",
             DeviceActionKind.FakeProxy => "DeviceAction_Name_FakeProxy",
             DeviceActionKind.StopFakeProxy => "DeviceAction_Name_StopFakeProxy",
@@ -114,6 +137,29 @@ public enum DeviceActionCancellationReason
 }
 
 /// <summary>
+/// Identifies the workspace that initiated a coordinated action.
+/// </summary>
+public enum DeviceActionSource
+{
+    Unknown,
+    SingleDevice,
+    MultipleDevices
+}
+
+public static class DeviceActionSourceExtensions
+{
+    public static string GetDisplayResourceKey(this DeviceActionSource source)
+    {
+        return source switch
+        {
+            DeviceActionSource.SingleDevice => "DeviceAction_Source_SingleDevice",
+            DeviceActionSource.MultipleDevices => "DeviceAction_Source_MultipleDevices",
+            _ => "DeviceAction_Source_Unknown"
+        };
+    }
+}
+
+/// <summary>
 /// Immutable presentation data for a currently owned device operation.
 /// </summary>
 public sealed record DeviceActionOperationSnapshot(
@@ -123,7 +169,8 @@ public sealed record DeviceActionOperationSnapshot(
     DeviceActionRuntimeState State,
     bool CanCancel,
     DeviceActionCancellationReason CancellationReason,
-    Guid SessionId);
+    Guid SessionId,
+    DeviceActionSource Source);
 
 /// <summary>
 /// Immutable presentation data for one logical action invocation.
@@ -133,6 +180,7 @@ public sealed record DeviceActionSessionSnapshot(
     DeviceActionKind Kind,
     DeviceActionRuntimeState State,
     bool CanCancel,
+    DeviceActionSource Source,
     IReadOnlyList<DeviceActionOperationSnapshot> Operations);
 
 /// <summary>
@@ -144,6 +192,7 @@ public interface IDeviceActionOperation : IDisposable
     DeviceActionKind Kind { get; }
     Guid OperationId { get; }
     Guid SessionId { get; }
+    DeviceActionSource Source { get; }
     DeviceActionRuntimeState State { get; }
     bool CanCancel { get; }
     DeviceActionCancellationReason CancellationReason { get; }
@@ -176,7 +225,8 @@ public interface IDeviceActionCoordinatorService
         DeviceActionKind kind,
         bool canCancel,
         CancellationToken externalCancellationToken = default,
-        Guid? sessionId = null);
+        Guid? sessionId = null,
+        DeviceActionSource source = DeviceActionSource.Unknown);
 
     bool TryRequestCancellation(string serial);
 
@@ -184,4 +234,15 @@ public interface IDeviceActionCoordinatorService
     /// Requests cancellation for every cancellable operation in a session.
     /// </summary>
     bool TryRequestSessionCancellation(Guid sessionId) => false;
+
+    /// <summary>
+    /// Requests cancellation for every active operation, including operations
+    /// whose normal UI command does not expose Stop.
+    /// </summary>
+    void RequestShutdownCancellation() { }
+
+    /// <summary>
+    /// Completes once the coordinator has no active device operations.
+    /// </summary>
+    Task WaitForIdleAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

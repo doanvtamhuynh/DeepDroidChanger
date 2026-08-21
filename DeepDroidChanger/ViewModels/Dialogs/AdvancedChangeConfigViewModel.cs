@@ -16,6 +16,7 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
     private IReadOnlyList<string> _loadedPackages = [];
     private string _deviceSerial = string.Empty;
     private IReadOnlyList<string> _deviceSerials = [];
+    private bool _initialUseDefaultMode;
 
     [ObservableProperty]
     private bool _changeAndroidId;
@@ -126,6 +127,7 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         _deviceSerial = _deviceSerials[0];
+        _initialUseDefaultMode = options.UseDefaultMode;
         _ = isMultiple;
         ChangeAndroidId = options.ChangeAndroidId;
         ChangeMacAddress = options.ChangeMacAddress;
@@ -337,7 +339,7 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
     {
         var options = new DeviceChangeOptions
         {
-            UseDefaultMode = false,
+            UseDefaultMode = _initialUseDefaultMode,
             ChangeAndroidId = ChangeAndroidId,
             ChangeMacAddress = ChangeMacAddress,
             UpdateIntegrity = UpdateIntegrity,
