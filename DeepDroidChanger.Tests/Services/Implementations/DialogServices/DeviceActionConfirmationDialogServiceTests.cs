@@ -38,7 +38,7 @@ public sealed class DeviceActionConfirmationDialogServiceTests
         bool changeSim = await service.ConfirmChangeSimAsync(
             "Phone", "SERIAL", CancellationToken.None);
         bool multipleChange = await service.ConfirmMultipleAsync(
-            MultipleDeviceBatchAction.ChangeAndWipe, 3, CancellationToken.None);
+            DeviceActionKind.ChangeDevice, 3, CancellationToken.None);
 
         Assert.IsTrue(changeWithoutWipe);
         Assert.IsTrue(wipeWithoutChange);

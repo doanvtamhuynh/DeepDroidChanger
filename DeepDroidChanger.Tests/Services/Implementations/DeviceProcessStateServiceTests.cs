@@ -37,11 +37,11 @@ public sealed class DeviceProcessStateServiceTests
         DeviceProcessSnapshot? published = null;
         service.ProcessChanged += snapshot => published = snapshot;
 
-        service.SetProcess("A", "Canceled", "Log_ChangeDeviceCanceled");
+        service.SetProcess("A", "Canceled", "Log_ActionCanceled");
 
         Assert.IsNotNull(published);
         Assert.AreEqual(DeviceProcessState.Canceled, published.State);
-        Assert.AreEqual("Log_ChangeDeviceCanceled", published.ResourceKey);
+        Assert.AreEqual("Log_ActionCanceled", published.ResourceKey);
     }
 
     [TestMethod]
@@ -63,7 +63,7 @@ public sealed class DeviceProcessStateServiceTests
     public void NewInProgressAction_CanReplaceTerminalState()
     {
         var service = new DeviceProcessStateService();
-        service.SetProcess("A", "Canceled", "Log_ChangeDeviceCanceled");
+        service.SetProcess("A", "Canceled", "Log_ActionCanceled");
 
         service.SetProcess("A", "Changing", "Log_ChangeDevice");
 

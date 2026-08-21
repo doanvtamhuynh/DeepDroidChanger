@@ -11,7 +11,7 @@
     </ModulePaths>
     <Functions>
       <Include>
-        <Function>^(?:DeepDroidChanger\.(?:Services|ViewModels)|DeepDroidChanger\.Authentication\.Internal)\..*</Function>
+        <Function>^(?:DeepDroidChanger\.Services|DeepDroidChanger\.Authentication\.Internal)\..*</Function>
       </Include>
       <Exclude>
         <Function>.*\.InitializeComponent\(.*</Function>

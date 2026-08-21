@@ -16,9 +16,9 @@ Apply decisions in this order:
 
 Before creating, moving, renaming, deleting, or substantially editing files,
 inspect the relevant tree, neighboring implementations, public contracts,
-composition root, resources, tests, extension points, and working-tree state.
-Use concrete names and paths only after discovering them. Prefer extending an
-existing pattern over introducing a parallel abstraction.
+composition root, resources, existing tests, extension points, and working-tree
+state. Use concrete names and paths only after discovering them. Prefer
+extending an existing pattern over introducing a parallel abstraction.
 
 ## 2. Architectural boundaries
 
@@ -48,8 +48,9 @@ folder, interface, service, resource dictionary, helper, or abstraction only
 when it has clear ownership and architectural value.
 
 Do not automatically create a model, interface, implementation, ViewModel,
-View, resource dictionary, and test file for every feature. Create only what the
-requested behavior requires.
+View, resource dictionary, or test file for every feature. Create only what the
+requested behavior requires. Test changes additionally require explicit user
+permission as defined below.
 
 Keep ownership clear:
 
@@ -63,22 +64,33 @@ Keep ownership clear:
 - Runtime data, secrets, caches, and generated output remain outside tracked
   source locations.
 
-## 4. Testing architecture
+## 4. Testing architecture and permission
 
-Use `DeepDroidChanger.Test` only for focused non-UI tests of functions and
-observable application logic. Suitable targets include parsing, formatting,
-validation, mapping, calculations, ViewModel logic without real rendering, and
-service/workflow behavior through mocks or fakes.
+The tracked automated suite is intentionally service-focused:
 
-Do not write UI automation or rendering tests in `DeepDroidChanger.Test`. Tests
-that require real Views, Windows, dialogs, controls, visual-tree interaction,
-keyboard/pointer automation, screenshots, or theme appearance belong outside
-that project and require an established UI-test location or explicit user
-approval to create one.
+- application service tests live under `DeepDroidChanger.Tests/Services/`;
+- authentication service tests live under
+  `DeepDroidChanger.Tests/Authentication/Services/`;
+- shared files under `DeepDroidChanger.Tests/Fakes/` or
+  `DeepDroidChanger.Tests/Helpers/` may exist only when they support retained
+  service tests.
 
-Agents may still validate the UI through safe inspection, manual checks,
-screenshots, accessibility/state review, or existing UI-test infrastructure.
-Report UI validation separately from function tests.
+Test changes are opt-in. Agents may inspect and run existing tests, but must not
+create test files, add cases, expand coverage, refactor tests, update expected
+values, or otherwise modify tests unless the user's current request explicitly
+asks for test work. A production implementation request alone is not permission
+to change tests.
+
+When test work is explicitly requested, keep it within the requested scope.
+Prefer focused service/workflow tests through mocks or fakes. Do not introduce
+Architecture, ViewModel, helper, UI, rendering, visual-tree, keyboard/pointer,
+screenshot, or presentation tests unless the user explicitly requests that
+category.
+
+If requested production behavior makes an existing test fail and test changes
+were not requested, report the failure and leave the test unchanged. Validation
+may still use builds, existing tests, safe inspection, manual checks, or other
+non-test-file verification appropriate to the task.
 
 ## 5. Change principles
 
@@ -95,8 +107,8 @@ For every change:
 
 When adding or changing a feature, determine from repository evidence whether it
 needs a contract, service boundary, registration, presentation state, View,
-localized text, resources, tests, configuration, migration, or compatibility
-handling. Do not generate all categories automatically.
+localized text, resources, configuration, migration, or compatibility handling.
+Do not add or modify tests unless the user explicitly requested test work.
 
 ## 6. Stop conditions
 

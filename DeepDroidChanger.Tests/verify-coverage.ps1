@@ -56,8 +56,7 @@ $criticalClasses = @(
     'DeepDroidChanger.Services.PackageInstallService',
     'DeepDroidChanger.Services.ProxyService',
     'DeepDroidChanger.Services.RandomDeviceService',
-    'DeepDroidChanger.Services.XapkPackageService',
-    'DeepDroidChanger.ViewModels.ChangeSingleDeviceViewModel'
+    'DeepDroidChanger.Services.XapkPackageService'
 )
 $classes = @($coverage.coverage.packages.package.classes.class)
 foreach ($className in $criticalClasses) {

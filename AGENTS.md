@@ -15,13 +15,32 @@ Explicit safety, permission, build, dependency, and Git restrictions always
 apply. If rules conflict, follow the user's current explicit instruction first,
 then this file, then the relevant document under `docs/`.
 
+## Testing permission
+
+Test changes are opt-in work in this repository.
+
+- Agents may inspect and run existing tests when useful for understanding or
+  validating the requested change.
+- Do not create test files, add test cases, expand coverage, rewrite or refactor
+  tests, or update expected values/snapshots unless the user's current request
+  explicitly asks for test changes.
+- A production-code request does not implicitly authorize test changes. If an
+  existing test fails because requested production behavior intentionally
+  changed, report the failure and leave the test untouched unless the user asks
+  to update it.
+- The tracked automated suite is intentionally service-focused. Do not
+  reintroduce Architecture, ViewModel, helper, UI, or presentation tests unless
+  the user explicitly requests those tests.
+- When the user explicitly requests tests, keep the test scope no broader than
+  requested and follow the testing boundaries in `docs/DESIGN.md`.
+
 ## Research first
 
 Before proposing or changing code:
 
 1. Inspect the current repository, relevant implementation, neighboring
-   patterns, public contracts, composition mechanism, resources, tests, and
-   working-tree state.
+   patterns, public contracts, composition mechanism, resources, existing tests,
+   and working-tree state.
 2. Use concrete names and paths only after discovering them in the repository or
    receiving them from the user.
 3. Treat documentation examples as illustrative unless explicitly marked as an

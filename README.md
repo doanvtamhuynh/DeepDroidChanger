@@ -150,7 +150,10 @@ dotnet test .\DeepDroidChanger.slnx --no-build --no-restore
 powershell -ExecutionPolicy Bypass -File .\DeepDroidChanger.Tests\verify-coverage.ps1
 ```
 
-Test suite dùng fake/mock cho Cognito, HTTP API và ADB. Việc xác nhận tương thích ROM, quyền root và hành vi cleanup cuối cùng vẫn cần test có kiểm soát trên thiết bị thật.
+Test suite dùng fake/mock cho Cognito, HTTP API và ADB. Việc xác nhận tương thích
+ROM, quyền root và hành vi cleanup cuối cùng vẫn cần kiểm tra có kiểm soát trên
+thiết bị thật. Quy tắc dành cho AI agent nằm trong `AGENTS.md`: agent chỉ được
+tạo hoặc sửa test khi yêu cầu hiện tại của người dùng nói rõ cần thay đổi test.
 
 ## Dữ liệu runtime và bảo mật
 
