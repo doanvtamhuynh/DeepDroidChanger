@@ -29,6 +29,12 @@ public interface IDeviceConfigService
         CancellationToken cancellationToken);
 
     Task<bool> SaveTimezoneConfigAsync(
+        string serial,
+        ChangeTimezoneMode mode,
+        string timezone,
+        CancellationToken cancellationToken);
+
+    Task<bool> SaveTimezoneConfigAsync(
         IList<StoredDeviceConfig> storedDevices,
         string serial,
         ChangeTimezoneMode mode,
@@ -44,6 +50,13 @@ public interface IDeviceConfigService
         CancellationToken cancellationToken);
 
     Task<bool> SaveLocationConfigAsync(
+        string serial,
+        ChangeLocationMode mode,
+        string latitude,
+        string longitude,
+        CancellationToken cancellationToken);
+
+    Task<bool> SaveLocationConfigAsync(
         IList<StoredDeviceConfig> storedDevices,
         string serial,
         ChangeLocationMode mode,
@@ -51,5 +64,16 @@ public interface IDeviceConfigService
         string longitude,
         string countryCode,
         string cityName,
+        CancellationToken cancellationToken);
+
+    Task<bool> SaveProxyConfigAsync(
+        IList<StoredDeviceConfig> storedDevices,
+        string serial,
+        FakeProxyDialogResult configuration,
+        CancellationToken cancellationToken);
+
+    Task<bool> SaveProxyConfigAsync(
+        string serial,
+        FakeProxyDialogResult configuration,
         CancellationToken cancellationToken);
 }

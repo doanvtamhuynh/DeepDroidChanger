@@ -75,4 +75,8 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Áp dụng Timezone cho các thiết bị online được chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApk">C&#224;i APK/XAPK</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApkTooltip">C&#224;i c&#225;c t&#7879;p APK/XAPK &#273;&#227; ch&#7885;n tr&#234;n c&#225;c thi&#7871;t b&#7883; online &#273;&#432;&#7907;c ch&#7885;n.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionFakeProxy">Fake Proxy</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionFakeProxyTooltip">Khởi chạy Fake Proxy trên các thiết bị online được chọn.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionStopFakeProxy">Dừng Proxy</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionStopFakeProxyTooltip">Dừng Fake Proxy trên các thiết bị online được chọn.</sys:String>
 </ResourceDictionary>

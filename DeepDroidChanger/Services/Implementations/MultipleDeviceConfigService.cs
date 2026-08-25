@@ -22,6 +22,7 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
     private readonly string _directory;
     private readonly string _changeConfigPath;
     private readonly string _changeOptionsPath;
+    private readonly string _proxyConfigPath;
 
     public MultipleDeviceConfigService(ILogger<MultipleDeviceConfigService> logger)
         : this(
@@ -43,6 +44,9 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
         _changeOptionsPath = Path.Combine(
             _directory,
             AssetConstants.RuntimeData.ChangeOptionsConfigFileName);
+        _proxyConfigPath = Path.Combine(
+            _directory,
+            AssetConstants.RuntimeData.MultipleDeviceProxyConfigFileName);
         _logger = logger;
     }
 
@@ -91,6 +95,49 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
         {
             await WriteConfigurationAsync(
                     Normalize(configuration),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    public async Task<MultipleDeviceProxyConfig> LoadProxyConfigAsync(
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(_directory);
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            MultipleDeviceProxyConfig configuration =
+                await ReadJsonOrDefaultAsync<MultipleDeviceProxyConfig>(
+                        _proxyConfigPath,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            return NormalizeProxyConfig(configuration);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    public async Task SaveProxyConfigAsync(
+        MultipleDeviceProxyConfig configuration,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        Directory.CreateDirectory(_directory);
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await WriteJsonAsync(
+                    _proxyConfigPath,
+                    NormalizeProxyConfig(configuration),
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -171,6 +218,32 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
             },
             ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
                 configuration.ChangeOptions)
+        };
+    }
+
+    private static MultipleDeviceProxyConfig NormalizeProxyConfig(
+        MultipleDeviceProxyConfig configuration)
+    {
+        var proxies = new List<string>();
+        foreach (string proxyText in configuration.Proxies ?? [])
+        {
+            if (ProxyEndpoint.TryParse(proxyText, out ProxyEndpoint? proxy))
+                proxies.Add(proxy!.NormalizedText);
+        }
+
+        return new MultipleDeviceProxyConfig
+        {
+            Proxies = proxies,
+            ProxyType = ProxyEndpoint.DefaultProxyType,
+            ChangeLocationByIp = configuration.ChangeLocationByIp,
+            ChangeTimezoneByIp = configuration.ChangeTimezoneByIp,
+            AssignmentMode = Enum.IsDefined(configuration.AssignmentMode)
+                ? configuration.AssignmentMode
+                : ProxyAssignmentMode.OneToOne,
+            RepeatCount = Math.Max(1, configuration.RepeatCount),
+            RepeatPattern = Enum.IsDefined(configuration.RepeatPattern)
+                ? configuration.RepeatPattern
+                : ProxyRepeatPattern.Interleaved
         };
     }
 

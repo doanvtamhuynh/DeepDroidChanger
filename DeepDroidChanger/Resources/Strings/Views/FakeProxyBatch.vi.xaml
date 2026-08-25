@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="FakeProxyBatch_WindowTitle">Fake Proxy - Nhiều thiết bị</system:String>
+    <system:String x:Key="FakeProxyBatch_SaveButton">Bắt đầu</system:String>
+    <system:String x:Key="FakeProxyBatch_DeviceInfo">Thiết bị đã chọn: {0}</system:String>
+    <system:String x:Key="FakeProxyBatch_OptionsGroupHeader">Tùy chọn theo IP</system:String>
+    <system:String x:Key="FakeProxyBatch_ChangeLocationByIpLabel">Đổi Location theo IP</system:String>
+    <system:String x:Key="FakeProxyBatch_ChangeTimezoneByIpLabel">Đổi Timezone theo IP</system:String>
+    <system:String x:Key="FakeProxyBatch_AssignmentGroupHeader">Cách gán proxy</system:String>
+    <system:String x:Key="FakeProxyBatch_OneToOneLabel">Mỗi thiết bị một proxy</system:String>
+    <system:String x:Key="FakeProxyBatch_RepeatByCountLabel">Lặp theo số lần</system:String>
+    <system:String x:Key="FakeProxyBatch_RepeatAllLabel">Lặp toàn bộ proxy</system:String>
+    <system:String x:Key="FakeProxyBatch_RepeatCountLabel">Số lần lặp</system:String>
+    <system:String x:Key="FakeProxyBatch_InterleavedLabel">Xen kẽ</system:String>
+    <system:String x:Key="FakeProxyBatch_ConsecutiveLabel">Liên tiếp</system:String>
+    <system:String x:Key="FakeProxyBatch_ProxyListLabel">Danh sách proxy</system:String>
+    <system:String x:Key="FakeProxyBatch_ProxyListTooltip">Nhập mỗi dòng một proxy: host:port hoặc host:port:username:password</system:String>
+    <system:String x:Key="FakeProxyBatch_ValidProxySummary">Proxy hợp lệ: {0}</system:String>
+    <system:String x:Key="FakeProxyBatch_AssignedDeviceSummary">Thiết bị được gán: {0} / {1}</system:String>
+    <system:String x:Key="FakeProxyBatch_TypeLabel">Loại proxy</system:String>
+    <system:String x:Key="FakeProxyBatch_InvalidProxyLine">Proxy không hợp lệ tại dòng {0}.</system:String>
+    <system:String x:Key="FakeProxyBatch_InvalidRepeatCount">Số lần lặp phải là số nguyên từ 1 trở lên.</system:String>
+    <system:String x:Key="FakeProxyBatch_PresetSaveFailed">Không thể lưu cấu hình proxy. Vui lòng thử lại.</system:String>
+</ResourceDictionary>

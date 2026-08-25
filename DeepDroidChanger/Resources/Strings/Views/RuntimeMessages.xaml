@@ -85,14 +85,16 @@
     <sys:String x:Key="Log_InstallPackageMissingSharedLibrary">Device is missing a required shared library</sys:String>
     <sys:String x:Key="Log_StartingProxy">Starting proxy...</sys:String>
     <sys:String x:Key="Log_FakeProxySuccess">Fake Proxy started successfully</sys:String>
-    <sys:String x:Key="Log_FakeProxyPartialSuccess">Fake Proxy started, but one or more IP-based updates failed</sys:String>
+    <sys:String x:Key="Log_FakeProxyPartialSuccess">Fake Proxy started, but an IP-based update or configuration save failed</sys:String>
     <sys:String x:Key="Log_FakeProxyFailed">Failed to start Fake Proxy</sys:String>
     <sys:String x:Key="Log_StoppingProxy">Stopping proxy...</sys:String>
     <sys:String x:Key="Log_StopFakeProxySuccess">Fake Proxy stopped successfully</sys:String>
     <sys:String x:Key="Log_StopFakeProxyFailed">Failed to stop Fake Proxy</sys:String>
+    <sys:String x:Key="Log_StopFakeProxyPartialSuccess">Fake Proxy stopped, but stored proxy configuration could not be updated</sys:String>
     <sys:String x:Key="Log_WaitingForDevice">Waiting for device...</sys:String>
     <sys:String x:Key="Log_ProxyLocationByIpFailed">Proxy applied, but location by IP failed. Please change location manually.</sys:String>
     <sys:String x:Key="Log_ProxyTimezoneByIpFailed">Proxy applied, but timezone by IP failed. Please change timezone manually.</sys:String>
+    <sys:String x:Key="Log_ProxyNotAssigned">No proxy assigned.</sys:String>
     <sys:String x:Key="Log_CopySerialSuccess">Serial copied to clipboard</sys:String>
     <sys:String x:Key="Log_CopySerialFailed">Failed to copy serial</sys:String>
     <sys:String x:Key="Log_GooglePackageStateFailed">Failed to read GMS and Play Store state</sys:String>

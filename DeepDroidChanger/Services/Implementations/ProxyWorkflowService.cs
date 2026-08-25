@@ -8,17 +8,20 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
     private readonly IProxyService _proxyService;
     private readonly IDeviceLocationService _locationService;
     private readonly IDeviceTimezoneService _timezoneService;
+    private readonly IDeviceConfigService _deviceConfigService;
     private readonly ILogger<ProxyWorkflowService> _logger;
 
     public ProxyWorkflowService(
         IProxyService proxyService,
         IDeviceLocationService locationService,
         IDeviceTimezoneService timezoneService,
+        IDeviceConfigService deviceConfigService,
         ILogger<ProxyWorkflowService> logger)
     {
         _proxyService = proxyService;
         _locationService = locationService;
         _timezoneService = timezoneService;
+        _deviceConfigService = deviceConfigService;
         _logger = logger;
     }
 
@@ -38,6 +41,14 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
                 cancellationToken)
             .ConfigureAwait(false);
 
+        await TryPersistProxyAsync(serial, configuration).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await _proxyService
+            .WaitForInternetAndOpenBrowserLeaksAsync(serial, cancellationToken)
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+
         bool locationUpdateFailed = false;
         string appliedLatitude = string.Empty;
         string appliedLongitude = string.Empty;
@@ -45,11 +56,19 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
         {
             try
             {
-                (string latitude, string longitude) =
+                DeviceLocationResult location =
                     await _locationService.ResolveLocationByDeviceIpAsync(serial, cancellationToken).ConfigureAwait(false);
-                await _locationService.ApplyLocationAsync(serial, latitude, longitude, cancellationToken).ConfigureAwait(false);
-                appliedLatitude = latitude;
-                appliedLongitude = longitude;
+                await _locationService
+                    .ApplyLocationAsync(serial, location.Latitude, location.Longitude, cancellationToken)
+                    .ConfigureAwait(false);
+                appliedLatitude = location.Latitude;
+                appliedLongitude = location.Longitude;
+                await TryPersistLocationAsync(
+                        serial,
+                        location.Latitude,
+                        location.Longitude)
+                    .ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException)
             {
@@ -73,6 +92,8 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
                     .ConfigureAwait(false);
                 await _timezoneService.ApplyTimezoneAsync(serial, timezone, cancellationToken).ConfigureAwait(false);
                 appliedTimezone = timezone;
+                await TryPersistTimezoneAsync(serial, timezone).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException)
             {
@@ -85,11 +106,98 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         return new ProxyWorkflowResult(
             locationUpdateFailed,
             timezoneUpdateFailed,
             appliedLatitude,
             appliedLongitude,
             appliedTimezone);
+    }
+
+    private async Task TryPersistProxyAsync(
+        string serial,
+        FakeProxyDialogResult configuration)
+    {
+        try
+        {
+            bool saved = await _deviceConfigService
+                .SaveProxyConfigAsync(serial, configuration, CancellationToken.None)
+                .ConfigureAwait(false);
+            if (!saved)
+            {
+                _logger.LogError(
+                    "Fake Proxy was applied but proxy configuration could not be stored for device {Serial}.",
+                    serial);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Fake Proxy proxy configuration persistence failed for device {Serial}.",
+                serial);
+        }
+    }
+
+    private async Task TryPersistLocationAsync(
+        string serial,
+        string latitude,
+        string longitude)
+    {
+        try
+        {
+            bool saved = await _deviceConfigService
+                .SaveLocationConfigAsync(
+                    serial,
+                    ChangeLocationMode.DeviceIp,
+                    latitude,
+                    longitude,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+            if (!saved)
+            {
+                _logger.LogError(
+                    "Fake Proxy was applied but location configuration could not be stored for device {Serial}.",
+                    serial);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Fake Proxy location configuration persistence failed for device {Serial}.",
+                serial);
+        }
+    }
+
+    private async Task TryPersistTimezoneAsync(
+        string serial,
+        string timezone)
+    {
+        try
+        {
+            bool saved = await _deviceConfigService
+                .SaveTimezoneConfigAsync(
+                    serial,
+                    ChangeTimezoneMode.DeviceIp,
+                    timezone,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
+            if (!saved)
+            {
+                _logger.LogError(
+                    "Fake Proxy was applied but timezone configuration could not be stored for device {Serial}.",
+                    serial);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Fake Proxy timezone configuration persistence failed for device {Serial}.",
+                serial);
+        }
     }
 }

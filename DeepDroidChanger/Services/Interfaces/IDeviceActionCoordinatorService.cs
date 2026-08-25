@@ -29,7 +29,9 @@ public enum DeviceActionKind
     BatchChangeSim,
     BatchChangeLocation,
     BatchChangeTimezone,
-    BatchInstallPackages
+    BatchInstallPackages,
+    BatchFakeProxy,
+    BatchStopFakeProxy
 }
 
 public static class DeviceActionKindExtensions
@@ -45,7 +47,9 @@ public static class DeviceActionKindExtensions
             or DeviceActionKind.BatchChangeSim
             or DeviceActionKind.BatchChangeLocation
             or DeviceActionKind.BatchChangeTimezone
-            or DeviceActionKind.BatchInstallPackages;
+            or DeviceActionKind.BatchInstallPackages
+            or DeviceActionKind.BatchFakeProxy
+            or DeviceActionKind.BatchStopFakeProxy;
     }
 
     /// <summary>
@@ -66,6 +70,8 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.BatchChangeLocation => DeviceActionKind.ChangeLocation,
             DeviceActionKind.BatchChangeTimezone => DeviceActionKind.ChangeTimezone,
             DeviceActionKind.BatchInstallPackages => DeviceActionKind.InstallPackages,
+            DeviceActionKind.BatchFakeProxy => DeviceActionKind.FakeProxy,
+            DeviceActionKind.BatchStopFakeProxy => DeviceActionKind.StopFakeProxy,
             _ => kind
         };
     }
@@ -91,6 +97,8 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.ChangeLocation => DeviceActionKind.BatchChangeLocation,
             DeviceActionKind.ChangeTimezone => DeviceActionKind.BatchChangeTimezone,
             DeviceActionKind.InstallPackages => DeviceActionKind.BatchInstallPackages,
+            DeviceActionKind.FakeProxy => DeviceActionKind.BatchFakeProxy,
+            DeviceActionKind.StopFakeProxy => DeviceActionKind.BatchStopFakeProxy,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }

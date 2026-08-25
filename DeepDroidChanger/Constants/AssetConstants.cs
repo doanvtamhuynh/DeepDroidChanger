@@ -43,6 +43,7 @@ public static class AssetConstants
         public const string LocationConfigFileName = "location_config.json";
         public const string TimezoneConfigFileName = "timezone_config.json";
         public const string ProxyConfigFileName = "proxy_config.json";
+        public const string MultipleDeviceProxyConfigFileName = "proxy_config.json";
     }
 
     public static class Localization

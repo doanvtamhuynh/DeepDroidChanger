@@ -966,6 +966,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <Button Grid.Row="0"
@@ -1078,6 +1079,28 @@
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="ClockOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeTimezone}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="5"
+                                        Grid.Column="0"
+                                        Command="{Binding StartMultipleDevicesFakeProxyCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionFakeProxyTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Wifi" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionFakeProxy}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="5"
+                                        Grid.Column="1"
+                                        Command="{Binding StopMultipleDevicesFakeProxyCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionStopFakeProxyTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="WifiOff" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionStopFakeProxy}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>

@@ -1,0 +1,220 @@
+<Window x:Class="DeepDroidChanger.Views.FakeProxyBatchDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource FakeProxyBatch_WindowTitle}"
+        Width="720"
+        Height="760"
+        MinWidth="620"
+        MinHeight="640"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+
+    <Window.Resources>
+
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
+        <Style x:Key="FakeProxyDeviceHeaderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <Style x:Key="FakeProxyTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource FlatTextBoxStyle}">
+            <Setter Property="SelectionBrush" Value="{DynamicResource Brush.SurfaceSelected}"/>
+        </Style>
+
+        <Style x:Key="FakeProxyButtonTextStyle" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="FakeProxyButtonIconStyle" TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+
+        <Style x:Key="FakeProxyCheckBoxStyle"
+               TargetType="CheckBox"
+               BasedOn="{StaticResource FlatCheckBoxStyle}">
+            <Setter Property="Margin" Value="0,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style x:Key="FakeProxyGroupBoxStyle"
+               TargetType="GroupBox"
+               BasedOn="{StaticResource OptionSectionGroupBoxStyle}">
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Style="{StaticResource DialogRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource FakeProxyDeviceHeaderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialDesign:PackIcon Kind="CellphoneCog"
+                                         Style="{StaticResource DialogHeaderIconStyle}"/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding DeviceInfoText}"
+                           Style="{StaticResource DialogHeaderTextStyle}"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,4,0">
+                <GroupBox Header="{DynamicResource FakeProxyBatch_OptionsGroupHeader}"
+                          Style="{StaticResource FakeProxyGroupBoxStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Grid.Column="0"
+                                  Content="{DynamicResource FakeProxyBatch_ChangeLocationByIpLabel}"
+                                  IsChecked="{Binding ProxyChangeLocationByIp, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
+                                  Style="{StaticResource FakeProxyCheckBoxStyle}"/>
+                        <CheckBox Grid.Column="2"
+                                  Content="{DynamicResource FakeProxyBatch_ChangeTimezoneByIpLabel}"
+                                  IsChecked="{Binding ProxyChangeTimezoneByIp, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
+                                  Style="{StaticResource FakeProxyCheckBoxStyle}"/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Header="{DynamicResource FakeProxyBatch_AssignmentGroupHeader}"
+                          Style="{StaticResource FakeProxyGroupBoxStyle}">
+                    <StackPanel>
+                        <RadioButton GroupName="ProxyAssignmentMode"
+                                     Content="{DynamicResource FakeProxyBatch_OneToOneLabel}"
+                                     IsChecked="{Binding IsOneToOne, Mode=TwoWay}"
+                                     Margin="0,5"
+                                     VerticalAlignment="Center"/>
+                        <RadioButton GroupName="ProxyAssignmentMode"
+                                     Content="{DynamicResource FakeProxyBatch_RepeatByCountLabel}"
+                                     IsChecked="{Binding IsRepeatByCountMode, Mode=TwoWay}"
+                                     Margin="0,5"
+                                     VerticalAlignment="Center"/>
+
+                        <Grid Margin="29,2,0,8"
+                              Visibility="{Binding IsRepeatByCount, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="24"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Row="0"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,10,0"
+                                       Text="{DynamicResource FakeProxyBatch_RepeatCountLabel}"/>
+                            <TextBox Grid.Row="0"
+                                     Grid.Column="1"
+                                     Text="{Binding RepeatCountText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource FakeProxyTextBoxStyle}"/>
+                            <StackPanel Grid.Row="1"
+                                        Grid.Column="0"
+                                        Grid.ColumnSpan="4"
+                                        Margin="0,8,0,0"
+                                        Orientation="Horizontal">
+                                <RadioButton GroupName="ProxyRepeatPattern"
+                                             Content="{DynamicResource FakeProxyBatch_InterleavedLabel}"
+                                             IsChecked="{Binding IsInterleaved, Mode=TwoWay}"
+                                             Margin="0,4,28,4"
+                                             VerticalAlignment="Center"/>
+                                <RadioButton GroupName="ProxyRepeatPattern"
+                                             Content="{DynamicResource FakeProxyBatch_ConsecutiveLabel}"
+                                             IsChecked="{Binding IsConsecutive, Mode=TwoWay}"
+                                             Margin="0,4"
+                                             VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <RadioButton GroupName="ProxyAssignmentMode"
+                                     Content="{DynamicResource FakeProxyBatch_RepeatAllLabel}"
+                                     IsChecked="{Binding IsRepeatAll, Mode=TwoWay}"
+                                     Margin="0,5"
+                                     VerticalAlignment="Center"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <TextBlock Text="{DynamicResource FakeProxyBatch_ProxyListLabel}"
+                           Style="{StaticResource DialogInputLabelStyle}"/>
+                <TextBox Text="{Binding ProxyListText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         TextWrapping="NoWrap"
+                         MinHeight="150"
+                         ToolTip="{DynamicResource FakeProxyBatch_ProxyListTooltip}"
+                         Style="{StaticResource FakeProxyTextBoxStyle}"/>
+
+                <TextBlock Margin="0,6,0,0"
+                           Foreground="{DynamicResource Brush.Danger}"
+                           Text="{Binding ValidationText}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasValidationError, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                <StackPanel Margin="0,8,0,14">
+                    <TextBlock Text="{Binding ValidProxySummaryText}"
+                               Foreground="{DynamicResource Brush.TextSecondary}"/>
+                    <TextBlock Margin="0,3,0,0"
+                               Text="{Binding AssignedDeviceSummaryText}"
+                               Foreground="{DynamicResource Brush.TextSecondary}"/>
+                </StackPanel>
+
+                <TextBlock Text="{DynamicResource FakeProxyBatch_TypeLabel}"
+                           Style="{StaticResource DialogInputLabelStyle}"/>
+                <ComboBox ItemsSource="{Binding ProxyTypes}"
+                          SelectedItem="{Binding SelectedProxyType, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipSelection}"
+                          Style="{StaticResource DialogFormComboBoxStyle}"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Style="{StaticResource DialogActionGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1"
+                    Command="{Binding SaveCommand}"
+                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="Play"
+                                             Style="{StaticResource FakeProxyButtonIconStyle}"/>
+                    <TextBlock Text="{DynamicResource FakeProxyBatch_SaveButton}"
+                               Style="{StaticResource FakeProxyButtonTextStyle}"/>
+                </StackPanel>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

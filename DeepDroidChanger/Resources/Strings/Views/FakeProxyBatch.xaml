@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=mscorlib">
+    <system:String x:Key="FakeProxyBatch_WindowTitle">Fake Proxy - Multiple Devices</system:String>
+    <system:String x:Key="FakeProxyBatch_SaveButton">Start</system:String>
+    <system:String x:Key="FakeProxyBatch_DeviceInfo">Selected devices: {0}</system:String>
+    <system:String x:Key="FakeProxyBatch_OptionsGroupHeader">Options (automatically update by IP)</system:String>
+    <system:String x:Key="FakeProxyBatch_ChangeLocationByIpLabel">Change location by IP</system:String>
+    <system:String x:Key="FakeProxyBatch_ChangeTimezoneByIpLabel">Change timezone by IP</system:String>
+    <system:String x:Key="FakeProxyBatch_AssignmentGroupHeader">Assignment</system:String>
+    <system:String x:Key="FakeProxyBatch_OneToOneLabel">One proxy per device</system:String>
+    <system:String x:Key="FakeProxyBatch_RepeatByCountLabel">Repeat by count</system:String>
+    <system:String x:Key="FakeProxyBatch_RepeatAllLabel">Repeat all proxies</system:String>
+    <system:String x:Key="FakeProxyBatch_RepeatCountLabel">Repeat count</system:String>
+    <system:String x:Key="FakeProxyBatch_InterleavedLabel">Interleaved</system:String>
+    <system:String x:Key="FakeProxyBatch_ConsecutiveLabel">Consecutive</system:String>
+    <system:String x:Key="FakeProxyBatch_ProxyListLabel">Proxy list</system:String>
+    <system:String x:Key="FakeProxyBatch_ProxyListTooltip">Enter one proxy per line: host:port or host:port:username:password</system:String>
+    <system:String x:Key="FakeProxyBatch_ValidProxySummary">Valid proxies: {0}</system:String>
+    <system:String x:Key="FakeProxyBatch_AssignedDeviceSummary">Assigned devices: {0} / {1}</system:String>
+    <system:String x:Key="FakeProxyBatch_TypeLabel">Proxy type</system:String>
+    <system:String x:Key="FakeProxyBatch_InvalidProxyLine">Invalid proxy at line {0}.</system:String>
+    <system:String x:Key="FakeProxyBatch_InvalidRepeatCount">Repeat count must be an integer of at least 1.</system:String>
+    <system:String x:Key="FakeProxyBatch_PresetSaveFailed">Could not save the proxy preset. Please try again.</system:String>
+</ResourceDictionary>

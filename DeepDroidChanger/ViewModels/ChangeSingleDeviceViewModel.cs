@@ -2299,12 +2299,9 @@ namespace DeepDroidChanger.ViewModels
                         SetDeviceLog(device, "Log_ProxyTimezoneByIpFailed");
                     }
 
-                    bool postProxyUpdatesSucceeded =
-                        !workflowResult.LocationUpdateFailed && !workflowResult.TimezoneUpdateFailed;
-
                     SetDeviceLog(
                         device,
-                        postProxyUpdatesSucceeded
+                        workflowResult.IsSuccess
                             ? "Log_FakeProxySuccess"
                             : "Log_FakeProxyPartialSuccess");
                 }

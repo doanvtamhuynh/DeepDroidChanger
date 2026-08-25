@@ -85,14 +85,16 @@
     <sys:String x:Key="Log_InstallPackageMissingSharedLibrary">Thiết bị thiếu thư viện hệ thống cần thiết</sys:String>
     <sys:String x:Key="Log_StartingProxy">Đang chạy Fake Proxy...</sys:String>
     <sys:String x:Key="Log_FakeProxySuccess">Fake Proxy thành công</sys:String>
-    <sys:String x:Key="Log_FakeProxyPartialSuccess">Fake Proxy đã được áp dụng, nhưng một hoặc nhiều thay đổi theo IP thất bại</sys:String>
+    <sys:String x:Key="Log_FakeProxyPartialSuccess">Fake Proxy đã được áp dụng, nhưng cập nhật theo IP hoặc lưu cấu hình thất bại</sys:String>
     <sys:String x:Key="Log_FakeProxyFailed">Fake Proxy thất bại</sys:String>
     <sys:String x:Key="Log_StoppingProxy">Đang dừng Fake Proxy...</sys:String>
     <sys:String x:Key="Log_StopFakeProxySuccess">Dừng Fake Proxy thành công</sys:String>
     <sys:String x:Key="Log_StopFakeProxyFailed">Dừng Fake Proxy thất bại</sys:String>
+    <sys:String x:Key="Log_StopFakeProxyPartialSuccess">Đã dừng Fake Proxy, nhưng không thể cập nhật cấu hình proxy đã lưu</sys:String>
     <sys:String x:Key="Log_WaitingForDevice">Đang chờ thiết bị...</sys:String>
     <sys:String x:Key="Log_ProxyLocationByIpFailed">Đã áp dụng proxy, nhưng đổi vị trí theo IP thất bại. Vui lòng tự đổi vị trí.</sys:String>
     <sys:String x:Key="Log_ProxyTimezoneByIpFailed">Đã áp dụng proxy, nhưng đổi múi giờ theo IP thất bại. Vui lòng tự đổi múi giờ.</sys:String>
+    <sys:String x:Key="Log_ProxyNotAssigned">Không có proxy được gán.</sys:String>
     <sys:String x:Key="Log_CopySerialSuccess">Đã sao chép serial vào bộ nhớ tạm</sys:String>
     <sys:String x:Key="Log_CopySerialFailed">Không thể sao chép serial</sys:String>
     <sys:String x:Key="Log_GooglePackageStateFailed">Không thể đọc trạng thái GMS và Play Store</sys:String>

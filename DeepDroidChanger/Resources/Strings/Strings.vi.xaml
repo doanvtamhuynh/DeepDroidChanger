@@ -10,6 +10,7 @@
         <ResourceDictionary Source="Views/ChangeTimezone.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeLocation.vi.xaml" />
         <ResourceDictionary Source="Views/FakeProxy.vi.xaml" />
+        <ResourceDictionary Source="Views/FakeProxyBatch.vi.xaml" />
         <ResourceDictionary Source="Views/UpdateIntegrity.vi.xaml" />
         <ResourceDictionary Source="Views/InstallPackage.vi.xaml" />
         <ResourceDictionary Source="Views/DeleteDeviceConfirmation.vi.xaml" />

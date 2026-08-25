@@ -11,6 +11,10 @@ namespace DeepDroidChanger.Services
             string proxyType,
             CancellationToken cancellationToken);
 
+        Task WaitForInternetAndOpenBrowserLeaksAsync(
+            string serial,
+            CancellationToken cancellationToken);
+
         Task StopProxyAsync(string serial, CancellationToken cancellationToken);
     }
 }

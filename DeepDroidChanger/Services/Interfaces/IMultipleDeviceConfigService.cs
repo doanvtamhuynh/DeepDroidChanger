@@ -9,4 +9,11 @@ public interface IMultipleDeviceConfigService
     Task SaveAsync(
         MultipleDeviceConfiguration configuration,
         CancellationToken cancellationToken);
+
+    Task<MultipleDeviceProxyConfig> LoadProxyConfigAsync(
+        CancellationToken cancellationToken);
+
+    Task SaveProxyConfigAsync(
+        MultipleDeviceProxyConfig configuration,
+        CancellationToken cancellationToken);
 }

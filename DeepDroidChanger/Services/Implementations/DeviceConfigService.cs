@@ -100,6 +100,22 @@ namespace DeepDroidChanger.Services
         }
 
         public async Task<bool> SaveTimezoneConfigAsync(
+            string serial,
+            ChangeTimezoneMode mode,
+            string timezone,
+            CancellationToken cancellationToken)
+        {
+            void Apply(StoredDeviceConfig device)
+            {
+                device.TimezoneMode = mode.ToString();
+                device.Timezone = Normalize(timezone);
+            }
+
+            return await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<bool> SaveTimezoneConfigAsync(
             IList<StoredDeviceConfig> storedDevices,
             string serial,
             ChangeTimezoneMode mode,
@@ -121,6 +137,24 @@ namespace DeepDroidChanger.Services
                 Apply(storedDevice);
 
             return updated;
+        }
+
+        public async Task<bool> SaveLocationConfigAsync(
+            string serial,
+            ChangeLocationMode mode,
+            string latitude,
+            string longitude,
+            CancellationToken cancellationToken)
+        {
+            void Apply(StoredDeviceConfig device)
+            {
+                device.LocationMode = mode.ToString();
+                device.LocationLatitude = Normalize(latitude);
+                device.LocationLongitude = Normalize(longitude);
+            }
+
+            return await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         public Task<bool> SaveLocationConfigAsync(
@@ -202,6 +236,58 @@ namespace DeepDroidChanger.Services
             }
 
             bool updated = await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken).ConfigureAwait(false);
+            if (updated)
+                Apply(storedDevice);
+
+            return updated;
+        }
+
+        public async Task<bool> SaveProxyConfigAsync(
+            string serial,
+            FakeProxyDialogResult configuration,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+
+            void Apply(StoredDeviceConfig device)
+            {
+                device.ProxyFullString = new ProxyEndpoint(
+                    configuration.Host.Trim(),
+                    configuration.Port,
+                    configuration.Username.Trim(),
+                    configuration.Password.Trim()).NormalizedText;
+                device.ProxyType = ProxyEndpoint.DefaultProxyType;
+            }
+
+            return await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<bool> SaveProxyConfigAsync(
+            IList<StoredDeviceConfig> storedDevices,
+            string serial,
+            FakeProxyDialogResult configuration,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+
+            var storedDevice = storedDevices.FirstOrDefault(device =>
+                DeviceRowFactory.SerialEquals(device.Serial, serial));
+            if (storedDevice == null)
+                return false;
+
+            void Apply(StoredDeviceConfig device)
+            {
+                device.ProxyFullString = new ProxyEndpoint(
+                    configuration.Host.Trim(),
+                    configuration.Port,
+                    configuration.Username.Trim(),
+                    configuration.Password.Trim()).NormalizedText;
+                device.ProxyType = ProxyEndpoint.DefaultProxyType;
+            }
+
+            bool updated = await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken)
+                .ConfigureAwait(false);
             if (updated)
                 Apply(storedDevice);
 

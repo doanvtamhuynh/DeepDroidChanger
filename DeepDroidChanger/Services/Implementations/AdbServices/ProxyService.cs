@@ -14,8 +14,12 @@ namespace DeepDroidChanger.Services
     {
         private const int OpenPackageDelayMilliseconds = 3000;
         private const int ProxyConnectDelayMilliseconds = 5000;
+        private const int ProxyReadyPollMilliseconds = 750;
+        private const int ProxyReadyTimeoutSeconds = 30;
         private const int NetworkRetryDelayMilliseconds = 5000;
         private const int InternetCheckTimeoutSeconds = 90;
+        private static readonly TimeSpan ProxyReadyTimeout = TimeSpan.FromSeconds(ProxyReadyTimeoutSeconds);
+        private static readonly TimeSpan ProxyReadyPollInterval = TimeSpan.FromMilliseconds(ProxyReadyPollMilliseconds);
         private static readonly TimeSpan InternetCheckTimeout = TimeSpan.FromSeconds(InternetCheckTimeoutSeconds);
         private static readonly TimeSpan NetworkRetryDelay = TimeSpan.FromMilliseconds(NetworkRetryDelayMilliseconds);
 
@@ -93,8 +97,14 @@ namespace DeepDroidChanger.Services
                 await _delay(TimeSpan.FromMilliseconds(ProxyConnectDelayMilliseconds), cancellationToken).ConfigureAwait(false);
                 await _adbCommandService.SetWifiAsync(serial, enabled: true, cancellationToken).ConfigureAwait(false);
                 wifiDisableAttempted = false;
-                await WaitForDeviceNetworkAsync(serial, cancellationToken).ConfigureAwait(false);
-                await _adbCommandService.OpenLinkAsync(serial, UrlConstants.BrowserLeaks, cancellationToken).ConfigureAwait(false);
+                await WaitForProxyReadyAsync(serial, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                await RestoreWifiAfterCanceledStartAsync(serial)
+                    .ConfigureAwait(false);
+                throw;
             }
             catch
             {
@@ -103,6 +113,76 @@ namespace DeepDroidChanger.Services
             }
 
             _logger.LogInformation("SOCKS5 fake proxy completed for device {Serial}.", serial);
+        }
+
+        public async Task WaitForInternetAndOpenBrowserLeaksAsync(
+            string serial,
+            CancellationToken cancellationToken)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var attempt = 1;
+
+            while (stopwatch.Elapsed < InternetCheckTimeout)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var publicIp = await _adbCommandService
+                    .CurlAsync(serial, UrlConstants.PublicIp, cancellationToken)
+                    .ConfigureAwait(false);
+                _logger.LogInformation(
+                    "Device network check attempt {Attempt} for {Serial}. ElapsedSeconds: {ElapsedSeconds}. PublicIpPresent: {PublicIpPresent}",
+                    attempt,
+                    serial,
+                    (int)stopwatch.Elapsed.TotalSeconds,
+                    !string.IsNullOrWhiteSpace(publicIp));
+
+                if (!string.IsNullOrWhiteSpace(publicIp))
+                {
+                    _logger.LogInformation(
+                        "Device internet check succeeded for {Serial} after {ElapsedSeconds} seconds.",
+                        serial,
+                        (int)stopwatch.Elapsed.TotalSeconds);
+                    await _adbCommandService
+                        .OpenLinkAsync(serial, UrlConstants.BrowserLeaks, cancellationToken)
+                        .ConfigureAwait(false);
+                    return;
+                }
+
+                await _adbCommandService
+                    .SetWifiAsync(serial, enabled: true, cancellationToken)
+                    .ConfigureAwait(false);
+                await _adbCommandService
+                    .OpenWifiSettingsAsync(serial, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var remaining = InternetCheckTimeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero)
+                    break;
+
+                await _delay(
+                        remaining < NetworkRetryDelay ? remaining : NetworkRetryDelay,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                attempt++;
+            }
+
+            _logger.LogError(
+                "Device internet check failed for {Serial} after {TimeoutSeconds} seconds. Please check the proxy.",
+                serial,
+                InternetCheckTimeoutSeconds);
+            throw new TimeoutException(
+                $"Internet check failed after {InternetCheckTimeoutSeconds} seconds. Please check the proxy.");
+        }
+
+        private async Task RestoreWifiAfterCanceledStartAsync(string serial)
+        {
+            await SafeExecuteAsync(
+                    () => _adbCommandService.SetWifiAsync(
+                        serial,
+                        enabled: true,
+                        CancellationToken.None),
+                    "restore Wi-Fi after canceled proxy start")
+                .ConfigureAwait(false);
         }
 
         private async Task RollbackFailedStartAsync(
@@ -418,46 +498,99 @@ namespace DeepDroidChanger.Services
             }
         }
 
-        private async Task WaitForDeviceNetworkAsync(string serial, CancellationToken cancellationToken)
+        private async Task WaitForProxyReadyAsync(string serial, CancellationToken cancellationToken)
         {
-            var stopwatch = Stopwatch.StartNew();
-            var attempt = 1;
-
-            while (stopwatch.Elapsed < InternetCheckTimeout)
+            DateTimeOffset deadline = DateTimeOffset.UtcNow + ProxyReadyTimeout;
+            int attempt = 1;
+            while (DateTimeOffset.UtcNow < deadline)
             {
-                var publicIp = await _adbCommandService.CurlAsync(serial, UrlConstants.PublicIp, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                bool deepProxyConnected = await IsDeepProxyConnectedAsync(serial, cancellationToken)
+                    .ConfigureAwait(false);
+                bool wifiEnabled = await _adbCommandService
+                    .IsWifiEnabledAsync(serial, cancellationToken)
+                    .ConfigureAwait(false);
                 _logger.LogInformation(
-                    "Device network check attempt {Attempt} for {Serial}. ElapsedSeconds: {ElapsedSeconds}. PublicIpPresent: {PublicIpPresent}",
+                    "DeepProxy readiness check attempt {Attempt} for {Serial}. DeepProxyConnected: {DeepProxyConnected}. WifiEnabled: {WifiEnabled}",
                     attempt,
                     serial,
-                    (int)stopwatch.Elapsed.TotalSeconds,
-                    !string.IsNullOrWhiteSpace(publicIp));
+                    deepProxyConnected,
+                    wifiEnabled);
 
-                if (!string.IsNullOrWhiteSpace(publicIp))
+                if (deepProxyConnected && wifiEnabled)
                 {
                     _logger.LogInformation(
-                        "Device internet check succeeded for {Serial} after {ElapsedSeconds} seconds.",
-                        serial,
-                        (int)stopwatch.Elapsed.TotalSeconds);
+                        "DeepProxy became ready for {Serial}.",
+                        serial);
                     return;
                 }
 
-                await _adbCommandService.SetWifiAsync(serial, enabled: true, cancellationToken).ConfigureAwait(false);
-                await _adbCommandService.OpenWifiSettingsAsync(serial, cancellationToken).ConfigureAwait(false);
-
-                var remaining = InternetCheckTimeout - stopwatch.Elapsed;
+                TimeSpan remaining = deadline - DateTimeOffset.UtcNow;
                 if (remaining <= TimeSpan.Zero)
                     break;
 
-                await _delay(remaining < NetworkRetryDelay ? remaining : NetworkRetryDelay, cancellationToken).ConfigureAwait(false);
+                await _delay(
+                        remaining < ProxyReadyPollInterval ? remaining : ProxyReadyPollInterval,
+                        cancellationToken)
+                    .ConfigureAwait(false);
                 attempt++;
             }
 
             _logger.LogError(
-                "Device internet check failed for {Serial} after {TimeoutSeconds} seconds. Please check the proxy.",
+                "DeepProxy readiness check failed for {Serial} after {TimeoutSeconds} seconds.",
                 serial,
-                InternetCheckTimeoutSeconds);
-            throw new TimeoutException($"Internet check failed after {InternetCheckTimeoutSeconds} seconds. Please check the proxy.");
+                ProxyReadyTimeoutSeconds);
+            throw new TimeoutException($"DeepProxy was not ready after {ProxyReadyTimeoutSeconds} seconds.");
+        }
+
+        private async Task<bool> IsDeepProxyConnectedAsync(
+            string serial,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                CommandResult result = await _adbCommandService
+                    .RunAdbShellAsync(
+                        serial,
+                        "dumpsys activity services hev.sockstun/.TProxyService",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return result.ExitCode == 0
+                    && IsDeepProxyConnectedOutput($"{result.StandardOutput}\n{result.StandardError}");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogDebug(
+                    exception,
+                    "DeepProxy service-state query failed for device {Serial}.",
+                    serial);
+                return false;
+            }
+        }
+
+        internal static bool IsDeepProxyConnectedOutput(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output)
+                || !output.Contains("hev.sockstun/.TProxyService", StringComparison.OrdinalIgnoreCase)
+                || !output.Contains("ServiceRecord", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            bool started = System.Text.RegularExpressions.Regex.IsMatch(
+                output,
+                @"\bstartRequested\s*[:=]\s*true\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            bool foreground = System.Text.RegularExpressions.Regex.IsMatch(
+                output,
+                @"\bisForeground\s*[:=]\s*true\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            return started && foreground;
         }
 
         private async Task EnsureDeepDroidDeviceAsync(string serial, CancellationToken cancellationToken)

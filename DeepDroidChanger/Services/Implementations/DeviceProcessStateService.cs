@@ -186,6 +186,9 @@ public sealed class DeviceProcessStateService : IDeviceProcessStateService
         if (string.Equals(resourceKey, "Log_Ready", StringComparison.Ordinal))
             return DeviceProcessState.Ready;
 
+        if (string.Equals(resourceKey, "Log_ProxyNotAssigned", StringComparison.Ordinal))
+            return DeviceProcessState.Succeeded;
+
         if (resourceKey.Contains("Partial", StringComparison.Ordinal))
             return DeviceProcessState.Failed;
 

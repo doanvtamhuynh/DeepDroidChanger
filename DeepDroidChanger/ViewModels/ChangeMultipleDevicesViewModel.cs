@@ -33,6 +33,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IDeviceTimezoneService _deviceTimezoneService;
     private readonly IChangeLocationDialogService _changeLocationDialogService;
     private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
+    private readonly IFakeProxyBatchDialogService _fakeProxyBatchDialogService;
+    private readonly IProxyService _proxyService;
+    private readonly IProxyWorkflowService _proxyWorkflowService;
     private readonly IInstallPackageDialogService _installPackageDialogService;
     private readonly IPackageInstallService _packageInstallService;
     private readonly ILocalizationService _localizationService;
@@ -56,7 +59,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly object _pendingConfigSaveLock = new();
     private readonly object _pendingSettingsSaveLock = new();
     private readonly object _batchWorkflowsLock = new();
-    private readonly Dictionary<Task, CancellationTokenSource> _batchWorkflows = [];
+    private readonly Dictionary<Task, TrackedBatchWorkflow> _batchWorkflows = [];
     private readonly object _activeContextOperationsLock = new();
     private readonly HashSet<Guid> _activeContextOperationIds = [];
     private TaskCompletionSource? _activeContextOperationsCompletion;
@@ -145,6 +148,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceTimezoneService deviceTimezoneService,
         IChangeLocationDialogService changeLocationDialogService,
         IChangeTimezoneDialogService changeTimezoneDialogService,
+        IFakeProxyBatchDialogService fakeProxyBatchDialogService,
+        IProxyService proxyService,
+        IProxyWorkflowService proxyWorkflowService,
         IInstallPackageDialogService installPackageDialogService,
         IPackageInstallService packageInstallService,
         IDeviceActionEligibilityService deviceActionEligibilityService,
@@ -168,6 +174,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _deviceTimezoneService = deviceTimezoneService;
         _changeLocationDialogService = changeLocationDialogService;
         _changeTimezoneDialogService = changeTimezoneDialogService;
+        _fakeProxyBatchDialogService = fakeProxyBatchDialogService;
+        _proxyService = proxyService;
+        _proxyWorkflowService = proxyWorkflowService;
         _installPackageDialogService = installPackageDialogService;
         _packageInstallService = packageInstallService;
         _localizationService = localizationService;
@@ -545,10 +554,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return StartTrackedBatchWorkflow(RunRandomSelectedDevicesAsync);
     }
 
-    private async Task RunRandomSelectedDevicesAsync(CancellationToken batchToken)
+    private async Task RunRandomSelectedDevicesAsync(
+        Guid sessionId,
+        CancellationToken batchToken)
     {
         var targets = new List<BatchActionTarget>();
-        Guid sessionId = Guid.NewGuid();
         try
         {
             DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
@@ -574,6 +584,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 if (!eligibleDevices.Contains(device))
                     continue;
 
+                batchToken.ThrowIfCancellationRequested();
+
                 IDeviceActionOperation? operation = TryStartBatchAction(
                     device,
                     DeviceActionKind.RandomDevice,
@@ -592,6 +604,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 }
                 else
                 {
+                    batchToken.ThrowIfCancellationRequested();
                     ShowBusyActionLog(device);
                 }
             }
@@ -625,8 +638,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private Task ChangeAndWipeMultipleDevicesAsync()
     {
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedDeviceBatchActionAsync(
+            (sessionId, workflowCancellation) => RunSelectedDeviceBatchActionAsync(
                 DeviceActionKind.ChangeDevice,
+                sessionId,
                 workflowCancellation));
     }
 
@@ -640,8 +654,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private Task ChangeMultipleDevicesWithoutWipeAsync()
     {
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedDeviceBatchActionAsync(
+            (sessionId, workflowCancellation) => RunSelectedDeviceBatchActionAsync(
                 DeviceActionKind.ChangeWithoutWipe,
+                sessionId,
                 workflowCancellation));
     }
 
@@ -649,8 +664,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private Task WipeMultipleDevicesWithoutChangeAsync()
     {
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedDeviceBatchActionAsync(
+            (sessionId, workflowCancellation) => RunSelectedDeviceBatchActionAsync(
                 DeviceActionKind.Wipe,
+                sessionId,
                 workflowCancellation));
     }
 
@@ -658,8 +674,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private Task RandomizeMultipleDevicesSimInfoAsync()
     {
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedDeviceBatchActionAsync(
+            (sessionId, workflowCancellation) => RunSelectedDeviceBatchActionAsync(
                 DeviceActionKind.RandomSim,
+                sessionId,
                 workflowCancellation));
     }
 
@@ -667,8 +684,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private Task ChangeMultipleDevicesSimInfoAsync()
     {
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedDeviceBatchActionAsync(
+            (sessionId, workflowCancellation) => RunSelectedDeviceBatchActionAsync(
                 DeviceActionKind.ChangeSim,
+                sessionId,
                 workflowCancellation));
     }
 
@@ -692,23 +710,39 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             return Task.CompletedTask;
 
         return StartTrackedBatchWorkflow(
-            workflowCancellation => RunSelectedInstallPackageWorkflowAsync(
+            (sessionId, workflowCancellation) => RunSelectedInstallPackageWorkflowAsync(
                 selectedDevices,
+                sessionId,
                 workflowCancellation));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task StartMultipleDevicesFakeProxyAsync()
+    {
+        return StartTrackedBatchWorkflow(RunSelectedFakeProxyWorkflowAsync);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task StopMultipleDevicesFakeProxyAsync()
+    {
+        return StartTrackedBatchWorkflow(RunSelectedStopFakeProxyWorkflowAsync);
     }
 
     private Task StartLocationTimezoneWorkflowAsync(bool isLocation)
     {
         return StartTrackedBatchWorkflow(
-            cancellationToken => RunSelectedLocationOrTimezoneAsync(isLocation, cancellationToken));
+            (sessionId, cancellationToken) => RunSelectedLocationOrTimezoneAsync(
+                isLocation,
+                sessionId,
+                cancellationToken));
     }
 
     private async Task RunSelectedLocationOrTimezoneAsync(
         bool isLocation,
+        Guid sessionId,
         CancellationToken cancellationToken)
     {
         var targets = new List<BatchActionTarget>();
-        Guid sessionId = Guid.NewGuid();
         try
         {
             DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
@@ -779,10 +813,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private async Task RunSelectedInstallPackageWorkflowAsync(
         IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        Guid sessionId,
         CancellationToken cancellationToken)
     {
         var targets = new List<BatchActionTarget>();
-        Guid sessionId = Guid.NewGuid();
         try
         {
             targets = await CreateReservedEligibleTargetsAsync(
@@ -828,6 +862,287 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         finally
         {
             CompleteBatchOwnedTargets(targets);
+        }
+    }
+
+    private async Task RunSelectedFakeProxyWorkflowAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        try
+        {
+            DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
+            if (selectedDevices.Length == 0)
+                return;
+
+            targets = await CreateReservedEligibleTargetsAsync(
+                    selectedDevices,
+                    cancellationToken,
+                    DeviceActionKind.FakeProxy,
+                    sessionId)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            FakeProxyBatchDialogResult? configuration = await _fakeProxyBatchDialogService
+                .ShowFakeProxyBatchAsync(targets.Count, cancellationToken)
+                .ConfigureAwait(true);
+            if (configuration == null)
+            {
+                await SetBatchDialogDismissalResultsAsync(targets)
+                    .ConfigureAwait(true);
+                return;
+            }
+
+            BatchActionTarget[] reservedTargets = targets
+                .Where(target => IsActiveBatchTarget(target)
+                    && !target.IsInvalidated
+                    && IsCurrentTarget(target))
+                .ToArray();
+            IReadOnlyList<ProxyAssignment<BatchActionTarget>> assignments =
+                ProxyAssignmentPlanner.Build(reservedTargets, configuration);
+            var assignedTargets = assignments
+                .Select(assignment => assignment.Target)
+                .ToHashSet();
+
+            foreach (BatchActionTarget target in reservedTargets)
+            {
+                if (assignedTargets.Contains(target))
+                    continue;
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ProxyNotAssigned"))
+                    .ConfigureAwait(true);
+                CompleteBatchTarget(target);
+                targets.Remove(target);
+            }
+
+            Task[] workers = assignments
+                .Select(assignment => StartBatchTargetWorker(
+                    assignment.Target,
+                    () => ExecuteFakeProxyBatchTargetAsync(
+                        assignment.Target,
+                        assignment.Proxy,
+                        configuration,
+                        cancellationToken)))
+                .ToArray();
+            await Task.WhenAll(workers).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to execute Multiple Device Fake Proxy action.");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+        }
+    }
+
+    private async Task RunSelectedStopFakeProxyWorkflowAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        try
+        {
+            DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
+            if (selectedDevices.Length == 0)
+                return;
+
+            targets = await CreateReservedEligibleTargetsAsync(
+                    selectedDevices,
+                    cancellationToken,
+                    DeviceActionKind.StopFakeProxy,
+                    sessionId)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            Task[] workers = targets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => ExecuteStopFakeProxyBatchTargetAsync(
+                        target,
+                        cancellationToken)))
+                .ToArray();
+            await Task.WhenAll(workers).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to execute Multiple Device Stop Fake Proxy action.");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+        }
+    }
+
+    private async Task ExecuteFakeProxyBatchTargetAsync(
+        BatchActionTarget target,
+        ProxyEndpoint proxy,
+        FakeProxyBatchDialogResult batchConfiguration,
+        CancellationToken cancellationToken)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            target.OperationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StartingProxy"))
+                    .ConfigureAwait(false);
+                var deviceConfiguration = new FakeProxyDialogResult(
+                    proxy.Host,
+                    proxy.Port,
+                    proxy.Username,
+                    proxy.Password,
+                    batchConfiguration.ProxyType,
+                    batchConfiguration.ChangeLocationByIp,
+                    batchConfiguration.ChangeTimezoneByIp);
+                ProxyWorkflowResult workflowResult = await _proxyWorkflowService
+                    .ApplyAsync(target.Serial, deviceConfiguration, targetCancellation.Token)
+                    .ConfigureAwait(false);
+                targetCancellation.Token.ThrowIfCancellationRequested();
+
+                if (workflowResult.LocationUpdateFailed)
+                {
+                    await RunOnUiContextAsync(() => SetTargetLog(
+                            target,
+                            "Log_ProxyLocationByIpFailed"))
+                        .ConfigureAwait(false);
+                }
+
+                if (workflowResult.TimezoneUpdateFailed)
+                {
+                    await RunOnUiContextAsync(() => SetTargetLog(
+                            target,
+                            "Log_ProxyTimezoneByIpFailed"))
+                        .ConfigureAwait(false);
+                }
+
+                targetCancellation.Token.ThrowIfCancellationRequested();
+
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        workflowResult.IsSuccess
+                            ? "Log_FakeProxySuccess"
+                            : "Log_FakeProxyPartialSuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await SetTargetCancellationResultAsync(target)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to apply fake proxy for device {Serial}.",
+                target.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_FakeProxyFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
+    private async Task ExecuteStopFakeProxyBatchTargetAsync(
+        BatchActionTarget target,
+        CancellationToken cancellationToken)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            target.OperationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StoppingProxy"))
+                    .ConfigureAwait(false);
+                await _proxyService
+                    .StopProxyAsync(target.Serial, targetCancellation.Token)
+                    .ConfigureAwait(false);
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopFakeProxySuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await SetTargetCancellationResultAsync(target)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to stop fake proxy for device {Serial}.",
+                target.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_StopFakeProxyFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
         }
     }
 
@@ -905,30 +1220,37 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     private Task StartTrackedBatchWorkflow(
-        Func<CancellationToken, Task> workflow)
+        Func<Guid, CancellationToken, Task> workflow)
     {
+        Guid sessionId = Guid.NewGuid();
         var workflowCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _actionLifetimeCancellation.Token);
         var completion = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_batchWorkflowsLock)
-            _batchWorkflows[completion.Task] = workflowCancellation;
+        {
+            _batchWorkflows[completion.Task] = new(
+                sessionId,
+                workflowCancellation);
+        }
 
         _ = CompleteTrackedBatchWorkflowAsync(
             workflow,
+            sessionId,
             workflowCancellation,
             completion);
         return completion.Task;
     }
 
     private async Task CompleteTrackedBatchWorkflowAsync(
-        Func<CancellationToken, Task> workflow,
+        Func<Guid, CancellationToken, Task> workflow,
+        Guid sessionId,
         CancellationTokenSource workflowCancellation,
         TaskCompletionSource completion)
     {
         try
         {
-            await workflow(workflowCancellation.Token)
+            await workflow(sessionId, workflowCancellation.Token)
                 .ConfigureAwait(false);
             completion.TrySetResult();
         }
@@ -967,26 +1289,33 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private Task[] RequestBatchWorkflowCancellation()
     {
-        CancellationTokenSource[] cancellations;
-        Task[] workflows;
+        return RequestBatchWorkflowCancellation(sessionId: null);
+    }
+
+    private Task[] RequestBatchWorkflowCancellation(Guid? sessionId)
+    {
+        KeyValuePair<Task, TrackedBatchWorkflow>[] registrations;
         lock (_batchWorkflowsLock)
         {
-            cancellations = _batchWorkflows.Values.ToArray();
-            workflows = _batchWorkflows.Keys.ToArray();
+            registrations = sessionId.HasValue
+                ? _batchWorkflows
+                    .Where(pair => pair.Value.SessionId == sessionId.Value)
+                    .ToArray()
+                : _batchWorkflows.ToArray();
         }
 
-        foreach (CancellationTokenSource cancellation in cancellations)
+        foreach (TrackedBatchWorkflow registration in registrations.Select(pair => pair.Value))
         {
             try
             {
-                cancellation.Cancel();
+                registration.Cancellation.Cancel();
             }
             catch (ObjectDisposedException)
             {
             }
         }
 
-        return workflows;
+        return registrations.Select(pair => pair.Key).ToArray();
     }
 
     private async Task<List<BatchActionTarget>> CreateReservedEligibleTargetsAsync(
@@ -1007,48 +1336,66 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             return (device, failure);
         }
 
-        (DeviceRowViewModel Device, DeviceActionEligibilityFailure Failure)[] checks = await Task
-            .WhenAll(selectedDevices.Select(CheckAsync))
-            .ConfigureAwait(true);
-        var targets = new List<BatchActionTarget>(checks.Length);
-        foreach ((DeviceRowViewModel device, DeviceActionEligibilityFailure failure) in checks)
+        var targets = new List<BatchActionTarget>(selectedDevices.Count);
+        try
         {
-            if (failure != DeviceActionEligibilityFailure.None)
-            {
-                await RunOnUiContextAsync(() =>
-                {
-                    ApplyLiveConnectionState(device, failure);
-                    _deviceActionFeedbackService.ReportEligibilityFailure(device.Serial, failure);
-                })
-                    .ConfigureAwait(true);
-                continue;
-            }
-
-            await RunOnUiContextAsync(() => ApplyLiveConnectionState(device, failure))
+            (DeviceRowViewModel Device, DeviceActionEligibilityFailure Failure)[] checks = await Task
+                .WhenAll(selectedDevices.Select(CheckAsync))
                 .ConfigureAwait(true);
-
-            IDeviceActionOperation? operation = TryStartBatchAction(
-                device,
-                logicalActionKind,
-                cancellationToken,
-                sessionId);
-            if (operation == null)
+            foreach ((DeviceRowViewModel device, DeviceActionEligibilityFailure failure) in checks)
             {
-                await RunOnUiContextAsync(() => ShowBusyActionLog(device))
-                    .ConfigureAwait(false);
-                continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (failure != DeviceActionEligibilityFailure.None)
+                {
+                    await RunOnUiContextAsync(() =>
+                    {
+                        ApplyLiveConnectionState(device, failure);
+                        _deviceActionFeedbackService.ReportEligibilityFailure(device.Serial, failure);
+                    })
+                        .ConfigureAwait(true);
+                    continue;
+                }
+
+                await RunOnUiContextAsync(() => ApplyLiveConnectionState(device, failure))
+                    .ConfigureAwait(true);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                IDeviceActionOperation? operation = TryStartBatchAction(
+                    device,
+                    logicalActionKind,
+                    cancellationToken,
+                    sessionId);
+                if (operation == null)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await RunOnUiContextAsync(() => ShowBusyActionLog(device))
+                        .ConfigureAwait(false);
+                    continue;
+                }
+
+                var target = new BatchActionTarget(
+                    device,
+                    operation,
+                    deviceProfile: null,
+                    simProfile: null);
+                RegisterBatchTarget(target);
+                targets.Add(target);
             }
 
-            var target = new BatchActionTarget(
-                device,
-                operation,
-                deviceProfile: null,
-                simProfile: null);
-            RegisterBatchTarget(target);
-            targets.Add(target);
+            return targets;
         }
-
-        return targets;
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+            CompleteBatchOwnedTargets(targets);
+            throw;
+        }
+        catch
+        {
+            CompleteBatchOwnedTargets(targets);
+            throw;
+        }
     }
 
     private async Task ExecuteLocationBatchTargetAsync(
@@ -1212,6 +1559,19 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (string.IsNullOrWhiteSpace(result.CountryCode)
+                && string.IsNullOrWhiteSpace(result.CityName))
+            {
+                return await _deviceConfigService.SaveLocationConfigAsync(
+                        _storedDevices,
+                        serial,
+                        mode,
+                        result.Latitude,
+                        result.Longitude,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             return await _deviceConfigService.SaveLocationConfigAsync(
                     _storedDevices,
                     serial,
@@ -1579,10 +1939,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private async Task RunSelectedDeviceBatchActionAsync(
         DeviceActionKind action,
+        Guid sessionId,
         CancellationToken cancellationToken)
     {
         var targets = new List<BatchActionTarget>();
-        Guid sessionId = Guid.NewGuid();
         try
         {
             DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
@@ -1613,6 +1973,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 if (!eligibleDevices.Contains(device))
                     continue;
 
+                cancellationToken.ThrowIfCancellationRequested();
+
                 DeviceInfoApiDevice? deviceProfile = null;
                 if (action is DeviceActionKind.ChangeDevice or DeviceActionKind.ChangeWithoutWipe)
                 {
@@ -1637,6 +1999,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     sessionId);
                 if (operation == null)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     ShowBusyActionLog(device);
                     continue;
                 }
@@ -1695,10 +2058,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
-    private async Task RunRandomChangeAndWipeSelectedDevicesAsync(CancellationToken cancellationToken)
+    private async Task RunRandomChangeAndWipeSelectedDevicesAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken)
     {
         var targets = new List<BatchActionTarget>();
-        Guid sessionId = Guid.NewGuid();
         try
         {
             DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
@@ -1728,6 +2092,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 if (!eligibleDevices.Contains(device))
                     continue;
 
+                cancellationToken.ThrowIfCancellationRequested();
+
                 IDeviceActionOperation? operation = TryStartBatchAction(
                     device,
                     DeviceActionKind.RandomChangeAndWipe,
@@ -1735,6 +2101,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     sessionId);
                 if (operation == null)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     ShowBusyActionLog(device);
                     continue;
                 }
@@ -2691,6 +3058,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             return;
 
         _deviceActionCoordinatorService.TryRequestSessionCancellation(action.SessionId);
+        RequestBatchWorkflowCancellation(action.SessionId);
         RefreshRunningActions();
     }
 
@@ -2989,6 +3357,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         ChangeMultipleDevicesLocationCommand.NotifyCanExecuteChanged();
         ChangeMultipleDevicesTimezoneCommand.NotifyCanExecuteChanged();
         InstallPackagesOnMultipleDevicesCommand.NotifyCanExecuteChanged();
+        StartMultipleDevicesFakeProxyCommand.NotifyCanExecuteChanged();
+        StopMultipleDevicesFakeProxyCommand.NotifyCanExecuteChanged();
     }
 
     private void NotifyActionPresentationChanged()
@@ -3003,6 +3373,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             return;
 
         _deviceActionCoordinatorService.TryRequestCancellation(device.Serial);
+        TryCancelQueuedBatchTarget(device.Serial);
     }
 
     private static bool CanStopDeviceActionCommandCanExecute(DeviceRowViewModel? device)
@@ -3658,6 +4029,43 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             NotifySelectionChanged();
     }
 
+    private bool TryCancelQueuedBatchTarget(string serial)
+    {
+        BatchActionTarget? target;
+        DeviceActionCancellationReason cancellationReason;
+
+        lock (_activeBatchTargetsLock)
+        {
+            target = _activeBatchTargets.FirstOrDefault(
+                candidate => SerialEquals(candidate.Serial, serial));
+            if (target == null || !target.TryInvalidateQueued())
+                return false;
+
+            cancellationReason = target.Operation.CancellationReason;
+            _activeBatchTargets.Remove(target);
+        }
+
+        target.CancelQueuedExecution();
+        TrackSilentSave(
+            ReportQueuedBatchTargetCancellationAsync(
+                target.Serial,
+                cancellationReason),
+            "Failed to report queued Multiple Device action cancellation.");
+        RefreshDeviceBusyState(target.Serial);
+        return true;
+    }
+
+    private Task ReportQueuedBatchTargetCancellationAsync(
+        string serial,
+        DeviceActionCancellationReason cancellationReason)
+    {
+        return _deviceActionFeedbackService.ReportOperationCanceledAsync(
+            serial,
+            cancellationReason,
+            requiresOnline: true,
+            CancellationToken.None);
+    }
+
     private static DeviceInfoApiDevice? CloneDeviceProfile(DeviceInfoApiDevice? profile)
     {
         return profile?.Clone();
@@ -3776,9 +4184,14 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         public Task PersistenceTask { get; set; } = Task.CompletedTask;
     }
 
+    private sealed record TrackedBatchWorkflow(
+        Guid SessionId,
+        CancellationTokenSource Cancellation);
+
     private sealed class BatchActionTarget
     {
         private readonly CancellationTokenSource _invalidation = new();
+        private readonly CancellationToken _operationToken;
         private int _state;
         private int _completionOwner;
         private int _isDisposed;
@@ -3798,6 +4211,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             Device = device;
             Serial = device.Serial;
             Operation = operation ?? throw new ArgumentNullException(nameof(operation));
+            _operationToken = Operation.CancellationToken;
             DeviceProfile = deviceProfile;
             SimProfile = simProfile;
             ChangeOptions = changeOptions;
@@ -3815,7 +4229,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         public DeviceRowViewModel Device { get; }
         public string Serial { get; }
         public IDeviceActionOperation Operation { get; }
-        public CancellationToken OperationToken => Operation.CancellationToken;
+        public CancellationToken OperationToken => _operationToken;
         public DeviceInfoApiDevice? DeviceProfile { get; }
         public SimProfile? SimProfile { get; }
         public DeviceChangeOptions? ChangeOptions { get; }

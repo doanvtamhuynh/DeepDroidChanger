@@ -75,4 +75,8 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Apply a timezone to the selected online devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApk">Install APK/XAPK</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApkTooltip">Install selected APK/XAPK files on the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionFakeProxy">Fake Proxy</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionFakeProxyTooltip">Start Fake Proxy on the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionStopFakeProxy">Stop Proxy</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionStopFakeProxyTooltip">Stop Fake Proxy on the selected online devices.</sys:String>
 </ResourceDictionary>

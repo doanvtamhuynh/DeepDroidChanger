@@ -18,6 +18,7 @@ public sealed class ProxyWorkflowResult
 
     public bool LocationUpdateFailed { get; }
     public bool TimezoneUpdateFailed { get; }
+    public bool IsSuccess => !LocationUpdateFailed && !TimezoneUpdateFailed;
     public string AppliedLatitude { get; }
     public string AppliedLongitude { get; }
     public string AppliedTimezone { get; }

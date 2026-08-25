@@ -2,6 +2,7 @@ using DeepDroidChanger.Models;
 using DeepDroidChanger.Constants;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.Services
@@ -295,6 +296,69 @@ namespace DeepDroidChanger.Services
             var command = $"svc wifi {state}";
             var result = await RunAdbShellAsync(serial, command, cancellationToken).ConfigureAwait(false);
             ProcessCommandResult(result, serial, $"{state} Wi-Fi", isWrite: true);
+        }
+
+        public async Task<bool> IsWifiEnabledAsync(string serial, CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+
+            CommandResult? statusResult = null;
+            try
+            {
+                statusResult = await RunAdbShellAsync(
+                        serial,
+                        "cmd wifi status",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                string statusText = $"{statusResult.StandardOutput}\n{statusResult.StandardError}";
+                if (statusResult.ExitCode == 0)
+                {
+                    if (Regex.IsMatch(statusText, @"\bwi[- ]?fi\s+is\s+enabled\b", RegexOptions.IgnoreCase))
+                        return true;
+
+                    if (Regex.IsMatch(statusText, @"\bwi[- ]?fi\s+is\s+disabled\b", RegexOptions.IgnoreCase))
+                        return false;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogDebug(exception, "The cmd wifi status query failed for device {Serial}.", serial);
+            }
+
+            try
+            {
+                CommandResult settingResult = await RunAdbShellAsync(
+                        serial,
+                        "settings get global wifi_on",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (settingResult.ExitCode == 0)
+                {
+                    string value = settingResult.StandardOutput.Trim();
+                    if (value == "1")
+                        return true;
+
+                    if (value == "0")
+                        return false;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogDebug(exception, "The global wifi_on query failed for device {Serial}.", serial);
+            }
+
+            _logger.LogWarning(
+                "Unable to determine Wi-Fi state for device {Serial}; treating Wi-Fi as disabled.",
+                serial);
+            return false;
         }
 
         public async Task OpenPackageAsync(string serial, string packageName, CancellationToken cancellationToken)
