@@ -2043,17 +2043,30 @@ namespace DeepDroidChanger.ViewModels
             await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
-                bool saved = await _deviceConfigService
-                    .SaveLocationConfigAsync(
-                        _storedDevices,
-                        serial,
-                        mode,
-                        latitude,
-                        longitude,
-                        countryCode,
-                        cityName,
-                        cancellationToken)
-                    .ConfigureAwait(true);
+                bool hasLocationMetadata =
+                    !string.IsNullOrWhiteSpace(countryCode)
+                    || !string.IsNullOrWhiteSpace(cityName);
+                bool saved = hasLocationMetadata
+                    ? await _deviceConfigService
+                        .SaveLocationConfigAsync(
+                            _storedDevices,
+                            serial,
+                            mode,
+                            latitude,
+                            longitude,
+                            countryCode,
+                            cityName,
+                            cancellationToken)
+                        .ConfigureAwait(true)
+                    : await _deviceConfigService
+                        .SaveLocationConfigAsync(
+                            _storedDevices,
+                            serial,
+                            mode,
+                            latitude,
+                            longitude,
+                            cancellationToken)
+                        .ConfigureAwait(true);
                 if (!saved)
                     throw new InvalidOperationException("The Location configuration could not be saved.");
             }
