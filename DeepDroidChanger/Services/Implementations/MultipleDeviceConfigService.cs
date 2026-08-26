@@ -188,13 +188,20 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
             .ConfigureAwait(false);
     }
 
-    private static Task WriteJsonAsync<T>(
+    private static async Task WriteJsonAsync<T>(
         string path,
         T value,
         CancellationToken cancellationToken)
     {
         string json = JsonSerializer.Serialize(value, JsonOptions);
-        return AtomicFileWriter.WriteAllTextAsync(path, json, cancellationToken);
+        if (File.Exists(path))
+        {
+            string current = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            if (string.Equals(current, json, StringComparison.Ordinal))
+                return;
+        }
+
+        await AtomicFileWriter.WriteAllTextAsync(path, json, cancellationToken).ConfigureAwait(false);
     }
 
     private static MultipleDeviceConfiguration Normalize(

@@ -199,7 +199,11 @@ public sealed class DeviceStoreService : IDeviceStoreService
             JsonSerializer.Deserialize<List<DeviceIndexEntry>>(json, JsonOptions) ?? [];
         IReadOnlyList<StoredDeviceConfig> devices =
             await ReadIndexedDevicesAsync(index, cancellationToken).ConfigureAwait(false);
-        await WriteStoreAsync(devices, cancellationToken).ConfigureAwait(false);
+
+        List<DeviceIndexEntry> normalizedIndex = CreateDeviceIndex(devices);
+        if (RequiresIndexRepair(index, normalizedIndex))
+            await WriteJsonAsync(_devicesPath, normalizedIndex, cancellationToken).ConfigureAwait(false);
+
         return devices;
     }
 
@@ -297,19 +301,44 @@ public sealed class DeviceStoreService : IDeviceStoreService
         where T : new()
     {
         if (!File.Exists(path))
-            return new T();
+            return await WriteDefaultJsonAsync<T>(path, cancellationToken).ConfigureAwait(false);
 
         try
         {
             string json = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-            return JsonSerializer.Deserialize<T>(json, JsonOptions) ?? new T();
+            T? value = JsonSerializer.Deserialize<T>(json, JsonOptions);
+            if (value is not null)
+                return value;
+
+            return await WriteDefaultJsonAsync<T>(path, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
             _logger.LogWarning(exception, "Failed to read device config file {FileName}.", Path.GetFileName(path));
             QuarantineFile(path, "device config");
-            return new T();
+            return await WriteDefaultJsonAsync<T>(path, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task<T> WriteDefaultJsonAsync<T>(
+        string path,
+        CancellationToken cancellationToken)
+        where T : new()
+    {
+        var value = new T();
+        try
+        {
+            await WriteJsonAsync(path, value, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(
+                exception,
+                "Failed to restore default device config file {FileName}.",
+                Path.GetFileName(path));
+        }
+
+        return value;
     }
 
     private async Task<IReadOnlyList<StoredDeviceConfig>> WriteAndReturnAsync(
@@ -329,7 +358,16 @@ public sealed class DeviceStoreService : IDeviceStoreService
         foreach (StoredDeviceConfig device in normalized)
             await WriteDeviceFilesAsync(device, cancellationToken).ConfigureAwait(false);
 
-        List<DeviceIndexEntry> index = normalized
+        await WriteJsonAsync(
+                _devicesPath,
+                CreateDeviceIndex(normalized),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private List<DeviceIndexEntry> CreateDeviceIndex(IEnumerable<StoredDeviceConfig> devices)
+    {
+        return devices
             .Select(device => new DeviceIndexEntry
             {
                 Serial = device.Serial,
@@ -338,7 +376,29 @@ public sealed class DeviceStoreService : IDeviceStoreService
                 DataPath = GetRelativeDeviceDataPath(device.Serial)
             })
             .ToList();
-        await WriteJsonAsync(_devicesPath, index, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool RequiresIndexRepair(
+        IReadOnlyList<DeviceIndexEntry> current,
+        IReadOnlyList<DeviceIndexEntry> normalized)
+    {
+        if (current.Count != normalized.Count)
+            return true;
+
+        for (int index = 0; index < current.Count; index++)
+        {
+            DeviceIndexEntry currentEntry = current[index];
+            DeviceIndexEntry normalizedEntry = normalized[index];
+            if (!string.Equals(currentEntry.Serial, normalizedEntry.Serial, StringComparison.Ordinal)
+                || !string.Equals(currentEntry.Name, normalizedEntry.Name, StringComparison.Ordinal)
+                || !string.Equals(currentEntry.Type, normalizedEntry.Type, StringComparison.Ordinal)
+                || !string.Equals(currentEntry.DataPath, normalizedEntry.DataPath, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task WriteDeviceFilesAsync(
@@ -409,13 +469,20 @@ public sealed class DeviceStoreService : IDeviceStoreService
             cancellationToken).ConfigureAwait(false);
     }
 
-    private static Task WriteJsonAsync<T>(
+    private static async Task WriteJsonAsync<T>(
         string path,
         T value,
         CancellationToken cancellationToken)
     {
         string json = JsonSerializer.Serialize(value, JsonOptions);
-        return AtomicFileWriter.WriteAllTextAsync(path, json, cancellationToken);
+        if (File.Exists(path))
+        {
+            string current = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            if (string.Equals(current, json, StringComparison.Ordinal))
+                return;
+        }
+
+        await AtomicFileWriter.WriteAllTextAsync(path, json, cancellationToken).ConfigureAwait(false);
     }
 
     private string GetRelativeDeviceDataPath(string serial)

@@ -3391,21 +3391,15 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
         try
         {
-            DeviceListSnapshot snapshot =
-                await _deviceListService.LoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            IReadOnlyList<AdbDevice> connectedDevices = await _deviceListService
+                .LoadDetectedDevicesAsync(cancellationToken)
+                .ConfigureAwait(false);
             int newDeviceCount = _deviceListService.CountNewDevices(
-                snapshot.StoredDevices,
-                snapshot.ConnectedDevices);
+                _storedDevices,
+                connectedDevices);
             await RunOnUiContextAsync(() =>
             {
-                bool deviceListChanged = !HaveSameDeviceSerials(
-                    _storedDevices,
-                    snapshot.StoredDevices);
-                _storedDevices = snapshot.StoredDevices.ToList();
-                if (deviceListChanged)
-                    RefreshDeviceRows(snapshot.StoredDevices, snapshot.ConnectedDevices);
-                else
-                    UpdateDeviceConnectionStatuses(snapshot.ConnectedDevices);
+                UpdateDeviceConnectionStatuses(connectedDevices);
 
                 if (!_isShowingToolbarLog)
                 {
@@ -4125,17 +4119,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private static bool SerialEquals(string left, string right)
     {
         return DeviceRowFactory.SerialEquals(left, right);
-    }
-
-    private static bool HaveSameDeviceSerials(
-        IReadOnlyCollection<StoredDeviceConfig> left,
-        IReadOnlyCollection<StoredDeviceConfig> right)
-    {
-        return left.Count == right.Count
-               && left
-                   .Select(device => device.Serial)
-                   .ToHashSet(StringComparer.OrdinalIgnoreCase)
-                   .SetEquals(right.Select(device => device.Serial));
     }
 
     public void Dispose()

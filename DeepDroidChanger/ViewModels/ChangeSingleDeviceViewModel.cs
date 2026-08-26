@@ -542,17 +542,6 @@ namespace DeepDroidChanger.ViewModels
                         "Log_ActionConfigurationSaveFailed");
                     return false;
                 }
-
-                IReadOnlyList<StoredDeviceConfig> storedDevices =
-                    await _deviceListService.LoadStoredDevicesAsync(CancellationToken.None)
-                        .ConfigureAwait(false);
-                await RunOnUiContextAsync(() =>
-                {
-                    _storedDevices = storedDevices.ToList();
-                    if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, serial))
-                        ApplyStoredDeviceConfig(SelectedDevice);
-                })
-                    .ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -1859,6 +1848,10 @@ namespace DeepDroidChanger.ViewModels
                     _logger.LogError(exception, "Failed to change location for device {Serial}.", device.Serial);
                     SetDeviceLog(device, "Log_ChangeLocationFailed");
                 }
+                finally
+                {
+                    await SynchronizeStoredDeviceCacheAsync(device.Serial).ConfigureAwait(true);
+                }
             }
         }
 
@@ -1933,6 +1926,10 @@ namespace DeepDroidChanger.ViewModels
                 {
                     _logger.LogError(exception, "Failed to change timezone for device {Serial}.", device.Serial);
                     SetDeviceLog(device, "Log_ChangeTimezoneFailed");
+                }
+                finally
+                {
+                    await SynchronizeStoredDeviceCacheAsync(device.Serial).ConfigureAwait(true);
                 }
             }
         }
@@ -2327,6 +2324,10 @@ namespace DeepDroidChanger.ViewModels
                     _logger.LogError(exception, "Failed to apply fake proxy for device {Serial}.", device.Serial);
                     SetDeviceLog(device, "Log_FakeProxyFailed");
                 }
+                finally
+                {
+                    await SynchronizeStoredDeviceCacheAsync(device.Serial).ConfigureAwait(true);
+                }
             }
         }
 
@@ -2453,13 +2454,13 @@ namespace DeepDroidChanger.ViewModels
 
             try
             {
-                var snapshot = await _deviceListService.LoadSnapshotAsync(cancellationToken).ConfigureAwait(false);
-                _storedDevices = snapshot.StoredDevices.ToList();
-
-                var newDeviceCount = _deviceListService.CountNewDevices(snapshot.StoredDevices, snapshot.ConnectedDevices);
+                IReadOnlyList<AdbDevice> connectedDevices = await _deviceListService
+                    .LoadDetectedDevicesAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                int newDeviceCount = _deviceListService.CountNewDevices(_storedDevices, connectedDevices);
                 await RunOnUiContextAsync(() =>
                 {
-                    UpdateDeviceConnectionStatuses(snapshot.ConnectedDevices);
+                    UpdateDeviceConnectionStatuses(connectedDevices);
                     if (!_isShowingToolbarLog)
                     {
                         NewDeviceCountText = string.Format(
@@ -2483,6 +2484,34 @@ namespace DeepDroidChanger.ViewModels
                             _localizationService.GetString("ChangeSingleDevice_NotAvailable"));
                     }
                 }).ConfigureAwait(false);
+            }
+            finally
+            {
+                _deviceRefreshLock.Release();
+            }
+        }
+
+        private async Task SynchronizeStoredDeviceCacheAsync(string serial)
+        {
+            await _deviceRefreshLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                IReadOnlyList<StoredDeviceConfig> storedDevices =
+                    await _deviceListService.LoadStoredDevicesAsync(CancellationToken.None)
+                        .ConfigureAwait(false);
+                await RunOnUiContextAsync(() =>
+                {
+                    _storedDevices = storedDevices.ToList();
+                    if (SelectedDevice != null && SerialEquals(SelectedDevice.Serial, serial))
+                        ApplyStoredDeviceConfig(SelectedDevice);
+                }).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(
+                    exception,
+                    "Failed to synchronize stored configuration after a device dialog for {Serial}.",
+                    serial);
             }
             finally
             {

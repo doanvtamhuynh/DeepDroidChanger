@@ -19,6 +19,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IPollingService _pollingService;
         private readonly CancellationTokenSource _refreshCancellation = new();
         private readonly SemaphoreSlim _refreshLock = new(1, 1);
+        private readonly HashSet<string> _storedSerials = new(StringComparer.OrdinalIgnoreCase);
         private bool _selectAll;
         private bool _isApplyingSelectAll;
         [ObservableProperty]
@@ -54,6 +55,12 @@ namespace DeepDroidChanger.ViewModels
         {
             if (_refreshTask != null)
                 return;
+
+            IReadOnlyList<StoredDeviceConfig> storedConfigs =
+                await _deviceStoreService.LoadAsync(cancellationToken).ConfigureAwait(false);
+            _storedSerials.Clear();
+            foreach (StoredDeviceConfig config in storedConfigs)
+                _storedSerials.Add(config.Serial);
 
             await RefreshDevicesAsync(cancellationToken).ConfigureAwait(false);
             _refreshTask = _pollingService.RunAsync(
@@ -145,17 +152,12 @@ namespace DeepDroidChanger.ViewModels
         private async Task<IReadOnlyList<AddDeviceRowViewModel>> LoadAddableRowsAsync(CancellationToken cancellationToken)
         {
             var connectedDevices = await _adbDeviceService.GetConnectedDevicesAsync(cancellationToken).ConfigureAwait(false);
-            var storedConfigs = await _deviceStoreService.LoadAsync(cancellationToken).ConfigureAwait(false);
-
-            var storedSerials = new HashSet<string>(
-                storedConfigs.Select(config => config.Serial),
-                StringComparer.OrdinalIgnoreCase);
 
             var addableRows = new List<AddDeviceRowViewModel>();
 
             foreach (var device in connectedDevices)
             {
-                if (device.Status != AdbDeviceStatus.Online || storedSerials.Contains(device.Serial))
+                if (device.Status != AdbDeviceStatus.Online || _storedSerials.Contains(device.Serial))
                     continue;
 
                 var type = await _adbDeviceService.GetDeviceTypeAsync(device.Serial, cancellationToken).ConfigureAwait(false);
