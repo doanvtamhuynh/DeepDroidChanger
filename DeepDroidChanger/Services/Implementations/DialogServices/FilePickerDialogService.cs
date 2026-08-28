@@ -36,5 +36,19 @@ namespace DeepDroidChanger.Services
 
             return Array.Empty<string>();
         }
+
+        public string? ShowSaveFileDialog(string filter, string title, string defaultFileName)
+        {
+            var dialog = new SaveFileDialog
+            {
+                Filter = filter,
+                Title = title,
+                FileName = defaultFileName,
+                AddExtension = true,
+                OverwritePrompt = true
+            };
+
+            return dialog.ShowDialog() == true ? dialog.FileName : null;
+        }
     }
 }

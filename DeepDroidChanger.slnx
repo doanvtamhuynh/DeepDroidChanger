@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="DeepDroidChanger.Authentication/DeepDroidChanger.Authentication.csproj" />
   <Project Path="DeepDroidChanger.Tests/DeepDroidChanger.Tests.csproj" />
+  <Project Path="DeepDroidChanger.ViewDevices/DeepDroidChanger.ViewDevices.csproj" />
   <Project Path="DeepDroidChanger/DeepDroidChanger.csproj" />
 </Solution>

@@ -40,6 +40,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IDeviceActionEligibilityService _deviceActionEligibilityService;
         private readonly IDeviceActionFeedbackService _deviceActionFeedbackService;
         private readonly IClipboardService _clipboardService;
+        private readonly IViewDeviceWindowService _viewDeviceWindowService;
         private readonly IDeviceActionService _deviceActionService;
         private readonly IDeviceChangeService _deviceChangeService;
         private readonly ILocalizationService _localizationService;
@@ -129,7 +130,8 @@ namespace DeepDroidChanger.ViewModels
             ILogger<ChangeSingleDeviceViewModel> logger,
             IDeviceActionEligibilityService deviceActionEligibilityService,
             IDeviceActionFeedbackService deviceActionFeedbackService,
-            IClipboardService clipboardService)
+            IClipboardService clipboardService,
+            IViewDeviceWindowService viewDeviceWindowService)
         {
             _addDevicesDialogService = addDevicesDialogService;
             _carrierDataService = carrierDataService;
@@ -156,6 +158,7 @@ namespace DeepDroidChanger.ViewModels
             _deviceActionEligibilityService = deviceActionEligibilityService;
             _deviceActionFeedbackService = deviceActionFeedbackService;
             _clipboardService = clipboardService;
+            _viewDeviceWindowService = viewDeviceWindowService;
             _deviceActionService = deviceActionService;
             _deviceChangeService = deviceChangeService;
             _localizationService = localizationService;
@@ -958,6 +961,15 @@ namespace DeepDroidChanger.ViewModels
             {
                 SetContextDeviceLog(targetDevice, "Log_CopySerialFailed");
             }
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
+        private Task OpenViewDeviceAsync(DeviceRowViewModel? device)
+        {
+            if (device == null || string.IsNullOrWhiteSpace(device.Serial))
+                return Task.CompletedTask;
+
+            return _viewDeviceWindowService.OpenAsync(device.Serial, device.Name);
         }
 
         [RelayCommand(AllowConcurrentExecutions = true)]

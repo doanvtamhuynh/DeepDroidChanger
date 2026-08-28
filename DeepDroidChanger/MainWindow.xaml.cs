@@ -1,6 +1,7 @@
 using DeepDroidChanger.ViewModels;
 using DeepDroidChanger.Views;
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Services;
 using System.ComponentModel;
 using System.Windows;
 using Microsoft.Extensions.Logging;
@@ -15,6 +16,7 @@ namespace DeepDroidChanger
         private readonly ChangeSingleDeviceView _changeSingleDeviceView;
         private readonly ChangeMultipleDevicesView _changeMultipleDevicesView;
         private readonly SettingsView _settingsView;
+        private readonly IViewDeviceWindowService _viewDeviceWindowService;
         private readonly ILogger<MainWindow> _logger;
         private bool _isClosingAfterSave;
         private bool _isCloseCleanupInProgress;
@@ -26,6 +28,7 @@ namespace DeepDroidChanger
             ChangeSingleDeviceView changeSingleDeviceView,
             ChangeMultipleDevicesView changeMultipleDevicesView,
             SettingsView settingsView,
+            IViewDeviceWindowService viewDeviceWindowService,
             ILogger<MainWindow> logger)
         {
             InitializeComponent();
@@ -36,6 +39,7 @@ namespace DeepDroidChanger
             _changeSingleDeviceView = changeSingleDeviceView;
             _changeMultipleDevicesView = changeMultipleDevicesView;
             _settingsView = settingsView;
+            _viewDeviceWindowService = viewDeviceWindowService;
             _logger = logger;
 
             Loaded += MainWindow_Loaded;
@@ -98,6 +102,7 @@ namespace DeepDroidChanger
 
             if (decision == ApplicationShutdownDecision.ForceExit)
             {
+                await CloseViewDevicesAsync().ConfigureAwait(true);
                 try
                 {
                     await _viewModel.SaveSettingsAsync(CancellationToken.None).ConfigureAwait(true);
@@ -111,6 +116,8 @@ namespace DeepDroidChanger
                 Environment.Exit(0);
                 return;
             }
+
+            await CloseViewDevicesAsync().ConfigureAwait(true);
 
             await DeactivateViewModelAsync(
                     _changeSingleDeviceViewModel.DeactivateAsync,
@@ -135,6 +142,23 @@ namespace DeepDroidChanger
                 _isClosingAfterSave = true;
                 _isCloseCleanupInProgress = false;
                 Close();
+            }
+        }
+
+        private async Task CloseViewDevicesAsync()
+        {
+            using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(10));
+            try
+            {
+                await _viewDeviceWindowService.CloseAllAsync(cancellation.Token).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                _logger.LogWarning("Timed out while closing View Device windows during application shutdown.");
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to close View Device windows while closing the application.");
             }
         }
 

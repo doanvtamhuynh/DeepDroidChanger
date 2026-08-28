@@ -30,6 +30,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IDeviceActionEligibilityService _deviceActionEligibilityService;
     private readonly IDeviceActionFeedbackService _deviceActionFeedbackService;
     private readonly IClipboardService _clipboardService;
+    private readonly IViewDeviceWindowService _viewDeviceWindowService;
     private readonly IDeviceTimezoneService _deviceTimezoneService;
     private readonly IChangeLocationDialogService _changeLocationDialogService;
     private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
@@ -155,7 +156,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IPackageInstallService packageInstallService,
         IDeviceActionEligibilityService deviceActionEligibilityService,
         IDeviceActionFeedbackService deviceActionFeedbackService,
-        IClipboardService clipboardService)
+        IClipboardService clipboardService,
+        IViewDeviceWindowService viewDeviceWindowService)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
@@ -171,6 +173,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _deviceActionEligibilityService = deviceActionEligibilityService;
         _deviceActionFeedbackService = deviceActionFeedbackService;
         _clipboardService = clipboardService;
+        _viewDeviceWindowService = viewDeviceWindowService;
         _deviceTimezoneService = deviceTimezoneService;
         _changeLocationDialogService = changeLocationDialogService;
         _changeTimezoneDialogService = changeTimezoneDialogService;
@@ -1629,6 +1632,15 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             _logger.LogError(exception, "Failed to copy serial for device {Serial}.", device.Serial);
             SetContextDeviceLog(device, "Log_CopySerialFailed");
         }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task OpenViewDeviceAsync(DeviceRowViewModel? device)
+    {
+        if (device == null || string.IsNullOrWhiteSpace(device.Serial))
+            return Task.CompletedTask;
+
+        return _viewDeviceWindowService.OpenAsync(device.Serial, device.Name);
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

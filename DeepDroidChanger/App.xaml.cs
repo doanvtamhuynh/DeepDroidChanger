@@ -5,6 +5,8 @@ using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
 using DeepDroidChanger.Views;
+using DeepDroidChanger.ViewDevices.Contracts;
+using DeepDroidChanger.ViewDevices.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -115,6 +117,12 @@ public sealed partial class App : Application
         services.AddSingleton<IRandomService, RandomService>();
         services.AddSingleton<IProcessRunnerService, ProcessRunnerService>();
         services.AddSingleton<AdbToolPathResolver>();
+        services.AddSingleton(serviceProvider => new ScrcpyRuntimeResolver(
+            AppContext.BaseDirectory,
+            serviceProvider.GetRequiredService<AdbToolPathResolver>().GetAdbPath()));
+        services.AddSingleton<IViewDeviceSessionFactory, ViewDeviceSessionFactory>();
+        services.AddSingleton<IViewDeviceWindowService, ViewDeviceWindowService>();
+        services.AddSingleton<IViewDeviceScreenshotService, ViewDeviceScreenshotService>();
         services.AddSingleton<IUiDispatcherService, UiDispatcherService>();
         services.AddSingleton<IPollingService, PollingService>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
@@ -172,6 +180,7 @@ public sealed partial class App : Application
         services.AddSingleton<ChangeSingleDeviceViewModel>();
         services.AddSingleton<ChangeMultipleDevicesViewModel>();
         services.AddSingleton<SettingsViewModel>();
+        services.AddTransient<ViewDeviceViewModel>();
         services.AddSingleton<MainWindow>();
         services.AddSingleton<ChangeSingleDeviceView>();
         services.AddSingleton<ChangeMultipleDevicesView>();

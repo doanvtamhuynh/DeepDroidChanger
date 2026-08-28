@@ -42,6 +42,23 @@
             </MenuItem.Header>
         </MenuItem>
 
+        <MenuItem Command="{Binding PlacementTarget.Tag.OpenViewDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                  Style="{DynamicResource DeviceActionsContextMenuItemStyle}">
+            <MenuItem.Header>
+                <Grid Style="{DynamicResource DeviceActionsContextMenuHeaderGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialDesign:PackIcon Kind="Cellphone" Style="{DynamicResource DeviceActionsContextMenuButtonIconStyle}"/>
+                    <TextBlock Grid.Column="1"
+                               Text="{DynamicResource ChangeSingleDevice_RowMenuViewDevice}"
+                               Style="{DynamicResource DeviceActionsContextMenuButtonTextStyle}"/>
+                </Grid>
+            </MenuItem.Header>
+        </MenuItem>
+
         <MenuItem Command="{Binding PlacementTarget.Tag.ToggleGmsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                   IsEnabled="{Binding PlacementTarget.DataContext.CanToggleContextMenuActions, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
