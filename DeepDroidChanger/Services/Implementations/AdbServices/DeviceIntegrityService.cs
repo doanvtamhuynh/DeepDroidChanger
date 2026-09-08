@@ -139,10 +139,7 @@ namespace DeepDroidChanger.Services
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Brand, splitFingerprint[0], cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Product, splitFingerprint[1], cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Device, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Board, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Hardware, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Id, splitFingerprint[4], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Incremental, splitFingerprint[5], cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Fingerprint, fingerprint, cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Manufacturer, pifData.MANUFACTURER ?? "Google", cancellationToken).ConfigureAwait(false);
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Model, pifData.MODEL ?? "Pixel", cancellationToken).ConfigureAwait(false);

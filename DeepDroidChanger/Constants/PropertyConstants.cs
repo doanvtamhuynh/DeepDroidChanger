@@ -77,24 +77,21 @@ public static class PropertyConstants
 
     public static class Integrity
     {
-        private const string Prefix = "persist.props.config.";
+        private const string Prefix = "persist.props.config.integrity.";
 
-        public const string Tags = Prefix + "TAGS";
-        public const string Type = Prefix + "TYPE";
-        public const string Board = Prefix + "BOARD";
         public const string Brand = Prefix + "BRAND";
         public const string Device = Prefix + "DEVICE";
+        public const string DeviceInitialSdkInt = Prefix + "DEVICE_INITIAL_SDK_INT";
         public const string Fingerprint = Prefix + "FINGERPRINT";
-        public const string Hardware = Prefix + "HARDWARE";
         public const string Id = Prefix + "ID";
-        public const string Incremental = Prefix + "INCREMENTAL";
         public const string Manufacturer = Prefix + "MANUFACTURER";
         public const string Model = Prefix + "MODEL";
         public const string Product = Prefix + "PRODUCT";
         public const string Release = Prefix + "RELEASE";
         public const string SecurityPatch = Prefix + "SECURITY_PATCH";
+        public const string Tags = Prefix + "TAGS";
+        public const string Type = Prefix + "TYPE";
         public const string SdkInt = Prefix + "SDK_INT";
-        public const string DeviceInitialSdkInt = Prefix + "DEVICE_INITIAL_SDK_INT";
     }
 
     public static class Proxy
