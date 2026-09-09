@@ -45,8 +45,4 @@
       Condition="Exists('$(TargetDir)Assets\Data')" />
   </Target>
 
-  <Target Name="RemoveLegacyScrcpyRuntimeFromOutput" AfterTargets="CopyFilesToOutputDirectory">
-    <RemoveDir Directories="$(TargetDir)Assets\Tools\scrcpy\win32;$(TargetDir)Assets\Tools\scrcpy\win64" />
-  </Target>
-
 </Project>

@@ -45,7 +45,7 @@ public sealed class ScrcpyRuntimeResolver(string applicationBaseDirectory, strin
 
     private string ResolveRuntimeDirectory()
     {
-        string relativePath = Path.Combine("Assets", "Tools", "scrcpy");
+        string relativePath = Path.Combine("Assets", "Tools");
         string runtimePath = Path.GetFullPath(Path.Combine(applicationBaseDirectory, relativePath));
         if (Directory.Exists(runtimePath))
             return runtimePath;

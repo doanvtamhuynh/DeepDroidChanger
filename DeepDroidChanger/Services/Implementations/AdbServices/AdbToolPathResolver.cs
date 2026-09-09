@@ -8,12 +8,8 @@ namespace DeepDroidChanger.Services;
 /// </summary>
 public sealed class AdbToolPathResolver
 {
-    private readonly Lazy<string> _adbPath = new(() => Resolve(
-        AssetConstants.Tools.PlatformToolsDirectoryName,
-        AssetConstants.Tools.AdbExecutableName));
-    private readonly Lazy<string> _fastbootPath = new(() => Resolve(
-        AssetConstants.Tools.PlatformToolsDirectoryName,
-        AssetConstants.Tools.FastbootExecutableName));
+    private readonly Lazy<string> _adbPath = new(() => Resolve(AssetConstants.Tools.AdbExecutableName));
+    private readonly Lazy<string> _fastbootPath = new(() => Resolve(AssetConstants.Tools.FastbootExecutableName));
 
     public string GetAdbPath()
     {
@@ -25,17 +21,15 @@ public sealed class AdbToolPathResolver
         return _fastbootPath.Value;
     }
 
-    private static string Resolve(string directoryName, string executableName)
+    private static string Resolve(string executableName)
     {
         var outputPath = Path.Combine(
             AppContext.BaseDirectory,
             AssetConstants.Tools.RootRelativePath,
-            directoryName,
             executableName);
         var projectPath = Path.Combine(
             Environment.CurrentDirectory,
             AssetConstants.Tools.RootRelativePath,
-            directoryName,
             executableName);
 
         if (File.Exists(outputPath))

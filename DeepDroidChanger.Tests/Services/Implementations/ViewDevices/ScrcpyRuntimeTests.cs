@@ -91,7 +91,7 @@ public sealed class ScrcpyRuntimeTests
 
             StringAssert.Contains(
                 exception.Message,
-                Path.Combine(applicationBase.Path, "Assets", "Tools", "scrcpy"));
+                Path.Combine(applicationBase.Path, "Assets", "Tools"));
         }
         finally
         {
@@ -104,10 +104,10 @@ public sealed class ScrcpyRuntimeTests
     {
         const string serial = "SERIAL-123";
         const string windowTitle = "DeepDroidChanger.ViewDevice.test";
-        string runtimeDirectory = Path.GetFullPath(Path.Combine("runtime", "scrcpy"));
+        string runtimeDirectory = Path.GetFullPath(Path.Combine("runtime", "Assets", "Tools"));
         string executablePath = Path.Combine(runtimeDirectory, "scrcpy.exe");
         string serverPath = Path.Combine(runtimeDirectory, "scrcpy-server");
-        string adbPath = Path.GetFullPath(Path.Combine("tools", "platform-tools", "adb.exe"));
+        string adbPath = Path.Combine(runtimeDirectory, "adb.exe");
         var runtime = new ScrcpyRuntimeInfo(runtimeDirectory, executablePath, serverPath, adbPath);
 
         ProcessStartInfo startInfo = ScrcpyProcessSession.CreateStartInfo(
@@ -170,7 +170,7 @@ public sealed class ScrcpyRuntimeTests
 
     private static string CreateRuntime(string root, string? excludedFile = null)
     {
-        string runtimeDirectory = Path.Combine(root, "Assets", "Tools", "scrcpy");
+        string runtimeDirectory = Path.Combine(root, "Assets", "Tools");
         Directory.CreateDirectory(runtimeDirectory);
         foreach (string file in RequiredRuntimeFiles)
         {

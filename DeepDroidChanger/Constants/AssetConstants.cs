@@ -22,7 +22,6 @@ public static class AssetConstants
     public static class Tools
     {
         public const string RootRelativePath = "Assets/Tools";
-        public const string PlatformToolsDirectoryName = "platform-tools";
         public const string AdbExecutableName = "adb.exe";
         public const string FastbootExecutableName = "fastboot.exe";
     }
