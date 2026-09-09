@@ -73,6 +73,8 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezone">Change Timezone</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocationTooltip">Apply a location to the selected online devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeTimezoneTooltip">Apply a timezone to the selected online devices.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionUpdateIntegrity">Update Integrity</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionUpdateIntegrityTooltip">Update integrity files on the selected online devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApk">Install APK/XAPK</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionInstallApkTooltip">Install selected APK/XAPK files on the selected online devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionFakeProxy">Fake Proxy</sys:String>

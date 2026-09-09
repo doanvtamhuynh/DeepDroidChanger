@@ -6,6 +6,7 @@
     <system:String x:Key="UpdateIntegrity_KeyboxFileFilter">Tệp XML (*.xml)|*.xml</system:String>
     <system:String x:Key="UpdateIntegrity_KeyboxFileTitle">Chọn tệp XML Keybox</system:String>
     <system:String x:Key="UpdateIntegrity_WindowTitle">Cập nhật Integrity</system:String>
+    <system:String x:Key="UpdateIntegrity_BatchDeviceInfo">Cập nhật Integrity cho {0} thiết bị</system:String>
     <system:String x:Key="UpdateIntegrity_SourceGroupHeader">Cấu hình nguồn</system:String>
     <system:String x:Key="UpdateIntegrity_SourceServer">Dùng dữ liệu từ server</system:String>
     <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Tùy chọn mục tiêu</system:String>

@@ -30,6 +30,7 @@ public enum DeviceActionKind
     BatchChangeLocation,
     BatchChangeTimezone,
     BatchInstallPackages,
+    BatchUpdateIntegrity,
     BatchFakeProxy,
     BatchStopFakeProxy
 }
@@ -48,6 +49,7 @@ public static class DeviceActionKindExtensions
             or DeviceActionKind.BatchChangeLocation
             or DeviceActionKind.BatchChangeTimezone
             or DeviceActionKind.BatchInstallPackages
+            or DeviceActionKind.BatchUpdateIntegrity
             or DeviceActionKind.BatchFakeProxy
             or DeviceActionKind.BatchStopFakeProxy;
     }
@@ -70,6 +72,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.BatchChangeLocation => DeviceActionKind.ChangeLocation,
             DeviceActionKind.BatchChangeTimezone => DeviceActionKind.ChangeTimezone,
             DeviceActionKind.BatchInstallPackages => DeviceActionKind.InstallPackages,
+            DeviceActionKind.BatchUpdateIntegrity => DeviceActionKind.UpdateIntegrity,
             DeviceActionKind.BatchFakeProxy => DeviceActionKind.FakeProxy,
             DeviceActionKind.BatchStopFakeProxy => DeviceActionKind.StopFakeProxy,
             _ => kind
@@ -97,6 +100,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.ChangeLocation => DeviceActionKind.BatchChangeLocation,
             DeviceActionKind.ChangeTimezone => DeviceActionKind.BatchChangeTimezone,
             DeviceActionKind.InstallPackages => DeviceActionKind.BatchInstallPackages,
+            DeviceActionKind.UpdateIntegrity => DeviceActionKind.BatchUpdateIntegrity,
             DeviceActionKind.FakeProxy => DeviceActionKind.BatchFakeProxy,
             DeviceActionKind.StopFakeProxy => DeviceActionKind.BatchStopFakeProxy,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)

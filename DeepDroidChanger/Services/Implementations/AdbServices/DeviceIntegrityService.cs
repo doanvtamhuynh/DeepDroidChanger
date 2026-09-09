@@ -16,6 +16,8 @@ namespace DeepDroidChanger.Services
         {
             Timeout = TimeSpan.FromSeconds(30),
         };
+        private const int PifMaximumBytes = 2 * 1024 * 1024;
+        private const int KeyboxMaximumBytes = 1024 * 1024;
         private readonly IAdbCommandService _adbCommandService;
         private readonly IRandomService _randomService;
         private readonly ILogger<DeviceIntegrityService> _logger;
@@ -45,12 +47,11 @@ namespace DeepDroidChanger.Services
         {
             try
             {
-                string pifJson = await _downloadString(
-                        UrlConstants.Pif,
-                        2 * 1024 * 1024,
+                string pifJson = await LoadPifContentAsync(
+                        fromServer: true,
+                        jsonPath: null,
                         cancellationToken)
                     .ConfigureAwait(false);
-                EnsureContentSize(pifJson, 2 * 1024 * 1024, "PIF JSON");
 
                 IReadOnlyList<Integrity> candidates = ParsePifJson(pifJson)?
                     .Where(item => !string.IsNullOrWhiteSpace(item.SECURITY_PATCH))
@@ -75,145 +76,132 @@ namespace DeepDroidChanger.Services
             }
         }
 
-        public async Task UpdateIntegrityAsync(string serial, bool fromServer, string? jsonPath, CancellationToken cancellationToken)
+        public Task UpdateIntegrityAsync(
+            string serial,
+            bool fromServer,
+            string? jsonPath,
+            CancellationToken cancellationToken)
         {
-            _logger.LogInformation(
-                "Updating Integrity/PIF for device {Serial}. FromServer: {FromServer}, LocalFileSelected: {LocalFileSelected}.",
+            return ApplyAsync(
                 serial,
-                fromServer,
-                !string.IsNullOrWhiteSpace(jsonPath));
-
-            string pifJson;
-            if (fromServer)
-            {
-                pifJson = await _downloadString(
-                        UrlConstants.Pif,
-                        2 * 1024 * 1024,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                EnsureContentSize(pifJson, 2 * 1024 * 1024, "PIF JSON");
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
-                {
-                    throw new FileNotFoundException("The selected PIF JSON file was not found.");
-                }
-                pifJson = await ReadLocalTextAsync(
-                        jsonPath,
-                        2 * 1024 * 1024,
-                        "PIF JSON",
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
-
-            var pifList = ParsePifJson(pifJson);
-            if (pifList == null || pifList.Count == 0)
-            {
-                throw new InvalidOperationException("No valid PIF record found in JSON.");
-            }
-
-            var pifData = _randomService.PickRandom(pifList);
-
-            ValidatePifData(pifData);
-
-            string fingerprint = pifData.FINGERPRINT!;
-            string[] parts = fingerprint.Split('/');
-            List<string> splitFingerprint = new List<string>();
-            foreach (string part in parts)
-            {
-                string[] subParts = part.Split(':');
-                splitFingerprint.AddRange(subParts);
-            }
-
-            if (splitFingerprint.Count != 8)
-            {
-                throw new InvalidOperationException(
-                    $"Fingerprint split failed. Expected 8 parts, but got {splitFingerprint.Count} parts.");
-            }
-
-            var releaseVersion = string.IsNullOrEmpty(pifData.RELEASE) ? splitFingerprint[3] : pifData.RELEASE;
-
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Type, "user", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Tags, "release-keys", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Brand, splitFingerprint[0], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Product, splitFingerprint[1], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Device, splitFingerprint[2], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Id, splitFingerprint[4], cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Fingerprint, fingerprint, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Manufacturer, pifData.MANUFACTURER ?? "Google", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Model, pifData.MODEL ?? "Pixel", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.SecurityPatch, pifData.SECURITY_PATCH!, cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.DeviceInitialSdkInt, pifData.DEVICE_INITIAL_SDK_INT ?? "21", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.SdkInt, pifData.SDK_INT ?? "32", cancellationToken).ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Integrity.Release, releaseVersion, cancellationToken).ConfigureAwait(false);
-
-            _logger.LogInformation("Successfully updated Integrity/PIF settings for device {Serial}.", serial);
+                new UpdateIntegrityDialogResult(
+                    updateIntegrityFromServer: fromServer,
+                    updateIntegrityEnabled: true,
+                    updateKeyboxEnabled: false,
+                    updateIntegrityFile: jsonPath ?? string.Empty,
+                    updateKeyboxFile: string.Empty),
+                cancellationToken);
         }
 
-        public async Task UpdateKeyboxAsync(string serial, bool fromServer, string? keyboxPath, CancellationToken cancellationToken)
+        public Task UpdateKeyboxAsync(
+            string serial,
+            bool fromServer,
+            string? keyboxPath,
+            CancellationToken cancellationToken)
         {
-            _logger.LogInformation(
-                "Updating Keybox for device {Serial}. FromServer: {FromServer}, LocalFileSelected: {LocalFileSelected}.",
+            return ApplyAsync(
                 serial,
-                fromServer,
-                !string.IsNullOrWhiteSpace(keyboxPath));
+                new UpdateIntegrityDialogResult(
+                    updateIntegrityFromServer: fromServer,
+                    updateIntegrityEnabled: false,
+                    updateKeyboxEnabled: true,
+                    updateIntegrityFile: string.Empty,
+                    updateKeyboxFile: keyboxPath ?? string.Empty),
+                cancellationToken);
+        }
 
-            string localPath;
-            bool isTemporary = false;
+        public async Task<PreparedIntegrityData> PrepareAsync(
+            UpdateIntegrityDialogResult result,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(result);
 
-            if (fromServer)
+            IReadOnlyList<Integrity> integrityCandidates = Array.Empty<Integrity>();
+            if (result.UpdateIntegrityEnabled)
             {
-                var xmlContent = await _downloadString(
-                        UrlConstants.Keybox,
-                        1024 * 1024,
+                string pifJson = await LoadPifContentAsync(
+                        result.UpdateIntegrityFromServer,
+                        result.UpdateIntegrityFile,
                         cancellationToken)
                     .ConfigureAwait(false);
-                ValidateKeyboxXml(xmlContent);
+                IReadOnlyList<Integrity> parsedCandidates = ParsePifJson(pifJson)?.ToArray()
+                    ?? Array.Empty<Integrity>();
+                var validCandidates = new List<Integrity>(parsedCandidates.Count);
+                int invalidCandidateCount = 0;
+                string? firstInvalidCandidateReason = null;
+                foreach (Integrity? candidate in parsedCandidates)
+                {
+                    if (candidate == null)
+                    {
+                        invalidCandidateCount++;
+                        firstInvalidCandidateReason ??= "The record is null.";
+                        continue;
+                    }
 
-                localPath = Path.GetTempFileName();
-                isTemporary = true;
-                await File.WriteAllTextAsync(localPath, xmlContent, cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(keyboxPath) || !File.Exists(keyboxPath))
-                {
-                    throw new FileNotFoundException("The selected Keybox file was not found.");
-                }
-                string xmlContent = await ReadLocalTextAsync(
-                        keyboxPath,
-                        1024 * 1024,
-                        "Keybox XML",
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                ValidateKeyboxXml(xmlContent);
-                localPath = keyboxPath;
-            }
-
-            try
-            {
-                var pushResult = await _adbCommandService.RunAdbAsync(serial, $"push \"{localPath}\" \"/data/local/tmp/keybox.xml\"", cancellationToken).ConfigureAwait(false);
-                if (pushResult.ExitCode != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"ADB push keybox.xml failed with exit code {pushResult.ExitCode}.");
-                }
-                _logger.LogInformation("Successfully pushed keybox.xml to /data/local/tmp/ on device {Serial}.", serial);
-            }
-            finally
-            {
-                if (isTemporary && File.Exists(localPath))
-                {
                     try
                     {
-                        File.Delete(localPath);
+                        ValidatePifData(candidate);
+                        _ = SplitFingerprint(candidate.FINGERPRINT!);
+                        validCandidates.Add(candidate);
                     }
-                    catch (Exception ex)
+                    catch (InvalidOperationException exception)
                     {
-                        _logger.LogWarning(ex, "Failed to delete temporary Keybox file.");
+                        invalidCandidateCount++;
+                        firstInvalidCandidateReason ??= exception.Message;
                     }
                 }
+
+                if (invalidCandidateCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Ignored {InvalidCandidateCount} invalid PIF record(s) while preparing Integrity data. First validation error: {ValidationError}",
+                        invalidCandidateCount,
+                        firstInvalidCandidateReason ?? "Unknown validation error.");
+                }
+
+                if (validCandidates.Count == 0)
+                    throw new InvalidOperationException("No valid PIF record found in JSON.");
+
+                integrityCandidates = validCandidates;
+            }
+
+            string? keyboxXml = null;
+            if (result.UpdateKeyboxEnabled)
+            {
+                keyboxXml = await LoadKeyboxContentAsync(
+                        result.UpdateIntegrityFromServer,
+                        result.UpdateKeyboxFile,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                ValidateKeyboxXml(keyboxXml);
+            }
+
+            return new PreparedIntegrityData(integrityCandidates, keyboxXml);
+        }
+
+        public async Task ApplyPreparedAsync(
+            string serial,
+            PreparedIntegrityData preparedData,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(preparedData);
+
+            if (preparedData.IntegrityCandidates.Count > 0)
+            {
+                await ApplyPreparedIntegrityAsync(
+                        serial,
+                        preparedData.IntegrityCandidates,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (preparedData.KeyboxXml != null)
+            {
+                await ApplyPreparedKeyboxAsync(
+                        serial,
+                        preparedData.KeyboxXml,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
 
@@ -226,23 +214,254 @@ namespace DeepDroidChanger.Services
 
             if (result.UpdateIntegrityEnabled)
             {
-                await UpdateIntegrityAsync(
-                        serial,
+                _logger.LogInformation(
+                    "Updating Integrity/PIF for device {Serial}. FromServer: {FromServer}, LocalFileSelected: {LocalFileSelected}.",
+                    serial,
+                    result.UpdateIntegrityFromServer,
+                    !string.IsNullOrWhiteSpace(result.UpdateIntegrityFile));
+            }
+
+            if (result.UpdateIntegrityEnabled)
+            {
+                string pifJson = await LoadPifContentAsync(
                         result.UpdateIntegrityFromServer,
                         result.UpdateIntegrityFile,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                IReadOnlyList<Integrity> pifCandidates = ParsePifJson(pifJson)
+                    ?? throw new InvalidOperationException("No valid PIF record found in JSON.");
+                if (pifCandidates.Count == 0)
+                    throw new InvalidOperationException("No valid PIF record found in JSON.");
+
+                Integrity pifData = _randomService.PickRandom(pifCandidates);
+                ValidatePifData(pifData);
+                await ApplyIntegrityCandidateAsync(
+                        serial,
+                        pifData,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
 
             if (result.UpdateKeyboxEnabled)
             {
-                await UpdateKeyboxAsync(
-                        serial,
+                _logger.LogInformation(
+                    "Updating Keybox for device {Serial}. FromServer: {FromServer}, LocalFileSelected: {LocalFileSelected}.",
+                    serial,
+                    result.UpdateIntegrityFromServer,
+                    !string.IsNullOrWhiteSpace(result.UpdateKeyboxFile));
+                string keyboxXml = await LoadKeyboxContentAsync(
                         result.UpdateIntegrityFromServer,
                         result.UpdateKeyboxFile,
                         cancellationToken)
                     .ConfigureAwait(false);
+                ValidateKeyboxXml(keyboxXml);
+                await ApplyPreparedKeyboxAsync(
+                        serial,
+                        keyboxXml,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             }
+        }
+
+        private async Task ApplyPreparedIntegrityAsync(
+            string serial,
+            IReadOnlyList<Integrity> integrityCandidates,
+            CancellationToken cancellationToken)
+        {
+            Integrity pifData = _randomService.PickRandom(integrityCandidates);
+            await ApplyIntegrityCandidateAsync(serial, pifData, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private async Task ApplyIntegrityCandidateAsync(
+            string serial,
+            Integrity pifData,
+            CancellationToken cancellationToken)
+        {
+            string fingerprint = pifData.FINGERPRINT!;
+            string[] splitFingerprint = SplitFingerprint(fingerprint);
+            string releaseVersion = string.IsNullOrEmpty(pifData.RELEASE)
+                ? splitFingerprint[3]
+                : pifData.RELEASE!;
+
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Type,
+                    "user",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Tags,
+                    "release-keys",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Brand,
+                    splitFingerprint[0],
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Product,
+                    splitFingerprint[1],
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Device,
+                    splitFingerprint[2],
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Id,
+                    splitFingerprint[4],
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Fingerprint,
+                    fingerprint,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Manufacturer,
+                    pifData.MANUFACTURER ?? "Google",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Model,
+                    pifData.MODEL ?? "Pixel",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.SecurityPatch,
+                    pifData.SECURITY_PATCH!,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.DeviceInitialSdkInt,
+                    pifData.DEVICE_INITIAL_SDK_INT ?? "21",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.SdkInt,
+                    pifData.SDK_INT ?? "32",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Release,
+                    releaseVersion,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            _logger.LogInformation("Successfully updated Integrity/PIF settings for device {Serial}.", serial);
+        }
+
+        private async Task ApplyPreparedKeyboxAsync(
+            string serial,
+            string keyboxXml,
+            CancellationToken cancellationToken)
+        {
+            string localPath = Path.GetTempFileName();
+            try
+            {
+                await File.WriteAllTextAsync(
+                        localPath,
+                        keyboxXml,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                CommandResult pushResult = await _adbCommandService
+                    .RunAdbAsync(
+                        serial,
+                        $"push \"{localPath}\" \"/data/local/tmp/keybox.xml\"",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (pushResult.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"ADB push keybox.xml failed with exit code {pushResult.ExitCode}.");
+                }
+
+                _logger.LogInformation(
+                    "Successfully pushed keybox.xml to /data/local/tmp/ on device {Serial}.",
+                    serial);
+            }
+            finally
+            {
+                if (File.Exists(localPath))
+                {
+                    try
+                    {
+                        File.Delete(localPath);
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogWarning(exception, "Failed to delete temporary Keybox file.");
+                    }
+                }
+            }
+        }
+
+        private async Task<string> LoadPifContentAsync(
+            bool fromServer,
+            string? jsonPath,
+            CancellationToken cancellationToken)
+        {
+            if (fromServer)
+            {
+                string pifJson = await _downloadString(
+                        UrlConstants.Pif,
+                        PifMaximumBytes,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                EnsureContentSize(pifJson, PifMaximumBytes, "PIF JSON");
+                return pifJson;
+            }
+
+            if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
+                throw new FileNotFoundException("The selected PIF JSON file was not found.");
+
+            return await ReadLocalTextAsync(
+                    jsonPath,
+                    PifMaximumBytes,
+                    "PIF JSON",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private async Task<string> LoadKeyboxContentAsync(
+            bool fromServer,
+            string? keyboxPath,
+            CancellationToken cancellationToken)
+        {
+            if (fromServer)
+            {
+                string xmlContent = await _downloadString(
+                        UrlConstants.Keybox,
+                        KeyboxMaximumBytes,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                return xmlContent;
+            }
+
+            if (string.IsNullOrWhiteSpace(keyboxPath) || !File.Exists(keyboxPath))
+                throw new FileNotFoundException("The selected Keybox file was not found.");
+
+            return await ReadLocalTextAsync(
+                    keyboxPath,
+                    KeyboxMaximumBytes,
+                    "Keybox XML",
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private static List<Integrity>? ParsePifJson(string json)
@@ -274,9 +493,28 @@ namespace DeepDroidChanger.Services
                 throw new InvalidOperationException("PIF SECURITY_PATCH is missing or empty.");
         }
 
+        private static string[] SplitFingerprint(string fingerprint)
+        {
+            string[] parts = fingerprint.Split('/');
+            var splitFingerprint = new List<string>();
+            foreach (string part in parts)
+            {
+                string[] subParts = part.Split(':');
+                splitFingerprint.AddRange(subParts);
+            }
+
+            if (splitFingerprint.Count != 8)
+            {
+                throw new InvalidOperationException(
+                    $"Fingerprint split failed. Expected 8 parts, but got {splitFingerprint.Count} parts.");
+            }
+
+            return splitFingerprint.ToArray();
+        }
+
         private static void ValidateKeyboxXml(string xmlContent)
         {
-            EnsureContentSize(xmlContent, 1024 * 1024, "Keybox XML");
+            EnsureContentSize(xmlContent, KeyboxMaximumBytes, "Keybox XML");
             if (string.IsNullOrWhiteSpace(xmlContent))
                 throw new InvalidOperationException("Keybox XML is empty.");
 
@@ -284,7 +522,7 @@ namespace DeepDroidChanger.Services
             {
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
-                MaxCharactersInDocument = 1024 * 1024
+                MaxCharactersInDocument = KeyboxMaximumBytes
             };
 
             try

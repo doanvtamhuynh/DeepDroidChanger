@@ -967,6 +967,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <Button Grid.Row="0"
@@ -1101,6 +1102,17 @@
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="WifiOff" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionStopFakeProxy}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="6"
+                                        Grid.Column="0"
+                                        Command="{Binding UpdateMultipleDevicesIntegrityCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionUpdateIntegrityTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="ShieldCheck" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionUpdateIntegrity}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>

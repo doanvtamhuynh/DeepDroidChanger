@@ -22,6 +22,7 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
     private readonly string _directory;
     private readonly string _changeConfigPath;
     private readonly string _changeOptionsPath;
+    private readonly string _updateIntegrityConfigPath;
     private readonly string _proxyConfigPath;
 
     public MultipleDeviceConfigService(ILogger<MultipleDeviceConfigService> logger)
@@ -44,6 +45,9 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
         _changeOptionsPath = Path.Combine(
             _directory,
             AssetConstants.RuntimeData.ChangeOptionsConfigFileName);
+        _updateIntegrityConfigPath = Path.Combine(
+            _directory,
+            AssetConstants.RuntimeData.UpdateIntegrityConfigFileName);
         _proxyConfigPath = Path.Combine(
             _directory,
             AssetConstants.RuntimeData.MultipleDeviceProxyConfigFileName);
@@ -76,6 +80,49 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
                 });
             await WriteConfigurationAsync(configuration, cancellationToken).ConfigureAwait(false);
             return configuration;
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    public async Task<DeviceUpdateIntegrityConfig> LoadUpdateIntegrityConfigAsync(
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(_directory);
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            DeviceUpdateIntegrityConfig configuration =
+                await ReadJsonOrDefaultAsync<DeviceUpdateIntegrityConfig>(
+                        _updateIntegrityConfigPath,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            return NormalizeUpdateIntegrityConfig(configuration);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    public async Task SaveUpdateIntegrityConfigAsync(
+        DeviceUpdateIntegrityConfig configuration,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        Directory.CreateDirectory(_directory);
+        await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await WriteJsonAsync(
+                    _updateIntegrityConfigPath,
+                    NormalizeUpdateIntegrityConfig(configuration),
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -225,6 +272,20 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
             },
             ChangeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
                 configuration.ChangeOptions)
+        };
+    }
+
+    private static DeviceUpdateIntegrityConfig NormalizeUpdateIntegrityConfig(
+        DeviceUpdateIntegrityConfig? configuration)
+    {
+        DeviceUpdateIntegrityConfig source = configuration ?? new();
+        return new DeviceUpdateIntegrityConfig
+        {
+            FromServer = source.FromServer,
+            IntegrityFile = source.IntegrityFile?.Trim() ?? string.Empty,
+            KeyboxFile = source.KeyboxFile?.Trim() ?? string.Empty,
+            IntegrityEnabled = source.IntegrityEnabled,
+            KeyboxEnabled = source.KeyboxEnabled
         };
     }
 

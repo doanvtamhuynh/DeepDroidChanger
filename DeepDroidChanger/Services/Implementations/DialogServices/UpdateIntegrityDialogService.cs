@@ -18,19 +18,64 @@ namespace DeepDroidChanger.Services
             _logger = logger;
         }
 
-        public async Task<UpdateIntegrityDialogResult?> ShowUpdateIntegrityAsync(
+        public Task<UpdateIntegrityDialogResult?> ShowUpdateIntegrityAsync(
             string deviceSerial,
             string deviceName,
             StoredDeviceConfig currentConfig,
             Func<UpdateIntegrityDialogResult, CancellationToken, Task>? settingsChangedAsync,
             CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(currentConfig);
+            return ShowAsync(
+                deviceSerial: deviceSerial,
+                deviceName: deviceName,
+                isBatchMode: false,
+                targetCount: 0,
+                initialize: viewModel => viewModel.InitializeFromConfig(currentConfig),
+                settingsChangedAsync: settingsChangedAsync,
+                cancellationToken: cancellationToken);
+        }
+
+        public Task<UpdateIntegrityDialogResult?> ShowUpdateIntegrityBatchAsync(
+            int targetCount,
+            DeviceUpdateIntegrityConfig currentConfig,
+            Func<UpdateIntegrityDialogResult, CancellationToken, Task> settingsChangedAsync,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(currentConfig);
+            ArgumentNullException.ThrowIfNull(settingsChangedAsync);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(targetCount);
+            return ShowAsync(
+                deviceSerial: string.Empty,
+                deviceName: string.Empty,
+                isBatchMode: true,
+                targetCount: targetCount,
+                initialize: viewModel => viewModel.InitializeFromConfig(currentConfig),
+                settingsChangedAsync: settingsChangedAsync,
+                cancellationToken: cancellationToken);
+        }
+
+        private async Task<UpdateIntegrityDialogResult?> ShowAsync(
+            string deviceSerial,
+            string deviceName,
+            bool isBatchMode,
+            int targetCount,
+            Action<UpdateIntegrityViewModel> initialize,
+            Func<UpdateIntegrityDialogResult, CancellationToken, Task>? settingsChangedAsync,
+            CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
 
-            _logger.LogDebug("Opening Update Integrity dialog for device {Serial}.", deviceSerial);
+            _logger.LogDebug(
+                "Opening Update Integrity dialog. Batch mode: {IsBatchMode}, Serial: {Serial}, Target count: {TargetCount}.",
+                isBatchMode,
+                deviceSerial,
+                targetCount);
             using var scope = _scopeFactory.CreateScope();
 
             var viewModel = scope.ServiceProvider.GetRequiredService<UpdateIntegrityViewModel>();
+            viewModel.IsBatchMode = isBatchMode;
+            viewModel.BatchTargetCount = targetCount;
             viewModel.DeviceSerial = deviceSerial;
             viewModel.DeviceName = deviceName;
 
@@ -55,14 +100,19 @@ namespace DeepDroidChanger.Services
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(exception, "Failed to persist Update Integrity settings for device {Serial}.", deviceSerial);
+                    _logger.LogError(
+                        exception,
+                        "Failed to persist Update Integrity settings for {Scope}.",
+                        isBatchMode ? "Multiple Devices" : deviceSerial);
                 }
             }
 
-            viewModel.SettingsChanged += OnSettingsChanged;
+            if (settingsChangedAsync != null)
+                viewModel.SettingsChanged += OnSettingsChanged;
+
             try
             {
-                viewModel.InitializeFromConfig(currentConfig);
+                initialize(viewModel);
 
                 var window = scope.ServiceProvider.GetRequiredService<UpdateIntegrityDialog>();
                 window.Owner = Application.Current?.MainWindow;
@@ -73,6 +123,8 @@ namespace DeepDroidChanger.Services
                     window.DialogResult = result;
                 };
 
+                using CancellationTokenRegistration cancellationRegistration =
+                    DialogCancellation.RegisterClose(window, cancellationToken);
                 var dialogResult = window.ShowDialog() ?? false;
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -86,8 +138,11 @@ namespace DeepDroidChanger.Services
             }
             finally
             {
-                viewModel.SettingsChanged -= OnSettingsChanged;
-                await pendingSettingsSave.ConfigureAwait(true);
+                if (settingsChangedAsync != null)
+                {
+                    viewModel.SettingsChanged -= OnSettingsChanged;
+                    await pendingSettingsSave.ConfigureAwait(true);
+                }
             }
         }
     }

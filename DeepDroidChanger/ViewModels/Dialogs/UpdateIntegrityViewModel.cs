@@ -23,6 +23,12 @@ namespace DeepDroidChanger.ViewModels
         private string _deviceInfoText = string.Empty;
 
         [ObservableProperty]
+        private bool _isBatchMode;
+
+        [ObservableProperty]
+        private int _batchTargetCount;
+
+        [ObservableProperty]
         private bool _updateIntegrityFromServer = true;
 
         [ObservableProperty]
@@ -55,11 +61,38 @@ namespace DeepDroidChanger.ViewModels
 
         public void InitializeFromConfig(StoredDeviceConfig config)
         {
-            var updateIntegrityFile = GetAvailableFilePathOrEmpty(config.UpdateIntegrityFile);
-            var updateKeyboxFile = GetAvailableFilePathOrEmpty(config.UpdateKeyboxFile);
-            var updateIntegrityFromServer = config.UpdateIntegrityFromServer;
-            var updateIntegrityEnabled = config.UpdateIntegrityEnabled;
-            var updateKeyboxEnabled = config.UpdateKeyboxEnabled;
+            ArgumentNullException.ThrowIfNull(config);
+            InitializeFromValues(
+                config.UpdateIntegrityFromServer,
+                config.UpdateIntegrityEnabled,
+                config.UpdateKeyboxEnabled,
+                config.UpdateIntegrityFile,
+                config.UpdateKeyboxFile);
+        }
+
+        public void InitializeFromConfig(DeviceUpdateIntegrityConfig config)
+        {
+            ArgumentNullException.ThrowIfNull(config);
+            InitializeFromValues(
+                config.FromServer,
+                config.IntegrityEnabled,
+                config.KeyboxEnabled,
+                config.IntegrityFile,
+                config.KeyboxFile);
+        }
+
+        private void InitializeFromValues(
+            bool configuredFromServer,
+            bool configuredIntegrityEnabled,
+            bool configuredKeyboxEnabled,
+            string? integrityFile,
+            string? keyboxFile)
+        {
+            var updateIntegrityFile = GetAvailableFilePathOrEmpty(integrityFile);
+            var updateKeyboxFile = GetAvailableFilePathOrEmpty(keyboxFile);
+            bool updateIntegrityFromServer = configuredFromServer;
+            bool updateIntegrityEnabled = configuredIntegrityEnabled;
+            bool updateKeyboxEnabled = configuredKeyboxEnabled;
 
             if (!updateIntegrityFromServer)
             {
@@ -82,11 +115,11 @@ namespace DeepDroidChanger.ViewModels
             }
 
             var shouldSaveSanitizedPaths =
-                !string.Equals(config.UpdateIntegrityFile?.Trim() ?? string.Empty, updateIntegrityFile, StringComparison.Ordinal) ||
-                !string.Equals(config.UpdateKeyboxFile?.Trim() ?? string.Empty, updateKeyboxFile, StringComparison.Ordinal) ||
-                config.UpdateIntegrityFromServer != updateIntegrityFromServer ||
-                config.UpdateIntegrityEnabled != updateIntegrityEnabled ||
-                config.UpdateKeyboxEnabled != updateKeyboxEnabled;
+                !string.Equals(integrityFile?.Trim() ?? string.Empty, updateIntegrityFile, StringComparison.Ordinal) ||
+                !string.Equals(keyboxFile?.Trim() ?? string.Empty, updateKeyboxFile, StringComparison.Ordinal) ||
+                configuredFromServer != updateIntegrityFromServer ||
+                configuredIntegrityEnabled != updateIntegrityEnabled ||
+                configuredKeyboxEnabled != updateKeyboxEnabled;
 
             _isInitializing = true;
             try
@@ -111,6 +144,8 @@ namespace DeepDroidChanger.ViewModels
 
         partial void OnDeviceSerialChanged(string value) => UpdateDeviceInfoText();
         partial void OnDeviceNameChanged(string value) => UpdateDeviceInfoText();
+        partial void OnIsBatchModeChanged(bool value) => UpdateDeviceInfoText();
+        partial void OnBatchTargetCountChanged(int value) => UpdateDeviceInfoText();
 
         partial void OnUpdateIntegrityFromServerChanged(bool value)
         {
@@ -172,6 +207,23 @@ namespace DeepDroidChanger.ViewModels
 
         private void UpdateDeviceInfoText()
         {
+            if (IsBatchMode)
+            {
+                string format = _localizationService.GetString("UpdateIntegrity_BatchDeviceInfo");
+                try
+                {
+                    DeviceInfoText = format.Contains("{0}", StringComparison.Ordinal)
+                        ? string.Format(format, BatchTargetCount)
+                        : $"{format} ({BatchTargetCount})";
+                }
+                catch (FormatException)
+                {
+                    DeviceInfoText = $"{format} ({BatchTargetCount})";
+                }
+
+                return;
+            }
+
             DeviceInfoText = DeviceInfoTextHelper.Create(_localizationService, DeviceName, DeviceSerial);
         }
 

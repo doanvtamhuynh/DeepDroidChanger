@@ -22,6 +22,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
     private readonly IDeviceActionService _deviceActionService;
     private readonly IDeviceChangeService _deviceChangeService;
+    private readonly IDeviceIntegrityService _deviceIntegrityService;
     private readonly IDeviceConfigService _deviceConfigService;
     private readonly IDeviceLocationService _deviceLocationService;
     private readonly IDeviceListService _deviceListService;
@@ -34,6 +35,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IDeviceTimezoneService _deviceTimezoneService;
     private readonly IChangeLocationDialogService _changeLocationDialogService;
     private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
+    private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
     private readonly IFakeProxyBatchDialogService _fakeProxyBatchDialogService;
     private readonly IProxyService _proxyService;
     private readonly IProxyWorkflowService _proxyWorkflowService;
@@ -75,6 +77,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private List<StoredDeviceConfig> _storedDevices = [];
     private List<CarrierProfile> _carrierProfiles = [];
     private DeviceChangeOptions _changeOptions = new();
+    private DeviceUpdateIntegrityConfig _updateIntegrityConfig = new();
     private CancellationTokenSource? _pollCancellation;
     private Task? _pollTask;
     private CancellationTokenSource? _configSaveCancellation;
@@ -131,6 +134,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         ICarrierDataService carrierDataService,
         IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
         IDeviceChangeService deviceChangeService,
+        IDeviceIntegrityService deviceIntegrityService,
         IDeviceConfigService deviceConfigService,
         IDeviceListService deviceListService,
         IDeviceActionCoordinatorService deviceActionCoordinatorService,
@@ -149,6 +153,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceTimezoneService deviceTimezoneService,
         IChangeLocationDialogService changeLocationDialogService,
         IChangeTimezoneDialogService changeTimezoneDialogService,
+        IUpdateIntegrityDialogService updateIntegrityDialogService,
         IFakeProxyBatchDialogService fakeProxyBatchDialogService,
         IProxyService proxyService,
         IProxyWorkflowService proxyWorkflowService,
@@ -165,6 +170,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
         _deviceActionService = deviceActionService;
         _deviceChangeService = deviceChangeService;
+        _deviceIntegrityService = deviceIntegrityService;
         _deviceConfigService = deviceConfigService;
         _deviceLocationService = deviceLocationService;
         _deviceListService = deviceListService;
@@ -177,6 +183,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _deviceTimezoneService = deviceTimezoneService;
         _changeLocationDialogService = changeLocationDialogService;
         _changeTimezoneDialogService = changeTimezoneDialogService;
+        _updateIntegrityDialogService = updateIntegrityDialogService;
         _fakeProxyBatchDialogService = fakeProxyBatchDialogService;
         _proxyService = proxyService;
         _proxyWorkflowService = proxyWorkflowService;
@@ -706,6 +713,20 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task UpdateMultipleDevicesIntegrityAsync()
+    {
+        DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
+        if (selectedDevices.Length == 0)
+            return Task.CompletedTask;
+
+        return StartTrackedBatchWorkflow(
+            (sessionId, workflowCancellation) => RunSelectedUpdateIntegrityWorkflowAsync(
+                selectedDevices,
+                sessionId,
+                workflowCancellation));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task InstallPackagesOnMultipleDevicesAsync()
     {
         DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
@@ -807,6 +828,128 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 exception,
                 "Failed to execute Multiple Device {Action} action.",
                 isLocation ? "Location" : "Timezone");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+        }
+    }
+
+    private async Task RunSelectedUpdateIntegrityWorkflowAsync(
+        IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        try
+        {
+            targets = await CreateReservedEligibleTargetsAsync(
+                    selectedDevices,
+                    cancellationToken,
+                    DeviceActionKind.UpdateIntegrity,
+                    sessionId)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            DeviceUpdateIntegrityConfig configuration = CloneUpdateIntegrityConfig(
+                _updateIntegrityConfig);
+            UpdateIntegrityDialogResult? result = await _updateIntegrityDialogService
+                .ShowUpdateIntegrityBatchAsync(
+                    targets.Count,
+                    configuration,
+                    (changedResult, saveCancellationToken) =>
+                        PersistMultipleUpdateIntegrityConfigAsync(
+                            changedResult,
+                            saveCancellationToken),
+                    cancellationToken)
+                .ConfigureAwait(true);
+            if (result == null)
+            {
+                await SetBatchDialogDismissalResultsAsync(targets)
+                    .ConfigureAwait(true);
+                return;
+            }
+
+            try
+            {
+                await PersistMultipleUpdateIntegrityConfigAsync(
+                        result,
+                        cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Failed to save Multiple Device Update Integrity preset/configuration.");
+                await RunOnUiContextAsync(() =>
+                {
+                    foreach (BatchActionTarget target in targets)
+                        SetTargetLog(target, "Log_ActionConfigurationSaveFailed");
+                }).ConfigureAwait(true);
+                return;
+            }
+
+            IReadOnlyList<BatchActionTarget> successfulTargets =
+                await PersistUpdateIntegrityConfigForTargetsAsync(
+                    targets,
+                    result,
+                    cancellationToken)
+                .ConfigureAwait(true);
+            if (successfulTargets.Count == 0)
+                return;
+
+            PreparedIntegrityData preparedData;
+            try
+            {
+                preparedData = await _deviceIntegrityService
+                    .PrepareAsync(result, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(
+                    exception,
+                    "Failed to prepare Update Integrity data for Multiple Devices.");
+                await RunOnUiContextAsync(() =>
+                {
+                    foreach (BatchActionTarget target in successfulTargets)
+                        SetTargetLog(target, "Log_UpdateIntegrityFailed");
+                }).ConfigureAwait(true);
+                return;
+            }
+
+            Task[] operations = successfulTargets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => ExecuteUpdateIntegrityBatchTargetAsync(target, preparedData)))
+                .ToArray();
+            await Task.WhenAll(operations).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to execute Multiple Device Update Integrity action.");
+            await RunOnUiContextAsync(() =>
+            {
+                foreach (BatchActionTarget target in targets)
+                    SetTargetLog(target, "Log_UpdateIntegrityFailed");
+            }).ConfigureAwait(true);
         }
         finally
         {
@@ -1553,6 +1696,75 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
+    private async Task ExecuteUpdateIntegrityBatchTargetAsync(
+        BatchActionTarget target,
+        PreparedIntegrityData preparedData)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            target.OperationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                    return;
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        preparedData.IntegrityCandidates.Count > 0
+                            ? "Log_UpdatingIntegrity"
+                            : "Log_UpdatingKeybox"))
+                    .ConfigureAwait(false);
+                await _deviceIntegrityService
+                    .ApplyPreparedAsync(
+                        target.Serial,
+                        preparedData,
+                        targetCancellation.Token)
+                    .ConfigureAwait(false);
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        "Log_UpdateIntegritySuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await SetTargetCancellationResultAsync(target)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to update Integrity for device {Serial}.",
+                target.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_UpdateIntegrityFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
     private async Task<bool> PersistLocationConfigAsync(
         string serial,
         ChangeLocationMode mode,
@@ -1613,6 +1825,70 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             _deviceRefreshLock.Release();
         }
+    }
+
+    private async Task<IReadOnlyList<BatchActionTarget>> PersistUpdateIntegrityConfigForTargetsAsync(
+        IReadOnlyList<BatchActionTarget> targets,
+        UpdateIntegrityDialogResult result,
+        CancellationToken cancellationToken)
+    {
+        var successfulTargets = new List<BatchActionTarget>(targets.Count);
+        var failedTargets = new List<BatchActionTarget>();
+        await _deviceRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            foreach (BatchActionTarget target in targets)
+            {
+                bool saved;
+                try
+                {
+                    saved = await _deviceConfigService.SaveUpdateIntegrityConfigAsync(
+                            _storedDevices,
+                            target.Serial,
+                            result,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(
+                        exception,
+                        "Failed to save Update Integrity configuration for device {Serial}.",
+                        target.Serial);
+                    saved = false;
+                }
+
+                if (saved)
+                    successfulTargets.Add(target);
+                else
+                    failedTargets.Add(target);
+            }
+        }
+        finally
+        {
+            _deviceRefreshLock.Release();
+        }
+
+        foreach (BatchActionTarget target in failedTargets)
+        {
+            try
+            {
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        "Log_ActionConfigurationSaveFailed"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                CompleteBatchTarget(target);
+            }
+        }
+
+        return successfulTargets;
     }
 
     [RelayCommand]
@@ -2397,6 +2673,22 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         };
     }
 
+    private async Task PersistMultipleUpdateIntegrityConfigAsync(
+        UpdateIntegrityDialogResult result,
+        CancellationToken cancellationToken)
+    {
+        DeviceUpdateIntegrityConfig updateIntegrityConfig = CreateUpdateIntegrityConfig(result);
+        await _multipleDeviceConfigService
+            .SaveUpdateIntegrityConfigAsync(
+                updateIntegrityConfig,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await RunOnUiContextAsync(() => _updateIntegrityConfig = CloneUpdateIntegrityConfig(
+                updateIntegrityConfig))
+            .ConfigureAwait(false);
+    }
+
     private async Task RefreshStoredDevicesFromDiskAsync(CancellationToken cancellationToken)
     {
         await FlushPendingDeviceEditsAsync().ConfigureAwait(false);
@@ -2714,11 +3006,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private async Task LoadConfigurationAsync(CancellationToken cancellationToken)
     {
-        MultipleDeviceConfiguration configuration =
-            await _multipleDeviceConfigService
-                .LoadAsync(cancellationToken)
-                .ConfigureAwait(false);
-        await RunOnUiContextAsync(() => ApplyConfiguration(configuration)).ConfigureAwait(false);
+        Task<MultipleDeviceConfiguration> configurationTask = _multipleDeviceConfigService
+            .LoadAsync(cancellationToken);
+        Task<DeviceUpdateIntegrityConfig> updateIntegrityConfigTask = _multipleDeviceConfigService
+            .LoadUpdateIntegrityConfigAsync(cancellationToken);
+        await Task.WhenAll(configurationTask, updateIntegrityConfigTask).ConfigureAwait(false);
+
+        await RunOnUiContextAsync(() => ApplyConfiguration(
+                configurationTask.Result,
+                updateIntegrityConfigTask.Result))
+            .ConfigureAwait(false);
     }
 
     private async Task LoadDevicesAsync(CancellationToken cancellationToken)
@@ -3368,6 +3665,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         ChangeMultipleDevicesSimInfoCommand.NotifyCanExecuteChanged();
         ChangeMultipleDevicesLocationCommand.NotifyCanExecuteChanged();
         ChangeMultipleDevicesTimezoneCommand.NotifyCanExecuteChanged();
+        UpdateMultipleDevicesIntegrityCommand.NotifyCanExecuteChanged();
         InstallPackagesOnMultipleDevicesCommand.NotifyCanExecuteChanged();
         StartMultipleDevicesFakeProxyCommand.NotifyCanExecuteChanged();
         StopMultipleDevicesFakeProxyCommand.NotifyCanExecuteChanged();
@@ -3484,7 +3782,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         return _localizationService.GetString(resourceKey);
     }
 
-    private void ApplyConfiguration(MultipleDeviceConfiguration configuration)
+    private void ApplyConfiguration(
+        MultipleDeviceConfiguration configuration,
+        DeviceUpdateIntegrityConfig updateIntegrityConfig)
     {
         _isApplyingConfiguration = true;
         try
@@ -3498,6 +3798,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             UseIntegritySecurityPatch = changeConfig.UseIntegritySecurityPatch;
             _changeOptions = DeviceChangeOptionsHelper.CreateNormalizedCopy(
                 configuration.ChangeOptions);
+            _updateIntegrityConfig = CloneUpdateIntegrityConfig(
+                updateIntegrityConfig);
             UseDefaultChangeMode = _changeOptions.UseDefaultMode;
 
             CarrierCountryOption? selectedCountry =
@@ -4070,6 +4372,33 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             cancellationReason,
             requiresOnline: true,
             CancellationToken.None);
+    }
+
+    private static DeviceUpdateIntegrityConfig CreateUpdateIntegrityConfig(
+        UpdateIntegrityDialogResult result)
+    {
+        return new DeviceUpdateIntegrityConfig
+        {
+            FromServer = result.UpdateIntegrityFromServer,
+            IntegrityFile = result.UpdateIntegrityFile,
+            KeyboxFile = result.UpdateKeyboxFile,
+            IntegrityEnabled = result.UpdateIntegrityEnabled,
+            KeyboxEnabled = result.UpdateKeyboxEnabled
+        };
+    }
+
+    private static DeviceUpdateIntegrityConfig CloneUpdateIntegrityConfig(
+        DeviceUpdateIntegrityConfig? configuration)
+    {
+        DeviceUpdateIntegrityConfig source = configuration ?? new();
+        return new DeviceUpdateIntegrityConfig
+        {
+            FromServer = source.FromServer,
+            IntegrityFile = source.IntegrityFile?.Trim() ?? string.Empty,
+            KeyboxFile = source.KeyboxFile?.Trim() ?? string.Empty,
+            IntegrityEnabled = source.IntegrityEnabled,
+            KeyboxEnabled = source.KeyboxEnabled
+        };
     }
 
     private static DeviceInfoApiDevice? CloneDeviceProfile(DeviceInfoApiDevice? profile)

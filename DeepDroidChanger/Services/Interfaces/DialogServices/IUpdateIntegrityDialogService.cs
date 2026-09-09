@@ -9,5 +9,11 @@ namespace DeepDroidChanger.Services
             StoredDeviceConfig currentConfig,
             Func<UpdateIntegrityDialogResult, CancellationToken, Task>? settingsChangedAsync,
             CancellationToken cancellationToken);
+
+        Task<UpdateIntegrityDialogResult?> ShowUpdateIntegrityBatchAsync(
+            int targetCount,
+            DeviceUpdateIntegrityConfig currentConfig,
+            Func<UpdateIntegrityDialogResult, CancellationToken, Task> settingsChangedAsync,
+            CancellationToken cancellationToken);
     }
 }

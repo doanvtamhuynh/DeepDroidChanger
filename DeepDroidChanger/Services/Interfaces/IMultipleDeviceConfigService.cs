@@ -10,6 +10,13 @@ public interface IMultipleDeviceConfigService
         MultipleDeviceConfiguration configuration,
         CancellationToken cancellationToken);
 
+    Task<DeviceUpdateIntegrityConfig> LoadUpdateIntegrityConfigAsync(
+        CancellationToken cancellationToken);
+
+    Task SaveUpdateIntegrityConfigAsync(
+        DeviceUpdateIntegrityConfig configuration,
+        CancellationToken cancellationToken);
+
     Task<MultipleDeviceProxyConfig> LoadProxyConfigAsync(
         CancellationToken cancellationToken);
 
