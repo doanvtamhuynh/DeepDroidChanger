@@ -117,25 +117,35 @@ namespace DeepDroidChanger.ViewModels
         public AppView ActiveView
         {
             get => _activeView;
-            private set
-            {
-                if (!SetProperty(ref _activeView, value))
-                    return;
+            private set => SetActiveView(value, raiseNavigation: true);
+        }
 
-                OnPropertyChanged(nameof(IsDevicesManagerActive));
-                OnPropertyChanged(nameof(IsChangeSingleDeviceActive));
-                OnPropertyChanged(nameof(IsChangeMultipleDevicesActive));
-                OnPropertyChanged(nameof(IsSettingsActive));
-                OnPropertyChanged(nameof(DevicesManagerIconKind));
-                SynchronizeDevicesManagerMenuState();
-                NavigationRequested?.Invoke(value);
-            }
+        internal void RestoreActiveView(AppView view)
+        {
+            SetActiveView(view, raiseNavigation: false);
+        }
+
+        private void SetActiveView(AppView view, bool raiseNavigation)
+        {
+            if (!SetProperty(ref _activeView, view))
+                return;
+
+            OnPropertyChanged(nameof(IsDevicesManagerActive));
+            OnPropertyChanged(nameof(IsChangeSingleDeviceActive));
+            OnPropertyChanged(nameof(IsChangeMultipleDevicesActive));
+            OnPropertyChanged(nameof(IsViewMultipleDevicesActive));
+            OnPropertyChanged(nameof(IsSettingsActive));
+            OnPropertyChanged(nameof(DevicesManagerIconKind));
+            SynchronizeDevicesManagerMenuState();
+            if (raiseNavigation)
+                NavigationRequested?.Invoke(view);
         }
 
         public bool IsDevicesManagerActive =>
             ActiveView is AppView.ChangeSingleDevice or AppView.ChangeMultipleDevices;
         public bool IsChangeSingleDeviceActive => ActiveView == AppView.ChangeSingleDevice;
         public bool IsChangeMultipleDevicesActive => ActiveView == AppView.ChangeMultipleDevices;
+        public bool IsViewMultipleDevicesActive => ActiveView == AppView.ViewMultipleDevices;
         public bool IsSettingsActive => ActiveView == AppView.Settings;
         public GridLength SidebarWidth => new(IsSidebarCollapsed ? CollapsedWidth : ExpandedWidth);
         public Thickness HeaderMargin => IsSidebarCollapsed ? new Thickness(0, 16, 0, 8) : new Thickness(14, 16, 10, 8);
@@ -228,6 +238,13 @@ namespace DeepDroidChanger.ViewModels
         {
             ActiveView = AppView.ChangeMultipleDevices;
             CloseFlyoutAfterNavigation();
+        }
+
+        [RelayCommand]
+        private void NavigateViewMultipleDevices()
+        {
+            CloseDevicesManagerMenus();
+            ActiveView = AppView.ViewMultipleDevices;
         }
 
         [RelayCommand]

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using DeepDroidChanger.Helpers;
 
 namespace DeepDroidChanger.Views;
 
@@ -36,29 +37,59 @@ public sealed class ScrcpyWindowHost : HwndHost
     private IntPtr _containerHandle;
     private IntPtr _scrcpyHandle;
     private IntPtr _requestedHandle;
+    private Rect? _requestedVisibleClip;
     private IntPtr _originalParent;
     private IntPtr _originalStyle;
+    private bool _originalStyleCaptured;
     private int _lastChildWidth = -1;
     private int _lastChildHeight = -1;
 
     public IntPtr AttachedWindowHandle => _scrcpyHandle;
+
+    public event Action<IntPtr>? AttachSucceeded;
+
+    public event Action<Exception, IntPtr>? AttachFailed;
+
+    public static readonly DependencyProperty IsInteractiveProperty =
+        DependencyProperty.Register(
+            nameof(IsInteractive),
+            typeof(bool),
+            typeof(ScrcpyWindowHost),
+            new FrameworkPropertyMetadata(true));
+
+    public bool IsInteractive
+    {
+        get => (bool)GetValue(IsInteractiveProperty);
+        set => SetValue(IsInteractiveProperty, value);
+    }
 
     public void AttachWindow(IntPtr windowHandle)
     {
         Dispatcher.VerifyAccess();
         _requestedHandle = windowHandle;
         if (_scrcpyHandle == windowHandle &&
-            windowHandle != IntPtr.Zero &&
-            IsWindow(windowHandle) &&
-            GetParent(windowHandle) == _containerHandle)
+            IsVerifiedEmbeddedWindow(windowHandle))
         {
-            ResizeChild();
+            if (!ResizeChild())
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastPInvokeError(),
+                    "Failed to resize the existing embedded scrcpy window.");
+            }
+
+            ApplyVisibleClipSafely();
+            ReportAttachSucceeded(windowHandle);
             return;
         }
 
         DetachWindowCore();
         if (windowHandle == IntPtr.Zero || _containerHandle == IntPtr.Zero)
             return;
+        if (!IsWindow(_containerHandle))
+        {
+            _requestedHandle = IntPtr.Zero;
+            throw new InvalidOperationException("The scrcpy native host window is no longer valid.");
+        }
         if (!IsWindow(windowHandle))
         {
             _requestedHandle = IntPtr.Zero;
@@ -67,7 +98,17 @@ public sealed class ScrcpyWindowHost : HwndHost
 
         _scrcpyHandle = windowHandle;
         _originalParent = GetParent(windowHandle);
+        Marshal.SetLastPInvokeError(0);
         _originalStyle = GetWindowLongPtr(windowHandle, GwlStyle);
+        int styleError = Marshal.GetLastPInvokeError();
+        if (_originalStyle == IntPtr.Zero && styleError != 0)
+        {
+            _requestedHandle = IntPtr.Zero;
+            ResetAttachedWindowState();
+            throw new Win32Exception(styleError, "Failed to read the official scrcpy window style.");
+        }
+
+        _originalStyleCaptured = true;
         _ = ShowWindow(windowHandle, SwHide);
         try
         {
@@ -111,22 +152,40 @@ public sealed class ScrcpyWindowHost : HwndHost
                     Marshal.GetLastPInvokeError(),
                     "Failed to size the embedded official scrcpy window.");
             }
+
             _ = ShowWindow(windowHandle, SwShow);
+            if (!IsVerifiedEmbeddedWindow(windowHandle))
+            {
+                throw new Win32Exception(
+                    "The official scrcpy window was no longer a verified child window after attaching.");
+            }
+
+            ApplyVisibleClipSafely();
+            ReportAttachSucceeded(windowHandle);
         }
         catch
         {
-            if (IsWindow(windowHandle))
-                _ = ShowWindow(windowHandle, SwHide);
+            DetachWindowCore();
             _requestedHandle = IntPtr.Zero;
-            ResetAttachedWindowState();
             throw;
         }
+    }
+
+    public void SetVisibleClip(Rect? visibleRect)
+    {
+        Dispatcher.VerifyAccess();
+        _requestedVisibleClip = visibleRect;
+        if (_containerHandle == IntPtr.Zero || !IsWindow(_containerHandle))
+            return;
+
+        ApplyVisibleClipSafely();
     }
 
     public void DetachWindow()
     {
         Dispatcher.VerifyAccess();
         _requestedHandle = IntPtr.Zero;
+        _requestedVisibleClip = null;
         DetachWindowCore();
     }
 
@@ -134,9 +193,48 @@ public sealed class ScrcpyWindowHost : HwndHost
     {
         IntPtr windowHandle = _scrcpyHandle;
         if (windowHandle != IntPtr.Zero && IsWindow(windowHandle))
+        {
             _ = ShowWindow(windowHandle, SwHide);
+            RestoreOriginalWindowState(windowHandle);
+        }
 
+        ResetVisibleClipSafely();
         ResetAttachedWindowState();
+    }
+
+    private void RestoreOriginalWindowState(IntPtr windowHandle)
+    {
+        try
+        {
+            Marshal.SetLastPInvokeError(0);
+            IntPtr previousParent = SetParent(windowHandle, _originalParent);
+            int parentError = Marshal.GetLastPInvokeError();
+            if (previousParent == IntPtr.Zero && parentError != 0)
+            {
+                LogHostFailure(
+                    $"Failed to detach the official scrcpy window from the WPF host. Error={parentError}.");
+            }
+
+            if (_originalStyleCaptured)
+            {
+                try
+                {
+                    SetWindowLongPtrChecked(windowHandle, GwlStyle, _originalStyle);
+                }
+                catch (Exception exception)
+                {
+                    LogHostFailure(
+                        "Failed to restore the official scrcpy window style after detaching.",
+                        exception);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            LogHostFailure(
+                "Failed to restore the official scrcpy window state after detaching.",
+                exception);
+        }
     }
 
     private void ResetAttachedWindowState()
@@ -144,6 +242,7 @@ public sealed class ScrcpyWindowHost : HwndHost
         _scrcpyHandle = IntPtr.Zero;
         _originalParent = IntPtr.Zero;
         _originalStyle = IntPtr.Zero;
+        _originalStyleCaptured = false;
         _lastChildWidth = -1;
         _lastChildHeight = -1;
     }
@@ -151,6 +250,9 @@ public sealed class ScrcpyWindowHost : HwndHost
     public void FocusNativeWindow()
     {
         Dispatcher.VerifyAccess();
+        if (!IsInteractive)
+            return;
+
         IntPtr windowHandle = _scrcpyHandle;
         if (windowHandle == IntPtr.Zero || !IsWindow(windowHandle))
             return;
@@ -217,15 +319,47 @@ public sealed class ScrcpyWindowHost : HwndHost
         if (_containerHandle == IntPtr.Zero)
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to create the scrcpy native host.");
 
+        ApplyVisibleClipSafely();
         if (_requestedHandle != IntPtr.Zero)
-            Dispatcher.BeginInvoke(() => AttachWindow(_requestedHandle));
+        {
+            IntPtr requestedHandle = _requestedHandle;
+            try
+            {
+                _ = Dispatcher.BeginInvoke(
+                    new Action(() => AttachRequestedWindowSafely(requestedHandle)));
+            }
+            catch (Exception exception)
+            {
+                LogHostFailure("Could not schedule the deferred scrcpy native-window attach.", exception);
+                ReportAttachFailure(exception, requestedHandle);
+            }
+        }
 
         return new HandleRef(this, _containerHandle);
+    }
+
+    private void AttachRequestedWindowSafely(IntPtr requestedHandle)
+    {
+        if (requestedHandle == IntPtr.Zero ||
+            requestedHandle != _requestedHandle ||
+            _containerHandle == IntPtr.Zero)
+            return;
+
+        try
+        {
+            AttachWindow(requestedHandle);
+        }
+        catch (Exception exception)
+        {
+            LogHostFailure("Deferred scrcpy native-window attach failed.", exception);
+            ReportAttachFailure(exception, requestedHandle);
+        }
     }
 
     protected override void DestroyWindowCore(HandleRef hwnd)
     {
         _requestedHandle = IntPtr.Zero;
+        _requestedVisibleClip = null;
         DetachWindowCore();
         if (hwnd.Handle != IntPtr.Zero)
             _ = DestroyWindow(hwnd.Handle);
@@ -241,8 +375,10 @@ public sealed class ScrcpyWindowHost : HwndHost
     {
         if ((uint)message == WmSize)
             ResizeChild();
-        else if ((uint)message == WmParentNotify && IsPointerDownMessage(LowWord(wParam)))
-            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(FocusNativeWindow));
+        else if (IsInteractive &&
+                 (uint)message == WmParentNotify &&
+                 IsPointerDownMessage(LowWord(wParam)))
+            QueueNativeFocus();
         return IntPtr.Zero;
     }
 
@@ -250,18 +386,122 @@ public sealed class ScrcpyWindowHost : HwndHost
     {
         base.OnWindowPositionChanged(rcBoundingBox);
         ResizeChild();
+        if (_requestedVisibleClip is not null)
+            ApplyVisibleClipSafely();
     }
 
     protected override bool TabIntoCore(TraversalRequest request)
     {
+        if (!IsInteractive)
+            return false;
+
         FocusNativeWindow();
         return _scrcpyHandle != IntPtr.Zero;
+    }
+
+    private void ApplyVisibleClipSafely()
+    {
+        try
+        {
+            ApplyVisibleClip();
+        }
+        catch (Exception exception)
+        {
+            LogHostFailure("Failed to apply the native scrcpy visible clip.", exception);
+        }
+    }
+
+    private void ApplyVisibleClip()
+    {
+        if (_containerHandle == IntPtr.Zero || !IsWindow(_containerHandle))
+            return;
+
+        Rect? requestedClip = _requestedVisibleClip;
+        if (requestedClip is null)
+        {
+            SetNativeWindowRegion(_containerHandle, IntPtr.Zero);
+            return;
+        }
+
+        (double scaleX, double scaleY) = DpiHelper.GetDpiScale(this);
+        Rect pixelClip = ViewMultipleDevicesLayout.ConvertDipRectToDevicePixels(
+            requestedClip.Value,
+            scaleX,
+            scaleY);
+
+        int left = pixelClip.IsEmpty ? 0 : ToNativeCoordinate(pixelClip.Left);
+        int top = pixelClip.IsEmpty ? 0 : ToNativeCoordinate(pixelClip.Top);
+        int right = pixelClip.IsEmpty ? 0 : ToNativeCoordinate(pixelClip.Right);
+        int bottom = pixelClip.IsEmpty ? 0 : ToNativeCoordinate(pixelClip.Bottom);
+        IntPtr region = CreateRectRgn(left, top, right, bottom);
+        if (region == IntPtr.Zero)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            throw new Win32Exception(
+                error == 0 ? 1 : error,
+                "Failed to create the native scrcpy clipping region.");
+        }
+
+        // SetWindowRgn transfers ownership of a successful region handle to Windows.
+        bool windowOwnsRegion = false;
+        try
+        {
+            SetNativeWindowRegion(_containerHandle, region);
+            windowOwnsRegion = true;
+        }
+        finally
+        {
+            if (!windowOwnsRegion && !DeleteObject(region))
+            {
+                int error = Marshal.GetLastPInvokeError();
+                LogHostFailure(
+                    $"Failed to release the native scrcpy clipping region. Error={error}.");
+            }
+        }
+    }
+
+    private void ResetVisibleClipSafely()
+    {
+        if (_containerHandle == IntPtr.Zero || !IsWindow(_containerHandle))
+            return;
+
+        try
+        {
+            SetNativeWindowRegion(_containerHandle, IntPtr.Zero);
+        }
+        catch (Exception exception)
+        {
+            LogHostFailure("Failed to reset the native scrcpy visible clip.", exception);
+        }
+    }
+
+    private static int ToNativeCoordinate(double value)
+    {
+        if (value <= int.MinValue)
+            return int.MinValue;
+        if (value >= int.MaxValue)
+            return int.MaxValue;
+        return (int)value;
+    }
+
+    private static void SetNativeWindowRegion(IntPtr windowHandle, IntPtr region)
+    {
+        Marshal.SetLastPInvokeError(0);
+        int result = SetWindowRgn(windowHandle, region, true);
+        if (result != 0)
+            return;
+
+        int error = Marshal.GetLastPInvokeError();
+        throw new Win32Exception(
+            error == 0 ? 1 : error,
+            "Failed to update the native scrcpy clipping region.");
     }
 
     private bool ResizeChild(bool frameChanged = false)
     {
         if (_containerHandle == IntPtr.Zero ||
             _scrcpyHandle == IntPtr.Zero ||
+            !IsWindow(_containerHandle) ||
             !IsWindow(_scrcpyHandle) ||
             !GetClientRect(_containerHandle, out RECT rect))
         {
@@ -292,6 +532,21 @@ public sealed class ScrcpyWindowHost : HwndHost
         }
 
         return false;
+    }
+
+    private bool IsVerifiedEmbeddedWindow(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero ||
+            _containerHandle == IntPtr.Zero ||
+            !IsWindow(_containerHandle) ||
+            !IsWindow(windowHandle) ||
+            GetParent(windowHandle) != _containerHandle)
+        {
+            return false;
+        }
+
+        long style = GetWindowLongPtr(windowHandle, GwlStyle).ToInt64();
+        return (style & WsChild) != 0;
     }
 
     private static void SetWindowLongPtrChecked(IntPtr windowHandle, int index, IntPtr value)
@@ -329,6 +584,82 @@ public sealed class ScrcpyWindowHost : HwndHost
             WmMiddleButtonDown or
             WmXButtonDown or
             WmPointerDown;
+    }
+
+    private void QueueNativeFocus()
+    {
+        try
+        {
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                return;
+
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Input,
+                new Action(FocusNativeWindowSafely));
+        }
+        catch (Exception exception)
+        {
+            LogHostFailure("Could not schedule native scrcpy focus.", exception);
+        }
+    }
+
+    private void FocusNativeWindowSafely()
+    {
+        try
+        {
+            FocusNativeWindow();
+        }
+        catch (Exception exception)
+        {
+            LogHostFailure("Native scrcpy focus callback failed.", exception);
+        }
+    }
+
+    private void ReportAttachFailure(Exception exception, IntPtr windowHandle)
+    {
+        Action<Exception, IntPtr>? handlers = AttachFailed;
+        if (handlers is null)
+            return;
+
+        foreach (Action<Exception, IntPtr> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(exception, windowHandle);
+            }
+            catch (Exception callbackException)
+            {
+                LogHostFailure("A scrcpy native-window attach-failure callback failed.", callbackException);
+            }
+        }
+    }
+
+    private void ReportAttachSucceeded(IntPtr windowHandle)
+    {
+        Action<IntPtr>? handlers = AttachSucceeded;
+        if (handlers is null)
+            return;
+
+        foreach (Action<IntPtr> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(windowHandle);
+            }
+            catch (Exception callbackException)
+            {
+                LogHostFailure("A scrcpy native-window attach-success callback failed.", callbackException);
+            }
+        }
+    }
+
+    private static void LogHostFailure(string message, Exception? exception = null)
+    {
+        string details = exception is null
+            ? message
+            : $"{message} {exception}";
+        Debug.WriteLine(details);
+        Trace.WriteLine(details);
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -400,6 +731,23 @@ public sealed class ScrcpyWindowHost : HwndHost
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetClientRect(IntPtr windowHandle, out RECT rect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int SetWindowRgn(
+        IntPtr windowHandle,
+        IntPtr region,
+        [MarshalAs(UnmanagedType.Bool)] bool redraw);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern IntPtr CreateRectRgn(
+        int left,
+        int top,
+        int right,
+        int bottom);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(IntPtr objectHandle);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetFocus(IntPtr windowHandle);

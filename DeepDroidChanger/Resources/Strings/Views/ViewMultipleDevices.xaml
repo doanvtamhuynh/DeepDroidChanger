@@ -1,0 +1,21 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:String x:Key="ViewMultipleDevices_Title">View Multiple Devices</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OnlineDevices">online devices</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_NoOnlineDevices">No saved online devices are available.</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Zoom">Zoom</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_ZoomOut">Zoom out</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_ZoomIn">Zoom in</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Fit">Fit</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Showing">Showing</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Of">of</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Devices">devices</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Page">Page</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Previous">Previous</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Next">Next</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Connecting">Connecting...</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Online">Online</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Disconnected">Disconnected</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Failed">Failed</sys:String>
+</ResourceDictionary>

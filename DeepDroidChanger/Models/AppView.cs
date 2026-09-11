@@ -4,6 +4,7 @@ namespace DeepDroidChanger.Models
     {
         ChangeSingleDevice,
         ChangeMultipleDevices,
+        ViewMultipleDevices,
         Settings
     }
 }

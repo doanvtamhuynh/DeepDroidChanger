@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Helpers;
@@ -22,27 +23,34 @@ public sealed partial class App : Application
         base.OnStartup(e);
 
         AppSettings settings = new();
-        _host = Host.CreateDefaultBuilder(e.Args)
-            .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Debug))
-            .ConfigureServices((_, services) => RegisterServices(services, settings))
-            .Build();
-
+        string startupStage = "creating the application host";
         try
         {
+            startupStage = "building the application host";
+            _host = Host.CreateDefaultBuilder(e.Args)
+                .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Debug))
+                .ConfigureServices((_, services) => RegisterServices(services, settings))
+                .Build();
+
+            startupStage = "starting the application host";
             await _host.StartAsync().ConfigureAwait(true);
 
+            startupStage = "running runtime data migration";
             _host.Services.GetRequiredService<IRuntimeDataMigrationService>().Migrate();
 
+            startupStage = "loading application settings";
             AppSettings loadedSettings = await _host.Services
                 .GetRequiredService<ISettingsService>()
                 .LoadAsync(CancellationToken.None)
                 .ConfigureAwait(true);
             CopySettings(loadedSettings, settings);
 
+            startupStage = "applying localization and theme";
             _host.Services.GetRequiredService<ILocalizationService>().ApplyLanguage(settings.Language);
             _host.Services.GetRequiredService<IThemeService>().ApplyTheme(settings.Theme);
 
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            startupStage = "showing the login dialog";
             bool authenticated = await _host.Services
                 .GetRequiredService<ILoginDialogService>()
                 .ShowLoginAsync(CancellationToken.None)
@@ -54,9 +62,11 @@ public sealed partial class App : Application
                 return;
             }
 
+            startupStage = "resolving MainWindow and its eager dependencies";
             MainWindow mainWindow = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = mainWindow;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
+            startupStage = "showing MainWindow";
             mainWindow.Show();
         }
         catch (OperationCanceledException)
@@ -65,8 +75,7 @@ public sealed partial class App : Application
         }
         catch (Exception exception)
         {
-            _host.Services.GetRequiredService<ILogger<App>>()
-                .LogError(exception, "Application startup failed.");
+            LogStartupFailure(startupStage, exception);
             Shutdown();
         }
     }
@@ -179,12 +188,18 @@ public sealed partial class App : Application
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ChangeSingleDeviceViewModel>();
         services.AddSingleton<ChangeMultipleDevicesViewModel>();
+        services.AddSingleton<ViewMultipleDevicesViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddTransient<ViewDeviceViewModel>();
         services.AddSingleton<MainWindow>();
         services.AddSingleton<ChangeSingleDeviceView>();
         services.AddSingleton<ChangeMultipleDevicesView>();
+        services.AddSingleton<ViewMultipleDevicesView>();
         services.AddSingleton<SettingsView>();
+        services.AddSingleton<Func<ViewMultipleDevicesViewModel>>(serviceProvider =>
+            () => serviceProvider.GetRequiredService<ViewMultipleDevicesViewModel>());
+        services.AddSingleton<Func<ViewMultipleDevicesView>>(serviceProvider =>
+            () => serviceProvider.GetRequiredService<ViewMultipleDevicesView>());
 
         services.AddTransient<LoginViewModel>();
         services.AddTransient<AddDevicesViewModel>();
@@ -221,5 +236,27 @@ public sealed partial class App : Application
         target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
         target.SelectedSingleDeviceSerial = source.SelectedSingleDeviceSerial;
         target.SelectedMultipleDeviceSerials = source.SelectedMultipleDeviceSerials;
+    }
+
+    private void LogStartupFailure(string startupStage, Exception exception)
+    {
+        string details =
+            $"Application startup failed while {startupStage}.{Environment.NewLine}{exception}";
+
+        try
+        {
+            _host?.Services.GetService<ILogger<App>>()?.LogCritical(
+                exception,
+                "Application startup failed while {StartupStage}. Full exception: {ExceptionDetails}",
+                startupStage,
+                exception.ToString());
+        }
+        catch (Exception loggingException)
+        {
+            Debug.WriteLine($"Could not write the startup failure to the configured logger: {loggingException}");
+        }
+
+        Debug.WriteLine(details);
+        Trace.WriteLine(details);
     }
 }

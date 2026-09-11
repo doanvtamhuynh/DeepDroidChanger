@@ -8,6 +8,8 @@ namespace DeepDroidChanger.Services
     {
         private readonly ILogger<LocalizationService> _logger;
 
+        public event EventHandler? LanguageChanged;
+
         public LocalizationService(ILogger<LocalizationService> logger)
         {
             _logger = logger;
@@ -41,6 +43,8 @@ namespace DeepDroidChanger.Services
                     Source = new Uri(AssetConstants.Localization.VietnameseStrings, UriKind.Relative)
                 });
             }
+
+            LanguageChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private static void EnsureBaseDictionary()

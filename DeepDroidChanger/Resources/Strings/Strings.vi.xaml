@@ -6,6 +6,7 @@
         <ResourceDictionary Source="Views/ChangeSingleDevice.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeMultipleDevices.vi.xaml" />
         <ResourceDictionary Source="Views/AddDevices.vi.xaml" />
+        <ResourceDictionary Source="Views/ViewMultipleDevices.vi.xaml" />
         <ResourceDictionary Source="Views/Settings.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeTimezone.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeLocation.vi.xaml" />

@@ -251,6 +251,10 @@ internal sealed class ScrcpyProcessSession : IViewDeviceSession
         startInfo.ArgumentList.Add($"--max-size={options.MaxSize}");
         startInfo.ArgumentList.Add($"--max-fps={options.MaxFps}");
         startInfo.ArgumentList.Add($"--video-bit-rate={options.VideoBitRate}");
+        if (options.NoControl)
+            startInfo.ArgumentList.Add("--no-control");
+        if (options.NoAudio)
+            startInfo.ArgumentList.Add("--no-audio");
 
         return startInfo;
     }

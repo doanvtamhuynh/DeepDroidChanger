@@ -573,6 +573,20 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="SidebarViewMultipleDevicesTabStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SidebarTabStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsViewMultipleDevicesActive}"
+                             Value="True">
+                    <Setter Property="Background"
+                            Value="{DynamicResource Brush.SurfaceSelected}"/>
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="ShellToggleIconStyle"
                TargetType="materialDesign:PackIcon">
             <Setter Property="Width"
@@ -774,6 +788,13 @@
                                 ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
                                 Style="{StaticResource SidebarMultipleDevicesSubmenuButtonStyle}"/>
                     </StackPanel>
+
+                    <Button x:Name="BtnViewMultipleDevices"
+                            Tag="ViewGrid"
+                            Content="{DynamicResource Nav_ViewMultipleDevices}"
+                            Command="{Binding NavigateViewMultipleDevicesCommand}"
+                            ToolTip="{DynamicResource Nav_ViewMultipleDevicesTooltip}"
+                            Style="{StaticResource SidebarViewMultipleDevicesTabStyle}"/>
 
                     <Button x:Name="BtnSettings"
                             Tag="Cog"

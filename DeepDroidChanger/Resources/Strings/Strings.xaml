@@ -6,6 +6,7 @@
         <ResourceDictionary Source="Views/ChangeSingleDevice.xaml" />
         <ResourceDictionary Source="Views/ChangeMultipleDevices.xaml" />
         <ResourceDictionary Source="Views/AddDevices.xaml" />
+        <ResourceDictionary Source="Views/ViewMultipleDevices.xaml" />
         <ResourceDictionary Source="Views/Settings.xaml" />
         <ResourceDictionary Source="Views/ChangeTimezone.xaml" />
         <ResourceDictionary Source="Views/ChangeLocation.xaml" />

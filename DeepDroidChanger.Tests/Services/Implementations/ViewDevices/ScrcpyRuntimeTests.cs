@@ -136,6 +136,34 @@ public sealed class ScrcpyRuntimeTests
     }
 
     [TestMethod]
+    public void CreateStartInfo_MultiView_UsesInteractiveLowCostProfile()
+    {
+        const string serial = "SERIAL-MULTI";
+        const string windowTitle = "DeepDroidChanger.ViewDevice.multi-test";
+        string runtimeDirectory = Path.GetFullPath(Path.Combine("runtime", "Assets", "Tools"));
+        var runtime = new ScrcpyRuntimeInfo(
+            runtimeDirectory,
+            Path.Combine(runtimeDirectory, "scrcpy.exe"),
+            Path.Combine(runtimeDirectory, "scrcpy-server"),
+            Path.Combine(runtimeDirectory, "adb.exe"));
+        ViewDeviceLaunchOptions options = ViewDeviceLaunchOptions.ForMultiView(serial);
+
+        ProcessStartInfo startInfo = ScrcpyProcessSession.CreateStartInfo(
+            options,
+            runtime,
+            windowTitle);
+        string[] arguments = startInfo.ArgumentList.ToArray();
+
+        Assert.IsFalse(options.NoControl);
+        Assert.IsTrue(options.NoAudio);
+        CollectionAssert.Contains(arguments, "--max-size=720");
+        CollectionAssert.Contains(arguments, "--max-fps=20");
+        CollectionAssert.Contains(arguments, "--video-bit-rate=2M");
+        CollectionAssert.Contains(arguments, "--no-audio");
+        CollectionAssert.DoesNotContain(arguments, "--no-control");
+    }
+
+    [TestMethod]
     [DataRow("Texture: 1080x2400", 1080, 2400)]
     [DataRow("Texture: 2400x1080", 2400, 1080)]
     [DataRow("INFO: Texture: 720x1280", 720, 1280)]
