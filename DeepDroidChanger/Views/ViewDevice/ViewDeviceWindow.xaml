@@ -5,12 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:models="clr-namespace:DeepDroidChanger.ViewDevices.Models;assembly=DeepDroidChanger.ViewDevices"
+        xmlns:scrcpy="clr-namespace:ScrcpyNet.Wpf;assembly=ScrcpyNet.Wpf"
         xmlns:views="clr-namespace:DeepDroidChanger.Views"
         mc:Ignorable="d"
-        Width="352"
-        Height="556"
-        MinWidth="352"
-        MinHeight="360"
+        Width="520"
+        Height="820"
+        MinWidth="320"
+        MinHeight="240"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Brush.WindowBackground}"
@@ -21,132 +22,126 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <views:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
 
-        <Style x:Key="ViewDeviceIconButtonStyle"
+        <Style x:Key="ViewDeviceToolbarButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Width" Value="40"/>
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="Width" Value="54"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Margin" Value="0"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="ViewDeviceActionButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="ViewDeviceButtonTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource PrimaryButtonTextStyle}">
-            <Setter Property="Foreground"
-                    Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"/>
-        </Style>
-
-        <Style x:Key="ViewDeviceNavButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource ViewDeviceActionButtonStyle}">
-            <Setter Property="MinWidth" Value="82"/>
-            <Setter Property="Margin" Value="4,0"/>
-        </Style>
-
-        <Style x:Key="ViewDeviceStatusPillStyle" TargetType="Border">
-            <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
             <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Warning}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.SurfaceAlt}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ViewDeviceStatusDotStyle" TargetType="Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource Brush.Warning}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Running}">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Unauthorized}">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
+                    <Setter Property="Fill" Value="{DynamicResource Brush.Success}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Failed}">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
+                    <Setter Property="Fill" Value="{DynamicResource Brush.Danger}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
     </Window.Resources>
 
-    <Border Background="{DynamicResource Brush.Surface}"
+    <Border x:Name="RootBorder"
+            Background="{DynamicResource Brush.Surface}"
             BorderBrush="{DynamicResource Brush.Border}"
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="HeaderRow" Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition x:Name="NavigationRow" Height="Auto"/>
             </Grid.RowDefinitions>
 
             <Border x:Name="HeaderPanel"
                     Grid.Row="0"
-                    Padding="8,5"
+                    Height="{StaticResource Metric.ToolbarMinHeight}"
+                    Padding="12,0"
                     Background="{DynamicResource Brush.Surface}"
                     BorderBrush="{DynamicResource Brush.Border}"
                     BorderThickness="0,0,0,1">
-                <Border Style="{StaticResource ViewDeviceStatusPillStyle}"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                    <TextBlock Text="{Binding StatusText}"
-                               FontSize="{StaticResource Metric.FontSize.Small}"
-                               FontWeight="SemiBold"/>
-                </Border>
+                <Grid>
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DeviceName}"
+                                   MaxWidth="260"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontSize="{StaticResource Metric.FontSize.Body}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Serial}"
+                                   Margin="8,0,0,0"
+                                   MaxWidth="180"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource Brush.TextSecondary}"
+                                   FontSize="{StaticResource Metric.FontSize.Micro}"
+                                   VerticalAlignment="Center"
+                                   ToolTip="{Binding Serial}"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center">
+                        <Ellipse Width="8"
+                                 Height="8"
+                                 Margin="0,0,6,0"
+                                 Style="{StaticResource ViewDeviceStatusDotStyle}"/>
+                        <TextBlock Text="{Binding StatusText}"
+                                   MaxWidth="210"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource Brush.TextSecondary}"
+                                   FontSize="{StaticResource Metric.FontSize.Small}"/>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition x:Name="ActionsColumn" Width="52"/>
+                    <ColumnDefinition x:Name="ToolbarColumn" Width="54"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0"
+                <Border x:Name="StreamContainer"
+                        Grid.Column="0"
                         Margin="8"
-                        Background="{DynamicResource Brush.WindowBackground}"
+                        Background="Black"
                         BorderBrush="{DynamicResource Brush.Border}"
                         BorderThickness="1"
                         CornerRadius="{StaticResource Radius.Medium}"
                         ClipToBounds="True">
-                    <Grid x:Name="StreamContainer"
-                          SizeChanged="OnStreamContainerSizeChanged">
-                        <Grid x:Name="StreamViewport"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              Background="Black">
-                            <views:ScrcpyWindowHost x:Name="NativeHost"
-                                                    Focusable="True"
-                                                    Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        </Grid>
+                    <Grid>
+                        <scrcpy:ScrcpyDisplay x:Name="ScrcpyDisplay"
+                                              Scrcpy="{Binding ScrcpyClient}"
+                                              Focusable="True"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"
+                                              Background="Black"/>
 
-                        <Grid Visibility="{Binding IsRunning, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
-                              Background="{DynamicResource Brush.WindowBackground}">
+                        <Grid Background="{DynamicResource Brush.WindowBackground}"
+                              Visibility="{Binding IsRunning, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                             <StackPanel HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         MaxWidth="300"
@@ -162,13 +157,15 @@
                                            FontWeight="SemiBold"
                                            TextAlignment="Center"
                                            TextWrapping="Wrap"/>
-                                <Button Style="{StaticResource ViewDeviceActionButtonStyle}"
+                                <Button Style="{StaticResource FlatButtonStyle}"
                                         HorizontalAlignment="Center"
                                         Command="{Binding RetryCommand}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,6,0"/>
-                                        <TextBlock Text="{DynamicResource ViewDevice_Retry}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
+                                        <materialDesign:PackIcon Kind="Refresh"
+                                                                 Width="16"
+                                                                 Height="16"
+                                                                 Margin="0,0,6,0"/>
+                                        <TextBlock Text="{DynamicResource ViewDevice_Retry}"/>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -176,258 +173,110 @@
                     </Grid>
                 </Border>
 
-                <Border x:Name="ActionsPanel"
+                <Border x:Name="ToolbarPanel"
                         Grid.Column="1"
                         Background="{DynamicResource Brush.SurfaceAlt}"
                         BorderBrush="{DynamicResource Brush.Border}"
                         BorderThickness="1,0,0,0">
                     <Grid>
-                        <Grid Visibility="{Binding IsFullscreen, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                            <Grid Visibility="{Binding IsActionsPanelExpanded, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <StackPanel Grid.Row="0"
-                                            HorizontalAlignment="Center"
-                                            Margin="0,8,0,0">
-                                    <Button Width="36"
-                                            Height="30"
-                                            Padding="0"
-                                            Margin="0,0,0,8"
-                                            Style="{StaticResource FlatButtonStyle}"
-                                            Focusable="False"
-                                            Command="{Binding ToggleActionsPanelCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_ExpandActions}">
-                                        <materialDesign:PackIcon Kind="ChevronDoubleRight" Width="17" Height="17"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceIconButtonStyle}"
-                                            Command="{Binding VolumeDownCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_VolumeDown}">
-                                        <materialDesign:PackIcon Kind="VolumeMinus" Width="18" Height="18"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceIconButtonStyle}"
-                                            Command="{Binding VolumeUpCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_VolumeUp}">
-                                        <materialDesign:PackIcon Kind="VolumePlus" Width="18" Height="18"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceIconButtonStyle}"
-                                            Command="{Binding ScreenshotCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_Screenshot}">
-                                        <materialDesign:PackIcon Kind="Camera" Width="18" Height="18"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceIconButtonStyle}"
-                                            Command="{Binding PowerCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_Power}">
-                                        <materialDesign:PackIcon Kind="Power" Width="18" Height="18"/>
-                                    </Button>
-                                </StackPanel>
-                                <StackPanel Grid.Row="2"
-                                            HorizontalAlignment="Center"
-                                            Margin="0,0,0,8">
-                                    <Button Width="40"
-                                            Height="34"
-                                            Padding="0"
-                                            Margin="0,0,0,4"
-                                            Style="{StaticResource FlatButtonStyle}"
-                                            Focusable="False"
-                                            Command="{Binding ReconnectCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_Reconnect}">
-                                        <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18"/>
-                                    </Button>
-                                    <Button Width="40"
-                                            Height="34"
-                                            Padding="0"
-                                            Style="{StaticResource FlatButtonStyle}"
-                                            Focusable="False"
-                                            Command="{Binding ToggleFullscreenCommand}"
-                                            ToolTip="{DynamicResource ViewDevice_Fullscreen}">
-                                        <materialDesign:PackIcon Kind="Fullscreen" Width="18" Height="18"/>
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                            <Grid Margin="14,10"
-                                  Visibility="{Binding IsActionsPanelExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid Grid.Row="0" Margin="0,0,0,18">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{DynamicResource ViewDevice_Actions}"
-                                           FontWeight="SemiBold"
-                                           VerticalAlignment="Center"/>
-                                <Button Grid.Column="1"
-                                        Width="32"
-                                        Height="28"
-                                        Padding="0"
-                                        Style="{StaticResource FlatButtonStyle}"
-                                        Focusable="False"
-                                        Command="{Binding ToggleActionsPanelCommand}"
-                                        ToolTip="{DynamicResource ViewDevice_CollapseActions}">
-                                    <materialDesign:PackIcon Kind="ChevronDoubleLeft" Width="17" Height="17"/>
-                                </Button>
-                            </Grid>
+                        <StackPanel Grid.Row="0">
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding ToggleFullscreenCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Fullscreen}">
+                                <materialDesign:PackIcon Kind="Fullscreen"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding RotateCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Rotate}">
+                                <materialDesign:PackIcon Kind="ScreenRotation"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Separator/>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding ScreenOnCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_ScreenOn}">
+                                <materialDesign:PackIcon Kind="Brightness7"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding ScreenOffCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_ScreenOff}">
+                                <materialDesign:PackIcon Kind="Brightness4"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding PowerCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Power}">
+                                <materialDesign:PackIcon Kind="Power"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Separator/>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding VolumeUpCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_VolumeUp}">
+                                <materialDesign:PackIcon Kind="VolumePlus"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding VolumeDownCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_VolumeDown}">
+                                <materialDesign:PackIcon Kind="VolumeMinus"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding ScreenshotCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Screenshot}">
+                                <materialDesign:PackIcon Kind="Camera"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding ReconnectCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Reconnect}">
+                                <materialDesign:PackIcon Kind="Refresh"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                        </StackPanel>
 
-                            <StackPanel Grid.Row="1" Margin="0,0,0,18">
-                                <TextBlock Text="{DynamicResource ViewDevice_InputText}"
-                                           Margin="0,0,0,7"
-                                           FontSize="{StaticResource Metric.FontSize.Small}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Brush.TextSecondary}"/>
-                                <TextBox x:Name="TextEntry"
-                                         MinHeight="36"
-                                         Padding="8,5"
-                                         ToolTip="{DynamicResource ViewDevice_TextInputHint}"
-                                         materialDesign:HintAssist.Hint="{DynamicResource ViewDevice_TextInputHint}"/>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0"
-                                            Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                            Command="{Binding SendTextCommand}"
-                                            CommandParameter="{Binding Text, ElementName=TextEntry}">
-                                        <TextBlock Text="{DynamicResource ViewDevice_SendText}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                    </Button>
-                                    <Button Grid.Column="2"
-                                            Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                            Command="{Binding SendEnterCommand}">
-                                        <TextBlock Text="{DynamicResource ViewDevice_Enter}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                    </Button>
-                                </Grid>
-                                <Button Margin="0,8,0,0"
-                                        Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                        Command="{Binding RunAdbShellCommand}"
-                                        CommandParameter="{Binding Text, ElementName=TextEntry}">
-                                    <TextBlock Text="{DynamicResource ViewDevice_RunAdbShell}"
-                                               Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                </Button>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="2">
-                                <TextBlock Text="{DynamicResource ViewDevice_Device}"
-                                           Margin="0,0,0,7"
-                                           FontSize="{StaticResource Metric.FontSize.Small}"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Brush.TextSecondary}"/>
-                                <UniformGrid Columns="2" Rows="2">
-                                    <Button Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                            Margin="0,0,4,6"
-                                            Command="{Binding VolumeDownCommand}">
-                                        <TextBlock Text="{DynamicResource ViewDevice_VolumeDown}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                            Margin="4,0,0,6"
-                                            Command="{Binding VolumeUpCommand}">
-                                        <TextBlock Text="{DynamicResource ViewDevice_VolumeUp}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                            Margin="0,0,4,0"
-                                            Command="{Binding ScreenshotCommand}">
-                                        <TextBlock Text="{DynamicResource ViewDevice_Screenshot}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                    </Button>
-                                    <Button Style="{StaticResource ViewDeviceActionButtonStyle}"
-                                            Margin="4,0,0,0"
-                                            Command="{Binding PowerCommand}">
-                                        <TextBlock Text="{DynamicResource ViewDevice_Power}"
-                                                   Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                                    </Button>
-                                </UniformGrid>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Width="40"
-                                        Height="34"
-                                        Padding="0"
-                                        Margin="0,0,6,0"
-                                        Style="{StaticResource FlatButtonStyle}"
-                                        Focusable="False"
-                                        Command="{Binding ReconnectCommand}"
-                                        ToolTip="{DynamicResource ViewDevice_Reconnect}">
-                                    <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18"/>
-                                </Button>
-                                <Button Width="40"
-                                        Height="34"
-                                        Padding="0"
-                                        Style="{StaticResource FlatButtonStyle}"
-                                        Focusable="False"
-                                        Command="{Binding ToggleFullscreenCommand}"
-                                        ToolTip="{DynamicResource ViewDevice_Fullscreen}">
-                                    <materialDesign:PackIcon Kind="Fullscreen" Width="18" Height="18"/>
-                                </Button>
-                            </StackPanel>
-                            </Grid>
-                        </Grid>
-
-                        <Button Width="36"
-                                Height="34"
-                                Padding="0"
-                                Margin="0,8,0,0"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Top"
-                                Style="{StaticResource FlatButtonStyle}"
-                                Focusable="False"
-                                Command="{Binding ToggleFullscreenCommand}"
-                                ToolTip="{DynamicResource ViewDevice_ExitFullscreen}"
-                                Visibility="{Binding IsFullscreen, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <materialDesign:PackIcon Kind="FullscreenExit" Width="18" Height="18"/>
-                        </Button>
+                        <StackPanel Grid.Row="1">
+                            <Separator/>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding RecentCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Recent}">
+                                <materialDesign:PackIcon Kind="Apps"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding HomeCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Home}">
+                                <materialDesign:PackIcon Kind="Home"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                            <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
+                                    Command="{Binding BackCommand}"
+                                    ToolTip="{DynamicResource ViewDevice_Back}">
+                                <materialDesign:PackIcon Kind="ArrowLeft"
+                                                         Width="20"
+                                                         Height="20"/>
+                            </Button>
+                        </StackPanel>
                     </Grid>
-                </Border>
-            </Grid>
-
-            <Grid x:Name="NavigationPanel" Grid.Row="2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="{Binding ActualWidth, ElementName=ActionsPanel}"/>
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0"
-                        Padding="8"
-                        Background="{DynamicResource Brush.Surface}"
-                        BorderBrush="{DynamicResource Brush.Border}"
-                        BorderThickness="0,1,0,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Style="{StaticResource ViewDeviceNavButtonStyle}"
-                                Command="{Binding BackCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="ArrowLeft" Width="16" Height="16" Margin="0,0,6,0"/>
-                                <TextBlock Text="{DynamicResource ViewDevice_Back}"
-                                           Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ViewDeviceNavButtonStyle}"
-                                Command="{Binding HomeCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Home" Width="16" Height="16" Margin="0,0,6,0"/>
-                                <TextBlock Text="{DynamicResource ViewDevice_Home}"
-                                           Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource ViewDeviceNavButtonStyle}"
-                                Command="{Binding RecentCommand}">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Apps" Width="16" Height="16" Margin="0,0,6,0"/>
-                                <TextBlock Text="{DynamicResource ViewDevice_Recent}"
-                                           Style="{StaticResource ViewDeviceButtonTextStyle}"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
                 </Border>
             </Grid>
         </Grid>

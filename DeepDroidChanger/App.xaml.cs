@@ -130,6 +130,13 @@ public sealed partial class App : Application
             AppContext.BaseDirectory,
             serviceProvider.GetRequiredService<AdbToolPathResolver>().GetAdbPath()));
         services.AddSingleton<IViewDeviceSessionFactory, ViewDeviceSessionFactory>();
+        services.AddSingleton<ScrcpyNetRuntimeResolver>(serviceProvider => new ScrcpyNetRuntimeResolver(
+            AppContext.BaseDirectory,
+            serviceProvider.GetRequiredService<AdbToolPathResolver>().GetAdbPath()));
+        services.AddSingleton<ISharpAdbDeviceResolver>(serviceProvider => new SharpAdbDeviceResolver(
+            serviceProvider.GetRequiredService<AdbToolPathResolver>().GetAdbPath()));
+        services.AddSingleton<IScrcpyNetClientFactory, ScrcpyNetClientFactory>();
+        services.AddSingleton<ISingleViewDeviceSessionFactory, ScrcpyNetSingleViewDeviceSessionFactory>();
         services.AddSingleton<IViewDeviceWindowService, ViewDeviceWindowService>();
         services.AddSingleton<IViewDeviceScreenshotService, ViewDeviceScreenshotService>();
         services.AddSingleton<IUiDispatcherService, UiDispatcherService>();

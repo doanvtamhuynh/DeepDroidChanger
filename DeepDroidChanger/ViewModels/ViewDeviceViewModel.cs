@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DeepDroidChanger.Models;
@@ -21,7 +22,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         TimeSpan.FromSeconds(5)
     ];
 
-    private readonly IViewDeviceSessionFactory _sessionFactory;
+    private readonly ISingleViewDeviceSessionFactory _sessionFactory;
     private readonly IAdbDeviceTrackerService _deviceTracker;
     private readonly IAdbCommandService _adbCommandService;
     private readonly IFilePickerDialogService _filePicker;
@@ -32,17 +33,17 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly object _evaluationSchedulingGate = new();
+
     private CancellationTokenSource? _pendingEvaluationCancellation;
     private Task _pendingEvaluationTask = Task.CompletedTask;
-    private IViewDeviceSession? _session;
+    private ISingleViewDeviceSession? _session;
     private string _serial = string.Empty;
     private string _deviceName = string.Empty;
     private ViewDeviceSessionState _state = ViewDeviceSessionState.Created;
     private string _statusText = string.Empty;
-    private IntPtr _nativeWindowHandle;
+    private ScrcpyNet.Scrcpy? _scrcpyClient;
     private int _contentWidth;
     private int _contentHeight;
-    private bool _isActionsPanelExpanded;
     private bool _isFullscreen;
     private bool _hasRun;
     private int _restartAttempt;
@@ -51,7 +52,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     private int _disposed;
 
     public ViewDeviceViewModel(
-        IViewDeviceSessionFactory sessionFactory,
+        ISingleViewDeviceSessionFactory sessionFactory,
         IAdbDeviceTrackerService deviceTracker,
         IAdbCommandService adbCommandService,
         IFilePickerDialogService filePicker,
@@ -71,23 +72,19 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
         RetryCommand = new AsyncRelayCommand(RetryAsync, CanRetry);
         ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, CanReconnect);
-        BackCommand = new AsyncRelayCommand(() => SendKeyAsync(4), CanInteract);
+        BackCommand = new AsyncRelayCommand(SendBackAsync, CanInteract);
         HomeCommand = new AsyncRelayCommand(() => SendKeyAsync(3), CanInteract);
         RecentCommand = new AsyncRelayCommand(() => SendKeyAsync(187), CanInteract);
         PowerCommand = new AsyncRelayCommand(() => SendKeyAsync(26), CanInteract);
         VolumeUpCommand = new AsyncRelayCommand(() => SendKeyAsync(24), CanInteract);
         VolumeDownCommand = new AsyncRelayCommand(() => SendKeyAsync(25), CanInteract);
-        SendTextCommand = new AsyncRelayCommand<string?>(SendTextAsync, _ => CanInteract());
-        SendEnterCommand = new AsyncRelayCommand(() => SendKeyAsync(66), CanInteract);
-        RunAdbShellCommand = new AsyncRelayCommand<string?>(RunAdbShellAsync, _ => CanInteract());
+        RotateCommand = new AsyncRelayCommand(RotateAsync, CanInteract);
+        ScreenOnCommand = new AsyncRelayCommand(ScreenOnAsync, CanInteract);
+        ScreenOffCommand = new AsyncRelayCommand(ScreenOffAsync, CanInteract);
         ScreenshotCommand = new AsyncRelayCommand(SaveScreenshotAsync, CanInteract);
-        ToggleActionsPanelCommand = new RelayCommand(() => IsActionsPanelExpanded = !IsActionsPanelExpanded);
         ToggleFullscreenCommand = new RelayCommand(() => IsFullscreen = !IsFullscreen);
         StatusText = GetStateText(State);
     }
-
-    public event EventHandler? NativeWindowHandleChanged;
-    public event EventHandler? NativeFocusRequested;
 
     public string Serial
     {
@@ -122,14 +119,10 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         private set => SetProperty(ref _statusText, value);
     }
 
-    public IntPtr NativeWindowHandle
+    public ScrcpyNet.Scrcpy? ScrcpyClient
     {
-        get => _nativeWindowHandle;
-        private set
-        {
-            if (SetProperty(ref _nativeWindowHandle, value))
-                NativeWindowHandleChanged?.Invoke(this, EventArgs.Empty);
-        }
+        get => _scrcpyClient;
+        private set => SetProperty(ref _scrcpyClient, value);
     }
 
     public int ContentWidth
@@ -151,12 +144,6 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     public bool IsRunning => State == ViewDeviceSessionState.Running;
     public bool IsUnavailable => !IsRunning;
 
-    public bool IsActionsPanelExpanded
-    {
-        get => _isActionsPanelExpanded;
-        set => SetProperty(ref _isActionsPanelExpanded, value);
-    }
-
     public bool IsFullscreen
     {
         get => _isFullscreen;
@@ -171,11 +158,10 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     public IAsyncRelayCommand PowerCommand { get; }
     public IAsyncRelayCommand VolumeUpCommand { get; }
     public IAsyncRelayCommand VolumeDownCommand { get; }
-    public IAsyncRelayCommand<string?> SendTextCommand { get; }
-    public IAsyncRelayCommand SendEnterCommand { get; }
-    public IAsyncRelayCommand<string?> RunAdbShellCommand { get; }
+    public IAsyncRelayCommand RotateCommand { get; }
+    public IAsyncRelayCommand ScreenOnCommand { get; }
+    public IAsyncRelayCommand ScreenOffCommand { get; }
     public IAsyncRelayCommand ScreenshotCommand { get; }
-    public IRelayCommand ToggleActionsPanelCommand { get; }
     public IRelayCommand ToggleFullscreenCommand { get; }
 
     public async Task InitializeAsync(
@@ -191,6 +177,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         State = ViewDeviceSessionState.CheckingDevice;
         _deviceTracker.DeviceStateChanged += OnDeviceStateChanged;
         _deviceTracker.HealthChanged += OnTrackerHealthChanged;
+        _localization.LanguageChanged += OnLanguageChanged;
 
         using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -212,6 +199,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
         _deviceTracker.DeviceStateChanged -= OnDeviceStateChanged;
         _deviceTracker.HealthChanged -= OnTrackerHealthChanged;
+        _localization.LanguageChanged -= OnLanguageChanged;
         _lifetimeCancellation.Cancel();
         Interlocked.Increment(ref _generation);
 
@@ -246,31 +234,6 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
-    internal async Task HandleNativeHostFailureAsync(Exception exception)
-    {
-        if (Volatile.Read(ref _disposed) != 0)
-            return;
-
-        _logger.LogWarning(exception, "Failed to embed the scrcpy window for {Serial}.", Serial);
-        Interlocked.Increment(ref _generation);
-
-        await _transitionGate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
-        try
-        {
-            if (Volatile.Read(ref _disposed) != 0)
-                return;
-
-            await StopCurrentSessionAsync(CancellationToken.None).ConfigureAwait(true);
-            await SetStateAsync(ViewDeviceSessionState.Failed, CancellationToken.None).ConfigureAwait(true);
-        }
-        finally
-        {
-            _transitionGate.Release();
-        }
-
-        ScheduleRestartAfterFailure();
-    }
-
     private Task RetryAsync()
     {
         return QueueEvaluationAsync(TimeSpan.Zero, resetRestartAttempt: true);
@@ -291,7 +254,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             try
             {
                 if (Volatile.Read(ref _disposed) != 0 ||
-                    _session?.State != ViewDeviceSessionState.Running)
+                    _session?.State != SingleViewDeviceSessionState.Running)
                 {
                     return;
                 }
@@ -402,7 +365,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
             if (_deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
             {
-                if (_session?.State == ViewDeviceSessionState.Running)
+                if (_session?.State == SingleViewDeviceSessionState.Running)
                     return;
 
                 await SetStateAsync(ViewDeviceSessionState.AdbUnavailable, cancellationToken).ConfigureAwait(false);
@@ -424,7 +387,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
                 return;
             }
 
-            if (_session?.State == ViewDeviceSessionState.Running)
+            if (_session?.State == SingleViewDeviceSessionState.Running)
                 return;
 
             await StartSessionAsync(generation, cancellationToken).ConfigureAwait(false);
@@ -463,14 +426,14 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        IViewDeviceSession session = _sessionFactory.Create(new ViewDeviceLaunchOptions(Serial));
-        _session = session;
-        session.NativeWindowReady += OnSessionNativeWindowReady;
-        session.ContentSizeChanged += OnSessionContentSizeChanged;
-        session.Exited += OnSessionExited;
-
+        ISingleViewDeviceSession? session = null;
         try
         {
+            session = _sessionFactory.Create(new ViewDeviceLaunchOptions(Serial));
+            _session = session;
+            session.ContentSizeChanged += OnSessionContentSizeChanged;
+            session.Exited += OnSessionExited;
+
             await session.StartAsync(cancellationToken).ConfigureAwait(false);
             if (requireCurrentGeneration && generation != Volatile.Read(ref _generation))
             {
@@ -480,7 +443,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
             _hasRun = true;
             Interlocked.Exchange(ref _restartAttempt, 0);
-            await SetNativeWindowAsync(session.NativeWindowHandle, cancellationToken).ConfigureAwait(false);
+            await SetScrcpyClientAsync(session.Client, cancellationToken).ConfigureAwait(false);
             await SetContentSizeAsync(session.ContentWidth, session.ContentHeight, cancellationToken).ConfigureAwait(false);
             await SetStateAsync(ViewDeviceSessionState.Running, cancellationToken).ConfigureAwait(false);
         }
@@ -493,9 +456,9 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         {
             _logger.LogWarning(
                 exception,
-                "Official scrcpy startup failed for {Serial}. Diagnostics: {Diagnostics}",
+                "ScrcpyNet startup failed for {Serial}. Diagnostics: {Diagnostics}",
                 Serial,
-                string.Join(" | ", session.RecentDiagnostics));
+                session is null ? string.Empty : string.Join(" | ", session.RecentDiagnostics));
             await StopCurrentSessionAsync(CancellationToken.None).ConfigureAwait(false);
             await SetStateAsync(ViewDeviceSessionState.Failed, CancellationToken.None).ConfigureAwait(false);
             ScheduleRestartAfterFailure();
@@ -504,15 +467,14 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
     private async Task StopCurrentSessionAsync(CancellationToken cancellationToken)
     {
-        IViewDeviceSession? session = _session;
+        ISingleViewDeviceSession? session = _session;
         if (session is null)
         {
-            await SetNativeWindowAsync(IntPtr.Zero, CancellationToken.None).ConfigureAwait(false);
+            await SetScrcpyClientAsync(null, CancellationToken.None).ConfigureAwait(false);
             return;
         }
 
         _session = null;
-        session.NativeWindowReady -= OnSessionNativeWindowReady;
         session.ContentSizeChanged -= OnSessionContentSizeChanged;
         session.Exited -= OnSessionExited;
         try
@@ -532,7 +494,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             }
             finally
             {
-                await SetNativeWindowAsync(IntPtr.Zero, CancellationToken.None).ConfigureAwait(false);
+                await SetScrcpyClientAsync(null, CancellationToken.None).ConfigureAwait(false);
             }
         }
     }
@@ -553,13 +515,16 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         _ = QueueEvaluationAsync(TimeSpan.Zero);
     }
 
-    private void OnSessionNativeWindowReady(object? sender, EventArgs eventArgs)
+    private void OnLanguageChanged(object? sender, EventArgs eventArgs)
     {
-        if (sender is IViewDeviceSession session && ReferenceEquals(session, _session))
-            _ = SetNativeWindowAsync(session.NativeWindowHandle, CancellationToken.None);
+        _ = _uiDispatcher.InvokeAsync(
+            () => StatusText = GetStateText(State),
+            CancellationToken.None);
     }
 
-    private void OnSessionContentSizeChanged(object? sender, ViewDeviceContentSizeChangedEventArgs eventArgs)
+    private void OnSessionContentSizeChanged(
+        object? sender,
+        SingleViewDeviceContentSizeChangedEventArgs eventArgs)
     {
         if (ReferenceEquals(sender, _session))
             _ = SetContentSizeAsync(eventArgs.Width, eventArgs.Height, CancellationToken.None);
@@ -570,15 +535,21 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         if (!ReferenceEquals(sender, _session) || Volatile.Read(ref _disposed) != 0)
             return;
 
-        _logger.LogInformation("Official scrcpy process exited for {Serial}; scheduling an isolated restart.", Serial);
-        _ = SetNativeWindowAsync(IntPtr.Zero, CancellationToken.None);
+        _logger.LogInformation("ScrcpyNet session exited for {Serial}; scheduling an isolated restart.", Serial);
+        _ = SetScrcpyClientAsync(null, CancellationToken.None);
         _ = SetStateAsync(ViewDeviceSessionState.Reconnecting, CancellationToken.None);
         ScheduleRestartAfterFailure();
     }
 
     private void ScheduleRestartAfterFailure()
     {
-        int attempt = Math.Min(Interlocked.Increment(ref _restartAttempt) - 1, RestartDelays.Length - 1);
+        int attempt = Interlocked.Increment(ref _restartAttempt) - 1;
+        if (attempt >= RestartDelays.Length)
+        {
+            _ = SetStateAsync(ViewDeviceSessionState.Failed, CancellationToken.None);
+            return;
+        }
+
         _ = QueueEvaluationAsync(RestartDelays[attempt]);
     }
 
@@ -593,7 +564,59 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    private async Task SendBackAsync()
+    {
+        if (!CanInteract())
+            return;
+
+        ISingleViewDeviceSession? session = _session;
+        if (session is null)
+            return;
+
+        try
+        {
+            await session.SendBackOrScreenOnAsync(_lifetimeCancellation.Token).ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning(exception, "View Device Back action failed for {Serial}.", Serial);
+        }
+    }
+
     private async Task SendKeyAsync(int keyCode)
+    {
+        if (!CanInteract())
+            return;
+
+        ISingleViewDeviceSession? session = _session;
+        if (session is null)
+            return;
+
+        try
+        {
+            await session.SendKeyEventAsync(keyCode, _lifetimeCancellation.Token).ConfigureAwait(true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                exception,
+                "View Device key action {KeyCode} failed for {Serial}.",
+                keyCode,
+                Serial);
+        }
+    }
+
+    private Task ScreenOnAsync()
+    {
+        return SendAdbKeyAsync(224, "screen on");
+    }
+
+    private Task ScreenOffAsync()
+    {
+        return SendAdbKeyAsync(26, "screen off");
+    }
+
+    private async Task SendAdbKeyAsync(int keyCode, string actionName)
     {
         if (!CanInteract())
             return;
@@ -603,56 +626,51 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             await _adbCommandService
                 .SendKeyEventAsync(Serial, keyCode, _lifetimeCancellation.Token)
                 .ConfigureAwait(true);
-            NativeFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _logger.LogWarning(exception, "View Device key action failed for {Serial}.", Serial);
+            _logger.LogWarning(exception, "View Device {ActionName} action failed for {Serial}.", actionName, Serial);
         }
     }
 
-    private async Task SendTextAsync(string? text)
+    private async Task RotateAsync()
     {
-        if (!CanInteract() || string.IsNullOrEmpty(text))
+        if (!CanInteract())
             return;
 
         try
         {
+            string? currentValue = await _adbCommandService
+                .GetSettingAsync(Serial, "system", "user_rotation", _lifetimeCancellation.Token)
+                .ConfigureAwait(true);
+            int currentRotation = int.TryParse(
+                currentValue,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out int parsedRotation)
+                ? Math.Clamp(parsedRotation, 0, 3)
+                : 0;
+
             await _adbCommandService
-                .SendTextAsync(Serial, text, _lifetimeCancellation.Token)
+                .PutSettingAsync(
+                    Serial,
+                    "system",
+                    "accelerometer_rotation",
+                    "0",
+                    _lifetimeCancellation.Token)
                 .ConfigureAwait(true);
-            NativeFocusRequested?.Invoke(this, EventArgs.Empty);
+            await _adbCommandService
+                .PutSettingAsync(
+                    Serial,
+                    "system",
+                    "user_rotation",
+                    ((currentRotation + 1) % 4).ToString(CultureInfo.InvariantCulture),
+                    _lifetimeCancellation.Token)
+                .ConfigureAwait(true);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _logger.LogWarning(exception, "View Device text input failed for {Serial}.", Serial);
-        }
-    }
-
-    private async Task RunAdbShellAsync(string? command)
-    {
-        if (!CanInteract() || string.IsNullOrWhiteSpace(command))
-            return;
-
-        try
-        {
-            CommandResult result = await _adbCommandService
-                .RunAdbShellAsync(Serial, command.Trim(), _lifetimeCancellation.Token)
-                .ConfigureAwait(true);
-            if (result.ExitCode != 0)
-            {
-                _logger.LogWarning(
-                    "View Device ADB shell command exited with code {ExitCode} for {Serial}.",
-                    result.ExitCode,
-                    Serial);
-            }
-        }
-        catch (OperationCanceledException) when (_lifetimeCancellation.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            _logger.LogWarning(exception, "View Device ADB shell command failed for {Serial}.", Serial);
+            _logger.LogWarning(exception, "View Device rotation failed for {Serial}.", Serial);
         }
     }
 
@@ -674,7 +692,6 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             await _screenshotService
                 .CapturePngAsync(Serial, path, _lifetimeCancellation.Token)
                 .ConfigureAwait(true);
-            NativeFocusRequested?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -687,9 +704,9 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         return _uiDispatcher.InvokeAsync(() => State = state, cancellationToken);
     }
 
-    private Task SetNativeWindowAsync(IntPtr handle, CancellationToken cancellationToken)
+    private Task SetScrcpyClientAsync(ScrcpyNet.Scrcpy? client, CancellationToken cancellationToken)
     {
-        return _uiDispatcher.InvokeAsync(() => NativeWindowHandle = handle, cancellationToken);
+        return _uiDispatcher.InvokeAsync(() => ScrcpyClient = client, cancellationToken);
     }
 
     private Task SetContentSizeAsync(int width, int height, CancellationToken cancellationToken)
@@ -699,6 +716,9 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
         return _uiDispatcher.InvokeAsync(() =>
         {
+            if (ContentWidth == width && ContentHeight == height)
+                return;
+
             ContentWidth = width;
             ContentHeight = height;
             OnPropertyChanged(nameof(DeviceAspectRatio));
@@ -722,7 +742,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     private bool CanReconnect()
     {
         return State == ViewDeviceSessionState.Running &&
-               _session?.State == ViewDeviceSessionState.Running &&
+               _session?.State == SingleViewDeviceSessionState.Running &&
                Volatile.Read(ref _manualReconnectActive) == 0 &&
                Volatile.Read(ref _disposed) == 0;
     }
@@ -737,9 +757,9 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         PowerCommand.NotifyCanExecuteChanged();
         VolumeUpCommand.NotifyCanExecuteChanged();
         VolumeDownCommand.NotifyCanExecuteChanged();
-        SendTextCommand.NotifyCanExecuteChanged();
-        SendEnterCommand.NotifyCanExecuteChanged();
-        RunAdbShellCommand.NotifyCanExecuteChanged();
+        RotateCommand.NotifyCanExecuteChanged();
+        ScreenOnCommand.NotifyCanExecuteChanged();
+        ScreenOffCommand.NotifyCanExecuteChanged();
         ScreenshotCommand.NotifyCanExecuteChanged();
     }
 

@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Tests.Fakes;
 using DeepDroidChanger.ViewDevices.Contracts;
 using DeepDroidChanger.ViewDevices.Models;
 using DeepDroidChanger.ViewModels;
+using ScrcpyNet;
 using NSubstitute;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.ViewDevices;
@@ -41,10 +43,11 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
-    public async Task InitializeAsync_OnlineDevice_StartsOneSession()
+    public async Task InitializeAsync_OnlineDevice_StartsSessionAndPublishesScrcpyClient()
     {
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
-        var session = new FakeSession(Serial);
+        Scrcpy client = CreateUninitializedScrcpy();
+        var session = new FakeSession(Serial, client);
         var factory = new FakeSessionFactory(session);
         await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
 
@@ -53,6 +56,7 @@ public sealed class ViewDeviceViewModelTests
         Assert.AreEqual(ViewDeviceSessionState.Running, viewModel.State);
         Assert.AreEqual(1, factory.CreateCount);
         Assert.AreEqual(1, session.StartCount);
+        Assert.AreSame(client, viewModel.ScrcpyClient);
     }
 
     [TestMethod]
@@ -113,10 +117,10 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
-    public async Task RunningDevice_BecomesOffline_StopsSessionAndWaitsForDevice()
+    public async Task RunningDevice_BecomesOffline_StopsSessionClearsClientAndWaitsForDevice()
     {
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
-        var session = new FakeSession(Serial);
+        var session = new FakeSession(Serial, CreateUninitializedScrcpy());
         var factory = new FakeSessionFactory(session);
         await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
         await viewModel.InitializeAsync(Serial, "Device");
@@ -128,6 +132,7 @@ public sealed class ViewDeviceViewModelTests
 
         Assert.AreEqual(1, session.StopCount);
         Assert.AreEqual(1, session.DisposeCount);
+        Assert.IsNull(viewModel.ScrcpyClient);
         Assert.AreEqual(1, factory.CreateCount);
     }
 
@@ -186,23 +191,22 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
-    public async Task ReconnectCommand_WhileSessionIsStopping_KeepsNativeHandleUntilStopCompletes()
+    public async Task ReconnectCommand_WhileSessionIsStopping_PreservesClientUntilStopCompletes()
     {
         TaskCompletionSource stopGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Scrcpy client = CreateUninitializedScrcpy();
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
-        var first = new FakeSession(Serial, stopGate: stopGate);
+        var first = new FakeSession(Serial, client, stopGate: stopGate);
         var second = new FakeSession(Serial);
         var factory = new FakeSessionFactory(first, second);
         await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
         await viewModel.InitializeAsync(Serial, "Device");
-        IntPtr runningHandle = viewModel.NativeWindowHandle;
 
         Task reconnect = viewModel.ReconnectCommand.ExecuteAsync(null);
         await WaitUntilAsync(() => first.StopCount == 1, TimeSpan.FromSeconds(2));
         try
         {
-            Assert.AreNotEqual(IntPtr.Zero, runningHandle);
-            Assert.AreEqual(runningHandle, viewModel.NativeWindowHandle);
+            Assert.AreSame(client, viewModel.ScrcpyClient);
         }
         finally
         {
@@ -217,7 +221,7 @@ public sealed class ViewDeviceViewModelTests
         TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
         var first = new FakeSession(Serial);
-        var second = new FakeSession(Serial, startGate);
+        var second = new FakeSession(Serial, startGate: startGate);
         var unusedThird = new FakeSession(Serial);
         var factory = new FakeSessionFactory(first, second, unusedThird);
         await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
@@ -243,10 +247,76 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
-    public async Task DisposeAsync_RunningSession_StopsOnceAndDoesNotCreateReplacement()
+    public async Task NavigationCommands_SendExactlyOneLogicalActionEach()
     {
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
         var session = new FakeSession(Serial);
+        var factory = new FakeSessionFactory(session);
+        await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
+        await viewModel.InitializeAsync(Serial, "Device");
+
+        await viewModel.BackCommand.ExecuteAsync(null);
+        await viewModel.HomeCommand.ExecuteAsync(null);
+        await viewModel.RecentCommand.ExecuteAsync(null);
+        await viewModel.PowerCommand.ExecuteAsync(null);
+        await viewModel.VolumeUpCommand.ExecuteAsync(null);
+        await viewModel.VolumeDownCommand.ExecuteAsync(null);
+
+        CollectionAssert.AreEqual(
+            new[] { "back", "key:3", "key:187", "key:26", "key:24", "key:25" },
+            session.Actions);
+    }
+
+    [TestMethod]
+    public async Task SessionContentSizeChange_UpdatesDeviceAspectRatio()
+    {
+        var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
+        var session = new FakeSession(Serial);
+        var factory = new FakeSessionFactory(session);
+        await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
+        await viewModel.InitializeAsync(Serial, "Device");
+
+        session.RaiseContentSize(1080, 2220);
+
+        await WaitUntilAsync(
+            () => viewModel.ContentWidth == 1080 && viewModel.ContentHeight == 2220,
+            TimeSpan.FromSeconds(1));
+
+        Assert.AreEqual(1080d / 2220d, viewModel.DeviceAspectRatio, 0.000001d);
+    }
+
+    [TestMethod]
+    public async Task LanguageChanged_RefreshesStatusText()
+    {
+        var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Offline));
+        var factory = new FakeSessionFactory(new FakeSession(Serial));
+        ILocalizationService localization = Substitute.For<ILocalizationService>();
+        int waitingStatusVersion = 0;
+        localization.GetString(Arg.Any<string>()).Returns(call =>
+        {
+            string key = call.Arg<string>();
+            return key == "ViewDevice_StatusWaitingForDevice"
+                ? $"waiting-{++waitingStatusVersion}"
+                : key;
+        });
+        await using ViewDeviceViewModel viewModel = CreateViewModel(
+            tracker,
+            factory,
+            localization: localization);
+        await viewModel.InitializeAsync(Serial, "Device");
+
+        string before = viewModel.StatusText;
+        localization.LanguageChanged += Raise.Event<EventHandler>(localization, EventArgs.Empty);
+
+        Assert.AreNotEqual(before, viewModel.StatusText);
+        Assert.AreEqual("waiting-2", viewModel.StatusText);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_RunningSession_StopsOnceAndDoesNotCreateReplacement()
+    {
+        var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
+        var session = new FakeSession(Serial, CreateUninitializedScrcpy());
         var factory = new FakeSessionFactory(session);
         ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory);
         try
@@ -258,7 +328,7 @@ public sealed class ViewDeviceViewModelTests
             await Task.Delay(TimeSpan.FromMilliseconds(650));
 
             Assert.AreEqual(ViewDeviceSessionState.Closed, viewModel.State);
-            Assert.AreEqual(IntPtr.Zero, viewModel.NativeWindowHandle);
+            Assert.IsNull(viewModel.ScrcpyClient);
             Assert.AreEqual(1, factory.CreateCount);
             Assert.AreEqual(1, session.StopCount);
             Assert.AreEqual(1, session.DisposeCount);
@@ -271,16 +341,15 @@ public sealed class ViewDeviceViewModelTests
 
     private static ViewDeviceViewModel CreateViewModel(
         IAdbDeviceTrackerService tracker,
-        IViewDeviceSessionFactory factory,
-        IAdbCommandService? adb = null)
+        ISingleViewDeviceSessionFactory factory,
+        IAdbCommandService? adb = null,
+        ILocalizationService? localization = null)
     {
-        if (adb is null)
-        {
-            adb = Substitute.For<IAdbCommandService>();
-            adb.RunAdbAsync(Serial, "get-state", Arg.Any<CancellationToken>())
-                .Returns(new CommandResult(0, "device", string.Empty));
-        }
-        ILocalizationService localization = Substitute.For<ILocalizationService>();
+        adb ??= Substitute.For<IAdbCommandService>();
+        adb.RunAdbAsync(Serial, "get-state", Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, "device", string.Empty));
+
+        localization ??= Substitute.For<ILocalizationService>();
         localization.GetString(Arg.Any<string>()).Returns(call => call.Arg<string>());
 
         return new ViewDeviceViewModel(
@@ -292,6 +361,11 @@ public sealed class ViewDeviceViewModelTests
             localization,
             new ImmediateDispatcher(),
             new TestLogger<ViewDeviceViewModel>());
+    }
+
+    private static Scrcpy CreateUninitializedScrcpy()
+    {
+        return (Scrcpy)RuntimeHelpers.GetUninitializedObject(typeof(Scrcpy));
     }
 
     private static async Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
@@ -359,13 +433,13 @@ public sealed class ViewDeviceViewModelTests
         }
     }
 
-    private sealed class FakeSessionFactory(params FakeSession[] sessions) : IViewDeviceSessionFactory
+    private sealed class FakeSessionFactory(params FakeSession[] sessions) : ISingleViewDeviceSessionFactory
     {
         private readonly Queue<FakeSession> _sessions = new(sessions);
 
         public int CreateCount { get; private set; }
 
-        public IViewDeviceSession Create(ViewDeviceLaunchOptions options)
+        public ISingleViewDeviceSession Create(ViewDeviceLaunchOptions options)
         {
             CreateCount++;
             if (_sessions.Count == 0)
@@ -377,46 +451,59 @@ public sealed class ViewDeviceViewModelTests
         }
     }
 
-    private sealed class FakeSession(
-        string serial,
-        TaskCompletionSource? startGate = null,
-        TaskCompletionSource? stopGate = null) : IViewDeviceSession
+    private sealed class FakeSession : ISingleViewDeviceSession
     {
-        public string Serial { get; } = serial;
-        public ViewDeviceSessionState State { get; private set; } = ViewDeviceSessionState.Created;
-        public IntPtr NativeWindowHandle { get; private set; }
-        public int ContentWidth => 720;
-        public int ContentHeight => 1280;
+        private readonly TaskCompletionSource? _startGate;
+        private readonly TaskCompletionSource? _stopGate;
+        private int _contentWidth = 720;
+        private int _contentHeight = 1280;
+
+        public FakeSession(
+            string serial,
+            Scrcpy? client = null,
+            TaskCompletionSource? startGate = null,
+            TaskCompletionSource? stopGate = null)
+        {
+            Serial = serial;
+            Client = client;
+            _startGate = startGate;
+            _stopGate = stopGate;
+        }
+
+        public string Serial { get; }
+        public SingleViewDeviceSessionState State { get; private set; } = SingleViewDeviceSessionState.Created;
+        public Scrcpy? Client { get; }
+        public int ContentWidth => _contentWidth;
+        public int ContentHeight => _contentHeight;
         public IReadOnlyList<string> RecentDiagnostics => [];
         public int StartCount { get; private set; }
         public int StopCount { get; private set; }
         public int DisposeCount { get; private set; }
+        public List<string> Actions { get; } = [];
 
-        public event EventHandler<ViewDeviceSessionStateChangedEventArgs>? StateChanged;
-        public event EventHandler? NativeWindowReady;
-        public event EventHandler<ViewDeviceContentSizeChangedEventArgs>? ContentSizeChanged;
+        public event EventHandler<SingleViewDeviceSessionStateChangedEventArgs>? StateChanged;
+        public event EventHandler<SingleViewDeviceContentSizeChangedEventArgs>? ContentSizeChanged;
         public event EventHandler? Exited;
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             StartCount++;
-            if (startGate is not null)
-                await startGate.Task.WaitAsync(cancellationToken);
-            SetState(ViewDeviceSessionState.Running);
-            NativeWindowHandle = new IntPtr(1234 + StartCount);
-            NativeWindowReady?.Invoke(this, EventArgs.Empty);
-            ContentSizeChanged?.Invoke(this, new ViewDeviceContentSizeChangedEventArgs(ContentWidth, ContentHeight));
+            if (_startGate is not null)
+                await _startGate.Task.WaitAsync(cancellationToken);
+            SetState(SingleViewDeviceSessionState.Running);
+            ContentSizeChanged?.Invoke(
+                this,
+                new SingleViewDeviceContentSizeChangedEventArgs(_contentWidth, _contentHeight));
         }
 
         public async Task StopAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             StopCount++;
-            if (stopGate is not null)
-                await stopGate.Task.WaitAsync(cancellationToken);
-            NativeWindowHandle = IntPtr.Zero;
-            SetState(ViewDeviceSessionState.Closed);
+            if (_stopGate is not null)
+                await _stopGate.Task.WaitAsync(cancellationToken);
+            SetState(SingleViewDeviceSessionState.Closed);
         }
 
         public ValueTask DisposeAsync()
@@ -425,18 +512,42 @@ public sealed class ViewDeviceViewModelTests
             return ValueTask.CompletedTask;
         }
 
+        public Task SendKeyEventAsync(int keyCode, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Actions.Add($"key:{keyCode}");
+            return Task.CompletedTask;
+        }
+
+        public Task SendBackOrScreenOnAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Actions.Add("back");
+            return Task.CompletedTask;
+        }
+
         public void Exit()
         {
-            NativeWindowHandle = IntPtr.Zero;
-            SetState(ViewDeviceSessionState.Failed);
+            SetState(SingleViewDeviceSessionState.Failed);
             Exited?.Invoke(this, EventArgs.Empty);
         }
 
-        private void SetState(ViewDeviceSessionState state)
+        public void RaiseContentSize(int width, int height)
         {
-            ViewDeviceSessionState previous = State;
+            _contentWidth = width;
+            _contentHeight = height;
+            ContentSizeChanged?.Invoke(
+                this,
+                new SingleViewDeviceContentSizeChangedEventArgs(width, height));
+        }
+
+        private void SetState(SingleViewDeviceSessionState state)
+        {
+            SingleViewDeviceSessionState previous = State;
             State = state;
-            StateChanged?.Invoke(this, new ViewDeviceSessionStateChangedEventArgs(previous, state));
+            StateChanged?.Invoke(
+                this,
+                new SingleViewDeviceSessionStateChangedEventArgs(previous, state));
         }
     }
 }
