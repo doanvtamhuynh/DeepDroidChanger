@@ -1,9 +1,10 @@
-﻿using Serilog;
+using Serilog;
 using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WpfPoint = System.Windows.Point;
@@ -14,27 +15,21 @@ namespace ScrcpyNet.Wpf
     /// Follow steps 1a or 1b and then 2 to use this custom control in a XAML file.
     ///
     /// Step 1a) Using this custom control in a XAML file that exists in the current project.
-    /// Add this XmlNamespace attribute to the root element of the markup file where it is 
+    /// Add this XmlNamespace attribute to the root element of the markup file where it is
     /// to be used:
     ///
     ///     xmlns:MyNamespace="clr-namespace:ScrcpyNet.Wpf"
     ///
-    ///
     /// Step 1b) Using this custom control in a XAML file that exists in a different project.
-    /// Add this XmlNamespace attribute to the root element of the markup file where it is 
+    /// Add this XmlNamespace attribute to the root element of the markup file where it is
     /// to be used:
     ///
     ///     xmlns:MyNamespace="clr-namespace:ScrcpyNet.Wpf;assembly=DeepDroidChanger.ViewDevices"
     ///
     /// You will also need to add a project reference from the project where the XAML file lives
-    /// to this project and Rebuild to avoid compilation errors:
+    /// to this project and Rebuild to avoid compilation errors.
     ///
-    ///     Right click on the target project in the Solution Explorer and
-    ///     "Add Reference"->"Projects"->[Select this project]
-    ///
-    ///
-    /// Step 2)
-    /// Go ahead and use your control in the XAML file.
+    /// Step 2) Go ahead and use the control in a XAML file:
     ///
     ///     <MyNamespace:ScrcpyDisplay/>
     ///
@@ -57,7 +52,9 @@ namespace ScrcpyNet.Wpf
 
         static ScrcpyDisplay()
         {
-            DefaultStyleKeyProperty.OverrideMetadata(typeof(ScrcpyDisplay), new FrameworkPropertyMetadata(typeof(ScrcpyDisplay)));
+            DefaultStyleKeyProperty.OverrideMetadata(
+                typeof(ScrcpyDisplay),
+                new FrameworkPropertyMetadata(typeof(ScrcpyDisplay)));
         }
 
         public Scrcpy? Scrcpy
@@ -70,11 +67,15 @@ namespace ScrcpyNet.Wpf
         {
             base.OnApplyTemplate();
 
-            if (GetTemplateChild("PART_RenderTargetImage") is Image img)
-            {
-                renderTarget = img;
-                renderTarget.Stretch = System.Windows.Media.Stretch.Uniform;
-            }
+            renderTarget = GetTemplateChild("PART_RenderTargetImage") as Image;
+            if (renderTarget is null)
+                return;
+
+            renderTarget.Stretch = Stretch.Uniform;
+
+            Scrcpy? current = Volatile.Read(ref subscribedScrcpy);
+            if (current is not null && ReferenceEquals(current, Scrcpy))
+                RenderLatestFrame(current.VideoStreamDecoder);
         }
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -87,8 +88,14 @@ namespace ScrcpyNet.Wpf
                 if (e.RightButton == MouseButtonState.Pressed)
                 {
                     e.Handled = true;
-                    Scrcpy.SendControlCommand(new BackOrScreenOnControlMessage() { Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_DOWN });
-                    Scrcpy.SendControlCommand(new BackOrScreenOnControlMessage() { Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_UP });
+                    Scrcpy.SendControlCommand(new BackOrScreenOnControlMessage
+                    {
+                        Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_DOWN
+                    });
+                    Scrcpy.SendControlCommand(new BackOrScreenOnControlMessage
+                    {
+                        Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_UP
+                    });
                 }
                 else if (e.LeftButton == MouseButtonState.Pressed)
                 {
@@ -143,14 +150,17 @@ namespace ScrcpyNet.Wpf
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            if (Scrcpy != null)
+            Scrcpy? scrcpy = Scrcpy;
+            if (scrcpy != null && KeycodeHelper.TryConvertKey(e.Key, out AndroidKeycode keyCode))
             {
                 e.Handled = true;
 
-                var msg = new KeycodeControlMessage();
-                msg.KeyCode = KeycodeHelper.ConvertKey(e.Key);
-                msg.Metastate = KeycodeHelper.ConvertModifiers(e.KeyboardDevice.Modifiers);
-                Scrcpy.SendControlCommand(msg);
+                KeycodeControlMessage msg = new()
+                {
+                    KeyCode = keyCode,
+                    Metastate = KeycodeHelper.ConvertModifiers(e.KeyboardDevice.Modifiers)
+                };
+                scrcpy.SendControlCommand(msg);
             }
 
             base.OnKeyDown(e);
@@ -158,15 +168,18 @@ namespace ScrcpyNet.Wpf
 
         protected override void OnKeyUp(KeyEventArgs e)
         {
-            if (Scrcpy != null)
+            Scrcpy? scrcpy = Scrcpy;
+            if (scrcpy != null && KeycodeHelper.TryConvertKey(e.Key, out AndroidKeycode keyCode))
             {
                 e.Handled = true;
 
-                var msg = new KeycodeControlMessage();
-                msg.Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_UP;
-                msg.KeyCode = KeycodeHelper.ConvertKey(e.Key);
-                msg.Metastate = KeycodeHelper.ConvertModifiers(e.KeyboardDevice.Modifiers);
-                Scrcpy.SendControlCommand(msg);
+                KeycodeControlMessage msg = new()
+                {
+                    Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_UP,
+                    KeyCode = keyCode,
+                    Metastate = KeycodeHelper.ConvertModifiers(e.KeyboardDevice.Modifiers)
+                };
+                scrcpy.SendControlCommand(msg);
             }
 
             base.OnKeyUp(e);
@@ -179,10 +192,12 @@ namespace ScrcpyNet.Wpf
             {
                 e.Handled = true;
 
-                ScrollEventControlMessage msg = new();
-                msg.Position = pos;
-                msg.VerticalScroll = e.Delta / 120; // Random guess
-                msg.HorizontalScroll = 0; // TODO: Can we implement this?
+                ScrollEventControlMessage msg = new()
+                {
+                    Position = pos,
+                    VerticalScroll = e.Delta / 120,
+                    HorizontalScroll = 0
+                };
                 Scrcpy.SendControlCommand(msg);
             }
 
@@ -267,44 +282,57 @@ namespace ScrcpyNet.Wpf
             };
         }
 
-        private unsafe void OnFrame(object? sender, FrameData frameData)
+        private void OnFrame(object? sender, FrameData _)
         {
-            if (sender is not Scrcpy source ||
-                !ReferenceEquals(source, Volatile.Read(ref subscribedScrcpy)) ||
+            if (sender is not VideoStreamDecoder sourceDecoder ||
+                !IsCurrentFrameSource(sourceDecoder) ||
                 renderTarget == null)
+            {
                 return;
+            }
 
             if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
                 return;
-
-            // This probably isn't the best way to do this.
+            DecodedFrameSnapshot? snapshot;
             try
             {
-                // The timeout is required. Otherwise this will block forever when the application is about to exit but the videoThread sends a last frame.
-                // The DispatcherPriority has been randomly selected, so it might not be the optimal value.
-                Dispatcher.Invoke(() =>
-                {
-                    if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished || renderTarget == null)
-                        return;
+                snapshot = sourceDecoder.CaptureLatestFrame();
+            }
+            catch (ObjectDisposedException)
+            {
+                log.Debug("Ignoring latest-frame capture from a disposed decoder.");
+                return;
+            }
 
-                    if (bmp == null || bmp.Width != frameData.Width || bmp.Height != frameData.Height)
-                    {
-                        bmp = new WriteableBitmap(frameData.Width, frameData.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null);
-                        renderTarget.Source = bmp;
-                    }
+            if (snapshot is null)
+                return;
 
-                    try
+            // The source decoder is captured before dispatch so a client replacement
+            // cannot make an old callback paint a frame from the new client.
+            try
+            {
+                // The timeout is required. Otherwise this can block forever when the
+                // application is about to exit but the video thread sends a last frame.
+                Dispatcher.Invoke(
+                    () =>
                     {
-                        bmp.Lock();
-                        Span<byte> dest = new(bmp.BackBuffer.ToPointer(), frameData.Data.Length);
-                        frameData.Data.CopyTo(dest);
-                        bmp.AddDirtyRect(new Int32Rect(0, 0, frameData.Width, frameData.Height));
-                    }
-                    finally
-                    {
-                        bmp.Unlock();
-                    }
-                }, DispatcherPriority.Send, default, TimeSpan.FromMilliseconds(200));
+                        if (Dispatcher.HasShutdownStarted ||
+                            Dispatcher.HasShutdownFinished ||
+                            renderTarget == null ||
+                            !IsCurrentFrameSource(sourceDecoder))
+                        {
+                            return;
+                        }
+
+                        RenderFrame(
+                            sourceDecoder,
+                            snapshot.Width,
+                            snapshot.Height,
+                            snapshot.Bgra32.Span);
+                    },
+                    DispatcherPriority.Send,
+                    default,
+                    TimeSpan.FromMilliseconds(200));
             }
             catch (TimeoutException)
             {
@@ -324,32 +352,157 @@ namespace ScrcpyNet.Wpf
             }
         }
 
-        private static void OnScrcpyChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
+        private void RenderLatestFrame(VideoStreamDecoder expectedDecoder)
         {
-            if (sender is ScrcpyDisplay display)
+            if (!IsCurrentFrameSource(expectedDecoder) || renderTarget == null)
+                return;
+
+            try
             {
-                // Unsubscribe on the old scrcpy
-                if (e.OldValue is Scrcpy old && old != null)
+                DecodedFrameSnapshot? snapshot = expectedDecoder.CaptureLatestFrame();
+                if (snapshot is not null)
                 {
-                    old.VideoStreamDecoder.OnFrame -= display.OnFrame;
-                    display.CancelPointer(old);
-                }
-
-                display.bmp = null;
-                if (display.renderTarget != null)
-                    display.renderTarget.Source = null;
-
-                // Subscribe on the new scrcpy
-                if (e.NewValue is Scrcpy value && value != null)
-                {
-                    Volatile.Write(ref display.subscribedScrcpy, value);
-                    value.VideoStreamDecoder.OnFrame += display.OnFrame;
-                }
-                else
-                {
-                    Volatile.Write(ref display.subscribedScrcpy, null);
+                    RenderFrame(
+                        expectedDecoder,
+                        snapshot.Width,
+                        snapshot.Height,
+                        snapshot.Bgra32.Span);
                 }
             }
+            catch (ObjectDisposedException)
+            {
+                log.Debug("Ignoring latest-frame capture from a disposed decoder.");
+            }
+        }
+
+        private unsafe void RenderFrame(
+            VideoStreamDecoder expectedDecoder,
+            int width,
+            int height,
+            ReadOnlySpan<byte> bgra32)
+        {
+            if (!IsCurrentFrameSource(expectedDecoder) || renderTarget == null)
+                return;
+            if (width <= 0 || height <= 0)
+            {
+                log.Debug("Ignoring decoded frame with invalid dimensions {Width}x{Height}.", width, height);
+                return;
+            }
+
+            if (!TryGetFrameLayout(width, height, bgra32.Length, out int rowLength, out int expectedLength))
+            {
+                log.Debug("Ignoring malformed or overflowing BGRA32 frame {Width}x{Height}.", width, height);
+                return;
+            }
+
+            if (bmp == null || bmp.Width != width || bmp.Height != height)
+            {
+                bmp = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
+                renderTarget.Source = bmp;
+            }
+
+            WriteableBitmap bitmap = bmp;
+            if (bitmap.BackBufferStride < rowLength)
+            {
+                log.Debug("Ignoring frame because the WPF back-buffer stride is too small.");
+                return;
+            }
+
+            bool locked = false;
+            try
+            {
+                bitmap.Lock();
+                locked = true;
+                if (!IsCurrentFrameSource(expectedDecoder) || renderTarget == null)
+                    return;
+
+                for (int y = 0; y < height; y++)
+                {
+                    int offset = checked(y * rowLength);
+                    bgra32.Slice(offset, rowLength).CopyTo(
+                        new Span<byte>(
+                            (byte*)bitmap.BackBuffer + y * bitmap.BackBufferStride,
+                            rowLength));
+                }
+
+                bitmap.AddDirtyRect(new Int32Rect(0, 0, width, height));
+            }
+            finally
+            {
+                if (locked)
+                    bitmap.Unlock();
+            }
+        }
+
+        private static void OnScrcpyChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (sender is not ScrcpyDisplay display)
+                return;
+
+            if (e.OldValue is Scrcpy old)
+            {
+                old.VideoStreamDecoder.OnFrame -= display.OnFrame;
+                display.CancelPointer(old);
+            }
+
+            Scrcpy? current = e.NewValue as Scrcpy;
+            if (current is not null)
+            {
+                // Publish and subscribe before taking the snapshot so a frame
+                // arriving during binding has no subscription gap.
+                Volatile.Write(ref display.subscribedScrcpy, current);
+                current.VideoStreamDecoder.OnFrame += display.OnFrame;
+            }
+
+            display.bmp = null;
+            if (display.renderTarget != null)
+                display.renderTarget.Source = null;
+
+            if (current is not null)
+                display.RenderLatestFrame(current.VideoStreamDecoder);
+            else
+                Volatile.Write(ref display.subscribedScrcpy, null);
+        }
+
+        internal static bool IsCurrentFrameSource(
+            VideoStreamDecoder? currentDecoder,
+            object? sender)
+        {
+            return currentDecoder is not null &&
+                   sender is VideoStreamDecoder decoder &&
+                   ReferenceEquals(decoder, currentDecoder);
+        }
+
+        internal static bool TryGetFrameLayout(
+            int width,
+            int height,
+            int bufferLength,
+            out int rowLength,
+            out int expectedLength)
+        {
+            rowLength = 0;
+            expectedLength = 0;
+            if (width <= 0 || height <= 0 || bufferLength < 0)
+                return false;
+
+            try
+            {
+                rowLength = checked(width * 4);
+                expectedLength = checked(rowLength * height);
+            }
+            catch (OverflowException)
+            {
+                return false;
+            }
+
+            return expectedLength == bufferLength;
+        }
+
+        private bool IsCurrentFrameSource(VideoStreamDecoder decoder)
+        {
+            Scrcpy? current = Volatile.Read(ref subscribedScrcpy);
+            return current is not null &&
+                   IsCurrentFrameSource(current.VideoStreamDecoder, decoder);
         }
 
         private void CancelPointer(Scrcpy? scrcpy)

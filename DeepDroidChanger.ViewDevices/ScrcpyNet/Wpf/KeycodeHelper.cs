@@ -1,4 +1,4 @@
-﻿using Serilog;
+using Serilog;
 using System.Collections.Generic;
 using System.Windows.Input;
 
@@ -25,32 +25,41 @@ namespace ScrcpyNet.Wpf
             { Key.OemMinus, AndroidKeycode.AKEYCODE_MINUS },
             { Key.OemPlus, AndroidKeycode.AKEYCODE_EQUALS },
             { Key.OemOpenBrackets, AndroidKeycode.AKEYCODE_LEFT_BRACKET },
-            { Key.OemCloseBrackets, AndroidKeycode.AKEYCODE_RIGHT_BRACKET },
+            { Key.OemCloseBrackets, AndroidKeycode.AKEYCODE_RIGHT_BRACKET }
         };
 
-        public static AndroidKeycode ConvertKey(Key key)
+        public static bool TryConvertKey(Key key, out AndroidKeycode androidKey)
         {
             // This maps physical WPF keys only; Unicode text and IME input are not implemented.
             // A - Z
             if (key >= Key.A && key <= Key.Z)
             {
                 int offset = (int)AndroidKeycode.AKEYCODE_A - (int)Key.A;
-                return (AndroidKeycode)((int)key + offset);
+                androidKey = (AndroidKeycode)((int)key + offset);
+                return true;
             }
+
             // Digits 0-9
-            else if (key >= Key.D0 && key <= Key.D9)
+            if (key >= Key.D0 && key <= Key.D9)
             {
                 int offset = (int)AndroidKeycode.AKEYCODE_0 - (int)Key.D0;
-                return (AndroidKeycode)((int)key + offset);
-            }
-            else if (keycodeDict.TryGetValue(key, out var androidKey))
-            {
-                return androidKey;
+                androidKey = (AndroidKeycode)((int)key + offset);
+                return true;
             }
 
-            Log.Warning("Unimplemented key: {@Key}", key);
+            if (keycodeDict.TryGetValue(key, out androidKey))
+                return true;
 
-            return AndroidKeycode.AKEYCODE_UNKNOWN;
+            Log.Debug("Unsupported physical key: {@Key}", key);
+            androidKey = AndroidKeycode.AKEYCODE_UNKNOWN;
+            return false;
+        }
+
+        public static AndroidKeycode ConvertKey(Key key)
+        {
+            return TryConvertKey(key, out AndroidKeycode androidKey)
+                ? androidKey
+                : AndroidKeycode.AKEYCODE_UNKNOWN;
         }
 
         public static AndroidMetastate ConvertModifiers(ModifierKeys keyModifiers)

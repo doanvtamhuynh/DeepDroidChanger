@@ -82,24 +82,41 @@
                     BorderBrush="{DynamicResource Brush.Border}"
                     BorderThickness="0,0,0,1">
                 <Grid>
-                    <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Center">
-                        <TextBlock Text="{Binding DeviceName}"
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0"
+                          MinWidth="0"
+                          ClipToBounds="True">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding DeviceName}"
+                                   MinWidth="0"
                                    MaxWidth="260"
                                    TextTrimming="CharacterEllipsis"
                                    FontSize="{StaticResource Metric.FontSize.Body}"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding Serial}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Serial}"
                                    Margin="8,0,0,0"
-                                   MaxWidth="180"
+                                   MinWidth="0"
+                                   MaxWidth="120"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{DynamicResource Brush.TextSecondary}"
                                    FontSize="{StaticResource Metric.FontSize.Micro}"
                                    VerticalAlignment="Center"
                                    ToolTip="{Binding Serial}"/>
-                    </StackPanel>
+                    </Grid>
 
-                    <StackPanel Orientation="Horizontal"
+                    <StackPanel Grid.Column="1"
+                                Margin="12,0,0,0"
+                                MaxWidth="206"
+                                Orientation="Horizontal"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
                         <Ellipse Width="8"
@@ -107,7 +124,7 @@
                                  Margin="0,0,6,0"
                                  Style="{StaticResource ViewDeviceStatusDotStyle}"/>
                         <TextBlock Text="{Binding StatusText}"
-                                   MaxWidth="210"
+                                   MaxWidth="190"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{DynamicResource Brush.TextSecondary}"
                                    FontSize="{StaticResource Metric.FontSize.Small}"/>

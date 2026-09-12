@@ -436,26 +436,26 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
                 cancellationToken)
             .ConfigureAwait(false);
 
-        CommandResult confirmation = await _adbCommandService
-            .RunAdbAsync(Serial, "get-state", cancellationToken)
-            .ConfigureAwait(false);
-        if (confirmation.ExitCode != 0 ||
-            !string.Equals(confirmation.StandardOutput.Trim(), "device", StringComparison.OrdinalIgnoreCase))
-        {
-            ViewDeviceSessionState state = confirmation.StandardError.Contains(
-                "unauthorized",
-                StringComparison.OrdinalIgnoreCase)
-                ? ViewDeviceSessionState.Unauthorized
-                : ViewDeviceSessionState.WaitingForDevice;
-            await SetStateAsync(state, cancellationToken).ConfigureAwait(false);
-            if (state == ViewDeviceSessionState.WaitingForDevice)
-                ScheduleRestartAfterFailure();
-            return;
-        }
-
         ISingleViewDeviceSession? session = null;
         try
         {
+            CommandResult confirmation = await _adbCommandService
+                .RunAdbAsync(Serial, "get-state", cancellationToken)
+                .ConfigureAwait(false);
+            if (confirmation.ExitCode != 0 ||
+                !string.Equals(confirmation.StandardOutput.Trim(), "device", StringComparison.OrdinalIgnoreCase))
+            {
+                ViewDeviceSessionState state = confirmation.StandardError.Contains(
+                    "unauthorized",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? ViewDeviceSessionState.Unauthorized
+                    : ViewDeviceSessionState.WaitingForDevice;
+                await SetStateAsync(state, cancellationToken).ConfigureAwait(false);
+                if (state == ViewDeviceSessionState.WaitingForDevice)
+                    ScheduleRestartAfterFailure();
+                return;
+            }
+
             session = _sessionFactory.Create(new ViewDeviceLaunchOptions(Serial));
             _session = session;
             session.ContentSizeChanged += OnSessionContentSizeChanged;

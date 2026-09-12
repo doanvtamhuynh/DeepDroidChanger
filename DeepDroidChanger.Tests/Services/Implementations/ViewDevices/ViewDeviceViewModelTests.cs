@@ -172,6 +172,34 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
+    public async Task InitializeAsync_AdbGetStateException_RetriesOnceAndStartsSession()
+    {
+        var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
+        var session = new FakeSession(Serial);
+        var factory = new FakeSessionFactory(session);
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        int adbCalls = 0;
+        adb.RunAdbAsync(Serial, "get-state", Arg.Any<CancellationToken>())
+            .Returns(_ => Interlocked.Increment(ref adbCalls) == 1
+                ? Task.FromException<CommandResult>(new InvalidOperationException("adb unavailable"))
+                : Task.FromResult(new CommandResult(0, "device", string.Empty)));
+        await using ViewDeviceViewModel viewModel = CreateViewModel(
+            tracker,
+            factory,
+            adb,
+            restartDelays: new[] { TimeSpan.Zero });
+
+        await viewModel.InitializeAsync(Serial, "Device");
+        await WaitUntilAsync(
+            () => factory.CreateCount == 1 && viewModel.State == ViewDeviceSessionState.Running,
+            TimeSpan.FromSeconds(2));
+
+        Assert.AreEqual(2, adbCalls);
+        Assert.AreEqual(1, factory.CreateCount);
+        Assert.AreEqual(1, session.StartCount);
+    }
+
+    [TestMethod]
     public async Task ReconnectCommand_RunningSession_CreatesOneReplacementSession()
     {
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));

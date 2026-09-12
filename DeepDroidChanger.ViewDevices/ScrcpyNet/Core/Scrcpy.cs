@@ -23,10 +23,9 @@ namespace ScrcpyNet
     public class Scrcpy : IDisposable
     {
         private const int DeviceInfoLength = 68;
-        private const int PacketMetadataLength = 12;
-        private const int MaximumPacketSize = 64 * 1024 * 1024;
+        private const int PacketMetadataLength = ScrcpyVideoPacketHeader.HeaderLength;
         private static readonly TimeSpan AcceptPollInterval = TimeSpan.FromMilliseconds(10);
-        private static readonly TimeSpan BackgroundTaskStopTimeout = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan ServerTaskStopTimeout = TimeSpan.FromSeconds(2);
         private static readonly ILogger Log = Serilog.Log.ForContext<Scrcpy>();
 
         public string DeviceName { get; private set; } = "";
@@ -54,6 +53,7 @@ namespace ScrcpyNet
         private readonly DeviceData device;
         private readonly Channel<IControlMessage> controlChannel = Channel.CreateUnbounded<IControlMessage>();
         private readonly SemaphoreSlim lifecycleGate = new(1, 1);
+        private readonly ScrcpyVideoPacketAssembler videoPacketAssembler = new();
         private static readonly ArrayPool<byte> pool = ArrayPool<byte>.Shared;
 
         private TcpClient? videoClient;
@@ -150,6 +150,11 @@ namespace ScrcpyNet
         {
             Volatile.Write(ref intentionalStop, 0);
             Volatile.Write(ref failureRaised, 0);
+            videoPacketAssembler.Clear();
+
+            using CancellationTokenSource startup =
+                ScrcpyStartupIo.CreateDeadline(timeoutMs, cancellationToken);
+            string startupStage = "setting up the scrcpy server";
 
             try
             {
@@ -157,29 +162,35 @@ namespace ScrcpyNet
                 listener = currentListener;
                 ListeningPort = ((IPEndPoint)currentListener.LocalEndpoint).Port;
 
-                MobileServerSetup(ListeningPort, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                MobileServerSetup(ListeningPort, startup.Token);
+                startup.Token.ThrowIfCancellationRequested();
 
                 serverCancellation = new CancellationTokenSource();
                 serverTask = MobileServerStart(serverCancellation.Token);
                 ObserveServerTask(serverTask);
 
+                startupStage = "waiting for the scrcpy video socket";
                 TcpClient currentVideoClient = await AcceptClientAsync(
                         currentListener,
-                        timeoutMs,
                         "video",
-                        cancellationToken)
+                        startup.Token)
                     .ConfigureAwait(false);
                 videoClient = currentVideoClient;
+
+                startupStage = "waiting for the scrcpy control socket";
                 TcpClient currentControlClient = await AcceptClientAsync(
                         currentListener,
-                        timeoutMs,
                         "control",
-                        cancellationToken)
+                        startup.Token)
                     .ConfigureAwait(false);
                 controlClient = currentControlClient;
 
-                await ReadDeviceInfoAsync(currentVideoClient, cancellationToken).ConfigureAwait(false);
+                startupStage = "reading scrcpy device metadata";
+                await ReadDeviceInfoAsync(
+                        currentVideoClient,
+                        startup.Token,
+                        cancellationToken)
+                    .ConfigureAwait(false);
 
                 CancellationTokenSource sessionCancellation = new();
                 cts = sessionCancellation;
@@ -194,10 +205,24 @@ namespace ScrcpyNet
                 // connections are needed. Remove only this session's reverse.
                 TryMobileServerCleanup();
             }
-            catch
+            catch (Exception exception)
             {
                 Volatile.Write(ref intentionalStop, 1);
                 await StopCoreAsync().ConfigureAwait(false);
+
+                if (cancellationToken.IsCancellationRequested &&
+                    exception is OperationCanceledException)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+
+                if (startup.IsCancellationRequested && exception is OperationCanceledException)
+                {
+                    throw new TimeoutException(
+                        $"Timed out while {startupStage}.",
+                        exception);
+                }
+
                 throw;
             }
         }
@@ -243,14 +268,18 @@ namespace ScrcpyNet
 
             CloseClient(videoClient);
             CloseClient(controlClient);
-
-            // Removing the reverse rule is what also tells the remote server
-            // to finish when a start failed halfway through.
             TryMobileServerCleanup();
+            videoPacketAssembler.Clear();
 
-            await WaitForBackgroundTaskAsync(currentVideoTask, "video").ConfigureAwait(false);
-            await WaitForBackgroundTaskAsync(currentControlTask, "control").ConfigureAwait(false);
-            await WaitForBackgroundTaskAsync(currentServerTask, "server").ConfigureAwait(false);
+            // Video and control tasks may still be using the decoder/socket.
+            // They must fully join before Scrcpy.Dispose can free native decoder state.
+            await JoinDecoderTasksAsync(currentVideoTask, currentControlTask).ConfigureAwait(false);
+            await WaitForBackgroundTaskAsync(
+                    currentServerTask,
+                    "server",
+                    ServerTaskStopTimeout)
+                .ConfigureAwait(false);
+            videoPacketAssembler.Clear();
 
             DisposeClient(videoClient);
             DisposeClient(controlClient);
@@ -280,32 +309,19 @@ namespace ScrcpyNet
 
         private async Task<TcpClient> AcceptClientAsync(
             TcpListener currentListener,
-            long timeoutMs,
             string channelName,
-            CancellationToken cancellationToken)
+            CancellationToken startupToken)
         {
-            using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
-
             while (!currentListener.Pending())
-            {
-                try
-                {
-                    await Task.Delay(AcceptPollInterval, timeout.Token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    throw new TimeoutException($"Timeout while waiting for the scrcpy {channelName} socket to connect.");
-                }
-            }
+                await Task.Delay(AcceptPollInterval, startupToken).ConfigureAwait(false);
 
             try
             {
                 return currentListener.AcceptTcpClient();
             }
-            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            catch (ObjectDisposedException) when (startupToken.IsCancellationRequested)
             {
-                throw new OperationCanceledException(cancellationToken);
+                throw new OperationCanceledException(startupToken);
             }
         }
 
@@ -316,16 +332,21 @@ namespace ScrcpyNet
             return value;
         }
 
-        private async Task ReadDeviceInfoAsync(TcpClient client, CancellationToken cancellationToken)
+        private async Task ReadDeviceInfoAsync(
+            TcpClient client,
+            CancellationToken startupToken,
+            CancellationToken callerToken)
         {
             NetworkStream infoStream = client.GetStream();
             byte[] deviceInfoBuffer = new byte[DeviceInfoLength];
-            await ReadExactAsync(
+            await ScrcpyStartupIo.ReadExactAsync(
                     infoStream,
                     deviceInfoBuffer,
                     0,
                     deviceInfoBuffer.Length,
-                    cancellationToken)
+                    startupToken,
+                    callerToken,
+                    "reading scrcpy device metadata")
                 .ConfigureAwait(false);
 
             DeviceName = Encoding.UTF8
@@ -352,25 +373,44 @@ namespace ScrcpyNet
                             cancellationToken)
                         .ConfigureAwait(false);
 
-                    ReadOnlySpan<byte> metadata = metadataBuffer.AsSpan(0, PacketMetadataLength);
-                    long presentationTimeUs = BinaryPrimitives.ReadInt64BigEndian(metadata);
-                    int packetSize = BinaryPrimitives.ReadInt32BigEndian(metadata[8..]);
-                    if (packetSize <= 0 || packetSize > MaximumPacketSize)
-                        throw new InvalidDataException($"The scrcpy video packet size {packetSize} is invalid.");
-
-                    byte[] packetBuffer = pool.Rent(packetSize);
+                    ScrcpyVideoPacketHeader header = ScrcpyVideoPacketHeader.Parse(
+                        metadataBuffer.AsSpan(0, PacketMetadataLength));
+                    byte[] packetBuffer = pool.Rent(header.PacketSize);
                     try
                     {
                         await ReadExactAsync(
                                 videoStream,
                                 packetBuffer,
                                 0,
-                                packetSize,
+                                header.PacketSize,
                                 cancellationToken)
                             .ConfigureAwait(false);
 
-                        if (!cancellationToken.IsCancellationRequested)
-                            VideoStreamDecoder.Decode(packetBuffer, packetSize, presentationTimeUs);
+                        if (cancellationToken.IsCancellationRequested)
+                            continue;
+
+                        ReadOnlySpan<byte> packet = packetBuffer.AsSpan(0, header.PacketSize);
+                        if (header.IsConfig)
+                        {
+                            videoPacketAssembler.StoreConfig(packet);
+                            continue;
+                        }
+
+                        byte[]? combinedPacket = videoPacketAssembler.ConsumeWith(packet);
+                        if (combinedPacket is null)
+                        {
+                            VideoStreamDecoder.Decode(
+                                packetBuffer,
+                                header.PacketSize,
+                                header.PresentationTimeUs);
+                        }
+                        else
+                        {
+                            VideoStreamDecoder.Decode(
+                                combinedPacket,
+                                combinedPacket.Length,
+                                header.PresentationTimeUs);
+                        }
                     }
                     finally
                     {
@@ -387,6 +427,7 @@ namespace ScrcpyNet
             }
             finally
             {
+                videoPacketAssembler.Clear();
                 pool.Return(metadataBuffer);
             }
         }
@@ -423,7 +464,10 @@ namespace ScrcpyNet
                     .ReadAsync(buffer, position, remaining, cancellationToken)
                     .ConfigureAwait(false);
                 if (bytesRead == 0)
-                    throw new EndOfStreamException("The scrcpy socket closed before the expected data was received.");
+                {
+                    throw new EndOfStreamException(
+                        "The scrcpy socket closed before the expected data was received.");
+                }
 
                 position += bytesRead;
                 remaining -= bytesRead;
@@ -560,22 +604,42 @@ namespace ScrcpyNet
             {
             }
 
+            videoPacketAssembler.Clear();
             Log.Error(exception, "ScrcpyNet session failed for {Serial}.", device.Serial);
             InvokeSafely(Failed, new ScrcpyErrorEventArgs(exception));
             InvokeSafely(Exited, EventArgs.Empty);
         }
 
-        private static async Task WaitForBackgroundTaskAsync(Task? task, string taskName)
+        internal static async Task JoinDecoderTasksAsync(Task? videoTask, Task? controlTask)
+        {
+            await ObserveBackgroundTaskAsync(videoTask, "video").ConfigureAwait(false);
+            await ObserveBackgroundTaskAsync(controlTask, "control").ConfigureAwait(false);
+        }
+
+        private static async Task WaitForBackgroundTaskAsync(
+            Task? task,
+            string taskName,
+            TimeSpan timeout)
         {
             if (task == null)
                 return;
 
-            Task completed = await Task.WhenAny(task, Task.Delay(BackgroundTaskStopTimeout)).ConfigureAwait(false);
+            Task completed = await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
             if (!ReferenceEquals(completed, task))
             {
-                Log.Warning("ScrcpyNet {TaskName} task did not stop within the shutdown timeout.", taskName);
+                Log.Warning(
+                    "ScrcpyNet {TaskName} task did not stop within the shutdown timeout.",
+                    taskName);
                 return;
             }
+
+            await ObserveBackgroundTaskAsync(task, taskName).ConfigureAwait(false);
+        }
+
+        private static async Task ObserveBackgroundTaskAsync(Task? task, string taskName)
+        {
+            if (task == null)
+                return;
 
             try
             {

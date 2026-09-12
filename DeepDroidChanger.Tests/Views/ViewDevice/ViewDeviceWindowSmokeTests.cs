@@ -75,6 +75,49 @@ public sealed class ViewDeviceWindowSmokeTests
         });
     }
 
+    [TestMethod]
+    public void ViewDeviceWindow_HeaderKeepsIdentityAndStatusInSeparateColumns()
+    {
+        RunOnSta(() =>
+        {
+            Application application = Application.Current ?? new DeepDroidChanger.App();
+            if (application is not DeepDroidChanger.App app)
+            {
+                throw new InvalidOperationException(
+                    "The WPF smoke test requires the DeepDroidChanger application instance.");
+            }
+
+            app.InitializeComponent();
+            ViewDeviceViewModel viewModel = CreateViewModel();
+            try
+            {
+                ViewDeviceWindow window = new(viewModel);
+                Border header = (Border)window.FindName("HeaderPanel");
+                Grid headerGrid = (Grid)header.Child;
+
+                Assert.AreEqual(2, headerGrid.ColumnDefinitions.Count);
+                Assert.AreEqual(GridUnitType.Star, headerGrid.ColumnDefinitions[0].Width.GridUnitType);
+                Assert.AreEqual(GridUnitType.Auto, headerGrid.ColumnDefinitions[1].Width.GridUnitType);
+                Assert.AreEqual(0, Grid.GetColumn(headerGrid.Children[0]));
+                Assert.AreEqual(1, Grid.GetColumn(headerGrid.Children[1]));
+
+                Grid identity = (Grid)headerGrid.Children[0];
+                Assert.AreEqual(2, identity.ColumnDefinitions.Count);
+                Assert.AreEqual(0, Grid.GetColumn(identity.Children[0]));
+                Assert.AreEqual(1, Grid.GetColumn(identity.Children[1]));
+                Assert.AreEqual(120, ((TextBlock)identity.Children[1]).MaxWidth);
+
+                StackPanel status = (StackPanel)headerGrid.Children[1];
+                Assert.AreEqual(206, status.MaxWidth);
+                Assert.AreEqual(190, ((TextBlock)status.Children[1]).MaxWidth);
+            }
+            finally
+            {
+                viewModel.DisposeAsync().GetAwaiter().GetResult();
+            }
+        });
+    }
+
     private static ViewDeviceViewModel CreateViewModel()
     {
         ILocalizationService localization = Substitute.For<ILocalizationService>();
