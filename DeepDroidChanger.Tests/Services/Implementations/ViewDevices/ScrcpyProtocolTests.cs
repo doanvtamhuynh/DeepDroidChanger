@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Input;
 using DeepDroidChanger.ViewDevices.Models;
 using DeepDroidChanger.ViewDevices.Runtime;
 using ScrcpyNet;
@@ -34,7 +35,9 @@ public sealed class ScrcpyProtocolTests
         TouchEventControlMessage message = new()
         {
             Action = AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN,
-            Position = CreatePosition(10, 20, 1080, 2220)
+            Position = CreatePosition(10, 20, 1080, 2220),
+            Buttons = AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY,
+            Pressure = 1f
         };
 
         AssertBytes(
@@ -53,6 +56,33 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
+    public void TouchMove_UsesPrimaryButtonAndFullPressure()
+    {
+        TouchEventControlMessage message = new()
+        {
+            Action = AndroidMotionEventAction.AMOTION_EVENT_ACTION_MOVE,
+            PointerId = 42,
+            Position = CreatePosition(400, 500, 1080, 2220),
+            Buttons = AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY,
+            Pressure = 1f
+        };
+
+        AssertBytes(
+            new byte[]
+            {
+                2, 2,
+                0, 0, 0, 0, 0, 0, 0, 42,
+                0, 0, 1, 0x90,
+                0, 0, 1, 0xF4,
+                4, 0x38,
+                8, 0xAC,
+                0xFF, 0xFF,
+                0, 0, 0, 1
+            },
+            message.ToBytes());
+    }
+
+    [TestMethod]
     public void TouchUp_UsesScrcpyV123GoldenBytes()
     {
         TouchEventControlMessage message = new()
@@ -60,7 +90,8 @@ public sealed class ScrcpyProtocolTests
             Action = AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP,
             PointerId = 42,
             Position = CreatePosition(-1, 2220, 400, 800),
-            Buttons = 0
+            Buttons = 0,
+            Pressure = 0f
         };
 
         AssertBytes(
@@ -72,10 +103,48 @@ public sealed class ScrcpyProtocolTests
                 0, 0, 8, 0xAC,
                 1, 0x90,
                 3, 0x20,
-                0xFF, 0xFF,
+                0, 0,
                 0, 0, 0, 0
             },
             message.ToBytes());
+    }
+
+    [TestMethod]
+    public void TouchCancel_UsesNoButtonsAndZeroPressure()
+    {
+        TouchEventControlMessage message = new()
+        {
+            Action = AndroidMotionEventAction.AMOTION_EVENT_ACTION_CANCEL,
+            PointerId = 42,
+            Position = CreatePosition(100, 200, 400, 800),
+            Buttons = 0,
+            Pressure = 0f
+        };
+
+        AssertBytes(
+            new byte[]
+            {
+                2, 3,
+                0, 0, 0, 0, 0, 0, 0, 42,
+                0, 0, 0, 100,
+                0, 0, 0, 200,
+                1, 0x90,
+                3, 0x20,
+                0, 0,
+                0, 0, 0, 0
+            },
+            message.ToBytes());
+    }
+
+    [TestMethod]
+    public void TouchPressure_RejectsValuesOutsideFixedPointRange()
+    {
+        TouchEventControlMessage message = new()
+        {
+            Pressure = 1.01f
+        };
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => message.ToBytes());
     }
 
     [TestMethod]
@@ -276,14 +345,37 @@ public sealed class ScrcpyProtocolTests
     {
         ScrcpyDisplayPointerState state = new();
 
-        Assert.IsTrue(state.BeginPointerDown());
-        Assert.IsTrue(state.CanMove);
+        Assert.IsFalse(state.TryBeginPointerDown(captureSucceeded: false));
+        Assert.IsFalse(state.IsPointerDown);
+        Assert.IsTrue(state.TryBeginPointerDown(captureSucceeded: true));
+        Assert.IsFalse(state.TryBeginPointerDown(captureSucceeded: true));
         Assert.IsTrue(state.EndPointerUp());
         Assert.IsFalse(state.EndPointerUp());
         Assert.IsTrue(state.BeginPointerDown());
+        Assert.IsTrue(state.CanMove);
         Assert.IsTrue(state.CancelPointer());
         Assert.IsFalse(state.CancelPointer());
         Assert.IsFalse(state.CanMove);
+    }
+
+    [TestMethod]
+    public void KeycodeHelper_MapsCommonPunctuationToAndroidKeycodes()
+    {
+        (Key WpfKey, AndroidKeycode AndroidKeycode)[] mappings =
+        [
+            (Key.OemComma, AndroidKeycode.AKEYCODE_COMMA),
+            (Key.OemPeriod, AndroidKeycode.AKEYCODE_PERIOD),
+            (Key.Oem2, AndroidKeycode.AKEYCODE_SLASH),
+            (Key.Oem1, AndroidKeycode.AKEYCODE_SEMICOLON),
+            (Key.OemQuotes, AndroidKeycode.AKEYCODE_APOSTROPHE),
+            (Key.OemMinus, AndroidKeycode.AKEYCODE_MINUS),
+            (Key.OemPlus, AndroidKeycode.AKEYCODE_EQUALS),
+            (Key.OemOpenBrackets, AndroidKeycode.AKEYCODE_LEFT_BRACKET),
+            (Key.OemCloseBrackets, AndroidKeycode.AKEYCODE_RIGHT_BRACKET)
+        ];
+
+        foreach ((Key wpfKey, AndroidKeycode androidKeycode) in mappings)
+            Assert.AreEqual(androidKeycode, KeycodeHelper.ConvertKey(wpfKey));
     }
 
     private static Position CreatePosition(int x, int y, ushort width, ushort height)

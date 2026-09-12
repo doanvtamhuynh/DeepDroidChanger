@@ -38,6 +38,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     private CancellationTokenSource? _pendingEvaluationCancellation;
     private Task _pendingEvaluationTask = Task.CompletedTask;
     private ISingleViewDeviceSession? _session;
+    private ISingleViewDeviceSession? _establishedSession;
     private string _serial = string.Empty;
     private string _deviceName = string.Empty;
     private ViewDeviceSessionState _state = ViewDeviceSessionState.Created;
@@ -458,6 +459,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             session = _sessionFactory.Create(new ViewDeviceLaunchOptions(Serial));
             _session = session;
             session.ContentSizeChanged += OnSessionContentSizeChanged;
+            session.StateChanged += OnSessionStateChanged;
             session.Exited += OnSessionExited;
 
             await session.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -467,6 +469,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
                 return;
             }
 
+            Volatile.Write(ref _establishedSession, session);
             _hasRun = true;
             Interlocked.Exchange(ref _restartAttempt, 0);
             await SetScrcpyClientAsync(session.Client, cancellationToken).ConfigureAwait(false);
@@ -501,7 +504,9 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         }
 
         _session = null;
+        Volatile.Write(ref _establishedSession, null);
         session.ContentSizeChanged -= OnSessionContentSizeChanged;
+        session.StateChanged -= OnSessionStateChanged;
         session.Exited -= OnSessionExited;
         try
         {
@@ -556,9 +561,23 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
             _ = SetContentSizeAsync(eventArgs.Width, eventArgs.Height, CancellationToken.None);
     }
 
+    private void OnSessionStateChanged(
+        object? sender,
+        SingleViewDeviceSessionStateChangedEventArgs eventArgs)
+    {
+        if (eventArgs.Current == SingleViewDeviceSessionState.Running &&
+            ReferenceEquals(sender, _session) &&
+            sender is ISingleViewDeviceSession session)
+        {
+            Volatile.Write(ref _establishedSession, session);
+        }
+    }
+
     private void OnSessionExited(object? sender, EventArgs eventArgs)
     {
-        if (!ReferenceEquals(sender, _session) || Volatile.Read(ref _disposed) != 0)
+        if (!ReferenceEquals(sender, _session) ||
+            !ReferenceEquals(sender, Volatile.Read(ref _establishedSession)) ||
+            Volatile.Read(ref _disposed) != 0)
             return;
 
         _logger.LogInformation("ScrcpyNet session exited for {Serial}; scheduling an isolated restart.", Serial);

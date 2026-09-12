@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:models="clr-namespace:DeepDroidChanger.ViewDevices.Models;assembly=DeepDroidChanger.ViewDevices"
-        xmlns:scrcpy="clr-namespace:ScrcpyNet.Wpf;assembly=ScrcpyNet.Wpf"
+        xmlns:scrcpy="clr-namespace:ScrcpyNet.Wpf;assembly=DeepDroidChanger.ViewDevices"
         xmlns:views="clr-namespace:DeepDroidChanger.Views"
         mc:Ignorable="d"
         Width="520"
@@ -44,10 +44,6 @@
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
@@ -185,7 +181,14 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0">
+                        <ScrollViewer x:Name="ToolbarActionsScrollViewer"
+                                      Grid.Row="0"
+                                      VerticalScrollBarVisibility="Hidden"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Focusable="False"
+                                      IsTabStop="False"
+                                      CanContentScroll="True">
+                            <StackPanel>
                             <Button Style="{StaticResource ViewDeviceToolbarButtonStyle}"
                                     Command="{Binding ToggleFullscreenCommand}"
                                     ToolTip="{DynamicResource ViewDevice_Fullscreen}">
@@ -251,7 +254,8 @@
                                                          Width="20"
                                                          Height="20"/>
                             </Button>
-                        </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
 
                         <StackPanel Grid.Row="1">
                             <Separator/>

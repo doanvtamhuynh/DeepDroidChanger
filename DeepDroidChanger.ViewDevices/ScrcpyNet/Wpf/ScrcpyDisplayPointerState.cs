@@ -13,6 +13,12 @@ internal sealed class ScrcpyDisplayPointerState
         return true;
     }
 
+    public bool TryBeginPointerDown(bool captureSucceeded)
+    {
+        // A DOWN is committed only after WPF confirms mouse capture.
+        return captureSucceeded && BeginPointerDown();
+    }
+
     public bool CanMove => IsPointerDown;
 
     public bool EndPointerUp()

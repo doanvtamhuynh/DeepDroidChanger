@@ -35,9 +35,20 @@ public sealed class ViewDeviceWindowSmokeTests
                 object? display = window.FindName("ScrcpyDisplay");
                 Assert.IsNotNull(display);
                 Assert.IsInstanceOfType(display, typeof(ScrcpyNet.Wpf.ScrcpyDisplay));
-                Assert.IsNull(((ScrcpyNet.Wpf.ScrcpyDisplay)display).Scrcpy);
+                ScrcpyNet.Wpf.ScrcpyDisplay scrcpyDisplay = (ScrcpyNet.Wpf.ScrcpyDisplay)display;
+                Assert.IsNull(scrcpyDisplay.Scrcpy);
+                Assert.AreEqual("DeepDroidChanger.ViewDevices", scrcpyDisplay.GetType().Assembly.GetName().Name);
+                scrcpyDisplay.ApplyTemplate();
+                Assert.IsNotNull(scrcpyDisplay.Template);
                 Assert.IsNull(window.FindName("NativeHost"));
                 Assert.IsNull(window.FindName("ActionsPanel"));
+
+                ScrollViewer toolbarActions =
+                    (ScrollViewer)window.FindName("ToolbarActionsScrollViewer");
+                Assert.AreEqual(ScrollBarVisibility.Hidden, toolbarActions.VerticalScrollBarVisibility);
+                Assert.AreEqual(ScrollBarVisibility.Disabled, toolbarActions.HorizontalScrollBarVisibility);
+                Assert.IsFalse(toolbarActions.Focusable);
+                Assert.IsFalse(toolbarActions.IsTabStop);
 
                 Style toolbarStyle = (Style)window.Resources["ViewDeviceToolbarButtonStyle"];
                 Assert.AreEqual(
@@ -52,6 +63,10 @@ public sealed class ViewDeviceWindowSmokeTests
                         .OfType<Setter>()
                         .Single(setter => setter.Property == Button.IsTabStopProperty)
                         .Value);
+                Assert.IsFalse(
+                    toolbarStyle.Triggers
+                        .OfType<Trigger>()
+                        .Any(trigger => trigger.Property == Button.IsKeyboardFocusedProperty));
             }
             finally
             {

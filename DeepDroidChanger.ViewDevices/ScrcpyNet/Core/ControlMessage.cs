@@ -96,7 +96,7 @@ namespace ScrcpyNet
         public AndroidMotionEventButtons Buttons { get; set; } = AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY;
         public ulong PointerId { get; set; } = 0xFFFFFFFFFFFFFFFF;
         public Position Position { get; set; } = new();
-        //public float Pressure { get; set; }
+        public float Pressure { get; set; } = 1f;
 
         public Span<byte> ToBytes()
         {
@@ -111,13 +111,19 @@ namespace ScrcpyNet
             BinaryPrimitives.WriteUInt16BigEndian(b[18..], Position.ScreenSize.Width);
             BinaryPrimitives.WriteUInt16BigEndian(b[20..], Position.ScreenSize.Height);
 
-            // TODO: Pressure
-            b[22] = 0xFF;
-            b[23] = 0xFF;
+            BinaryPrimitives.WriteUInt16BigEndian(b[22..], ToFixedPoint16(Pressure));
 
             BinaryPrimitives.WriteInt32BigEndian(b[24..], (int)Buttons);
 
             return b;
+        }
+
+        internal static ushort ToFixedPoint16(float pressure)
+        {
+            if (!float.IsFinite(pressure) || pressure < 0f || pressure > 1f)
+                throw new ArgumentOutOfRangeException(nameof(pressure), "Pressure must be between 0 and 1.");
+
+            return checked((ushort)MathF.Round(pressure * ushort.MaxValue));
         }
     }
 

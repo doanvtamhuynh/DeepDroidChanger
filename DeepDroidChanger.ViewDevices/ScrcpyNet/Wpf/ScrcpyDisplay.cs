@@ -24,7 +24,7 @@ namespace ScrcpyNet.Wpf
     /// Add this XmlNamespace attribute to the root element of the markup file where it is 
     /// to be used:
     ///
-    ///     xmlns:MyNamespace="clr-namespace:ScrcpyNet.Wpf;assembly=ScrcpyNet.Wpf"
+    ///     xmlns:MyNamespace="clr-namespace:ScrcpyNet.Wpf;assembly=DeepDroidChanger.ViewDevices"
     ///
     /// You will also need to add a project reference from the project where the XAML file lives
     /// to this project and Rebuild to avoid compilation errors:
@@ -93,7 +93,7 @@ namespace ScrcpyNet.Wpf
                 else if (e.LeftButton == MouseButtonState.Pressed)
                 {
                     Position? position = GetScrcpyMousePosition(e);
-                    if (position != null && pointerState.BeginPointerDown())
+                    if (position != null && pointerState.TryBeginPointerDown(CaptureMouse()))
                     {
                         e.Handled = true;
                         lastPointerPosition = position;
@@ -101,7 +101,6 @@ namespace ScrcpyNet.Wpf
                             AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN,
                             position,
                             Scrcpy);
-                        CaptureMouse();
                     }
                 }
             }
@@ -216,7 +215,15 @@ namespace ScrcpyNet.Wpf
             TouchEventControlMessage msg = new()
             {
                 Action = action,
-                Position = position
+                Position = position,
+                Buttons = action is AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP or
+                    AndroidMotionEventAction.AMOTION_EVENT_ACTION_CANCEL
+                    ? (AndroidMotionEventButtons)0
+                    : AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY,
+                Pressure = action is AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP or
+                    AndroidMotionEventAction.AMOTION_EVENT_ACTION_CANCEL
+                    ? 0f
+                    : 1f
             };
             scrcpy.SendControlCommand(msg);
 

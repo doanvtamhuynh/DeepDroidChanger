@@ -17,10 +17,20 @@ namespace ScrcpyNet.Wpf
             { Key.Delete, AndroidKeycode.AKEYCODE_FORWARD_DEL },
             { Key.Tab, AndroidKeycode.AKEYCODE_TAB },
             { Key.Enter, AndroidKeycode.AKEYCODE_ENTER },
+            { Key.OemComma, AndroidKeycode.AKEYCODE_COMMA },
+            { Key.OemPeriod, AndroidKeycode.AKEYCODE_PERIOD },
+            { Key.Oem2, AndroidKeycode.AKEYCODE_SLASH },
+            { Key.Oem1, AndroidKeycode.AKEYCODE_SEMICOLON },
+            { Key.OemQuotes, AndroidKeycode.AKEYCODE_APOSTROPHE },
+            { Key.OemMinus, AndroidKeycode.AKEYCODE_MINUS },
+            { Key.OemPlus, AndroidKeycode.AKEYCODE_EQUALS },
+            { Key.OemOpenBrackets, AndroidKeycode.AKEYCODE_LEFT_BRACKET },
+            { Key.OemCloseBrackets, AndroidKeycode.AKEYCODE_RIGHT_BRACKET },
         };
 
         public static AndroidKeycode ConvertKey(Key key)
         {
+            // This maps physical WPF keys only; Unicode text and IME input are not implemented.
             // A - Z
             if (key >= Key.A && key <= Key.Z)
             {

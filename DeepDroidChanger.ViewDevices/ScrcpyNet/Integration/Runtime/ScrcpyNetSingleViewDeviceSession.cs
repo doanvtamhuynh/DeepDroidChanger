@@ -28,6 +28,7 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
     private int _contentWidth;
     private int _contentHeight;
     private int _intentionalStop = 1;
+    private int _unexpectedExitReported;
     private int _disposed;
 
     public ScrcpyNetSingleViewDeviceSession(
@@ -132,6 +133,7 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
                     _client = client;
                     _firstFrameReceived = firstFrameReceived;
                     Volatile.Write(ref _intentionalStop, 0);
+                    Volatile.Write(ref _unexpectedExitReported, 0);
                 }
                 SubscribeToClient(client);
 
@@ -434,18 +436,32 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         if (sender is not IScrcpyNetClient client ||
             !IsCurrentClient(client) ||
             Volatile.Read(ref _intentionalStop) != 0 ||
-            Volatile.Read(ref _disposed) != 0)
+            Volatile.Read(ref _disposed) != 0 ||
+            Interlocked.Exchange(ref _unexpectedExitReported, 1) != 0)
         {
             return;
         }
 
+        SingleViewDeviceSessionState state;
         lock (_gate)
         {
+            if (!ReferenceEquals(_client, client))
+                return;
+
+            state = _state;
+            if (state != SingleViewDeviceSessionState.Starting &&
+                state != SingleViewDeviceSessionState.Running)
+            {
+                return;
+            }
+
             _firstFrameReceived?.TrySetException(
                 new InvalidOperationException("ScrcpyNet exited before the first decoded frame was received."));
         }
+
         SetState(SingleViewDeviceSessionState.Failed);
-        InvokeSafely(Exited, EventArgs.Empty);
+        if (state == SingleViewDeviceSessionState.Running)
+            InvokeSafely(Exited, EventArgs.Empty);
     }
 
     private void SetState(SingleViewDeviceSessionState state)

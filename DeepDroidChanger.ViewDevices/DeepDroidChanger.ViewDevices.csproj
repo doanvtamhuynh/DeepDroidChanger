@@ -4,21 +4,24 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FFmpeg.AutoGen" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Serilog" Version="2.11.0" />
+    <PackageReference Include="SharpAdbClient" Version="2.3.23" />
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="DeepDroidChanger.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\external\ScrcpyNet\src\ScrcpyNet\ScrcpyNet.csproj" />
   </ItemGroup>
 
 </Project>

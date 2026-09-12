@@ -103,7 +103,7 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
     }
 
     [TestMethod]
-    public async Task StartAsync_DecoderExitBeforeFirstFrame_FailsStartup()
+    public async Task ClientExitBeforeFirstFrame_DoesNotRaisePublicExited()
     {
         FakeClient client = new(CreateUninitializedScrcpy())
         {
@@ -115,6 +115,8 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
             new FakeDeviceResolver(),
             new FakeClientFactory(client),
             TimeSpan.FromSeconds(1));
+        int exitedCount = 0;
+        session.Exited += (_, _) => exitedCount++;
 
         Task startTask = session.StartAsync(CancellationToken.None);
         await WaitUntilAsync(() => client.StartCount == 1, TimeSpan.FromSeconds(1));
@@ -128,6 +130,7 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
         Assert.IsNull(session.Client);
         Assert.AreEqual(1, client.StopCount);
         Assert.AreEqual(1, client.DisposeCount);
+        Assert.AreEqual(0, exitedCount);
     }
 
     [TestMethod]
@@ -231,7 +234,7 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
     }
 
     [TestMethod]
-    public async Task ClientExit_RaisesExitedAndMarksSessionFailed()
+    public async Task ClientExitAfterFirstFrame_RaisesExitedExactlyOnce()
     {
         FakeClient client = new(CreateUninitializedScrcpy())
         {
@@ -243,8 +246,10 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
             new FakeDeviceResolver(),
             new FakeClientFactory(client));
         TaskCompletionSource exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int exitedCount = 0;
         session.Exited += (_, _) =>
         {
+            exitedCount++;
             Assert.AreEqual(SingleViewDeviceSessionState.Failed, session.State);
             exited.TrySetResult();
         };
@@ -252,8 +257,10 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
         await session.StartAsync(CancellationToken.None);
         client.RaiseExited();
         await exited.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        client.RaiseExited();
 
         Assert.AreEqual(SingleViewDeviceSessionState.Failed, session.State);
+        Assert.AreEqual(1, exitedCount);
         await session.StopAsync(CancellationToken.None);
     }
 

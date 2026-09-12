@@ -301,14 +301,15 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
-    public async Task RepeatedPreFirstFrameFailures_AdvanceRetryAttemptsAndStop()
+    public async Task StartupFailureThatSignalsClientExit_ConsumesOneRetryAttempt()
     {
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
         FakeSession[] failures = Enumerable
             .Range(0, 6)
             .Select(index => new FakeSession(Serial)
             {
-                StartException = new TimeoutException($"first frame {index}")
+                StartException = new TimeoutException($"first frame {index}"),
+                RaiseExitedOnStart = true
             })
             .ToArray();
         var factory = new FakeSessionFactory(failures);
@@ -569,6 +570,7 @@ public sealed class ViewDeviceViewModelTests
         public int StopCount { get; private set; }
         public int DisposeCount { get; private set; }
         public Exception? StartException { get; set; }
+        public bool RaiseExitedOnStart { get; set; }
         public List<string> Actions { get; } = [];
 
         public event EventHandler<SingleViewDeviceSessionStateChangedEventArgs>? StateChanged;
@@ -580,7 +582,15 @@ public sealed class ViewDeviceViewModelTests
             cancellationToken.ThrowIfCancellationRequested();
             StartCount++;
             if (StartException is not null)
+            {
+                if (RaiseExitedOnStart)
+                {
+                    SetState(SingleViewDeviceSessionState.Failed);
+                    Exited?.Invoke(this, EventArgs.Empty);
+                }
+
                 throw StartException;
+            }
             if (_startGate is not null)
                 await _startGate.Task.WaitAsync(cancellationToken);
             SetState(SingleViewDeviceSessionState.Running);
