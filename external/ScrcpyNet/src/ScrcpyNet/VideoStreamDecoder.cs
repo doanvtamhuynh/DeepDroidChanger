@@ -7,7 +7,7 @@ namespace ScrcpyNet
 {
     public unsafe class FrameData : IDisposable
     {
-        private bool disposed;
+        private int disposed;
 
         /// <summary>
         /// Byte array with the frame data in BGRA32 format.
@@ -19,7 +19,8 @@ namespace ScrcpyNet
             get
             {
                 // This line might not be needed?
-                if (disposed) throw new ObjectDisposedException(nameof(FrameData));
+                if (Volatile.Read(ref disposed) != 0)
+                    throw new ObjectDisposedException(nameof(FrameData));
                 return new ReadOnlySpan<byte>(data, length);
             }
         }
@@ -50,18 +51,11 @@ namespace ScrcpyNet
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposed)
-            {
-                if (disposing)
-                {
-                    // Dispose managed state (managed objects)
-                }
+            if (Interlocked.Exchange(ref disposed, 1) != 0)
+                return;
 
-                // Free unmanaged resources (unmanaged objects) and override finalizer
-                ffmpeg.av_free(data);
-
-                disposed = true;
-            }
+            // Free unmanaged resources (unmanaged objects) and override finalizer
+            ffmpeg.av_free(data);
         }
 
         public void Dispose()
@@ -83,8 +77,7 @@ namespace ScrcpyNet
 
         public event EventHandler<FrameData>? OnFrame;
 
-        private bool disposed;
-        private int lastFrameRefCount;
+        private int disposed;
         private readonly object lastFrameLock = new();
         private SwsContext* swsContext = null;
         private FrameData? lastFrame;
@@ -122,15 +115,6 @@ namespace ScrcpyNet
         {
             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
             Dispose(disposing: false);
-        }
-
-        public FrameData? GetLastFrame()
-        {
-            lock (lastFrameLock)
-            {
-                lastFrameRefCount++;
-                return lastFrame;
-            }
         }
 
         public void Decode(byte[] data, long pts = -1)
@@ -223,23 +207,23 @@ namespace ScrcpyNet
 
                     if (outputSliceHeight > 0)
                     {
-                        // Poor man's reference counting.
+                        FrameData currentFrame = new(
+                            destBufferPtr,
+                            destSize,
+                            frame->width,
+                            frame->height,
+                            ctx->frame_number,
+                            AVPixelFormat.AV_PIX_FMT_BGRA);
+                        FrameData? previousFrame;
                         lock (lastFrameLock)
                         {
-                            //if (lastFrame != null && Interlocked.Read(ref lastFrameRefCount) == 0)
-                            if (lastFrame != null && lastFrameRefCount == 0)
-                            {
-                                // We don't have to dispose it, but then the GC will remove all old frames after 'some time'.
-                                // On my 32GB RAM computer the GC allowed the app to use up to 8GB before cleaning it up.
-                                lastFrame.Dispose();
-                            }
-                            //Interlocked.Exchange(ref lastFrameRefCount, 0);
-                            lastFrameRefCount = 0;
+                            previousFrame = lastFrame;
+                            lastFrame = currentFrame;
                         }
+                        previousFrame?.Dispose();
 
                         // FrameData takes ownership of the destBufferPtr and will free it when disposed!
-                        lastFrame = new FrameData(destBufferPtr, destSize, frame->width, frame->height, ctx->frame_number, AVPixelFormat.AV_PIX_FMT_BGRA);
-                        OnFrame?.Invoke(this, lastFrame);
+                        OnFrame?.Invoke(this, currentFrame);
                     }
                     else
                     {
@@ -254,28 +238,29 @@ namespace ScrcpyNet
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposed)
+            if (Interlocked.Exchange(ref disposed, 1) != 0)
+                return;
+
+            FrameData? currentFrame;
+            lock (lastFrameLock)
             {
-                if (disposing)
-                {
-                    // Dispose managed state (managed objects)
-                }
-
-                // Free unmanaged resources (unmanaged objects) and override finalizer
-                ffmpeg.av_parser_close(parser);
-                ffmpeg.sws_freeContext(swsContext);
-
-                fixed (AVCodecContext** ptr = &ctx)
-                    ffmpeg.avcodec_free_context(ptr);
-
-                fixed (AVFrame** ptr = &frame)
-                    ffmpeg.av_frame_free(ptr);
-
-                fixed (AVPacket** ptr = &packet)
-                    ffmpeg.av_packet_free(ptr);
-
-                disposed = true;
+                currentFrame = lastFrame;
+                lastFrame = null;
             }
+            currentFrame?.Dispose();
+
+            // Free unmanaged resources (unmanaged objects) and override finalizer
+            ffmpeg.av_parser_close(parser);
+            ffmpeg.sws_freeContext(swsContext);
+
+            fixed (AVCodecContext** ptr = &ctx)
+                ffmpeg.avcodec_free_context(ptr);
+
+            fixed (AVFrame** ptr = &frame)
+                ffmpeg.av_frame_free(ptr);
+
+            fixed (AVPacket** ptr = &packet)
+                ffmpeg.av_packet_free(ptr);
         }
 
         public void Dispose()

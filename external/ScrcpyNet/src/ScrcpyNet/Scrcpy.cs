@@ -33,6 +33,8 @@ namespace ScrcpyNet
         public int Width { get; internal set; }
         public int Height { get; internal set; }
         public long Bitrate { get; set; } = 8000000;
+        public int MaxSize { get; set; }
+        public int MaxFramerate { get; set; }
         public string ScrcpyServerFile { get; set; } = "ScrcpyNet/scrcpy-server.jar";
 
         public bool Connected => Volatile.Read(ref connected) != 0;
@@ -48,7 +50,7 @@ namespace ScrcpyNet
         public event EventHandler<ScrcpyErrorEventArgs>? Failed;
         public event EventHandler? Exited;
 
-        private readonly AdbClient adb;
+        private readonly ScrcpyNetServerLifecycle serverLifecycle;
         private readonly DeviceData device;
         private readonly Channel<IControlMessage> controlChannel = Channel.CreateUnbounded<IControlMessage>();
         private readonly SemaphoreSlim lifecycleGate = new(1, 1);
@@ -69,10 +71,13 @@ namespace ScrcpyNet
 
         public Scrcpy(DeviceData device, VideoStreamDecoder? videoStreamDecoder = null)
         {
-            adb = new AdbClient();
             this.device = device;
             VideoStreamDecoder = videoStreamDecoder ?? new VideoStreamDecoder();
             VideoStreamDecoder.Scrcpy = this;
+            serverLifecycle = new ScrcpyNetServerLifecycle(
+                device,
+                new SharpAdbClientOperations(),
+                exception => Log.Debug(exception, "No stale ScrcpyNet reverse rule was removed."));
         }
 
         public void Start(long timeoutMs = 5000)
@@ -186,8 +191,7 @@ namespace ScrcpyNet
                 listener = null;
 
                 // The two sockets are established now, so no more reverse
-                // connections are needed. Keep the cleanup behavior from the
-                // upstream client but isolate failures from the active stream.
+                // connections are needed. Remove only this session's reverse.
                 TryMobileServerCleanup();
             }
             catch
@@ -435,22 +439,15 @@ namespace ScrcpyNet
 
         private void MobileServerSetup(int hostPort, CancellationToken cancellationToken)
         {
-            MobileServerCleanup();
-            UploadMobileServer(cancellationToken);
-            adb.CreateReverseForward(
-                device,
-                "localabstract:scrcpy",
-                $"tcp:{hostPort}",
-                true);
+            serverLifecycle.Setup(hostPort, ScrcpyServerFile, cancellationToken);
         }
 
         /// <summary>
-        /// Remove ADB forwards/reverses.
+        /// Remove this session's ADB reverse rule.
         /// </summary>
         private void MobileServerCleanup()
         {
-            adb.RemoveAllForwards(device);
-            adb.RemoveAllReverseForwards(device);
+            serverLifecycle.Cleanup();
         }
 
         private void TryMobileServerCleanup()
@@ -461,7 +458,7 @@ namespace ScrcpyNet
             }
             catch (Exception exception)
             {
-                Log.Warning(exception, "ScrcpyNet reverse/forward cleanup failed for {Serial}.", device.Serial);
+                Log.Warning(exception, "ScrcpyNet reverse cleanup failed for {Serial}.", device.Serial);
             }
         }
 
@@ -473,50 +470,44 @@ namespace ScrcpyNet
             Log.Information("Starting scrcpy server...");
 
             SerilogOutputReceiver receiver = new();
-            const string version = "1.23";
-            const int maxFramerate = 0;
-            ScrcpyLockVideoOrientation orientation = ScrcpyLockVideoOrientation.Unlocked;
-            const bool control = true;
-            const bool showTouches = false;
-            const bool stayAwake = false;
+            IReadOnlyList<string> commands = BuildServerArguments(Bitrate, MaxSize, MaxFramerate);
 
+            string command = string.Join(" ", commands);
+            Log.Information("Starting scrcpy server command: {Command}", command);
+            return serverLifecycle.StartServerAsync(command, receiver, cancellationToken);
+        }
+
+        internal static IReadOnlyList<string> BuildServerArguments(
+            long bitrate,
+            int maxSize,
+            int maxFramerate)
+        {
             List<string> commands = new()
             {
                 "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
                 "app_process",
                 "/",
                 "com.genymobile.scrcpy.Server",
-                version,
+                "1.23",
                 "log_level=debug",
-                $"bit_rate={Bitrate}",
             };
 
-            if (maxFramerate != 0)
+            if (bitrate > 0 && bitrate <= int.MaxValue)
+                commands.Add($"bit_rate={bitrate}");
+            if (maxSize > 0)
+                commands.Add($"max_size={maxSize}");
+            if (maxFramerate > 0)
                 commands.Add($"max_fps={maxFramerate}");
-            if (orientation != ScrcpyLockVideoOrientation.Unlocked)
-                commands.Add($"lock_video_orientation={(int)orientation}");
 
             commands.Add("tunnel_forward=false");
-            commands.Add($"control={control}");
+            commands.Add("control=true");
             commands.Add("display_id=0");
-            commands.Add($"show_touches={showTouches}");
-            commands.Add($"stay_awake={stayAwake}");
+            commands.Add("show_touches=false");
+            commands.Add("stay_awake=false");
             commands.Add("power_off_on_close=false");
             commands.Add("downsize_on_error=true");
             commands.Add("cleanup=true");
-
-            string command = string.Join(" ", commands);
-            Log.Information("Starting scrcpy server command: {Command}", command);
-            return adb.ExecuteRemoteCommandAsync(command, device, receiver, cancellationToken);
-        }
-
-        private void UploadMobileServer(CancellationToken cancellationToken)
-        {
-            using SyncService service = new(
-                new AdbSocket(new IPEndPoint(IPAddress.Loopback, AdbClient.AdbServerPort)),
-                device);
-            using Stream stream = File.OpenRead(ScrcpyServerFile);
-            service.Push(stream, "/data/local/tmp/scrcpy-server.jar", 444, DateTime.Now, null, cancellationToken);
+            return commands;
         }
 
         private void ObserveServerTask(Task task)

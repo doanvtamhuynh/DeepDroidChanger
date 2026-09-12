@@ -11,6 +11,7 @@ namespace DeepDroidChanger.ViewDevices.Runtime;
 public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
 {
     private const int DiagnosticCapacity = 64;
+    private static readonly TimeSpan DefaultFirstFrameTimeout = TimeSpan.FromSeconds(5);
 
     private readonly ViewDeviceLaunchOptions _options;
     private readonly ISharpAdbDeviceResolver _deviceResolver;
@@ -19,8 +20,10 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
     private readonly object _gate = new();
     private readonly Queue<string> _diagnostics = new();
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+    private readonly TimeSpan _firstFrameTimeout;
 
     private IScrcpyNetClient? _client;
+    private TaskCompletionSource? _firstFrameReceived;
     private SingleViewDeviceSessionState _state = SingleViewDeviceSessionState.Created;
     private int _contentWidth;
     private int _contentHeight;
@@ -31,7 +34,8 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         ViewDeviceLaunchOptions options,
         ISharpAdbDeviceResolver deviceResolver,
         IScrcpyNetClientFactory clientFactory,
-        ILogger<ScrcpyNetSingleViewDeviceSession> logger)
+        ILogger<ScrcpyNetSingleViewDeviceSession> logger,
+        TimeSpan? firstFrameTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(deviceResolver);
@@ -42,6 +46,9 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         _deviceResolver = deviceResolver;
         _clientFactory = clientFactory;
         _logger = logger;
+        _firstFrameTimeout = firstFrameTimeout ?? DefaultFirstFrameTimeout;
+        if (_firstFrameTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(firstFrameTimeout));
         if (string.IsNullOrWhiteSpace(options.Serial))
             throw new ArgumentException("A serial is required for a Single View session.", nameof(options));
     }
@@ -119,9 +126,11 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
                 cancellationToken.ThrowIfCancellationRequested();
 
                 IScrcpyNetClient client = _clientFactory.Create(device, _options);
+                TaskCompletionSource firstFrameReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 lock (_gate)
                 {
                     _client = client;
+                    _firstFrameReceived = firstFrameReceived;
                     Volatile.Write(ref _intentionalStop, 0);
                 }
                 SubscribeToClient(client);
@@ -132,6 +141,19 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!client.Connected)
                         throw new InvalidOperationException("ScrcpyNet did not report a connected session after start.");
+                    try
+                    {
+                        await firstFrameReceived.Task
+                            .WaitAsync(_firstFrameTimeout, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch (TimeoutException exception)
+                    {
+                        throw new TimeoutException(
+                            "Timed out waiting for the first decoded frame from ScrcpyNet.",
+                            exception);
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch
                 {
@@ -154,11 +176,11 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
 
                 SetState(SingleViewDeviceSessionState.Running);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 await CleanupClientAsync().ConfigureAwait(false);
                 SetState(SingleViewDeviceSessionState.Closed);
-                throw;
+                throw new OperationCanceledException(cancellationToken);
             }
             catch (Exception exception)
             {
@@ -224,6 +246,30 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         {
             Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_UP
         });
+        return Task.CompletedTask;
+    }
+
+    public Task SetScreenPowerModeAsync(
+        AndroidScreenPowerMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IScrcpyNetClient? client = GetInteractiveClient();
+        if (client is null)
+            return Task.CompletedTask;
+
+        client.SendControlCommand(new SetScreenPowerModeControlMessage { Mode = mode });
+        return Task.CompletedTask;
+    }
+
+    public Task RotateDeviceAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IScrcpyNetClient? client = GetInteractiveClient();
+        if (client is null)
+            return Task.CompletedTask;
+
+        client.SendControlCommand(new RotateDeviceControlMessage());
         return Task.CompletedTask;
     }
 
@@ -316,6 +362,8 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         {
             client = _client;
             _client = null;
+            _firstFrameReceived?.TrySetCanceled();
+            _firstFrameReceived = null;
             Volatile.Write(ref _intentionalStop, 1);
         }
 
@@ -360,8 +408,19 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
 
     private void OnClientFrameReceived(object? sender, ScrcpyNetFrameEventArgs eventArgs)
     {
-        if (sender is IScrcpyNetClient client && IsCurrentClient(client))
-            SetContentSize(eventArgs.Width, eventArgs.Height);
+        if (sender is not IScrcpyNetClient client || !IsCurrentClient(client))
+            return;
+
+        SetContentSize(eventArgs.Width, eventArgs.Height);
+        lock (_gate)
+        {
+            if (ReferenceEquals(_client, client) &&
+                eventArgs.Width > 0 &&
+                eventArgs.Height > 0)
+            {
+                _firstFrameReceived?.TrySetResult();
+            }
+        }
     }
 
     private void OnClientFailed(object? sender, ScrcpyNetErrorEventArgs eventArgs)
@@ -380,6 +439,11 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
             return;
         }
 
+        lock (_gate)
+        {
+            _firstFrameReceived?.TrySetException(
+                new InvalidOperationException("ScrcpyNet exited before the first decoded frame was received."));
+        }
         SetState(SingleViewDeviceSessionState.Failed);
         InvokeSafely(Exited, EventArgs.Empty);
     }

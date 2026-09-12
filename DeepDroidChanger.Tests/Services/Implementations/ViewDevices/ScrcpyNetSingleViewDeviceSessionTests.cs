@@ -53,6 +53,84 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
     }
 
     [TestMethod]
+    public async Task StartAsync_SocketConnectedWithoutFrame_DoesNotCompleteAsRunning()
+    {
+        FakeClient client = new(CreateUninitializedScrcpy())
+        {
+            Width = 720,
+            Height = 1280,
+            RaiseFrameOnStart = false
+        };
+        await using ScrcpyNetSingleViewDeviceSession session = CreateSession(
+            new FakeDeviceResolver(),
+            new FakeClientFactory(client),
+            TimeSpan.FromSeconds(1));
+
+        Task startTask = session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => client.StartCount == 1, TimeSpan.FromSeconds(1));
+
+        Assert.IsFalse(startTask.IsCompleted);
+        Assert.AreEqual(SingleViewDeviceSessionState.Starting, session.State);
+
+        client.RaiseFrame(720, 1280);
+        await startTask;
+
+        Assert.AreEqual(SingleViewDeviceSessionState.Running, session.State);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_FirstFrameTimeout_CleansClientAndFails()
+    {
+        FakeClient client = new(CreateUninitializedScrcpy())
+        {
+            Width = 720,
+            Height = 1280,
+            RaiseFrameOnStart = false
+        };
+        await using ScrcpyNetSingleViewDeviceSession session = CreateSession(
+            new FakeDeviceResolver(),
+            new FakeClientFactory(client),
+            TimeSpan.FromMilliseconds(20));
+
+        TimeoutException thrown = await Assert.ThrowsExactlyAsync<TimeoutException>(
+            () => session.StartAsync(CancellationToken.None));
+
+        StringAssert.Contains(thrown.Message, "first");
+        Assert.AreEqual(SingleViewDeviceSessionState.Failed, session.State);
+        Assert.IsNull(session.Client);
+        Assert.AreEqual(1, client.StopCount);
+        Assert.AreEqual(1, client.DisposeCount);
+    }
+
+    [TestMethod]
+    public async Task StartAsync_DecoderExitBeforeFirstFrame_FailsStartup()
+    {
+        FakeClient client = new(CreateUninitializedScrcpy())
+        {
+            Width = 720,
+            Height = 1280,
+            RaiseFrameOnStart = false
+        };
+        await using ScrcpyNetSingleViewDeviceSession session = CreateSession(
+            new FakeDeviceResolver(),
+            new FakeClientFactory(client),
+            TimeSpan.FromSeconds(1));
+
+        Task startTask = session.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(() => client.StartCount == 1, TimeSpan.FromSeconds(1));
+        client.RaiseExited();
+
+        InvalidOperationException thrown = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => startTask);
+
+        StringAssert.Contains(thrown.Message, "first decoded frame");
+        Assert.AreEqual(SingleViewDeviceSessionState.Failed, session.State);
+        Assert.IsNull(session.Client);
+        Assert.AreEqual(1, client.StopCount);
+        Assert.AreEqual(1, client.DisposeCount);
+    }
+
+    [TestMethod]
     public async Task StartAsync_WhenClientFails_CleansUpAndPreservesDiagnostics()
     {
         InvalidOperationException failure = new("scrcpy start failed");
@@ -210,6 +288,34 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
     }
 
     [TestMethod]
+    public async Task ScreenPowerAndRotateCommands_SendDistinctScrcpyMessages()
+    {
+        FakeClient client = new(CreateUninitializedScrcpy())
+        {
+            Connected = true,
+            Width = 720,
+            Height = 1280
+        };
+        await using ScrcpyNetSingleViewDeviceSession session = CreateSession(
+            new FakeDeviceResolver(),
+            new FakeClientFactory(client));
+        await session.StartAsync(CancellationToken.None);
+
+        await session.SetScreenPowerModeAsync(AndroidScreenPowerMode.POWER_MODE_NORMAL);
+        await session.SetScreenPowerModeAsync(AndroidScreenPowerMode.POWER_MODE_OFF);
+        await session.RotateDeviceAsync();
+
+        Assert.HasCount(3, client.Commands);
+        Assert.AreEqual(
+            AndroidScreenPowerMode.POWER_MODE_NORMAL,
+            ((SetScreenPowerModeControlMessage)client.Commands[0]).Mode);
+        Assert.AreEqual(
+            AndroidScreenPowerMode.POWER_MODE_OFF,
+            ((SetScreenPowerModeControlMessage)client.Commands[1]).Mode);
+        Assert.IsInstanceOfType(client.Commands[2], typeof(RotateDeviceControlMessage));
+    }
+
+    [TestMethod]
     public async Task FrameSizeChange_UpdatesDimensionsOnlyWhenChanged()
     {
         FakeClient client = new(CreateUninitializedScrcpy())
@@ -279,13 +385,15 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
 
     private static ScrcpyNetSingleViewDeviceSession CreateSession(
         ISharpAdbDeviceResolver resolver,
-        IScrcpyNetClientFactory factory)
+        IScrcpyNetClientFactory factory,
+        TimeSpan? firstFrameTimeout = null)
     {
         return new ScrcpyNetSingleViewDeviceSession(
             new ViewDeviceLaunchOptions(Serial),
             resolver,
             factory,
-            new TestLogger<ScrcpyNetSingleViewDeviceSession>());
+            new TestLogger<ScrcpyNetSingleViewDeviceSession>(),
+            firstFrameTimeout);
     }
 
     private static Scrcpy CreateUninitializedScrcpy()
@@ -346,6 +454,7 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
         public Exception? StartException { get; set; }
         public TaskCompletionSource? StartGate { get; set; }
         public TaskCompletionSource? StopGate { get; set; }
+        public bool RaiseFrameOnStart { get; set; } = true;
         public List<IControlMessage> Commands { get; } = [];
 
         public event EventHandler<ScrcpyNetFrameEventArgs>? FrameReceived;
@@ -361,6 +470,8 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
             if (StartGate is not null)
                 await StartGate.Task.WaitAsync(cancellationToken);
             Connected = true;
+            if (RaiseFrameOnStart)
+                RaiseFrame(Width, Height);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken = default)

@@ -4,6 +4,7 @@ using System.Windows;
 namespace DeepDroidChanger.Tests.Views.ViewMultipleDevices;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class ViewMultipleDevicesResourcesSmokeTests
 {
     [TestMethod]
@@ -12,6 +13,14 @@ public sealed class ViewMultipleDevicesResourcesSmokeTests
         (Type MarginType, Type HeaderHeightType, double HeaderHeight) result =
             RunOnSta(() =>
             {
+                Application application = Application.Current ?? new DeepDroidChanger.App();
+                if (application is not DeepDroidChanger.App app)
+                {
+                    throw new InvalidOperationException(
+                        "The WPF smoke test requires the DeepDroidChanger application instance.");
+                }
+
+                app.InitializeComponent();
                 ResourceDictionary resources = new()
                 {
                     Source = new Uri(

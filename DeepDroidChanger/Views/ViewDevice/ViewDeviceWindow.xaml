@@ -32,7 +32,8 @@
             <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.SurfaceAlt}"/>
             <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
-            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Style.Triggers>

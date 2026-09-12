@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Controls;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewDevices.Contracts;
 using DeepDroidChanger.ViewModels;
@@ -37,6 +38,20 @@ public sealed class ViewDeviceWindowSmokeTests
                 Assert.IsNull(((ScrcpyNet.Wpf.ScrcpyDisplay)display).Scrcpy);
                 Assert.IsNull(window.FindName("NativeHost"));
                 Assert.IsNull(window.FindName("ActionsPanel"));
+
+                Style toolbarStyle = (Style)window.Resources["ViewDeviceToolbarButtonStyle"];
+                Assert.AreEqual(
+                    false,
+                    toolbarStyle.Setters
+                        .OfType<Setter>()
+                        .Single(setter => setter.Property == Button.FocusableProperty)
+                        .Value);
+                Assert.AreEqual(
+                    false,
+                    toolbarStyle.Setters
+                        .OfType<Setter>()
+                        .Single(setter => setter.Property == Button.IsTabStopProperty)
+                        .Value);
             }
             finally
             {

@@ -1,5 +1,4 @@
 using System.IO;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DeepDroidChanger.Models;
@@ -7,13 +6,14 @@ using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewDevices.Contracts;
 using DeepDroidChanger.ViewDevices.Models;
 using Microsoft.Extensions.Logging;
+using ScrcpyNet;
 
 namespace DeepDroidChanger.ViewModels;
 
 public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 {
     private static readonly TimeSpan DeviceOnlineDebounce = TimeSpan.FromMilliseconds(400);
-    private static readonly TimeSpan[] RestartDelays =
+    internal static readonly TimeSpan[] DefaultRestartDelays =
     [
         TimeSpan.FromMilliseconds(250),
         TimeSpan.FromMilliseconds(500),
@@ -30,6 +30,7 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     private readonly ILocalizationService _localization;
     private readonly IUiDispatcherService _uiDispatcher;
     private readonly ILogger<ViewDeviceViewModel> _logger;
+    private readonly TimeSpan[] _restartDelays;
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly object _evaluationSchedulingGate = new();
@@ -60,6 +61,29 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         ILocalizationService localization,
         IUiDispatcherService uiDispatcher,
         ILogger<ViewDeviceViewModel> logger)
+        : this(
+            sessionFactory,
+            deviceTracker,
+            adbCommandService,
+            filePicker,
+            screenshotService,
+            localization,
+            uiDispatcher,
+            logger,
+            DefaultRestartDelays)
+    {
+    }
+
+    internal ViewDeviceViewModel(
+        ISingleViewDeviceSessionFactory sessionFactory,
+        IAdbDeviceTrackerService deviceTracker,
+        IAdbCommandService adbCommandService,
+        IFilePickerDialogService filePicker,
+        IViewDeviceScreenshotService screenshotService,
+        ILocalizationService localization,
+        IUiDispatcherService uiDispatcher,
+        ILogger<ViewDeviceViewModel> logger,
+        IReadOnlyList<TimeSpan> restartDelays)
     {
         _sessionFactory = sessionFactory;
         _deviceTracker = deviceTracker;
@@ -69,6 +93,8 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         _localization = localization;
         _uiDispatcher = uiDispatcher;
         _logger = logger;
+        ArgumentNullException.ThrowIfNull(restartDelays);
+        _restartDelays = restartDelays.ToArray();
 
         RetryCommand = new AsyncRelayCommand(RetryAsync, CanRetry);
         ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, CanReconnect);
@@ -544,13 +570,13 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
     private void ScheduleRestartAfterFailure()
     {
         int attempt = Interlocked.Increment(ref _restartAttempt) - 1;
-        if (attempt >= RestartDelays.Length)
+        if (attempt >= _restartDelays.Length)
         {
             _ = SetStateAsync(ViewDeviceSessionState.Failed, CancellationToken.None);
             return;
         }
 
-        _ = QueueEvaluationAsync(RestartDelays[attempt]);
+        _ = QueueEvaluationAsync(_restartDelays[attempt]);
     }
 
     private static void CancelEvaluation(CancellationTokenSource? cancellation)
@@ -608,23 +634,27 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
 
     private Task ScreenOnAsync()
     {
-        return SendAdbKeyAsync(224, "screen on");
+        return SendScreenPowerModeAsync(AndroidScreenPowerMode.POWER_MODE_NORMAL, "screen on");
     }
 
     private Task ScreenOffAsync()
     {
-        return SendAdbKeyAsync(26, "screen off");
+        return SendScreenPowerModeAsync(AndroidScreenPowerMode.POWER_MODE_OFF, "screen off");
     }
 
-    private async Task SendAdbKeyAsync(int keyCode, string actionName)
+    private async Task SendScreenPowerModeAsync(AndroidScreenPowerMode mode, string actionName)
     {
         if (!CanInteract())
             return;
 
+        ISingleViewDeviceSession? session = _session;
+        if (session is null)
+            return;
+
         try
         {
-            await _adbCommandService
-                .SendKeyEventAsync(Serial, keyCode, _lifetimeCancellation.Token)
+            await session
+                .SetScreenPowerModeAsync(mode, _lifetimeCancellation.Token)
                 .ConfigureAwait(true);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -638,34 +668,14 @@ public sealed class ViewDeviceViewModel : ObservableObject, IAsyncDisposable
         if (!CanInteract())
             return;
 
+        ISingleViewDeviceSession? session = _session;
+        if (session is null)
+            return;
+
         try
         {
-            string? currentValue = await _adbCommandService
-                .GetSettingAsync(Serial, "system", "user_rotation", _lifetimeCancellation.Token)
-                .ConfigureAwait(true);
-            int currentRotation = int.TryParse(
-                currentValue,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out int parsedRotation)
-                ? Math.Clamp(parsedRotation, 0, 3)
-                : 0;
-
-            await _adbCommandService
-                .PutSettingAsync(
-                    Serial,
-                    "system",
-                    "accelerometer_rotation",
-                    "0",
-                    _lifetimeCancellation.Token)
-                .ConfigureAwait(true);
-            await _adbCommandService
-                .PutSettingAsync(
-                    Serial,
-                    "system",
-                    "user_rotation",
-                    ((currentRotation + 1) % 4).ToString(CultureInfo.InvariantCulture),
-                    _lifetimeCancellation.Token)
+            await session
+                .RotateDeviceAsync(_lifetimeCancellation.Token)
                 .ConfigureAwait(true);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

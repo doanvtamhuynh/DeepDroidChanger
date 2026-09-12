@@ -175,4 +175,12 @@ namespace ScrcpyNet
         AMOTION_EVENT_BUTTON_STYLUS_PRIMARY = 1 << 5,
         AMOTION_EVENT_BUTTON_STYLUS_SECONDARY = 1 << 6,
     };
+
+    // scrcpy v1.23 app/src/control_msg.h: only these two modes are part of
+    // the pinned control protocol.
+    public enum AndroidScreenPowerMode : byte
+    {
+        POWER_MODE_OFF = 0,
+        POWER_MODE_NORMAL = 2,
+    }
 }

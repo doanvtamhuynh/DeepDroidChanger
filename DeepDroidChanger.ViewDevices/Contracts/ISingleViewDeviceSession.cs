@@ -20,4 +20,8 @@ public interface ISingleViewDeviceSession : IAsyncDisposable
     Task StopAsync(CancellationToken cancellationToken = default);
     Task SendKeyEventAsync(int keyCode, CancellationToken cancellationToken = default);
     Task SendBackOrScreenOnAsync(CancellationToken cancellationToken = default);
+    Task SetScreenPowerModeAsync(
+        AndroidScreenPowerMode mode,
+        CancellationToken cancellationToken = default);
+    Task RotateDeviceAsync(CancellationToken cancellationToken = default);
 }

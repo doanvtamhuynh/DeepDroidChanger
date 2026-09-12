@@ -19,6 +19,8 @@ public sealed class ScrcpyNetClientFactory(ScrcpyNetRuntimeResolver runtimeResol
         Scrcpy client = new(device)
         {
             Bitrate = ParseBitrate(options.VideoBitRate),
+            MaxSize = options.MaxSize,
+            MaxFramerate = options.MaxFps,
             ScrcpyServerFile = runtime.ServerPath
         };
         return new ScrcpyNetClient(client);

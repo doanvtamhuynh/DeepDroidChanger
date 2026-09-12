@@ -268,6 +268,74 @@ public sealed class ViewDeviceViewModelTests
     }
 
     [TestMethod]
+    public async Task ScreenOnOffAndRotateUseScrcpyControls_WhilePowerRemainsKeyToggle()
+    {
+        var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
+        var session = new FakeSession(Serial);
+        var factory = new FakeSessionFactory(session);
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        adb.RunAdbAsync(Serial, "get-state", Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, "device", string.Empty));
+        await using ViewDeviceViewModel viewModel = CreateViewModel(tracker, factory, adb);
+        await viewModel.InitializeAsync(Serial, "Device");
+
+        await viewModel.ScreenOnCommand.ExecuteAsync(null);
+        await viewModel.ScreenOffCommand.ExecuteAsync(null);
+        await viewModel.RotateCommand.ExecuteAsync(null);
+        await viewModel.PowerCommand.ExecuteAsync(null);
+
+        CollectionAssert.AreEqual(
+            new[] { "screen:normal", "screen:off", "rotate", "key:26" },
+            session.Actions);
+        await adb.DidNotReceive().GetSettingAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().PutSettingAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task RepeatedPreFirstFrameFailures_AdvanceRetryAttemptsAndStop()
+    {
+        var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
+        FakeSession[] failures = Enumerable
+            .Range(0, 6)
+            .Select(index => new FakeSession(Serial)
+            {
+                StartException = new TimeoutException($"first frame {index}")
+            })
+            .ToArray();
+        var factory = new FakeSessionFactory(failures);
+        await using ViewDeviceViewModel viewModel = CreateViewModel(
+            tracker,
+            factory,
+            restartDelays: new[]
+            {
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                TimeSpan.Zero
+            });
+
+        await viewModel.InitializeAsync(Serial, "Device");
+        await WaitUntilAsync(
+            () => factory.CreateCount == 6 && viewModel.State == ViewDeviceSessionState.Failed,
+            TimeSpan.FromSeconds(2));
+
+        CollectionAssert.AreEqual(
+            new[] { 250L, 500L, 1000L, 2000L, 5000L },
+            ViewDeviceViewModel.DefaultRestartDelays.Select(delay => (long)delay.TotalMilliseconds).ToArray());
+        Assert.AreEqual(6, factory.CreateCount);
+    }
+
+    [TestMethod]
     public async Task SessionContentSizeChange_UpdatesDeviceAspectRatio()
     {
         var tracker = new FakeTracker(new AdbDevice(Serial, AdbDeviceStatus.Online));
@@ -343,14 +411,34 @@ public sealed class ViewDeviceViewModelTests
         IAdbDeviceTrackerService tracker,
         ISingleViewDeviceSessionFactory factory,
         IAdbCommandService? adb = null,
-        ILocalizationService? localization = null)
+        ILocalizationService? localization = null,
+        IReadOnlyList<TimeSpan>? restartDelays = null)
     {
-        adb ??= Substitute.For<IAdbCommandService>();
-        adb.RunAdbAsync(Serial, "get-state", Arg.Any<CancellationToken>())
-            .Returns(new CommandResult(0, "device", string.Empty));
+        if (adb is null)
+        {
+            adb = Substitute.For<IAdbCommandService>();
+            adb.RunAdbAsync(Serial, "get-state", Arg.Any<CancellationToken>())
+                .Returns(new CommandResult(0, "device", string.Empty));
+        }
 
-        localization ??= Substitute.For<ILocalizationService>();
-        localization.GetString(Arg.Any<string>()).Returns(call => call.Arg<string>());
+        if (localization is null)
+        {
+            localization = Substitute.For<ILocalizationService>();
+            localization.GetString(Arg.Any<string>()).Returns(call => call.Arg<string>());
+        }
+
+        if (restartDelays is null)
+        {
+            return new ViewDeviceViewModel(
+                factory,
+                tracker,
+                adb,
+                Substitute.For<IFilePickerDialogService>(),
+                Substitute.For<IViewDeviceScreenshotService>(),
+                localization,
+                new ImmediateDispatcher(),
+                new TestLogger<ViewDeviceViewModel>());
+        }
 
         return new ViewDeviceViewModel(
             factory,
@@ -360,7 +448,8 @@ public sealed class ViewDeviceViewModelTests
             Substitute.For<IViewDeviceScreenshotService>(),
             localization,
             new ImmediateDispatcher(),
-            new TestLogger<ViewDeviceViewModel>());
+            new TestLogger<ViewDeviceViewModel>(),
+            restartDelays);
     }
 
     private static Scrcpy CreateUninitializedScrcpy()
@@ -479,6 +568,7 @@ public sealed class ViewDeviceViewModelTests
         public int StartCount { get; private set; }
         public int StopCount { get; private set; }
         public int DisposeCount { get; private set; }
+        public Exception? StartException { get; set; }
         public List<string> Actions { get; } = [];
 
         public event EventHandler<SingleViewDeviceSessionStateChangedEventArgs>? StateChanged;
@@ -489,6 +579,8 @@ public sealed class ViewDeviceViewModelTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             StartCount++;
+            if (StartException is not null)
+                throw StartException;
             if (_startGate is not null)
                 await _startGate.Task.WaitAsync(cancellationToken);
             SetState(SingleViewDeviceSessionState.Running);
@@ -523,6 +615,22 @@ public sealed class ViewDeviceViewModelTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             Actions.Add("back");
+            return Task.CompletedTask;
+        }
+
+        public Task SetScreenPowerModeAsync(
+            AndroidScreenPowerMode mode,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Actions.Add(mode == AndroidScreenPowerMode.POWER_MODE_OFF ? "screen:off" : "screen:normal");
+            return Task.CompletedTask;
+        }
+
+        public Task RotateDeviceAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Actions.Add("rotate");
             return Task.CompletedTask;
         }
 

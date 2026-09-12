@@ -10,7 +10,8 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}">
-                        <Image Name="PART_RenderTargetImage"/>
+                        <Image Name="PART_RenderTargetImage"
+                               Stretch="Uniform"/>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>

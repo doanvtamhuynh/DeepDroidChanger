@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using WpfPoint = System.Windows.Point;
 
 namespace ScrcpyNet.Wpf
 {
@@ -50,6 +51,9 @@ namespace ScrcpyNet.Wpf
 
         private Image? renderTarget;
         private WriteableBitmap? bmp;
+        private readonly ScrcpyDisplayPointerState pointerState = new();
+        private Position? lastPointerPosition;
+        private Scrcpy? subscribedScrcpy;
 
         static ScrcpyDisplay()
         {
@@ -67,7 +71,10 @@ namespace ScrcpyNet.Wpf
             base.OnApplyTemplate();
 
             if (GetTemplateChild("PART_RenderTargetImage") is Image img)
+            {
                 renderTarget = img;
+                renderTarget.Stretch = System.Windows.Media.Stretch.Uniform;
+            }
         }
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -85,8 +92,17 @@ namespace ScrcpyNet.Wpf
                 }
                 else if (e.LeftButton == MouseButtonState.Pressed)
                 {
-                    e.Handled = true;
-                    SendTouchCommand(AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN, e);
+                    Position? position = GetScrcpyMousePosition(e);
+                    if (position != null && pointerState.BeginPointerDown())
+                    {
+                        e.Handled = true;
+                        lastPointerPosition = position;
+                        SendTouchCommand(
+                            AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN,
+                            position,
+                            Scrcpy);
+                        CaptureMouse();
+                    }
                 }
             }
 
@@ -95,10 +111,16 @@ namespace ScrcpyNet.Wpf
 
         protected override void OnMouseUp(MouseButtonEventArgs e)
         {
-            if (Scrcpy != null && e.ChangedButton == MouseButton.Left)
+            if (e.ChangedButton == MouseButton.Left && pointerState.EndPointerUp())
             {
                 e.Handled = true;
-                SendTouchCommand(AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, e);
+                SendTouchCommand(
+                    AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP,
+                    GetScrcpyMousePosition(e) ?? lastPointerPosition,
+                    Scrcpy);
+                lastPointerPosition = null;
+                if (IsMouseCaptured)
+                    ReleaseMouseCapture();
             }
 
             base.OnMouseUp(e);
@@ -106,15 +128,15 @@ namespace ScrcpyNet.Wpf
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            if (Scrcpy != null && renderTarget != null)
+            if (pointerState.CanMove)
             {
-                var point = e.GetPosition(renderTarget);
-
-                if (e.LeftButton == MouseButtonState.Pressed && point.X >= 0 && point.Y >= 0)
-                {
-                    // Do we need to set e.Handled?
-                    SendTouchCommand(AndroidMotionEventAction.AMOTION_EVENT_ACTION_MOVE, e);
-                }
+                Position? position = GetScrcpyMousePosition(e);
+                if (position != null)
+                    lastPointerPosition = position;
+                SendTouchCommand(
+                    AndroidMotionEventAction.AMOTION_EVENT_ACTION_MOVE,
+                    position,
+                    Scrcpy);
             }
 
             base.OnMouseMove(e);
@@ -153,12 +175,12 @@ namespace ScrcpyNet.Wpf
 
         protected override void OnMouseWheel(MouseWheelEventArgs e)
         {
-            var pos = GetScrcpyMousePosition(e);
+            Position? pos = GetScrcpyMousePosition(e);
             if (Scrcpy != null && pos != null)
             {
                 e.Handled = true;
 
-                var msg = new ScrollEventControlMessage();
+                ScrollEventControlMessage msg = new();
                 msg.Position = pos;
                 msg.VerticalScroll = e.Delta / 120; // Random guess
                 msg.HorizontalScroll = 0; // TODO: Can we implement this?
@@ -168,73 +190,130 @@ namespace ScrcpyNet.Wpf
             base.OnMouseWheel(e);
         }
 
-        protected void SendTouchCommand(AndroidMotionEventAction action, MouseEventArgs e)
+        protected override void OnLostMouseCapture(MouseEventArgs e)
         {
-            var pos = GetScrcpyMousePosition(e);
-            if (Scrcpy != null && pos != null)
+            if (pointerState.CancelPointer())
             {
-                var msg = new TouchEventControlMessage();
-                msg.Action = action;
-                msg.Position = pos;
-                Scrcpy.SendControlCommand(msg);
-
-                log.Debug("Sending {Action} for position {PositionX}, {PositionY}", action, msg.Position.Point.X, msg.Position.Point.Y);
+                Position? position = lastPointerPosition;
+                lastPointerPosition = null;
+                SendTouchCommand(
+                    AndroidMotionEventAction.AMOTION_EVENT_ACTION_CANCEL,
+                    position,
+                    Scrcpy);
             }
+
+            base.OnLostMouseCapture(e);
+        }
+
+        private void SendTouchCommand(
+            AndroidMotionEventAction action,
+            Position? position,
+            Scrcpy? scrcpy)
+        {
+            if (scrcpy == null || position == null)
+                return;
+
+            TouchEventControlMessage msg = new()
+            {
+                Action = action,
+                Position = position
+            };
+            scrcpy.SendControlCommand(msg);
+
+            log.Debug(
+                "Sending {Action} for position {PositionX}, {PositionY}",
+                action,
+                msg.Position.Point.X,
+                msg.Position.Point.Y);
         }
 
         private Position? GetScrcpyMousePosition(MouseEventArgs e)
         {
-            if (Scrcpy == null || renderTarget == null) return null;
+            Scrcpy? scrcpy = Scrcpy;
+            if (scrcpy == null || renderTarget == null)
+                return null;
 
-            var point = e.GetPosition(renderTarget);
+            WpfPoint point = e.GetPosition(renderTarget);
+            if (!ScrcpyDisplayGeometry.TryMapPointToDevice(
+                    point,
+                    scrcpy.Width,
+                    scrcpy.Height,
+                    renderTarget.ActualWidth,
+                    renderTarget.ActualHeight,
+                    out WpfPoint devicePoint))
+            {
+                return null;
+            }
 
-            var pos = new Position();
-            pos.Point = new Point { X = (int)point.X, Y = (int)point.Y };
-            pos.ScreenSize.Width = (ushort)renderTarget.ActualWidth;
-            pos.ScreenSize.Height = (ushort)renderTarget.ActualHeight;
-            TouchHelper.ScaleToScreenSize(pos, Scrcpy.Width, Scrcpy.Height);
-
-            return pos;
+            return new Position
+            {
+                Point = new ScrcpyNet.Point
+                {
+                    X = (int)devicePoint.X,
+                    Y = (int)devicePoint.Y
+                },
+                ScreenSize = new ScreenSize
+                {
+                    Width = checked((ushort)scrcpy.Width),
+                    Height = checked((ushort)scrcpy.Height)
+                }
+            };
         }
 
         private unsafe void OnFrame(object? sender, FrameData frameData)
         {
-            if (renderTarget != null)
-            {
-                // This probably isn't the best way to do this.
-                try
-                {
-                    // The timeout is required. Otherwise this will block forever when the application is about to exit but the videoThread sends a last frame.
-                    // The DispatcherPriority has been randomly selected, so it might not be the optimal value.
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (bmp == null || bmp.Width != frameData.Width || bmp.Height != frameData.Height)
-                        {
-                            bmp = new WriteableBitmap(frameData.Width, frameData.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null);
-                            renderTarget.Source = bmp;
-                        }
+            if (sender is not Scrcpy source ||
+                !ReferenceEquals(source, Volatile.Read(ref subscribedScrcpy)) ||
+                renderTarget == null)
+                return;
 
-                        try
-                        {
-                            bmp.Lock();
-                            var dest = new Span<byte>(bmp.BackBuffer.ToPointer(), frameData.Data.Length);
-                            frameData.Data.CopyTo(dest);
-                            bmp.AddDirtyRect(new Int32Rect(0, 0, frameData.Width, frameData.Height));
-                        }
-                        finally
-                        {
-                            bmp.Unlock();
-                        }
-                    }, DispatcherPriority.Send, default, TimeSpan.FromMilliseconds(200));
-                }
-                catch (TimeoutException)
+            if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+                return;
+
+            // This probably isn't the best way to do this.
+            try
+            {
+                // The timeout is required. Otherwise this will block forever when the application is about to exit but the videoThread sends a last frame.
+                // The DispatcherPriority has been randomly selected, so it might not be the optimal value.
+                Dispatcher.Invoke(() =>
                 {
-                    log.Debug("Ignoring TimeoutException inside OnFrame.");
-                }
-                catch (TaskCanceledException)
-                {
-                    log.Debug("Ignoring TaskCanceledException inside OnFrame.");
-                }
+                    if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished || renderTarget == null)
+                        return;
+
+                    if (bmp == null || bmp.Width != frameData.Width || bmp.Height != frameData.Height)
+                    {
+                        bmp = new WriteableBitmap(frameData.Width, frameData.Height, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null);
+                        renderTarget.Source = bmp;
+                    }
+
+                    try
+                    {
+                        bmp.Lock();
+                        Span<byte> dest = new(bmp.BackBuffer.ToPointer(), frameData.Data.Length);
+                        frameData.Data.CopyTo(dest);
+                        bmp.AddDirtyRect(new Int32Rect(0, 0, frameData.Width, frameData.Height));
+                    }
+                    finally
+                    {
+                        bmp.Unlock();
+                    }
+                }, DispatcherPriority.Send, default, TimeSpan.FromMilliseconds(200));
+            }
+            catch (TimeoutException)
+            {
+                log.Debug("Ignoring TimeoutException inside OnFrame.");
+            }
+            catch (TaskCanceledException)
+            {
+                log.Debug("Ignoring TaskCanceledException inside OnFrame.");
+            }
+            catch (ObjectDisposedException)
+            {
+                log.Debug("Ignoring ObjectDisposedException inside OnFrame during control disposal.");
+            }
+            catch (InvalidOperationException)
+            {
+                log.Debug("Ignoring InvalidOperationException inside OnFrame during dispatcher shutdown.");
             }
         }
 
@@ -244,7 +323,10 @@ namespace ScrcpyNet.Wpf
             {
                 // Unsubscribe on the old scrcpy
                 if (e.OldValue is Scrcpy old && old != null)
+                {
                     old.VideoStreamDecoder.OnFrame -= display.OnFrame;
+                    display.CancelPointer(old);
+                }
 
                 display.bmp = null;
                 if (display.renderTarget != null)
@@ -252,8 +334,30 @@ namespace ScrcpyNet.Wpf
 
                 // Subscribe on the new scrcpy
                 if (e.NewValue is Scrcpy value && value != null)
+                {
+                    Volatile.Write(ref display.subscribedScrcpy, value);
                     value.VideoStreamDecoder.OnFrame += display.OnFrame;
+                }
+                else
+                {
+                    Volatile.Write(ref display.subscribedScrcpy, null);
+                }
             }
+        }
+
+        private void CancelPointer(Scrcpy? scrcpy)
+        {
+            if (!pointerState.CancelPointer())
+                return;
+
+            Position? position = lastPointerPosition;
+            lastPointerPosition = null;
+            SendTouchCommand(
+                AndroidMotionEventAction.AMOTION_EVENT_ACTION_CANCEL,
+                position,
+                scrcpy);
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
         }
     }
 }
