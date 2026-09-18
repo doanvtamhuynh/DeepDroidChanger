@@ -24,6 +24,10 @@ public interface IDeviceActionService
         string serial,
         CancellationToken cancellationToken);
 
+    Task<bool?> GetScreenOnAsync(
+        string serial,
+        CancellationToken cancellationToken);
+
     Task SetWifiEnabledAsync(
         string serial,
         bool enabled,

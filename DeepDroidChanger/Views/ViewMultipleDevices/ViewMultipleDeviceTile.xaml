@@ -2,9 +2,11 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:scrcpy="clr-namespace:ScrcpyNet.Wpf;assembly=DeepDroidChanger.ViewDevices"
              xmlns:views="clr-namespace:DeepDroidChanger.Views"
              Background="Transparent"
              Width="{Binding TileWidth}"
+             PreviewKeyDown="OnPreviewKeyDown"
              FontFamily="{StaticResource Metric.FontFamily}">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -14,70 +16,14 @@
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
             <views:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
 
-            <Style x:Key="ViewMultipleDeviceStatusPillStyle"
-                   TargetType="Border">
-                <Setter Property="Padding"
-                        Value="8,3"/>
-                <Setter Property="CornerRadius"
-                        Value="{StaticResource Radius.Interactive}"/>
-                <Setter Property="Background"
-                        Value="{DynamicResource Brush.SurfaceAlt}"/>
-                <Setter Property="BorderBrush"
-                        Value="{DynamicResource Brush.Border}"/>
-                <Setter Property="BorderThickness"
-                        Value="{StaticResource Metric.BorderThickness.Uniform}"/>
-                <Setter Property="TextElement.Foreground"
-                        Value="{DynamicResource Brush.TextSecondary}"/>
-                <Setter Property="TextElement.FontSize"
-                        Value="{StaticResource Metric.FontSize.Small}"/>
-                <Setter Property="TextElement.FontWeight"
-                        Value="SemiBold"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsRunning}"
-                                 Value="True">
-                        <Setter Property="Background"
-                                Value="{DynamicResource Brush.DeviceStatusPositiveBackground}"/>
-                        <Setter Property="BorderBrush"
-                                Value="{DynamicResource Brush.DeviceStatusPositiveForeground}"/>
-                        <Setter Property="TextElement.Foreground"
-                                Value="{DynamicResource Brush.DeviceStatusPositiveForeground}"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding IsFailed}"
-                                 Value="True">
-                        <Setter Property="Background"
-                                Value="{DynamicResource Brush.DeviceStatusNegativeBackground}"/>
-                        <Setter Property="BorderBrush"
-                                Value="{DynamicResource Brush.DeviceStatusNegativeForeground}"/>
-                        <Setter Property="TextElement.Foreground"
-                                Value="{DynamicResource Brush.DeviceStatusNegativeForeground}"/>
-                    </DataTrigger>
-                </Style.Triggers>
-            </Style>
-
-            <Style x:Key="ViewMultipleDeviceStatusDotStyle"
-                   TargetType="Ellipse">
-                <Setter Property="Fill"
-                        Value="{DynamicResource Brush.TextDisabled}"/>
-                <Setter Property="Width"
-                        Value="8"/>
-                <Setter Property="Height"
-                        Value="8"/>
-                <Setter Property="VerticalAlignment"
-                        Value="Center"/>
-                <Setter Property="Margin"
-                        Value="0,0,5,0"/>
-                <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsRunning}"
-                                 Value="True">
-                        <Setter Property="Fill"
-                                Value="{DynamicResource Brush.Success}"/>
-                    </DataTrigger>
-                    <DataTrigger Binding="{Binding IsFailed}"
-                                 Value="True">
-                        <Setter Property="Fill"
-                                Value="{DynamicResource Brush.Danger}"/>
-                    </DataTrigger>
-                </Style.Triggers>
+            <Style x:Key="ViewMultipleDeviceOpenViewButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource FlatButtonStyle}">
+                <Setter Property="Width" Value="30"/>
+                <Setter Property="Height" Value="30"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -116,15 +62,17 @@
                                TextTrimming="CharacterEllipsis"
                                Margin="0,0,8,0"/>
 
-                    <Border Grid.Row="0"
+                    <Button x:Name="OpenViewDeviceButton"
+                            Grid.Row="0"
                             Grid.Column="1"
-                            Style="{StaticResource ViewMultipleDeviceStatusPillStyle}">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Style="{StaticResource ViewMultipleDeviceStatusDotStyle}"/>
-                            <TextBlock Text="{Binding StatusText}"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                    </Border>
+                            Style="{StaticResource ViewMultipleDeviceOpenViewButtonStyle}"
+                            Command="{Binding OpenViewDeviceCommand}"
+                            AutomationProperties.Name="{DynamicResource ViewMultipleDevices_OpenView}"
+                            ToolTip="{DynamicResource ViewMultipleDevices_OpenViewDevice}">
+                        <materialDesign:PackIcon Kind="OpenInNew"
+                                                 Width="16"
+                                                 Height="16"/>
+                    </Button>
 
                     <TextBlock Grid.Row="1"
                                Grid.Column="0"
@@ -143,13 +91,12 @@
                   ClipToBounds="True"
                   MinHeight="1"
                   SizeChanged="OnStreamViewportSizeChanged">
-                <views:ScrcpyWindowHost x:Name="NativeHost"
-                                        Focusable="True"
-                                        IsHitTestVisible="True"
-                                        IsInteractive="True"
-                                        HorizontalAlignment="Stretch"
-                                        VerticalAlignment="Stretch"
-                                        Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <scrcpy:ScrcpyDisplay x:Name="ScrcpyDisplay"
+                                      Scrcpy="{Binding ScrcpyClient}"
+                                      Focusable="True"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Stretch"
+                                      Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                 <Grid Background="{DynamicResource Brush.WindowBackground}"
                       IsHitTestVisible="False"

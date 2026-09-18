@@ -4,14 +4,16 @@ using System.Windows;
 namespace DeepDroidChanger.Tests.Views.ViewMultipleDevices;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class ViewMultipleDevicesResourcesSmokeTests
 {
     [TestMethod]
     public void ViewMultipleDevicesResources_LoadsExpectedResourceTypes()
     {
         (Type MarginType, Type HeaderHeightType, double HeaderHeight) result =
-            RunOnSta(() =>
+            WpfTestDispatcher.Run(() =>
             {
+                WpfTestDispatcher.EnsureApplicationResources();
                 ResourceDictionary resources = new()
                 {
                     Source = new Uri(
@@ -29,28 +31,4 @@ public sealed class ViewMultipleDevicesResourcesSmokeTests
         Assert.AreEqual(64d, result.HeaderHeight);
     }
 
-    private static T RunOnSta<T>(Func<T> operation)
-    {
-        T result = default!;
-        Exception? failure = null;
-        Thread thread = new(() =>
-        {
-            try
-            {
-                result = operation();
-            }
-            catch (Exception exception)
-            {
-                failure = exception;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (failure is not null)
-            ExceptionDispatchInfo.Capture(failure).Throw();
-
-        return result;
-    }
 }

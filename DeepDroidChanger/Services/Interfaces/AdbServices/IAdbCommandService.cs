@@ -21,6 +21,17 @@ namespace DeepDroidChanger.Services
         Task SendTextAsync(string serial, string text, CancellationToken cancellationToken);
         Task RebootAsync(string serial, CancellationToken cancellationToken);
 
+        Task<CommandResult> PushFileAsync(
+            string serial,
+            string localPath,
+            string remotePath,
+            CancellationToken cancellationToken);
+        Task<CommandResult> PullFileAsync(
+            string serial,
+            string remotePath,
+            string localPath,
+            CancellationToken cancellationToken);
+
         Task SetWifiAsync(string serial, bool enabled, CancellationToken cancellationToken);
         Task<bool> IsWifiEnabledAsync(string serial, CancellationToken cancellationToken);
         Task OpenPackageAsync(string serial, string packageName, CancellationToken cancellationToken);

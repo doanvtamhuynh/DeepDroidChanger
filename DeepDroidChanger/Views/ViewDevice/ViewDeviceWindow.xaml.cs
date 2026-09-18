@@ -1,21 +1,21 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
+using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
 
 namespace DeepDroidChanger.Views;
 
 public sealed partial class ViewDeviceWindow : Window
 {
-    private const double CollapsedActionsWidth = 52;
-    private const double ExpandedActionsWidth = 315;
-    private const double FullscreenActionsWidth = 44;
+    private const double ToolsWindowVisibleGap = 12;
+    private const double ToolsWindowShadowMargin = 8;
+    private static readonly Thickness NormalStreamMargin = new(8);
     private readonly ViewDeviceViewModel _viewModel;
-    private readonly double _collapsedMinimumWidth;
-    private WindowStyle _savedWindowStyle;
-    private ResizeMode _savedResizeMode;
-    private WindowState _savedWindowState;
-    private double _fullscreenRestoreStreamArea;
+    private readonly ViewDeviceShortcutResolver _shortcutResolver = new();
+    private ViewDeviceToolsWindow? _toolsWindow;
+    private bool _toolsEnabled;
     private bool _isLoaded;
     private bool _isClosing;
 
@@ -23,35 +23,208 @@ public sealed partial class ViewDeviceWindow : Window
     {
         _viewModel = viewModel;
         InitializeComponent();
-        _collapsedMinimumWidth = MinWidth;
         DataContext = viewModel;
+        SettingsButton.Tag = _toolsEnabled;
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        _viewModel.NativeWindowHandleChanged += OnNativeWindowHandleChanged;
-        _viewModel.NativeFocusRequested += OnNativeFocusRequested;
         Loaded += OnLoaded;
         Closed += OnClosed;
+        Deactivated += OnDeactivated;
+        LocationChanged += OnOwnerLocationChanged;
+        SizeChanged += OnOwnerSizeChanged;
+        StateChanged += OnOwnerStateChanged;
+        PreviewMouseDown += OnPreviewMouseDown;
         PreviewKeyDown += OnPreviewKeyDown;
+        PreviewKeyUp += OnPreviewKeyUp;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs eventArgs)
     {
         _isLoaded = true;
-        ApplyActionsPanelLayout(adjustWindowWidth: false);
+        StreamContainer.Margin = NormalStreamMargin;
+        RootBorder.BorderThickness = new Thickness(1);
         FitWindowToDeviceAspect();
-        UpdateStreamViewport();
-        AttachNativeWindow();
+        FocusDisplay();
+
+        if (_toolsEnabled)
+            ShowToolsWindow();
     }
 
     private void OnClosed(object? sender, EventArgs eventArgs)
     {
         _isClosing = true;
+        _shortcutResolver.Reset();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-        _viewModel.NativeWindowHandleChanged -= OnNativeWindowHandleChanged;
-        _viewModel.NativeFocusRequested -= OnNativeFocusRequested;
         Loaded -= OnLoaded;
         Closed -= OnClosed;
+        Deactivated -= OnDeactivated;
+        LocationChanged -= OnOwnerLocationChanged;
+        SizeChanged -= OnOwnerSizeChanged;
+        StateChanged -= OnOwnerStateChanged;
+        PreviewMouseDown -= OnPreviewMouseDown;
         PreviewKeyDown -= OnPreviewKeyDown;
+        PreviewKeyUp -= OnPreviewKeyUp;
+        CloseToolsWindow();
+    }
+
+    private void OnDeactivated(object? sender, EventArgs eventArgs)
+    {
+        _shortcutResolver.Reset();
+        ScrcpyDisplay.ReleaseActiveInput();
+    }
+
+    private void OnOwnerLocationChanged(object? sender, EventArgs eventArgs)
+    {
+        UpdateToolsWindowPosition();
+    }
+
+    private void OnOwnerSizeChanged(object? sender, SizeChangedEventArgs eventArgs)
+    {
+        UpdateToolsWindowPosition();
+    }
+
+    private void OnOwnerStateChanged(object? sender, EventArgs eventArgs)
+    {
+        if (_isClosing || _toolsWindow is null)
+            return;
+
+        if (WindowState == WindowState.Minimized)
+        {
+            HideToolsWindow();
+            return;
+        }
+
+        if (_toolsEnabled && _isLoaded && IsVisible)
+            ShowToolsWindow();
+        else
+            UpdateToolsWindowPosition();
+    }
+
+    private void OnSettingsClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_isClosing)
+            return;
+
+        _toolsEnabled = !_toolsEnabled;
+        SettingsButton.Tag = _toolsEnabled;
+
+        if (_toolsEnabled)
+        {
+            if (_isLoaded && IsVisible && WindowState != WindowState.Minimized)
+                ShowToolsWindow();
+        }
+        else
+        {
+            HideToolsWindow();
+        }
+    }
+
+    private ViewDeviceToolsWindow EnsureToolsWindow()
+    {
+        if (_toolsWindow is not null)
+            return _toolsWindow;
+
+        ViewDeviceToolsWindow toolsWindow = new(_viewModel)
+        {
+            Owner = this,
+            DataContext = _viewModel,
+            ShowInTaskbar = false
+        };
+        toolsWindow.Closing += OnToolsWindowClosing;
+        _toolsWindow = toolsWindow;
+        return toolsWindow;
+    }
+
+    private void ShowToolsWindow()
+    {
+        if (_isClosing || !_isLoaded || !IsVisible || WindowState == WindowState.Minimized)
+            return;
+
+        _viewModel.SetToolsVisibility(true);
+        ViewDeviceToolsWindow toolsWindow = EnsureToolsWindow();
+        UpdateToolsWindowPosition();
+        if (!toolsWindow.IsVisible)
+            toolsWindow.Show();
+        UpdateToolsWindowPosition();
+    }
+
+    private void HideToolsWindow()
+    {
+        _toolsWindow?.DismissDetailWindow();
+        _viewModel.CloseToolEditor();
+        _viewModel.SetToolsVisibility(false);
+        if (_toolsWindow?.IsVisible == true)
+            _toolsWindow.Hide();
+    }
+
+    private void OnToolsWindowClosing(object? sender, CancelEventArgs eventArgs)
+    {
+        if (!_isClosing)
+            eventArgs.Cancel = true;
+    }
+
+    private void CloseToolsWindow()
+    {
+        _toolsWindow?.DismissDetailWindow();
+        _viewModel.SetToolsVisibility(false);
+        ViewDeviceToolsWindow? toolsWindow = _toolsWindow;
+        _toolsWindow = null;
+        _toolsEnabled = false;
+        SettingsButton.Tag = false;
+
+        if (toolsWindow is null)
+            return;
+
+        toolsWindow.CloseDetailWindow();
+        toolsWindow.Closing -= OnToolsWindowClosing;
+        toolsWindow.DataContext = null;
+        if (toolsWindow.IsLoaded)
+            toolsWindow.Close();
+    }
+
+    private void UpdateToolsWindowPosition()
+    {
+        if (_toolsWindow is null ||
+            !_toolsEnabled ||
+            !_isLoaded ||
+            _isClosing ||
+            !IsVisible ||
+            WindowState == WindowState.Minimized)
+        {
+            return;
+        }
+
+        Rect workArea = ViewDeviceMonitorWorkArea.GetFor(this);
+        double ownerWidth = ActualWidth > 0 ? ActualWidth : Width;
+        double ownerHeight = ActualHeight > 0 ? ActualHeight : Height;
+        if (!double.IsFinite(ownerWidth) ||
+            !double.IsFinite(ownerHeight) ||
+            ownerWidth <= 0 ||
+            ownerHeight <= 0)
+        {
+            return;
+        }
+
+        double toolsHeight = Math.Max(_toolsWindow.MinHeight, ownerHeight);
+        if (workArea.Height > 0)
+            toolsHeight = Math.Min(toolsHeight, Math.Max(_toolsWindow.MinHeight, workArea.Height));
+        _toolsWindow.Height = toolsHeight;
+
+        double toolsWidth = _toolsWindow.Width;
+        if (!double.IsFinite(toolsWidth) || toolsWidth <= 0)
+            toolsWidth = 310;
+
+        double ownerLeft = double.IsFinite(Left) ? Left : workArea.Left;
+        double ownerTop = double.IsFinite(Top) ? Top : workArea.Top;
+        Point position = ViewDeviceToolsPlacement.Calculate(
+            new Rect(ownerLeft, ownerTop, ownerWidth, ownerHeight),
+            new Size(toolsWidth, toolsHeight),
+            workArea,
+            ToolsWindowVisibleGap,
+            ToolsWindowShadowMargin);
+
+        _toolsWindow.Left = position.X;
+        _toolsWindow.Top = position.Y;
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
@@ -61,64 +234,28 @@ public sealed partial class ViewDeviceWindow : Window
 
         switch (eventArgs.PropertyName)
         {
-            case nameof(ViewDeviceViewModel.IsFullscreen):
-                ApplyFullscreen(_viewModel.IsFullscreen);
-                break;
-            case nameof(ViewDeviceViewModel.IsActionsPanelExpanded):
-                ApplyActionsPanelLayout(adjustWindowWidth: !_viewModel.IsFullscreen);
-                RestoreNativeFocus();
+            case nameof(ViewDeviceViewModel.DeviceName):
+                Title = ViewDeviceWindowService.FormatWindowTitle(
+                    _viewModel.Serial,
+                    _viewModel.DeviceName);
                 break;
             case nameof(ViewDeviceViewModel.DeviceAspectRatio):
                 FitWindowToDeviceAspect();
-                UpdateStreamViewport();
+                break;
+            case nameof(ViewDeviceViewModel.ViewRotationQuarterTurns):
+                ApplyLocalViewRotation();
                 break;
             case nameof(ViewDeviceViewModel.IsRunning):
-                UpdateStreamViewport();
                 if (_viewModel.IsRunning)
-                    Dispatcher.BeginInvoke(new Action(AttachNativeWindow));
+                    FocusDisplay();
                 break;
         }
     }
 
-    private void OnNativeWindowHandleChanged(object? sender, EventArgs eventArgs)
+    private void FitWindowToDeviceAspect()
     {
-        if (!_isClosing)
-            Dispatcher.BeginInvoke(new Action(AttachNativeWindow));
-    }
-
-    private void OnNativeFocusRequested(object? sender, EventArgs eventArgs)
-    {
-        if (!_isClosing && IsActive)
-            Dispatcher.BeginInvoke(new Action(NativeHost.FocusNativeWindow));
-    }
-
-    private void AttachNativeWindow()
-    {
-        if (!_isClosing && _isLoaded)
-        {
-            try
-            {
-                NativeHost.AttachWindow(_viewModel.NativeWindowHandle);
-                RestoreNativeFocus();
-            }
-            catch (Win32Exception exception)
-            {
-                NativeHost.DetachWindow();
-                _ = _viewModel.HandleNativeHostFailureAsync(exception);
-            }
-        }
-    }
-
-    private void OnStreamContainerSizeChanged(object sender, SizeChangedEventArgs eventArgs)
-    {
-        UpdateStreamViewport();
-    }
-
-    private void FitWindowToDeviceAspect(double? preferredAreaOverride = null)
-    {
-        double aspectRatio = _viewModel.DeviceAspectRatio;
+        double aspectRatio = _viewModel.ViewAspectRatio;
         if (!_isLoaded ||
-            _viewModel.IsFullscreen ||
             WindowState != WindowState.Normal ||
             !double.IsFinite(aspectRatio) ||
             aspectRatio <= 0 ||
@@ -130,12 +267,45 @@ public sealed partial class ViewDeviceWindow : Window
         Rect workArea = ViewDeviceMonitorWorkArea.GetFor(this);
         double horizontalChrome = Math.Max(0, ActualWidth - StreamContainer.ActualWidth);
         double verticalChrome = Math.Max(0, ActualHeight - StreamContainer.ActualHeight);
-        double preferredArea = preferredAreaOverride is > 0
-            ? preferredAreaOverride.Value
-            : GetCurrentStreamArea();
-        double desiredStreamWidth = Math.Sqrt(preferredArea * aspectRatio);
-        double desiredStreamHeight = desiredStreamWidth / aspectRatio;
+        double availableStreamWidth = Math.Max(1, workArea.Width - horizontalChrome);
+        double availableStreamHeight = Math.Max(1, workArea.Height - verticalChrome);
+        double currentStreamHeight = StreamContainer.ActualHeight > 0
+            ? StreamContainer.ActualHeight
+            : Math.Max(1, ActualHeight - verticalChrome);
+        double desiredStreamHeight = Math.Min(currentStreamHeight, availableStreamHeight);
+        double desiredStreamWidth = desiredStreamHeight * aspectRatio;
+        if (desiredStreamWidth > availableStreamWidth)
+        {
+            double scale = availableStreamWidth / desiredStreamWidth;
+            desiredStreamWidth *= scale;
+            desiredStreamHeight *= scale;
+        }
 
+        ApplyWindowBounds(
+            Math.Max(MinWidth, desiredStreamWidth + horizontalChrome),
+            Math.Max(MinHeight, desiredStreamHeight + verticalChrome),
+            workArea);
+    }
+
+    private void ApplyLocalViewRotation()
+    {
+        ViewRotationTransform.Angle = _viewModel.ViewRotationAngle;
+        if (!_isLoaded ||
+            _isClosing ||
+            WindowState != WindowState.Normal ||
+            StreamContainer.ActualWidth <= 0 ||
+            StreamContainer.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        double streamWidth = StreamContainer.ActualWidth;
+        double streamHeight = StreamContainer.ActualHeight;
+        double horizontalChrome = Math.Max(0, ActualWidth - streamWidth);
+        double verticalChrome = Math.Max(0, ActualHeight - streamHeight);
+        double desiredStreamWidth = streamHeight;
+        double desiredStreamHeight = streamWidth;
+        Rect workArea = ViewDeviceMonitorWorkArea.GetFor(this);
         double availableStreamWidth = Math.Max(1, workArea.Width - horizontalChrome);
         double availableStreamHeight = Math.Max(1, workArea.Height - verticalChrome);
         double scale = Math.Min(
@@ -143,149 +313,17 @@ public sealed partial class ViewDeviceWindow : Window
             Math.Min(
                 availableStreamWidth / desiredStreamWidth,
                 availableStreamHeight / desiredStreamHeight));
-        desiredStreamWidth *= scale;
-        desiredStreamHeight *= scale;
+        if (double.IsFinite(scale) && scale > 0 && scale < 1)
+        {
+            desiredStreamWidth *= scale;
+            desiredStreamHeight *= scale;
+        }
 
         ApplyWindowBounds(
             Math.Max(MinWidth, desiredStreamWidth + horizontalChrome),
             Math.Max(MinHeight, desiredStreamHeight + verticalChrome),
             workArea);
-        UpdateStreamViewport();
-    }
-
-    private double GetCurrentStreamArea()
-    {
-        double preferredStreamWidth = StreamViewport.ActualWidth > 0
-            ? StreamViewport.ActualWidth
-            : StreamContainer.ActualWidth;
-        double preferredStreamHeight = StreamViewport.ActualHeight > 0
-            ? StreamViewport.ActualHeight
-            : StreamContainer.ActualHeight;
-        return Math.Max(1, preferredStreamWidth * preferredStreamHeight);
-    }
-
-    private void UpdateStreamViewport()
-    {
-        if (!_isLoaded || StreamContainer.ActualWidth <= 0 || StreamContainer.ActualHeight <= 0)
-            return;
-
-        double availableWidth = StreamContainer.ActualWidth;
-        double availableHeight = StreamContainer.ActualHeight;
-        double aspectRatio = _viewModel.DeviceAspectRatio;
-        if (!double.IsFinite(aspectRatio) || aspectRatio <= 0)
-        {
-            StreamViewport.Width = availableWidth;
-            StreamViewport.Height = availableHeight;
-            return;
-        }
-
-        double width = availableWidth;
-        double height = width / aspectRatio;
-        if (height > availableHeight)
-        {
-            height = availableHeight;
-            width = height * aspectRatio;
-        }
-
-        StreamViewport.Width = Math.Max(1, width);
-        StreamViewport.Height = Math.Max(1, height);
-    }
-
-    private void ApplyActionsPanelLayout(bool adjustWindowWidth)
-    {
-        double oldWidth = ActionsColumn.Width.IsAbsolute
-            ? ActionsColumn.Width.Value
-            : CollapsedActionsWidth;
-        double newWidth = _viewModel.IsFullscreen
-            ? FullscreenActionsWidth
-            : _viewModel.IsActionsPanelExpanded
-                ? ExpandedActionsWidth
-                : CollapsedActionsWidth;
-        double windowWidthBeforeLayout = ActualWidth > 0 ? ActualWidth : Width;
-        double windowHeightBeforeLayout = ActualHeight > 0 ? ActualHeight : Height;
-
-        ActionsColumn.Width = new GridLength(newWidth);
-        MinWidth = !_viewModel.IsFullscreen && _viewModel.IsActionsPanelExpanded
-            ? _collapsedMinimumWidth + ExpandedActionsWidth - CollapsedActionsWidth
-            : _collapsedMinimumWidth;
-        if (adjustWindowWidth &&
-            WindowState == WindowState.Normal &&
-            double.IsFinite(windowWidthBeforeLayout) &&
-            double.IsFinite(windowHeightBeforeLayout))
-        {
-            // MinWidth can resize the WPF window immediately. Base the panel delta on
-            // the dimensions captured before that coercion so the stream stays fixed.
-            ApplyWindowBounds(
-                windowWidthBeforeLayout + newWidth - oldWidth,
-                windowHeightBeforeLayout,
-                ViewDeviceMonitorWorkArea.GetFor(this));
-        }
-        else if (WindowState == WindowState.Normal)
-        {
-            ClampWindowToCurrentWorkArea();
-        }
-
-        UpdateStreamViewport();
-    }
-
-    private void ApplyFullscreen(bool fullscreen)
-    {
-        if (fullscreen)
-        {
-            _fullscreenRestoreStreamArea = GetCurrentStreamArea();
-            _savedWindowStyle = WindowStyle;
-            _savedResizeMode = ResizeMode;
-            _savedWindowState = WindowState;
-            HeaderPanel.Visibility = Visibility.Collapsed;
-            NavigationPanel.Visibility = Visibility.Collapsed;
-            ActionsColumn.Width = new GridLength(FullscreenActionsWidth);
-            WindowStyle = WindowStyle.None;
-            ResizeMode = ResizeMode.NoResize;
-            WindowState = WindowState.Maximized;
-        }
-        else
-        {
-            WindowState = _savedWindowState == WindowState.Minimized
-                ? WindowState.Normal
-                : _savedWindowState;
-            ResizeMode = _savedResizeMode;
-            WindowStyle = _savedWindowStyle;
-            HeaderPanel.Visibility = Visibility.Visible;
-            NavigationPanel.Visibility = Visibility.Visible;
-            ApplyActionsPanelLayout(adjustWindowWidth: false);
-        }
-
-        Dispatcher.BeginInvoke(new Action(() =>
-        {
-            if (!fullscreen)
-            {
-                FitWindowToDeviceAspect(_fullscreenRestoreStreamArea);
-                _fullscreenRestoreStreamArea = 0;
-            }
-            ClampWindowToCurrentWorkArea();
-            UpdateStreamViewport();
-            RestoreNativeFocus();
-        }));
-    }
-
-    private void RestoreNativeFocus()
-    {
-        if (_isClosing || !_isLoaded || !_viewModel.IsRunning || !IsActive)
-            return;
-
-        Dispatcher.BeginInvoke(new Action(() =>
-        {
-            if (!_isClosing && _isLoaded && _viewModel.IsRunning && IsActive)
-                NativeHost.FocusNativeWindow();
-        }));
-    }
-
-    private void ClampWindowToCurrentWorkArea()
-    {
-        if (!_isLoaded || WindowState != WindowState.Normal)
-            return;
-
-        ApplyWindowBounds(Width, Height, ViewDeviceMonitorWorkArea.GetFor(this));
+        UpdateToolsWindowPosition();
     }
 
     private void ApplyWindowBounds(double desiredWidth, double desiredHeight, Rect workArea)
@@ -309,12 +347,189 @@ public sealed partial class ViewDeviceWindow : Window
         Top = Math.Clamp(currentTop, workArea.Top, maximumTop);
     }
 
+    private void FocusDisplay()
+    {
+        if (!_isLoaded ||
+            _isClosing ||
+            !_viewModel.IsRunning ||
+            !IsActive)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(() =>
+            {
+                if (!_isClosing && _isLoaded && _viewModel.IsRunning && IsActive)
+                    ScrcpyDisplay.Focus();
+            }));
+    }
+
     private void OnPreviewKeyDown(object sender, KeyEventArgs eventArgs)
     {
-        if (eventArgs.Key != Key.F11)
+        Key physicalKey = NormalizePhysicalKey(eventArgs.Key, eventArgs.SystemKey);
+        ModifierKeys modifiers = eventArgs.KeyboardDevice.Modifiers;
+        ViewDeviceShortcutResolution resolution = _shortcutResolver.Resolve(
+            physicalKey,
+            modifiers,
+            eventArgs.IsRepeat);
+        if (!resolution.Consume)
             return;
 
-        _viewModel.IsFullscreen = !_viewModel.IsFullscreen;
+        ConsumeShortcut(eventArgs);
+        if (ViewDeviceShortcutPolicy.ShouldExecute(resolution, eventArgs.IsRepeat))
+        {
+            ExecuteShortcut(resolution.Action);
+        }
+    }
+
+    private void OnPreviewKeyUp(object sender, KeyEventArgs eventArgs)
+    {
+        Key physicalKey = NormalizePhysicalKey(eventArgs.Key, eventArgs.SystemKey);
+        if (physicalKey is Key.LeftAlt or Key.RightAlt)
+            _shortcutResolver.Reset();
+    }
+
+    private void ExecuteShortcut(ViewDeviceShortcutAction action)
+    {
+        switch (action)
+        {
+            case ViewDeviceShortcutAction.Home:
+                _viewModel.HomeCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Back:
+                _viewModel.BackCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Recent:
+                _viewModel.RecentCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.VolumeUp:
+                _viewModel.VolumeUpCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.VolumeDown:
+                _viewModel.VolumeDownCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Power:
+                _viewModel.PowerCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.ScreenOff:
+                _viewModel.ScreenOffCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.ScreenOn:
+                _viewModel.ScreenOnCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Copy:
+                _viewModel.CopyClipboardCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Cut:
+                _viewModel.CutClipboardCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Paste:
+                _viewModel.PasteHostClipboardCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.PasteWithPasteKey:
+                _viewModel.PasteHostClipboardWithPasteKeyCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.InjectClipboardText:
+                _viewModel.InjectHostClipboardCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.ExpandNotifications:
+                _viewModel.ExpandNotificationPanelCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.ExpandSettings:
+                _viewModel.ExpandSettingsPanelCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.CollapsePanels:
+                _viewModel.CollapsePanelsCommand.Execute(null);
+                break;
+            case ViewDeviceShortcutAction.Menu:
+                _viewModel.MenuCommand.Execute(null);
+                break;
+        }
+    }
+
+    private void OnPreviewDragEnter(object sender, DragEventArgs eventArgs)
+    {
+        UpdatePackageDropState(eventArgs);
+    }
+
+    private void OnPreviewMouseDown(object sender, MouseButtonEventArgs eventArgs)
+    {
+        _toolsWindow?.DismissDetailWindow();
+    }
+
+    private void OnPreviewDragLeave(object sender, DragEventArgs eventArgs)
+    {
+        PackageDropOverlay.Visibility = Visibility.Collapsed;
+        eventArgs.Effects = DragDropEffects.None;
         eventArgs.Handled = true;
+    }
+
+    private void OnPreviewDragOver(object sender, DragEventArgs eventArgs)
+    {
+        UpdatePackageDropState(eventArgs);
+    }
+
+    private void UpdatePackageDropState(DragEventArgs eventArgs)
+    {
+        bool canInstall = CanAcceptPackageDrop(_viewModel, eventArgs.Data);
+        eventArgs.Effects = canInstall
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        PackageDropOverlay.Visibility = canInstall
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        eventArgs.Handled = true;
+    }
+
+    private void OnDrop(object sender, DragEventArgs eventArgs)
+    {
+        PackageDropOverlay.Visibility = Visibility.Collapsed;
+        if (CanAcceptPackageDrop(_viewModel, eventArgs.Data) &&
+            TryGetSupportedPackagePath(eventArgs.Data, out string path))
+            _viewModel.InstallPackageCommand.Execute(path);
+
+        eventArgs.Effects = DragDropEffects.None;
+        eventArgs.Handled = true;
+    }
+
+    internal static bool CanAcceptPackageDrop(
+        ViewDeviceViewModel viewModel,
+        IDataObject data)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+        return TryGetSupportedPackagePath(data, out string path) &&
+               viewModel.InstallPackageCommand.CanExecute(path);
+    }
+
+    internal static bool TryGetSupportedPackagePath(
+        IDataObject data,
+        out string path)
+    {
+        path = string.Empty;
+        if (!data.GetDataPresent(DataFormats.FileDrop))
+            return false;
+
+        if (data.GetData(DataFormats.FileDrop) is not string[] files ||
+            files.Length != 1 ||
+            string.IsNullOrWhiteSpace(files[0]) ||
+            !ViewDeviceViewModel.IsSupportedPackagePath(files[0]))
+        {
+            return false;
+        }
+
+        path = files[0];
+        return true;
+    }
+
+    private static void ConsumeShortcut(KeyEventArgs eventArgs)
+    {
+        eventArgs.Handled = true;
+    }
+
+    internal static Key NormalizePhysicalKey(Key key, Key systemKey)
+    {
+        return key == Key.System ? systemKey : key;
     }
 }

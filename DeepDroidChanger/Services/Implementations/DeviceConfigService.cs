@@ -8,20 +8,42 @@ namespace DeepDroidChanger.Services
         private readonly IDeviceStoreService _deviceStoreService;
         private readonly ISettingsService _settingsService;
         private readonly AppSettings _settings;
+        private readonly IDeviceMetadataChangeNotifier? _metadataChangeNotifier;
 
         public DeviceConfigService(
             IDeviceStoreService deviceStoreService,
             ISettingsService settingsService,
-            AppSettings settings)
+            AppSettings settings,
+            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
         {
             _deviceStoreService = deviceStoreService;
             _settingsService = settingsService;
             _settings = settings;
+            _metadataChangeNotifier = metadataChangeNotifier;
         }
 
         public Task SaveSettingsAsync(CancellationToken cancellationToken)
         {
             return _settingsService.SaveAsync(_settings, cancellationToken);
+        }
+
+        public async Task<bool> RenameDeviceAsync(
+            string serial,
+            string name,
+            CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+            string normalizedName = name.Trim();
+
+            bool updated = await _deviceStoreService.UpdateAsync(
+                serial,
+                device => device.Name = normalizedName,
+                cancellationToken).ConfigureAwait(false);
+            if (updated)
+                _metadataChangeNotifier?.PublishDeviceNameChanged(serial, normalizedName);
+
+            return updated;
         }
 
         public async Task<bool> SaveDeviceRowAsync(
@@ -49,6 +71,9 @@ namespace DeepDroidChanger.Services
             bool updated = await _deviceStoreService.UpdateAsync(serial, Apply, cancellationToken).ConfigureAwait(false);
             if (updated)
                 Apply(storedDevice);
+
+            if (updated)
+                _metadataChangeNotifier?.PublishDeviceNameChanged(serial, storedDevice.Name);
 
             return updated;
         }

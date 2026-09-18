@@ -1,7 +1,9 @@
+using System.Runtime.CompilerServices;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewDevices.Contracts;
 using DeepDroidChanger.ViewDevices.Models;
+using ScrcpyNet;
 
 namespace DeepDroidChanger.Tests.ViewModels;
 
@@ -23,16 +25,20 @@ internal sealed class FakeLocalizationService : ILocalizationService
     {
         ["ViewMultipleDevices_Connecting"] = "Connecting...",
         ["ViewMultipleDevices_Online"] = "Online",
-        ["ViewMultipleDevices_Disconnected"] = "Disconnected",
-        ["ViewMultipleDevices_Failed"] = "Failed"
+        ["ViewMultipleDevices_Stopped"] = "Stopped",
+        ["ViewMultipleDevices_Failed"] = "Failed",
+        ["ViewMultipleDevices_Busy"] = "Already open in another viewer",
+        ["ViewDevice_TestStatus"] = "Status {0}"
     };
 
     private static readonly IReadOnlyDictionary<string, string> Vietnamese = new Dictionary<string, string>
     {
         ["ViewMultipleDevices_Connecting"] = "Đang kết nối...",
         ["ViewMultipleDevices_Online"] = "Trực tuyến",
-        ["ViewMultipleDevices_Disconnected"] = "Đã ngắt kết nối",
-        ["ViewMultipleDevices_Failed"] = "Thất bại"
+        ["ViewMultipleDevices_Stopped"] = "Đã dừng",
+        ["ViewMultipleDevices_Failed"] = "Thất bại",
+        ["ViewMultipleDevices_Busy"] = "Thiết bị đang được mở ở cửa sổ xem khác",
+        ["ViewDevice_TestStatus"] = "Trạng thái {0}"
     };
 
     public event EventHandler? LanguageChanged;
@@ -56,6 +62,30 @@ internal sealed class FakeLocalizationService : ILocalizationService
     {
         Language = NormalizeLanguage(languageCode);
         LanguageChanged?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+internal sealed class NoOpViewDeviceWindowService : IViewDeviceWindowService
+{
+    public int OpenCount { get; private set; }
+
+    public List<string> OpenedSerials { get; } = [];
+
+    public Task OpenAsync(
+        string serial,
+        string? displayName,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        OpenCount++;
+        OpenedSerials.Add(serial);
+        return Task.CompletedTask;
+    }
+
+    public Task CloseAllAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
     }
 }
 
@@ -306,7 +336,35 @@ internal sealed class FakeDeviceStoreService : IDeviceStoreService
     }
 }
 
-internal sealed class FakeSessionFactory : IViewDeviceSessionFactory
+internal sealed class FakeClipboardService : IViewDeviceClipboardService
+{
+    public string? Text { get; set; }
+
+    public TaskCompletionSource<string?>? ReadGate { get; set; }
+
+    public int ReadCount { get; private set; }
+
+    public List<string> SetTexts { get; } = [];
+
+    public async Task<string?> GetTextAsync(CancellationToken cancellationToken = default)
+    {
+        ReadCount++;
+        if (ReadGate is not null)
+            return await ReadGate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        return Text;
+    }
+
+    public Task SetTextAsync(string text, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SetTexts.Add(text);
+        Text = text;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeSessionFactory : ISingleViewDeviceSessionFactory
 {
     private readonly Queue<FakeViewDeviceSession> _queuedSessions;
 
@@ -325,7 +383,7 @@ internal sealed class FakeSessionFactory : IViewDeviceSessionFactory
 
     public int MaxActiveSessionCount { get; private set; }
 
-    public IViewDeviceSession Create(ViewDeviceLaunchOptions options)
+    public ISingleViewDeviceSession Create(ViewDeviceLaunchOptions options)
     {
         CreateCount++;
         FakeViewDeviceSession session = _queuedSessions.Count > 0
@@ -361,10 +419,8 @@ internal sealed class FakeSessionFactory : IViewDeviceSessionFactory
     private int _maxActiveSessionCount;
 }
 
-internal sealed class FakeViewDeviceSession : IViewDeviceSession
+internal sealed class FakeViewDeviceSession : ISingleViewDeviceSession
 {
-    private static int _nextHandle = 1000;
-
     public FakeViewDeviceSession(
         string serial,
         int contentWidth = 720,
@@ -377,9 +433,9 @@ internal sealed class FakeViewDeviceSession : IViewDeviceSession
 
     public string Serial { get; }
 
-    public ViewDeviceSessionState State { get; private set; } = ViewDeviceSessionState.Created;
+    public SingleViewDeviceSessionState State { get; private set; } = SingleViewDeviceSessionState.Created;
 
-    public IntPtr NativeWindowHandle { get; private set; }
+    public Scrcpy? Client { get; private set; }
 
     public int ContentWidth { get; private set; }
 
@@ -393,21 +449,33 @@ internal sealed class FakeViewDeviceSession : IViewDeviceSession
 
     public int DisposeCount { get; private set; }
 
+    public int FlushCount { get; private set; }
+
+    public List<string> PastedTexts { get; } = [];
+
     public bool IsActive { get; private set; }
 
     public bool FailStart { get; set; }
+
+    public Exception? StartException { get; set; }
+
+    public bool RejectPaste { get; set; }
 
     public TaskCompletionSource? StartGate { get; set; }
 
     public TaskCompletionSource? StopGate { get; set; }
 
+    public TaskCompletionSource? StopStarted { get; set; }
+
+    public TaskCompletionSource? FlushGate { get; set; }
+
     public List<string>? LifecycleEvents { get; set; }
 
     public Action<bool>? ActiveChanged { get; set; }
 
-    public event EventHandler<ViewDeviceSessionStateChangedEventArgs>? StateChanged;
-    public event EventHandler? NativeWindowReady;
-    public event EventHandler<ViewDeviceContentSizeChangedEventArgs>? ContentSizeChanged;
+    public event EventHandler<SingleViewDeviceSessionStateChangedEventArgs>? StateChanged;
+    public event EventHandler<SingleViewDeviceContentSizeChangedEventArgs>? ContentSizeChanged;
+    public event EventHandler<ScrcpyClipboardChangedEventArgs>? ClipboardChanged;
     public event EventHandler? Exited;
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -417,19 +485,19 @@ internal sealed class FakeViewDeviceSession : IViewDeviceSession
         LifecycleEvents?.Add($"start:{Serial}");
         if (StartGate is not null)
             await StartGate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-        if (FailStart)
+        SetState(SingleViewDeviceSessionState.Starting);
+        if (FailStart || StartException is not null)
         {
-            SetState(ViewDeviceSessionState.Failed);
-            throw new InvalidOperationException("The configured fake session failed to start.");
+            SetState(SingleViewDeviceSessionState.Failed);
+            throw StartException ?? new InvalidOperationException("The configured fake session failed to start.");
         }
 
-        NativeWindowHandle = new IntPtr(Interlocked.Increment(ref _nextHandle));
+        Client = (Scrcpy)RuntimeHelpers.GetUninitializedObject(typeof(Scrcpy));
         SetActive(true);
-        SetState(ViewDeviceSessionState.Running);
-        NativeWindowReady?.Invoke(this, EventArgs.Empty);
+        SetState(SingleViewDeviceSessionState.Running);
         ContentSizeChanged?.Invoke(
             this,
-            new ViewDeviceContentSizeChangedEventArgs(ContentWidth, ContentHeight));
+            new SingleViewDeviceContentSizeChangedEventArgs(ContentWidth, ContentHeight));
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
@@ -437,12 +505,13 @@ internal sealed class FakeViewDeviceSession : IViewDeviceSession
         cancellationToken.ThrowIfCancellationRequested();
         StopCount++;
         LifecycleEvents?.Add($"stop:{Serial}");
+        StopStarted?.TrySetResult();
         if (StopGate is not null)
             await StopGate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         SetActive(false);
-        NativeWindowHandle = IntPtr.Zero;
-        SetState(ViewDeviceSessionState.Closed);
+        Client = null;
+        SetState(SingleViewDeviceSessionState.Closed);
     }
 
     public ValueTask DisposeAsync()
@@ -452,21 +521,104 @@ internal sealed class FakeViewDeviceSession : IViewDeviceSession
         return ValueTask.CompletedTask;
     }
 
+    public Task FlushControlAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        FlushCount++;
+        if (FlushGate is not null)
+            return FlushGate.Task.WaitAsync(cancellationToken);
+
+        return Task.CompletedTask;
+    }
+
+    public Task PasteHostClipboardAsync(string text, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (RejectPaste)
+            return Task.FromException(new InvalidOperationException("The fake paste queue rejected the command."));
+
+        PastedTexts.Add(text);
+        return Task.CompletedTask;
+    }
+
+    public Task PasteHostClipboardWithPasteKeyAsync(string text, CancellationToken cancellationToken = default)
+    {
+        return PasteHostClipboardAsync(text, cancellationToken);
+    }
+
+    public Task SendKeyEventAsync(int keyCode, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task SendBackOrScreenOnAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task SetScreenPowerModeAsync(
+        AndroidScreenPowerMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task RotateDeviceAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task InjectTextAsync(string text, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task RequestClipboardAsync(
+        ScrcpyCopyKey copyKey,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task ExpandNotificationPanelAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task ExpandSettingsPanelAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
+    public Task CollapsePanelsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     public void RaiseContentSize(int width, int height)
     {
         ContentWidth = width;
         ContentHeight = height;
         ContentSizeChanged?.Invoke(
             this,
-            new ViewDeviceContentSizeChangedEventArgs(width, height));
+            new SingleViewDeviceContentSizeChangedEventArgs(width, height));
     }
 
-    public void RaiseNativeWindowReady()
+    public void RaiseClipboard(string text)
     {
-        NativeWindowReady?.Invoke(this, EventArgs.Empty);
+        ClipboardChanged?.Invoke(this, new ScrcpyClipboardChangedEventArgs(text));
     }
 
-    public void RaiseState(ViewDeviceSessionState state)
+    public void RaiseState(SingleViewDeviceSessionState state)
     {
         SetState(state);
     }
@@ -474,18 +626,17 @@ internal sealed class FakeViewDeviceSession : IViewDeviceSession
     public void Exit()
     {
         SetActive(false);
-        NativeWindowHandle = IntPtr.Zero;
-        SetState(ViewDeviceSessionState.Failed);
+        SetState(SingleViewDeviceSessionState.Failed);
         Exited?.Invoke(this, EventArgs.Empty);
     }
 
-    private void SetState(ViewDeviceSessionState state)
+    private void SetState(SingleViewDeviceSessionState state)
     {
-        ViewDeviceSessionState previous = State;
+        SingleViewDeviceSessionState previous = State;
         State = state;
         StateChanged?.Invoke(
             this,
-            new ViewDeviceSessionStateChangedEventArgs(previous, state));
+            new SingleViewDeviceSessionStateChangedEventArgs(previous, state));
     }
 
     private void SetActive(bool active)

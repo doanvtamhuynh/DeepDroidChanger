@@ -1,0 +1,933 @@
+using Serilog;
+using SharpAdbClient;
+using System;
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace ScrcpyNet
+{
+    /// <summary>
+    /// A scrcpy client using the protocol implemented by the pinned 1.23 server.
+    /// The async lifecycle methods are intentionally kept small so existing
+    /// callers can continue using the synchronous Start/Stop wrappers.
+    /// </summary>
+    public class Scrcpy : IDisposable
+    {
+        private const int DeviceInfoLength = 68;
+        private const int PacketMetadataLength = ScrcpyVideoPacketHeader.HeaderLength;
+        private static readonly TimeSpan AcceptPollInterval = TimeSpan.FromMilliseconds(10);
+        private static readonly TimeSpan ServerTaskStopTimeout = TimeSpan.FromSeconds(2);
+        private static readonly ILogger Log = Serilog.Log.ForContext<Scrcpy>();
+
+        public string DeviceName { get; private set; } = "";
+        public int Width { get; internal set; }
+        public int Height { get; internal set; }
+        public long Bitrate { get; set; } = 8000000;
+        public int MaxSize { get; set; }
+        public int MaxFramerate { get; set; }
+        public string ScrcpyServerFile { get; set; } = "ScrcpyNet/scrcpy-server.jar";
+
+        public bool Connected => Volatile.Read(ref connected) != 0;
+
+        /// <summary>
+        /// The loopback port allocated for the current or most recent start.
+        /// It is zero after Stop completes.
+        /// </summary>
+        public int ListeningPort { get; private set; }
+
+        public VideoStreamDecoder VideoStreamDecoder { get; }
+
+        public event EventHandler<ScrcpyErrorEventArgs>? Failed;
+        public event EventHandler? Exited;
+        public event EventHandler<ScrcpyClipboardChangedEventArgs>? ClipboardChanged;
+        public event EventHandler<ScrcpyClipboardAcknowledgedEventArgs>? ClipboardAcknowledged;
+
+        private readonly ScrcpyNetServerLifecycle serverLifecycle;
+        private readonly DeviceData device;
+        private readonly ScrcpyControlCommandQueue controlCommandQueue = new();
+        private readonly SemaphoreSlim lifecycleGate = new(1, 1);
+        private readonly ScrcpyVideoPacketAssembler videoPacketAssembler = new();
+        private static readonly ArrayPool<byte> pool = ArrayPool<byte>.Shared;
+
+        private TcpClient? videoClient;
+        private TcpClient? controlClient;
+        private TcpListener? listener;
+        private CancellationTokenSource? cts;
+        private CancellationTokenSource? serverCancellation;
+        private Task? serverTask;
+        private Task serverLifecycleCompletion = Task.CompletedTask;
+        private Task? videoTask;
+        private Task? controlTask;
+        private Task? controlReaderTask;
+        private int connected;
+        private int intentionalStop = 1;
+        private int failureRaised;
+        private int disposed;
+
+        /// <summary>
+        /// Completes when the most recent remote scrcpy server command has
+        /// reached a terminal state. Stop remains bounded for the UI, while
+        /// integration owners can retain same-serial ownership until this
+        /// lifecycle has actually ended.
+        /// </summary>
+        internal Task ServerLifecycleCompletion =>
+            Volatile.Read(ref serverLifecycleCompletion);
+
+        public Scrcpy(DeviceData device, VideoStreamDecoder? videoStreamDecoder = null)
+        {
+            this.device = device;
+            VideoStreamDecoder = videoStreamDecoder ?? new VideoStreamDecoder();
+            VideoStreamDecoder.Scrcpy = this;
+            serverLifecycle = new ScrcpyNetServerLifecycle(
+                device,
+                new SharpAdbClientOperations(),
+                exception => Log.Debug(exception, "No stale ScrcpyNet reverse rule was removed."));
+        }
+
+        public void Start(long timeoutMs = 5000)
+        {
+            StartAsync(timeoutMs, CancellationToken.None).GetAwaiter().GetResult();
+        }
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            return StartAsync(5000, cancellationToken);
+        }
+
+        public async Task StartAsync(long timeoutMs, CancellationToken cancellationToken = default)
+        {
+            if (timeoutMs <= 0)
+                throw new ArgumentOutOfRangeException(nameof(timeoutMs));
+
+            ThrowIfDisposed();
+            await lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                ThrowIfDisposed();
+                if (Connected)
+                    throw new InvalidOperationException("Already connected.");
+
+                await Task.Run(
+                        () => StartCoreAsync(timeoutMs, cancellationToken))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                lifecycleGate.Release();
+            }
+        }
+
+        public void Stop()
+        {
+            StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            await lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await Task.Run(StopCoreAsync).ConfigureAwait(false);
+            }
+            finally
+            {
+                lifecycleGate.Release();
+            }
+        }
+
+        public void SendControlCommand(IControlMessage msg)
+        {
+            ArgumentNullException.ThrowIfNull(msg);
+            SendControlCommands([msg]);
+        }
+
+        public void SendControlCommands(IReadOnlyList<IControlMessage> messages)
+        {
+            _ = TrySendControlCommands(messages);
+        }
+
+        public Task FlushControlAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Connected)
+            {
+                return Task.FromException(
+                    new InvalidOperationException("The scrcpy control session is not connected."));
+            }
+
+            return controlCommandQueue.FlushAsync(cancellationToken);
+        }
+
+        internal bool TrySendControlCommands(IReadOnlyList<IControlMessage> messages)
+        {
+            ArgumentNullException.ThrowIfNull(messages);
+            ScrcpyControlCommandBatch batch = new(messages);
+
+            ScrcpyControlCommandQueueWriteResult result =
+                !Connected || controlClient == null
+                    ? ScrcpyControlCommandQueueWriteResult.Unavailable
+                    : controlCommandQueue.TryWriteBatchDetailed(batch);
+            if (result == ScrcpyControlCommandQueueWriteResult.Accepted)
+                return true;
+
+            if (result == ScrcpyControlCommandQueueWriteResult.Full &&
+                batch.IsDroppable)
+            {
+                Log.Debug(
+                    "Dropping droppable scrcpy control batch of {MessageCount} messages because the control queue is full.",
+                    batch.MessageCount);
+                return false;
+            }
+
+            if (result == ScrcpyControlCommandQueueWriteResult.Full)
+            {
+                Log.Warning(
+                    "Critical scrcpy control batch of {MessageCount} messages filled the control queue; reporting session failure.",
+                    batch.MessageCount);
+                ReportFailure(new InvalidOperationException("The scrcpy control queue is full."));
+                return false;
+            }
+
+            Log.Debug(
+                "Scrcpy control channel is unavailable; rejecting batch of {MessageCount} messages.",
+                batch.MessageCount);
+            return false;
+        }
+
+        private async Task StartCoreAsync(long timeoutMs, CancellationToken cancellationToken)
+        {
+            Volatile.Write(ref intentionalStop, 0);
+            Volatile.Write(ref failureRaised, 0);
+            videoPacketAssembler.Clear();
+
+            using CancellationTokenSource startup =
+                ScrcpyStartupIo.CreateDeadline(timeoutMs, cancellationToken);
+            string startupStage = "setting up the scrcpy server";
+
+            try
+            {
+                TcpListener currentListener = CreateDynamicLoopbackListener();
+                listener = currentListener;
+                ListeningPort = ((IPEndPoint)currentListener.LocalEndpoint).Port;
+
+                MobileServerSetup(ListeningPort, startup.Token);
+                startup.Token.ThrowIfCancellationRequested();
+
+                serverCancellation = new CancellationTokenSource();
+                serverTask = MobileServerStart(serverCancellation.Token);
+                Volatile.Write(ref serverLifecycleCompletion, serverTask);
+                ObserveServerTask(serverTask);
+
+                startupStage = "waiting for the scrcpy video socket";
+                TcpClient currentVideoClient = await AcceptClientAsync(
+                        currentListener,
+                        "video",
+                        startup.Token)
+                    .ConfigureAwait(false);
+                videoClient = currentVideoClient;
+
+                startupStage = "waiting for the scrcpy control socket";
+                TcpClient currentControlClient = await AcceptClientAsync(
+                        currentListener,
+                        "control",
+                        startup.Token)
+                    .ConfigureAwait(false);
+                controlClient = currentControlClient;
+
+                startupStage = "reading scrcpy device metadata";
+                await ReadDeviceInfoAsync(
+                        currentVideoClient,
+                        startup.Token,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                ScrcpyControlQueueSession controlSession = controlCommandQueue.StartSession();
+                CancellationTokenSource sessionCancellation = new();
+                cts = sessionCancellation;
+                Volatile.Write(ref connected, 1);
+                videoTask = Task.Run(() => VideoMainAsync(currentVideoClient, sessionCancellation.Token));
+                controlTask = Task.Run(() => ControllerMainAsync(
+                        currentControlClient,
+                        controlSession,
+                        sessionCancellation.Token));
+                controlReaderTask = Task.Run(() => ControlReceiverMainAsync(
+                    currentControlClient,
+                    sessionCancellation.Token));
+
+                currentListener.Stop();
+                listener = null;
+
+                // The two sockets are established now, so no more reverse
+                // connections are needed. Remove only this session's reverse.
+                TryMobileServerCleanup();
+            }
+            catch (Exception exception)
+            {
+                Volatile.Write(ref intentionalStop, 1);
+                await StopCoreAsync().ConfigureAwait(false);
+
+                if (cancellationToken.IsCancellationRequested &&
+                    exception is OperationCanceledException)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+
+                if (startup.IsCancellationRequested && exception is OperationCanceledException)
+                {
+                    throw new TimeoutException(
+                        $"Timed out while {startupStage}.",
+                        exception);
+                }
+
+                throw;
+            }
+        }
+
+        private async Task StopCoreAsync()
+        {
+            Volatile.Write(ref intentionalStop, 1);
+            Volatile.Write(ref connected, 0);
+
+            CancellationTokenSource? sessionCancellation = cts;
+            CancellationTokenSource? currentServerCancellation = serverCancellation;
+            Task? currentVideoTask = videoTask;
+            Task? currentControlTask = controlTask;
+            Task? currentControlReaderTask = controlReaderTask;
+            Task? currentServerTask = serverTask;
+
+            try
+            {
+                sessionCancellation?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            try
+            {
+                currentServerCancellation?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            controlCommandQueue.EndSession();
+
+            try
+            {
+                listener?.Stop();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                listener = null;
+            }
+
+            CloseClient(videoClient);
+            CloseClient(controlClient);
+            TryMobileServerCleanup();
+            videoPacketAssembler.Clear();
+
+            // Video and control tasks may still be using the decoder/socket.
+            // They must fully join before Scrcpy.Dispose can free native decoder state.
+            await JoinDecoderTasksAsync(
+                    currentVideoTask,
+                    currentControlTask,
+                    currentControlReaderTask)
+                .ConfigureAwait(false);
+            await WaitForBackgroundTaskAsync(
+                    currentServerTask,
+                    "server",
+                    ServerTaskStopTimeout)
+                .ConfigureAwait(false);
+            Volatile.Write(
+                ref serverLifecycleCompletion,
+                currentServerTask is null || currentServerTask.IsCompleted
+                    ? Task.CompletedTask
+                    : currentServerTask);
+            videoPacketAssembler.Clear();
+
+            DisposeClient(videoClient);
+            DisposeClient(controlClient);
+
+            videoClient = null;
+            controlClient = null;
+            videoTask = null;
+            controlTask = null;
+            controlReaderTask = null;
+            serverTask = null;
+
+            if (sessionCancellation != null)
+            {
+                sessionCancellation.Dispose();
+                if (ReferenceEquals(cts, sessionCancellation))
+                    cts = null;
+            }
+
+            if (currentServerCancellation != null)
+            {
+                currentServerCancellation.Dispose();
+                if (ReferenceEquals(serverCancellation, currentServerCancellation))
+                    serverCancellation = null;
+            }
+
+            ListeningPort = 0;
+        }
+
+        private async Task<TcpClient> AcceptClientAsync(
+            TcpListener currentListener,
+            string channelName,
+            CancellationToken startupToken)
+        {
+            while (!currentListener.Pending())
+                await Task.Delay(AcceptPollInterval, startupToken).ConfigureAwait(false);
+
+            try
+            {
+                return currentListener.AcceptTcpClient();
+            }
+            catch (ObjectDisposedException) when (startupToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(startupToken);
+            }
+        }
+
+        internal static TcpListener CreateDynamicLoopbackListener()
+        {
+            TcpListener value = new(IPAddress.Loopback, 0);
+            value.Start();
+            return value;
+        }
+
+        private async Task ReadDeviceInfoAsync(
+            TcpClient client,
+            CancellationToken startupToken,
+            CancellationToken callerToken)
+        {
+            NetworkStream infoStream = client.GetStream();
+            byte[] deviceInfoBuffer = new byte[DeviceInfoLength];
+            await ScrcpyStartupIo.ReadExactAsync(
+                    infoStream,
+                    deviceInfoBuffer,
+                    0,
+                    deviceInfoBuffer.Length,
+                    startupToken,
+                    callerToken,
+                    "reading scrcpy device metadata")
+                .ConfigureAwait(false);
+
+            DeviceName = Encoding.UTF8
+                .GetString(deviceInfoBuffer, 0, 64)
+                .TrimEnd('\0');
+            Width = BinaryPrimitives.ReadUInt16BigEndian(deviceInfoBuffer.AsSpan(64, 2));
+            Height = BinaryPrimitives.ReadUInt16BigEndian(deviceInfoBuffer.AsSpan(66, 2));
+            Log.Information("Connected to {DeviceName}; initial texture: {Width}x{Height}", DeviceName, Width, Height);
+        }
+
+        private async Task VideoMainAsync(TcpClient client, CancellationToken cancellationToken)
+        {
+            byte[] metadataBuffer = pool.Rent(PacketMetadataLength);
+            try
+            {
+                NetworkStream videoStream = client.GetStream();
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await ReadExactAsync(
+                            videoStream,
+                            metadataBuffer,
+                            0,
+                            PacketMetadataLength,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    ScrcpyVideoPacketHeader header = ScrcpyVideoPacketHeader.Parse(
+                        metadataBuffer.AsSpan(0, PacketMetadataLength));
+                    byte[] packetBuffer = pool.Rent(header.PacketSize);
+                    try
+                    {
+                        await ReadExactAsync(
+                                videoStream,
+                                packetBuffer,
+                                0,
+                                header.PacketSize,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+
+                        if (cancellationToken.IsCancellationRequested)
+                            continue;
+
+                        ReadOnlySpan<byte> packet = packetBuffer.AsSpan(0, header.PacketSize);
+                        if (header.IsConfig)
+                        {
+                            videoPacketAssembler.StoreConfig(packet);
+                            continue;
+                        }
+
+                        byte[]? combinedPacket = videoPacketAssembler.ConsumeWith(packet);
+                        if (combinedPacket is null)
+                        {
+                            VideoStreamDecoder.Decode(
+                                packetBuffer,
+                                header.PacketSize,
+                                header.PresentationTimeUs);
+                        }
+                        else
+                        {
+                            VideoStreamDecoder.Decode(
+                                combinedPacket,
+                                combinedPacket.Length,
+                                header.PresentationTimeUs);
+                        }
+                    }
+                    finally
+                    {
+                        pool.Return(packetBuffer);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                ReportFailure(exception);
+            }
+            finally
+            {
+                videoPacketAssembler.Clear();
+                pool.Return(metadataBuffer);
+            }
+        }
+
+        private async Task ControllerMainAsync(
+            TcpClient client,
+            ScrcpyControlQueueSession controlSession,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                NetworkStream stream = client.GetStream();
+                await RunControlWriterAsync(
+                    controlSession,
+                    () => Connected,
+                    (batch, writeCancellation) =>
+                        ControllerSendAsync(stream, batch, writeCancellation),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                ReportFailure(exception);
+            }
+        }
+
+        internal static async Task RunControlWriterAsync(
+            ScrcpyControlQueueSession controlSession,
+            Func<bool> isConnected,
+            Func<ScrcpyControlCommandBatch, CancellationToken, ValueTask> sendBatchAsync,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(controlSession);
+            ArgumentNullException.ThrowIfNull(isConnected);
+            ArgumentNullException.ThrowIfNull(sendBatchAsync);
+
+            using CancellationTokenSource linkedCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    controlSession.EndedToken);
+            try
+            {
+                await foreach (ScrcpyControlQueueItem item in
+                    controlSession.ReadAllAsync(linkedCancellation.Token))
+                {
+                    if (linkedCancellation.IsCancellationRequested || !isConnected())
+                        break;
+
+                    switch (item)
+                    {
+                        case ScrcpyControlQueueItem.Batch batch:
+                            // A batch is already frozen and is sent as one
+                            // contiguous write. Cancellation terminates this
+                            // connection; the batch must never be replayed.
+                            await sendBatchAsync(
+                                    batch.Value,
+                                    linkedCancellation.Token)
+                                .ConfigureAwait(false);
+                            break;
+                        case ScrcpyControlQueueItem.FlushBarrier barrier:
+                            // The barrier is ordering-only and emits no wire
+                            // bytes. All preceding writes have returned here.
+                            barrier.Completion.TrySetResult();
+                            break;
+                        default:
+                            throw new InvalidOperationException(
+                                $"Unsupported scrcpy control queue item {item.GetType().Name}.");
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (
+                cancellationToken.IsCancellationRequested ||
+                controlSession.EndedToken.IsCancellationRequested)
+            {
+            }
+        }
+
+        private async Task ControlReceiverMainAsync(
+            TcpClient client,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                NetworkStream stream = client.GetStream();
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    ScrcpyDeviceMessage message = await ScrcpyDeviceMessageReader
+                        .ReadAsync(stream, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    switch (message)
+                    {
+                        case ScrcpyClipboardDeviceMessage clipboard:
+                            InvokeSafely(
+                                ClipboardChanged,
+                                new ScrcpyClipboardChangedEventArgs(clipboard.Text));
+                            break;
+                        case ScrcpyClipboardAckDeviceMessage acknowledgement:
+                            InvokeSafely(
+                                ClipboardAcknowledged,
+                                new ScrcpyClipboardAcknowledgedEventArgs(acknowledgement.Sequence));
+                            break;
+                        default:
+                            throw new InvalidDataException(
+                                $"Unsupported scrcpy device message {message.Type}.");
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                ReportFailure(exception);
+            }
+        }
+
+        private static async Task ReadExactAsync(
+            Stream stream,
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            int position = offset;
+            int remaining = count;
+            while (remaining > 0)
+            {
+                int bytesRead = await stream
+                    .ReadAsync(buffer, position, remaining, cancellationToken)
+                    .ConfigureAwait(false);
+                if (bytesRead == 0)
+                {
+                    throw new EndOfStreamException(
+                        "The scrcpy socket closed before the expected data was received.");
+                }
+
+                position += bytesRead;
+                remaining -= bytesRead;
+            }
+        }
+
+        // Pass the frozen ReadOnlyMemory payload directly to cancellable socket IO.
+        private static ValueTask ControllerSendAsync(
+            NetworkStream stream,
+            ScrcpyControlCommandBatch batch,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(stream);
+            ArgumentNullException.ThrowIfNull(batch);
+            return stream.WriteAsync(batch.Payload, cancellationToken);
+        }
+
+        internal static byte[] SerializeControlCommandBatch(ScrcpyControlCommandBatch batch)
+        {
+            ArgumentNullException.ThrowIfNull(batch);
+            return batch.Payload.ToArray();
+        }
+
+        private void MobileServerSetup(int hostPort, CancellationToken cancellationToken)
+        {
+            serverLifecycle.Setup(hostPort, ScrcpyServerFile, cancellationToken);
+        }
+
+        /// <summary>
+        /// Remove this session's ADB reverse rule.
+        /// </summary>
+        private void MobileServerCleanup()
+        {
+            serverLifecycle.Cleanup();
+        }
+
+        private void TryMobileServerCleanup()
+        {
+            try
+            {
+                MobileServerCleanup();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "ScrcpyNet reverse cleanup failed for {Serial}.", device.Serial);
+            }
+        }
+
+        /// <summary>
+        /// Start the scrcpy server on the Android device.
+        /// </summary>
+        private Task MobileServerStart(CancellationToken cancellationToken)
+        {
+            Log.Information("Starting scrcpy server...");
+
+            SerilogOutputReceiver receiver = new();
+            IReadOnlyList<string> commands = BuildServerArguments(Bitrate, MaxSize, MaxFramerate);
+
+            string command = string.Join(" ", commands);
+            Log.Information("Starting scrcpy server command: {Command}", command);
+            return serverLifecycle.StartServerAsync(command, receiver, cancellationToken);
+        }
+
+        internal static IReadOnlyList<string> BuildServerArguments(
+            long bitrate,
+            int maxSize,
+            int maxFramerate)
+        {
+            List<string> commands = new()
+            {
+                "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
+                "app_process",
+                "/",
+                "com.genymobile.scrcpy.Server",
+                "1.23",
+                "log_level=debug",
+            };
+
+            if (bitrate > 0 && bitrate <= int.MaxValue)
+                commands.Add($"bit_rate={bitrate}");
+            if (maxSize > 0)
+                commands.Add($"max_size={maxSize}");
+            if (maxFramerate > 0)
+                commands.Add($"max_fps={maxFramerate}");
+
+            commands.Add("tunnel_forward=false");
+            commands.Add("control=true");
+            commands.Add("clipboard_autosync=true");
+            commands.Add("display_id=0");
+            commands.Add("show_touches=false");
+            commands.Add("stay_awake=false");
+            commands.Add("power_off_on_close=false");
+            commands.Add("downsize_on_error=true");
+            commands.Add("cleanup=true");
+            return commands;
+        }
+
+        private void ObserveServerTask(Task task)
+        {
+            _ = task.ContinueWith(
+                completedTask =>
+                {
+                    Exception exception = completedTask.Exception?.GetBaseException()
+                        ?? new InvalidOperationException("The scrcpy server task failed without an exception.");
+                    ReportFailure(exception);
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
+        private void ReportFailure(Exception exception)
+        {
+            if (Volatile.Read(ref intentionalStop) != 0 ||
+                Volatile.Read(ref disposed) != 0 ||
+                Interlocked.Exchange(ref failureRaised, 1) != 0)
+            {
+                return;
+            }
+
+            Volatile.Write(ref connected, 0);
+            controlCommandQueue.EndSession();
+            try
+            {
+                cts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            try
+            {
+                serverCancellation?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            CloseClient(videoClient);
+            CloseClient(controlClient);
+            try
+            {
+                listener?.Stop();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            videoPacketAssembler.Clear();
+            Log.Error(exception, "ScrcpyNet session failed for {Serial}.", device.Serial);
+            InvokeSafely(Failed, new ScrcpyErrorEventArgs(exception));
+            InvokeSafely(Exited, EventArgs.Empty);
+        }
+
+        internal static async Task JoinDecoderTasksAsync(
+            Task? videoTask,
+            Task? controlTask,
+            Task? controlReaderTask = null)
+        {
+            await ObserveBackgroundTaskAsync(videoTask, "video").ConfigureAwait(false);
+            await ObserveBackgroundTaskAsync(controlTask, "control writer").ConfigureAwait(false);
+            await ObserveBackgroundTaskAsync(controlReaderTask, "control reader").ConfigureAwait(false);
+        }
+
+        private static async Task WaitForBackgroundTaskAsync(
+            Task? task,
+            string taskName,
+            TimeSpan timeout)
+        {
+            if (task == null)
+                return;
+
+            Task completed = await Task.WhenAny(task, Task.Delay(timeout)).ConfigureAwait(false);
+            if (!ReferenceEquals(completed, task))
+            {
+                Log.Warning(
+                    "ScrcpyNet {TaskName} task did not stop within the shutdown timeout.",
+                    taskName);
+                return;
+            }
+
+            await ObserveBackgroundTaskAsync(task, taskName).ConfigureAwait(false);
+        }
+
+        private static async Task ObserveBackgroundTaskAsync(Task? task, string taskName)
+        {
+            if (task == null)
+                return;
+
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                Log.Debug(exception, "ScrcpyNet {TaskName} task ended during shutdown.", taskName);
+            }
+        }
+
+        private static void CloseClient(TcpClient? client)
+        {
+            try
+            {
+                client?.Close();
+            }
+            catch (Exception exception)
+            {
+                Log.Debug(exception, "Failed to close a ScrcpyNet socket.");
+            }
+        }
+
+        private static void DisposeClient(TcpClient? client)
+        {
+            try
+            {
+                client?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Log.Debug(exception, "Failed to dispose a ScrcpyNet socket.");
+            }
+        }
+
+        private static void InvokeSafely<TEventArgs>(
+            EventHandler<TEventArgs>? handlers,
+            TEventArgs eventArgs)
+            where TEventArgs : EventArgs
+        {
+            if (handlers == null)
+                return;
+
+            foreach (EventHandler<TEventArgs> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler(null, eventArgs);
+                }
+                catch (Exception exception)
+                {
+                    Log.Debug(exception, "A ScrcpyNet lifecycle event handler failed.");
+                }
+            }
+        }
+
+        private static void InvokeSafely(EventHandler? handlers, EventArgs eventArgs)
+        {
+            if (handlers == null)
+                return;
+
+            foreach (EventHandler handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler(null, eventArgs);
+                }
+                catch (Exception exception)
+                {
+                    Log.Debug(exception, "A ScrcpyNet lifecycle event handler failed.");
+                }
+            }
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (Volatile.Read(ref disposed) != 0)
+                throw new ObjectDisposedException(nameof(Scrcpy));
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref disposed, 1) != 0)
+                return;
+
+            try
+            {
+                StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                VideoStreamDecoder.Dispose();
+                lifecycleGate.Dispose();
+            }
+        }
+    }
+}

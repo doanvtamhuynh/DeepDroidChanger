@@ -1,4 +1,5 @@
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Services;
 using DeepDroidChanger.ViewModels;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -7,6 +8,13 @@ namespace DeepDroidChanger.Tests.ViewModels;
 [TestClass]
 public sealed class ViewMultipleDevicesViewModelTests
 {
+    [TestMethod]
+    public void PageSize_Remains8()
+    {
+        int pageSize = GetPageSize();
+        Assert.AreEqual(8, pageSize);
+    }
+
     [TestMethod]
     [DataRow(0, 1, 0)]
     [DataRow(1, 1, 1)]
@@ -33,6 +41,23 @@ public sealed class ViewMultipleDevicesViewModelTests
         Assert.AreEqual(expectedVisibleCount, viewModel.VisibleDevices.Count);
         Assert.AreEqual(deviceCount, viewModel.CatalogDeviceCount);
         Assert.AreEqual(1, viewModel.CurrentPage);
+    }
+
+    [TestMethod]
+    public async Task Page1_StartsOnlyVisibleItems()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(19);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        await viewModel.WaitForPendingOperationsAsync();
+
+        Assert.IsTrue(factory.Sessions.Take(8).All(session => session.StartCount == 1));
+        Assert.IsTrue(factory.Sessions.Skip(8).All(session => session.StartCount == 0));
     }
 
     [TestMethod]
@@ -123,6 +148,48 @@ public sealed class ViewMultipleDevicesViewModelTests
         Assert.AreEqual(200, viewModel.ZoomPercent);
         Assert.AreNotEqual(widthAt1920, viewModel.VisibleDevices.Single().TileWidth);
         Assert.IsTrue(viewModel.VisibleDevices.Single().TileWidth < widthAt1920);
+    }
+
+    [TestMethod]
+    public async Task ViewportResize_DoesNotRestartSessions()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(1);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        FakeViewDeviceSession session = factory.Sessions.Single();
+        int createCount = factory.CreateCount;
+        int startCount = session.StartCount;
+
+        viewModel.UpdateViewport(1280, 720, 12, 12);
+        viewModel.UpdateViewport(1920, 1080, 12, 12);
+
+        Assert.AreEqual(createCount, factory.CreateCount);
+        Assert.AreEqual(startCount, session.StartCount);
+        Assert.AreEqual(0, session.StopCount);
+    }
+
+    [TestMethod]
+    public async Task Rotation_DoesNotRestartSessions()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(1);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        FakeViewDeviceSession session = factory.Sessions.Single();
+        session.RaiseContentSize(1280, 720);
+
+        Assert.AreEqual(1, factory.CreateCount);
+        Assert.AreEqual(1, session.StartCount);
+        Assert.AreEqual(0, session.StopCount);
     }
 
     [TestMethod]
@@ -256,7 +323,86 @@ public sealed class ViewMultipleDevicesViewModelTests
     }
 
     [TestMethod]
-    public async Task PageNavigation_TrackerEventDuringRefresh_KeepsRequestedPage()
+    public async Task NavigatePage2_StopsPage1Sessions()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(16);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        viewModel.NextPageCommand.Execute(null);
+        await viewModel.WaitForPendingOperationsAsync();
+
+        Assert.AreEqual(2, viewModel.CurrentPage);
+        Assert.IsTrue(factory.Sessions.Take(8).All(session => session.StopCount == 1));
+    }
+
+    [TestMethod]
+    public async Task NavigatePage2_StartsOnlyPage2Sessions()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(16);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        viewModel.NextPageCommand.Execute(null);
+        await viewModel.WaitForPendingOperationsAsync();
+
+        Assert.IsTrue(factory.Sessions.Skip(8).Take(8).All(session => session.StartCount == 1));
+        Assert.IsTrue(factory.Sessions.Skip(8).Take(8).All(session => session.IsActive));
+    }
+
+    [TestMethod]
+    public async Task NavigateBack_CreatesFreshSessions()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(16);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        viewModel.NextPageCommand.Execute(null);
+        await viewModel.WaitForPendingOperationsAsync();
+        FakeViewDeviceSession[] firstPage = factory.Sessions.Take(8).ToArray();
+        viewModel.PreviousPageCommand.Execute(null);
+        await viewModel.WaitForPendingOperationsAsync();
+
+        Assert.AreEqual(24, factory.CreateCount);
+        Assert.IsTrue(factory.Sessions.Skip(16).Take(8).All(session => session.StartCount == 1));
+        Assert.IsTrue(firstPage.All(session => session.StopCount >= 1));
+    }
+
+    [TestMethod]
+    public async Task NavigatePageAndBack_PreservesCatalogItemInstances()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(16);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+
+        await viewModel.InitializeAsync();
+        ViewMultipleDeviceItemViewModel[] firstPageItems = viewModel.VisibleDevices.ToArray();
+        viewModel.NextPageCommand.Execute(null);
+        await viewModel.WaitForPendingOperationsAsync();
+        viewModel.PreviousPageCommand.Execute(null);
+        await viewModel.WaitForPendingOperationsAsync();
+
+        CollectionAssert.AreEqual(firstPageItems, viewModel.VisibleDevices.ToArray());
+        Assert.AreEqual(16, viewModel.CatalogDeviceCount);
+    }
+
+    [TestMethod]
+    public async Task PageNavigation_DoesNotReloadDeviceStore()
     {
         (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
             CreateFixture(19);
@@ -266,14 +412,11 @@ public sealed class ViewMultipleDevicesViewModelTests
             factory);
         await viewModel.InitializeAsync();
 
-        TaskCompletionSource loadGate = NewSignal();
-        store.LoadGate = loadGate;
+        int loadCountBeforeNavigation = store.LoadCount;
         viewModel.NextPageCommand.Execute(null);
-        await store.WaitForLoadAsync(2);
-        tracker.RaiseDeviceStateChanged("SERIAL-01");
-        loadGate.TrySetResult();
         await viewModel.WaitForPendingOperationsAsync();
 
+        Assert.AreEqual(loadCountBeforeNavigation, store.LoadCount);
         Assert.AreEqual(2, viewModel.CurrentPage);
         CollectionAssert.AreEqual(
             CreateSerials(9, 16),
@@ -296,14 +439,10 @@ public sealed class ViewMultipleDevicesViewModelTests
             factory);
         await viewModel.InitializeAsync();
 
-        TaskCompletionSource loadGate = NewSignal();
-        store.LoadGate = loadGate;
         viewModel.NextPageCommand.Execute(null);
         viewModel.NextPageCommand.Execute(null);
         viewModel.PreviousPageCommand.Execute(null);
         viewModel.NextPageCommand.Execute(null);
-        await store.WaitForLoadAsync(2);
-        loadGate.TrySetResult();
         await viewModel.WaitForPendingOperationsAsync();
 
         Assert.AreEqual(3, viewModel.CurrentPage);
@@ -342,6 +481,31 @@ public sealed class ViewMultipleDevicesViewModelTests
 
         Assert.AreEqual(1, viewModel.CatalogDeviceCount);
         Assert.AreEqual("SERIAL-01", viewModel.VisibleDevices.Single().Serial);
+    }
+
+    [TestMethod]
+    public async Task Initialize_OnlyPublishesSavedOnlineDevices()
+    {
+        FakeDeviceStoreService store = new(CreateStoredDevices(3));
+        FakeTracker tracker = new(
+        [
+            new AdbDevice("SERIAL-01", AdbDeviceStatus.Online),
+            new AdbDevice("SERIAL-02", AdbDeviceStatus.Offline),
+            new AdbDevice("SERIAL-03", AdbDeviceStatus.Unauthorized)
+        ]);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            new FakeSessionFactory());
+
+        await viewModel.InitializeAsync();
+
+        CollectionAssert.AreEqual(
+            new[] { "SERIAL-01" },
+            viewModel.OnlineDevices.Select(item => item.Serial).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { "SERIAL-01" },
+            viewModel.VisibleDevices.Select(item => item.Serial).ToArray());
     }
 
     [TestMethod]
@@ -396,7 +560,7 @@ public sealed class ViewMultipleDevicesViewModelTests
     }
 
     [TestMethod]
-    public async Task TrackerReconnecting_PreservesCatalogAndMarksCurrentSessionDisconnected()
+    public async Task TrackerReconnecting_ClearsCatalogAndDisposesCurrentSession()
     {
         (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
             CreateFixture(1);
@@ -405,15 +569,43 @@ public sealed class ViewMultipleDevicesViewModelTests
             tracker,
             factory);
         await viewModel.InitializeAsync();
-        ViewMultipleDeviceItemViewModel currentItem = viewModel.OnlineDevices.Single();
-
         tracker.SetHealth(AdbDeviceTrackerHealth.Reconnecting);
         await viewModel.WaitForPendingOperationsAsync();
 
-        Assert.AreEqual(1, viewModel.CatalogDeviceCount);
-        Assert.AreSame(currentItem, viewModel.OnlineDevices.Single());
-        Assert.IsTrue(viewModel.VisibleDevices.Single().IsDisconnected);
+        Assert.AreEqual(0, viewModel.CatalogDeviceCount);
+        Assert.IsEmpty(viewModel.OnlineDevices);
+        Assert.IsEmpty(viewModel.VisibleDevices);
         Assert.IsFalse(factory.Sessions.Single().IsActive);
+        Assert.AreEqual(1, factory.Sessions.Single().StopCount);
+        Assert.AreEqual(1, factory.Sessions.Single().DisposeCount);
+    }
+
+    [TestMethod]
+    public async Task TrackerOffline_RemovesOnlyAffectedItemAndPreservesHealthyItems()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(3);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+        await viewModel.InitializeAsync();
+        ViewMultipleDeviceItemViewModel[] initialItems = viewModel.OnlineDevices.ToArray();
+
+        tracker.SetDevice(new AdbDevice("SERIAL-02", AdbDeviceStatus.Offline));
+        await viewModel.WaitForPendingOperationsAsync();
+
+        CollectionAssert.AreEqual(
+            new[] { "SERIAL-01", "SERIAL-03" },
+            viewModel.OnlineDevices.Select(item => item.Serial).ToArray());
+        Assert.AreSame(initialItems[0], viewModel.OnlineDevices[0]);
+        Assert.AreSame(initialItems[2], viewModel.OnlineDevices[1]);
+        Assert.AreEqual(0, factory.Sessions[0].StopCount);
+        Assert.AreEqual(0, factory.Sessions[0].DisposeCount);
+        Assert.AreEqual(1, factory.Sessions[1].StopCount);
+        Assert.AreEqual(1, factory.Sessions[1].DisposeCount);
+        Assert.AreEqual(0, factory.Sessions[2].StopCount);
+        Assert.AreEqual(0, factory.Sessions[2].DisposeCount);
     }
 
     [TestMethod]
@@ -438,6 +630,182 @@ public sealed class ViewMultipleDevicesViewModelTests
     }
 
     [TestMethod]
+    public async Task TrackerOnline_CanStartFreshSession()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(1);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory);
+        await viewModel.InitializeAsync();
+        tracker.SetHealth(AdbDeviceTrackerHealth.Reconnecting);
+        await viewModel.WaitForPendingOperationsAsync();
+        tracker.SetHealth(AdbDeviceTrackerHealth.Connected);
+        await viewModel.WaitForPendingOperationsAsync();
+
+        Assert.IsTrue(viewModel.VisibleDevices.Single().IsRunning);
+        Assert.IsTrue(factory.CreateCount >= 2);
+        Assert.IsTrue(factory.Sessions.Last().StartCount == 1);
+    }
+
+    [TestMethod]
+    public async Task TrackerConnectedAfterReconnect_ReconcilesCurrentOnlineSnapshot()
+    {
+        FakeDeviceStoreService store = new(CreateStoredDevices(3));
+        FakeTracker tracker = new(
+        [
+            new AdbDevice("SERIAL-01", AdbDeviceStatus.Online),
+            new AdbDevice("SERIAL-02", AdbDeviceStatus.Online),
+            new AdbDevice("SERIAL-03", AdbDeviceStatus.Online)
+        ]);
+        FakeSessionFactory factory = new();
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(store, tracker, factory);
+        await viewModel.InitializeAsync();
+
+        tracker.SetDevices(
+        [
+            new AdbDevice("SERIAL-01", AdbDeviceStatus.Online),
+            new AdbDevice("SERIAL-03", AdbDeviceStatus.Online)
+        ]);
+        tracker.SetHealth(AdbDeviceTrackerHealth.Reconnecting);
+        await viewModel.WaitForPendingOperationsAsync();
+        tracker.SetHealth(AdbDeviceTrackerHealth.Connected);
+        await viewModel.WaitForPendingOperationsAsync();
+
+        CollectionAssert.AreEqual(
+            new[] { "SERIAL-01", "SERIAL-03" },
+            viewModel.OnlineDevices.Select(item => item.Serial).ToArray());
+    }
+
+    [TestMethod]
+    public async Task DeviceRemoval_RefillsVisiblePageWithoutRestartingHealthySessions()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(9);
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(store, tracker, factory);
+        await viewModel.InitializeAsync();
+
+        tracker.SetDevice(new AdbDevice("SERIAL-04", AdbDeviceStatus.Offline));
+        await viewModel.WaitForPendingOperationsAsync();
+
+        CollectionAssert.AreEqual(
+            new[] { "SERIAL-01", "SERIAL-02", "SERIAL-03", "SERIAL-05", "SERIAL-06", "SERIAL-07", "SERIAL-08", "SERIAL-09" },
+            viewModel.VisibleDevices.Select(item => item.Serial).ToArray());
+        Assert.AreEqual(1, factory.Sessions[8].StartCount);
+        Assert.AreEqual(0, factory.Sessions[0].StopCount);
+        Assert.AreEqual(0, factory.Sessions[1].StopCount);
+        Assert.AreEqual(0, factory.Sessions[2].StopCount);
+        Assert.AreEqual(1, factory.Sessions[3].StopCount);
+    }
+
+    [TestMethod]
+    public async Task OpenViewDevice_DeviceRemovedBeforeExecution_DoesNotOpenWindow()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(1);
+        NoOpViewDeviceWindowService windowService = new();
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory,
+            viewDeviceWindowService: windowService);
+
+        await viewModel.InitializeAsync();
+        ViewMultipleDeviceItemViewModel item = viewModel.VisibleDevices.Single();
+        tracker.SetDevice(new AdbDevice("SERIAL-01", AdbDeviceStatus.Offline));
+
+        await item.OpenViewDeviceCommand.ExecuteAsync(null);
+
+        Assert.AreEqual(0, windowService.OpenCount);
+    }
+
+    [TestMethod]
+    public async Task PresentationLease_SuspendsAndResumesVisibleMultiItem()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(1);
+        ViewDevicePresentationCoordinator coordinator = new();
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory,
+            presentationCoordinator: coordinator);
+
+        await viewModel.InitializeAsync();
+        ViewMultipleDeviceItemViewModel item = viewModel.VisibleDevices.Single();
+        FakeViewDeviceSession firstSession = factory.Sessions.Single();
+
+        IAsyncDisposable lease = await coordinator.AcquireDedicatedViewAsync("SERIAL-01");
+        Assert.IsTrue(item.IsDedicatedView);
+        Assert.AreEqual(1, firstSession.StopCount);
+        Assert.AreEqual(1, firstSession.DisposeCount);
+
+        await DisposeLeaseAsync(lease);
+
+        Assert.IsTrue(item.IsRunning);
+        Assert.AreEqual(2, factory.CreateCount);
+        Assert.AreEqual(1, factory.Sessions[1].StartCount);
+    }
+
+    [TestMethod]
+    public async Task Deactivate_ConcurrentDedicatedOpen_ReleasesMultiLeaseBeforeDedicatedContinues()
+    {
+        FakeDeviceStoreService store = new(CreateStoredDevices(1));
+        FakeTracker tracker = new(CreateAdbDevices(1));
+        FakeViewDeviceSession session = new("SERIAL-01");
+        FakeSessionFactory factory = new(session);
+        ViewDevicePresentationCoordinator coordinator = new();
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory,
+            presentationCoordinator: coordinator);
+
+        await viewModel.InitializeAsync();
+        TaskCompletionSource stopStarted = NewSignal();
+        TaskCompletionSource stopGate = NewSignal();
+        session.StopStarted = stopStarted;
+        session.StopGate = stopGate;
+
+        Task deactivate = viewModel.DeactivateAsync();
+        await stopStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Task<IAsyncDisposable> acquire = coordinator.AcquireDedicatedViewAsync("SERIAL-01");
+        Assert.IsFalse(acquire.IsCompleted);
+
+        stopGate.TrySetResult();
+        await deactivate;
+        IAsyncDisposable lease = await acquire;
+        await lease.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task DedicatedLeaseOpenedBeforeMultiActivation_DoesNotStartUntilReleased()
+    {
+        (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
+            CreateFixture(1);
+        ViewDevicePresentationCoordinator coordinator = new();
+        IAsyncDisposable lease = await coordinator.AcquireDedicatedViewAsync("SERIAL-01");
+        await using ViewMultipleDevicesViewModel viewModel = CreateViewModel(
+            store,
+            tracker,
+            factory,
+            presentationCoordinator: coordinator);
+
+        await viewModel.InitializeAsync();
+        ViewMultipleDeviceItemViewModel item = viewModel.VisibleDevices.Single();
+        Assert.IsTrue(item.IsDedicatedView);
+        Assert.AreEqual(0, factory.CreateCount);
+
+        await DisposeLeaseAsync(lease);
+
+        Assert.IsTrue(item.IsRunning);
+        Assert.AreEqual(1, factory.CreateCount);
+        Assert.AreEqual(1, factory.Sessions.Single().StartCount);
+    }
+
+    [TestMethod]
     public async Task Deactivate_CleansSessionsRetriesAndOperations()
     {
         (FakeDeviceStoreService store, FakeTracker tracker, FakeSessionFactory factory) =
@@ -456,10 +824,6 @@ public sealed class ViewMultipleDevicesViewModelTests
         tracker.SetHealth(AdbDeviceTrackerHealth.Connected);
         await store.WaitForLoadAsync(2);
 
-        ViewMultipleDeviceItemViewModel failedItem = viewModel.VisibleDevices[0];
-        await failedItem.HandleNativeHostFailureAsync(
-            new InvalidOperationException("host"),
-            failedItem.NativeWindowHandle);
         await viewModel.DeactivateAsync();
 
         Assert.IsEmpty(viewModel.VisibleDevices);
@@ -474,16 +838,26 @@ public sealed class ViewMultipleDevicesViewModelTests
         FakeDeviceStoreService store,
         FakeTracker tracker,
         FakeSessionFactory factory,
-        FakeLocalizationService? localization = null)
+        FakeLocalizationService? localization = null,
+        IViewDeviceWindowService? viewDeviceWindowService = null,
+        IViewDevicePresentationCoordinator? presentationCoordinator = null)
     {
+        IViewDeviceWindowService windowService =
+            viewDeviceWindowService ?? new NoOpViewDeviceWindowService();
+        IViewDevicePresentationCoordinator coordinator =
+            presentationCoordinator ?? new ViewDevicePresentationCoordinator();
         return new ViewMultipleDevicesViewModel(
             store,
             tracker,
             factory,
+            new FakeClipboardService(),
             localization ?? new FakeLocalizationService(),
             new ImmediateUiDispatcher(),
             NullLoggerFactory.Instance,
-            NullLogger<ViewMultipleDevicesViewModel>.Instance);
+            NullLogger<ViewMultipleDevicesViewModel>.Instance,
+            windowService,
+            coordinator,
+            metadataChangeNotifier: null);
     }
 
     private static async Task<ViewMultipleDevicesViewModel> CreateInitializedViewModelAsync(
@@ -539,5 +913,15 @@ public sealed class ViewMultipleDevicesViewModelTests
     private static TaskCompletionSource NewSignal()
     {
         return new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private static int GetPageSize()
+    {
+        return ViewMultipleDevicesViewModel.PageSize;
+    }
+
+    private static Task DisposeLeaseAsync(IAsyncDisposable lease)
+    {
+        return lease.DisposeAsync().AsTask();
     }
 }

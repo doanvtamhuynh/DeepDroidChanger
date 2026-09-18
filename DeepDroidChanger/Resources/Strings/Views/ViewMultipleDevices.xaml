@@ -16,6 +16,10 @@
     <sys:String x:Key="ViewMultipleDevices_Next">Next</sys:String>
     <sys:String x:Key="ViewMultipleDevices_Connecting">Connecting...</sys:String>
     <sys:String x:Key="ViewMultipleDevices_Online">Online</sys:String>
-    <sys:String x:Key="ViewMultipleDevices_Disconnected">Disconnected</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OpenedInViewDevice">Opened in View Device</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OpenView">Open View</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OpenViewDevice">Open this device in View Device</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Stopped">Stopped</sys:String>
     <sys:String x:Key="ViewMultipleDevices_Failed">Failed</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Busy">Already open in another viewer</sys:String>
 </ResourceDictionary>

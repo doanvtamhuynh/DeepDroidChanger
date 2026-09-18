@@ -8,8 +8,28 @@ namespace DeepDroidChanger.Services;
 /// </summary>
 public sealed class AdbToolPathResolver
 {
-    private readonly Lazy<string> _adbPath = new(() => Resolve(AssetConstants.Tools.AdbExecutableName));
-    private readonly Lazy<string> _fastbootPath = new(() => Resolve(AssetConstants.Tools.FastbootExecutableName));
+    private readonly string _applicationBaseDirectory;
+    private readonly string _projectDirectory;
+    private readonly Lazy<string> _adbPath;
+    private readonly Lazy<string> _fastbootPath;
+
+    public AdbToolPathResolver()
+        : this(AppContext.BaseDirectory, Environment.CurrentDirectory)
+    {
+    }
+
+    internal AdbToolPathResolver(
+        string applicationBaseDirectory,
+        string projectDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationBaseDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+
+        _applicationBaseDirectory = Path.GetFullPath(applicationBaseDirectory);
+        _projectDirectory = Path.GetFullPath(projectDirectory);
+        _adbPath = new(() => Resolve(AssetConstants.Tools.AdbExecutableName));
+        _fastbootPath = new(() => Resolve(AssetConstants.Tools.FastbootExecutableName));
+    }
 
     public string GetAdbPath()
     {
@@ -21,15 +41,19 @@ public sealed class AdbToolPathResolver
         return _fastbootPath.Value;
     }
 
-    private static string Resolve(string executableName)
+    private string Resolve(string executableName)
     {
-        var outputPath = Path.Combine(
-            AppContext.BaseDirectory,
-            AssetConstants.Tools.RootRelativePath,
+        string outputPath = Path.Combine(
+            _applicationBaseDirectory,
+            AssetConstants.Tools.PlatformToolsRelativePath.Replace(
+                '/',
+                Path.DirectorySeparatorChar),
             executableName);
-        var projectPath = Path.Combine(
-            Environment.CurrentDirectory,
-            AssetConstants.Tools.RootRelativePath,
+        string projectPath = Path.Combine(
+            _projectDirectory,
+            AssetConstants.Tools.PlatformToolsRelativePath.Replace(
+                '/',
+                Path.DirectorySeparatorChar),
             executableName);
 
         if (File.Exists(outputPath))
@@ -38,6 +62,9 @@ public sealed class AdbToolPathResolver
         if (File.Exists(projectPath))
             return projectPath;
 
-        return executableName;
+        throw new FileNotFoundException(
+            $"The bundled platform-tools executable '{executableName}' was not found. " +
+            $"Attempted paths: '{outputPath}' and '{projectPath}'.",
+            outputPath);
     }
 }

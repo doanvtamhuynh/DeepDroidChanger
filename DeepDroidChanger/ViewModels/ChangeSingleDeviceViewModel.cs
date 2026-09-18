@@ -49,6 +49,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly ILogger<ChangeSingleDeviceViewModel> _logger;
         private readonly IUiDispatcherService _uiDispatcher;
         private readonly IPollingService _pollingService;
+        private readonly IDeviceMetadataChangeNotifier? _metadataChangeNotifier;
         private readonly SemaphoreSlim _deviceRefreshLock = new(1, 1);
         private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
         private readonly object _pendingDeviceEditsLock = new();
@@ -131,7 +132,8 @@ namespace DeepDroidChanger.ViewModels
             IDeviceActionEligibilityService deviceActionEligibilityService,
             IDeviceActionFeedbackService deviceActionFeedbackService,
             IClipboardService clipboardService,
-            IViewDeviceWindowService viewDeviceWindowService)
+            IViewDeviceWindowService viewDeviceWindowService,
+            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
         {
             _addDevicesDialogService = addDevicesDialogService;
             _carrierDataService = carrierDataService;
@@ -169,6 +171,7 @@ namespace DeepDroidChanger.ViewModels
             _uiDispatcher = uiDispatcher;
             _pollingService = pollingService;
             _logger = logger;
+            _metadataChangeNotifier = metadataChangeNotifier;
             Devices = new ObservableCollection<DeviceRowViewModel>();
             SelectedDevices = new ReadOnlyObservableCollection<DeviceRowViewModel>(_selectedDevices);
             Countries = new ObservableCollection<CarrierCountryOption>();
@@ -178,6 +181,7 @@ namespace DeepDroidChanger.ViewModels
             DeviceInfo.PropertyChanged += OnDeviceInfoPropertyChanged;
             _deviceActionCoordinatorService.OperationStateChanged += OnDeviceActionStateChanged;
             _deviceProcessStateService.ProcessChanged += OnDeviceProcessChanged;
+            _metadataChangeNotifier?.DeviceNameChanged += OnDeviceNameChanged;
 
             Brands = DeviceProfileOptionsHelper.Brands;
             UpdateAndroidVersionOptions("Random", null);
@@ -396,6 +400,7 @@ namespace DeepDroidChanger.ViewModels
             DeviceInfo.PropertyChanged -= OnDeviceInfoPropertyChanged;
             _deviceActionCoordinatorService.OperationStateChanged -= OnDeviceActionStateChanged;
             _deviceProcessStateService.ProcessChanged -= OnDeviceProcessChanged;
+            _metadataChangeNotifier?.DeviceNameChanged -= OnDeviceNameChanged;
             _pollCancellation?.Dispose();
             _pollCancellation = null;
             _actionLifetimeCancellation.Dispose();
@@ -2587,6 +2592,49 @@ namespace DeepDroidChanger.ViewModels
             }
 
             RestoreSelection(targetSerial);
+        }
+
+        private void OnDeviceNameChanged(object? sender, DeviceNameChangedEventArgs eventArgs)
+        {
+            if (_isDisposed)
+                return;
+
+            void ApplyNameChange()
+            {
+                if (_isDisposed)
+                    return;
+
+                bool wasRefreshingRows = _isRefreshingRows;
+                _isRefreshingRows = true;
+                try
+                {
+                    foreach (StoredDeviceConfig storedDevice in _storedDevices.Where(device =>
+                                 SerialEquals(device.Serial, eventArgs.Serial)))
+                    {
+                        storedDevice.Name = eventArgs.Name;
+                    }
+
+                    foreach (DeviceRowViewModel deviceRow in _allDeviceRows.Where(device =>
+                                 SerialEquals(device.Serial, eventArgs.Serial)))
+                    {
+                        deviceRow.Name = eventArgs.Name;
+                    }
+                }
+                finally
+                {
+                    _isRefreshingRows = wasRefreshingRows;
+                }
+
+                ApplyDeviceFilter();
+            }
+
+            if (_uiDispatcher.CheckAccess())
+            {
+                ApplyNameChange();
+                return;
+            }
+
+            _ = _uiDispatcher.InvokeAsync(ApplyNameChange);
         }
 
         internal void ApplyDeviceListSnapshot(DeviceListSnapshot snapshot)

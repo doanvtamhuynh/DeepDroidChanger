@@ -9,6 +9,7 @@ public enum ViewDeviceSessionState
     WaitingForDevice,
     Unauthorized,
     AdbUnavailable,
+    Busy,
     Reconnecting,
     Failed,
     Closing,

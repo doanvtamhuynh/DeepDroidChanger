@@ -289,6 +289,38 @@ namespace DeepDroidChanger.Services
             _logger.LogInformation("Successfully sent reboot command to device {Serial}.", serial);
         }
 
+        public Task<CommandResult> PushFileAsync(
+            string serial,
+            string localPath,
+            string remotePath,
+            CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+            return RunAdbAsync(
+                serial,
+                $"push {QuoteProcessArgument(localPath)} {QuoteProcessArgument(remotePath)}",
+                cancellationToken);
+        }
+
+        public Task<CommandResult> PullFileAsync(
+            string serial,
+            string remotePath,
+            string localPath,
+            CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(localPath);
+
+            return RunAdbAsync(
+                serial,
+                $"pull {QuoteProcessArgument(remotePath)} {QuoteProcessArgument(localPath)}",
+                cancellationToken);
+        }
+
         public async Task SetWifiAsync(string serial, bool enabled, CancellationToken cancellationToken)
         {
             var state = enabled ? "enable" : "disable";

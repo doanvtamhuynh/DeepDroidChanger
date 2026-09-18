@@ -13,34 +13,6 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
     public const int PageSize = 8;
     private const int BaseTilesPerRow = 4;
 
-    private enum TrackerTransitionKind
-    {
-        DeviceOffline,
-        DeviceOnline,
-        TrackerReconnecting,
-        TrackerConnected
-    }
-
-    private sealed class PendingTrackerWork
-    {
-        public bool RequiresCatalogRefresh { get; set; }
-
-        public bool TrackerReconnecting { get; set; }
-
-        public HashSet<string> DeviceSerials { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-        public bool HasWork => RequiresCatalogRefresh ||
-                                TrackerReconnecting ||
-                                DeviceSerials.Count > 0;
-
-        public void Clear()
-        {
-            RequiresCatalogRefresh = false;
-            TrackerReconnecting = false;
-            DeviceSerials.Clear();
-        }
-    }
-
     private static readonly int[] ZoomLevels =
     [
         50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300
@@ -50,11 +22,15 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     private readonly IDeviceStoreService _deviceStoreService;
     private readonly IAdbDeviceTrackerService _deviceTracker;
-    private readonly IViewDeviceSessionFactory _sessionFactory;
+    private readonly ISingleViewDeviceSessionFactory _sessionFactory;
+    private readonly IViewDeviceClipboardService _clipboardService;
     private readonly ILocalizationService _localization;
     private readonly IUiDispatcherService _uiDispatcher;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<ViewMultipleDevicesViewModel> _logger;
+    private readonly IDeviceMetadataChangeNotifier? _metadataChangeNotifier;
+    private readonly IViewDeviceWindowService _viewDeviceWindowService;
+    private readonly IViewDevicePresentationCoordinator _presentationCoordinator;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly object _navigationSchedulingGate = new();
@@ -71,7 +47,8 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
     private Task _navigationTask = Task.CompletedTask;
     private CancellationTokenSource? _trackerCancellation;
     private Task _trackerTask = Task.CompletedTask;
-    private PendingTrackerWork _pendingTrackerWork = new();
+    private IDisposable? _multiViewRegistration;
+    private int _trackerRefreshPending;
     private int _generation;
     private int _currentPage = 1;
     private int _requestedPage = 1;
@@ -86,33 +63,42 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
     private int _disposed;
     private bool _trackerEventsSubscribed;
     private int _initializationInProgress;
-    private int _trackerRefreshInProgress;
-    private int _trackerDirtyDuringRefresh;
 
     public ViewMultipleDevicesViewModel(
         IDeviceStoreService deviceStoreService,
         IAdbDeviceTrackerService deviceTracker,
-        IViewDeviceSessionFactory sessionFactory,
+        ISingleViewDeviceSessionFactory sessionFactory,
+        IViewDeviceClipboardService clipboardService,
         ILocalizationService localization,
         IUiDispatcherService uiDispatcher,
         ILoggerFactory loggerFactory,
-        ILogger<ViewMultipleDevicesViewModel> logger)
+        ILogger<ViewMultipleDevicesViewModel> logger,
+        IViewDeviceWindowService viewDeviceWindowService,
+        IViewDevicePresentationCoordinator presentationCoordinator,
+        IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
     {
         ArgumentNullException.ThrowIfNull(deviceStoreService);
         ArgumentNullException.ThrowIfNull(deviceTracker);
         ArgumentNullException.ThrowIfNull(sessionFactory);
+        ArgumentNullException.ThrowIfNull(clipboardService);
         ArgumentNullException.ThrowIfNull(localization);
         ArgumentNullException.ThrowIfNull(uiDispatcher);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(viewDeviceWindowService);
+        ArgumentNullException.ThrowIfNull(presentationCoordinator);
 
         _deviceStoreService = deviceStoreService;
         _deviceTracker = deviceTracker;
         _sessionFactory = sessionFactory;
+        _clipboardService = clipboardService;
         _localization = localization;
         _uiDispatcher = uiDispatcher;
         _loggerFactory = loggerFactory;
         _logger = logger;
+        _metadataChangeNotifier = metadataChangeNotifier;
+        _viewDeviceWindowService = viewDeviceWindowService;
+        _presentationCoordinator = presentationCoordinator;
         _zoomIndex = DefaultZoomIndex;
 
         ZoomOutCommand = new RelayCommand(ZoomOut, CanZoomOut);
@@ -120,17 +106,21 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         FitCommand = new RelayCommand(FitToViewport, CanFit);
         PreviousPageCommand = new RelayCommand(RequestPreviousPage, CanNavigatePrevious);
         NextPageCommand = new RelayCommand(RequestNextPage, CanNavigateNext);
+        _metadataChangeNotifier?.DeviceNameChanged += OnDeviceNameChanged;
     }
 
+    // Invariant:
+    // every item in OnlineDevices represents a saved device
+    // currently reported as AdbDeviceStatus.Online while tracker
+    // health is Connected. Offline devices are removed, not retained
+    // for reconnect.
     public ObservableCollection<ViewMultipleDeviceItemViewModel> OnlineDevices { get; } = [];
 
     public ObservableCollection<ViewMultipleDeviceItemViewModel> VisibleDevices { get; } = [];
 
     public int CatalogDeviceCount => OnlineDevices.Count;
 
-    public int OnlineDeviceCount => _deviceTracker.Health == AdbDeviceTrackerHealth.Connected
-        ? OnlineDevices.Count(item => _deviceTracker.GetDevice(item.Serial)?.Status == AdbDeviceStatus.Online)
-        : 0;
+    public int OnlineDeviceCount => OnlineDevices.Count;
 
     public bool HasOnlineDevices => CatalogDeviceCount > 0;
 
@@ -172,8 +162,6 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<ViewMultipleDeviceItemViewModel>? catalog = null;
-        bool catalogPublished = false;
         try
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
@@ -191,24 +179,22 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             _activationCancellation = activation;
 
             // Mark initialization before subscribing so every tracker event raised
-            // during StartAsync or catalog construction is coalesced for later.
+            // during StartAsync or initial reconciliation is coalesced for later.
             Volatile.Write(ref _initializationInProgress, 1);
+            _multiViewRegistration = _presentationCoordinator.RegisterMultiView(
+                SuspendMultiViewAsync,
+                ResumeMultiViewAsync);
             SubscribeToTracker();
 
             try
             {
                 await _deviceTracker.StartAsync(activation.Token).ConfigureAwait(false);
-                IReadOnlyList<ViewMultipleDeviceItemViewModel> initialCatalog =
-                    await BuildOnlineCatalogAsync(activation.Token).ConfigureAwait(false) ?? [];
-                catalog = initialCatalog;
-
                 int generation = Interlocked.Increment(ref _generation);
                 await _transitionGate.WaitAsync(activation.Token).ConfigureAwait(false);
                 try
                 {
-                    bool applied = await ReplaceCatalogAndPageAsync(
-                            initialCatalog,
-                            page: 1,
+                    bool applied = await ReconcileOnlineCatalogAsync(
+                            requestedPage: 1,
                             navigationGeneration: generation,
                             cancellationToken: activation.Token)
                         .ConfigureAwait(false);
@@ -218,11 +204,9 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
                         throw new InvalidOperationException("The initial multi-view page was superseded.");
                     }
 
-                    catalogPublished = true;
                     await _uiDispatcher
                         .InvokeAsync(ApplyInitialFitCore, activation.Token)
                         .ConfigureAwait(false);
-                    await StartVisibleSessionsAsync(activation.Token).ConfigureAwait(false);
                 }
                 finally
                 {
@@ -243,9 +227,6 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         }
         finally
         {
-            if (catalog is not null && !catalogPublished)
-                await DisposeItemsAsync(catalog).ConfigureAwait(false);
-
             _lifecycleGate.Release();
         }
     }
@@ -354,6 +335,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         finally
         {
             CancelCancellation(_lifetimeCancellation);
+            _metadataChangeNotifier?.DeviceNameChanged -= OnDeviceNameChanged;
             _lifetimeCancellation.Dispose();
             _lifecycleGate.Release();
             _lifecycleGate.Dispose();
@@ -373,176 +355,126 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         CancelCancellation(activation);
         await CancelItemRetriesAsync().ConfigureAwait(false);
         await CancelOperationsAndWaitAsync().ConfigureAwait(false);
-
-        ViewMultipleDeviceItemViewModel[] items = await SnapshotOnlineItemsAsync().ConfigureAwait(false);
         try
         {
-            // Remove visible tiles before stopping their sessions. Their
-            // Unloaded handlers then detach native children while the host
-            // controls are still available.
-            await _uiDispatcher
-                .InvokeAsync(() =>
-                {
-                    VisibleDevices.Clear();
-                    OnlineDevices.Clear();
-                    _requestedPage = 1;
-                    CurrentPage = 1;
-                    _fitPending = true;
-                    SetZoomIndexCore(DefaultZoomIndex);
-                    NotifyCollectionSummary();
-                    NotifyZoomCommands();
-                })
-                .ConfigureAwait(false);
+            // Keep the registration active while the final stop/dispose drain
+            // runs. Suspend callbacks serialize behind this gate and therefore
+            // cannot observe a cleared catalog before its sessions are stopped.
+            await _transitionGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                ViewMultipleDeviceItemViewModel[] items =
+                    await SnapshotOnlineItemsAsync().ConfigureAwait(false);
+                await _uiDispatcher
+                    .InvokeAsync(() =>
+                    {
+                        VisibleDevices.Clear();
+                        OnlineDevices.Clear();
+                        _requestedPage = 1;
+                        CurrentPage = 1;
+                        _fitPending = true;
+                        SetZoomIndexCore(DefaultZoomIndex);
+                        NotifyCollectionSummary();
+                        NotifyZoomCommands();
+                    })
+                    .ConfigureAwait(false);
+                await StopItemsAsync(items).ConfigureAwait(false);
+                await DisposeItemsAsync(items).ConfigureAwait(false);
+            }
+            finally
+            {
+                _transitionGate.Release();
+            }
         }
         finally
         {
-            await StopItemsAsync(items).ConfigureAwait(false);
-            await DisposeItemsAsync(items).ConfigureAwait(false);
+            IDisposable? multiViewRegistration = Interlocked.Exchange(
+                ref _multiViewRegistration,
+                null);
+            multiViewRegistration?.Dispose();
+            activation?.Dispose();
         }
-
-        activation?.Dispose();
     }
 
-    private async Task<IReadOnlyList<ViewMultipleDeviceItemViewModel>?> BuildOnlineCatalogAsync(
+    private ViewMultipleDeviceItemViewModel CreateItem(StoredDeviceConfig device)
+    {
+        return new ViewMultipleDeviceItemViewModel(
+            device.Serial,
+            device.Name,
+            _sessionFactory,
+            _deviceTracker,
+            _clipboardService,
+            _localization,
+            _uiDispatcher,
+            _loggerFactory.CreateLogger<ViewMultipleDeviceItemViewModel>(),
+            _presentationCoordinator,
+            RequestItemRetry,
+            openViewDeviceRequest: OpenViewDeviceAsync);
+    }
+
+    private void OnDeviceNameChanged(object? sender, DeviceNameChangedEventArgs eventArgs)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
+        void ApplyNameChange()
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+                return;
+
+            foreach (ViewMultipleDeviceItemViewModel item in OnlineDevices.Where(item =>
+                         string.Equals(item.Serial, eventArgs.Serial, StringComparison.OrdinalIgnoreCase)))
+            {
+                item.UpdateDeviceName(eventArgs.Name);
+            }
+        }
+
+        if (_uiDispatcher.CheckAccess())
+        {
+            ApplyNameChange();
+            return;
+        }
+
+        _ = _uiDispatcher.InvokeAsync(ApplyNameChange);
+    }
+
+    private async Task StartItemsAsync(
+        IEnumerable<ViewMultipleDeviceItemViewModel> items,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<StoredDeviceConfig> savedDevices =
-            await _deviceStoreService.LoadAsync(cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<AdbDevice> detectedDevices = _deviceTracker.CurrentSnapshot;
-        if (_deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
-            return null;
+        ViewMultipleDeviceItemViewModel[] distinctItems = items
+            .Distinct()
+            .ToArray();
+        if (distinctItems.Length == 0)
+            return;
 
-        HashSet<string> onlineSerials = detectedDevices
-            .Where(device => device.Status == AdbDeviceStatus.Online)
-            .Select(device => device.Serial)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return savedDevices
-            .Where(device => onlineSerials.Contains(device.Serial))
-            .Select(device => new ViewMultipleDeviceItemViewModel(
-                device.Serial,
-                device.Name,
-                _sessionFactory,
-                _deviceTracker,
-                _localization,
-                _uiDispatcher,
-                _loggerFactory.CreateLogger<ViewMultipleDeviceItemViewModel>(),
-                RequestItemRetry))
-            .ToList();
-    }
-
-    private async Task<bool> ReplaceCatalogAndPageAsync(
-        IReadOnlyList<ViewMultipleDeviceItemViewModel> catalog,
-        int page,
-        int? navigationGeneration,
-        CancellationToken cancellationToken,
-        bool requireTrackerConnected = false)
-    {
-        if (!IsCurrentOperation(navigationGeneration, cancellationToken) ||
-            (requireTrackerConnected &&
-             _deviceTracker.Health != AdbDeviceTrackerHealth.Connected))
-        {
-            return false;
-        }
-
-        // Candidate construction happens before this method. Keep the current
-        // catalog and its sessions alive until both collections are swapped in
-        // one dispatcher action; this is the commit point.
-        ViewMultipleDeviceItemViewModel[] oldItems = await SnapshotOnlineItemsAsync()
-            .ConfigureAwait(false);
-        if (!IsCurrentOperation(navigationGeneration, cancellationToken) ||
-            (requireTrackerConnected &&
-             _deviceTracker.Health != AdbDeviceTrackerHealth.Connected))
-        {
-            return false;
-        }
-
-        bool applied = await ApplyCatalogAndPageAsync(
-                catalog,
-                page,
-                navigationGeneration,
-                cancellationToken,
-                requireTrackerConnected)
-            .ConfigureAwait(false);
-        if (!applied)
-            return false;
-
-        // Ownership changed at commit. Cleanup is deliberately unconditional:
-        // cancellation after commit must never leave the old catalog alive or
-        // dispose a candidate that is now published.
-        await StopItemsAsync(oldItems).ConfigureAwait(false);
-        await DisposeItemsAsync(oldItems).ConfigureAwait(false);
-        return true;
-    }
-
-    private async Task<bool> ApplyCatalogAndPageAsync(
-        IReadOnlyList<ViewMultipleDeviceItemViewModel> catalog,
-        int page,
-        int? navigationGeneration,
-        CancellationToken cancellationToken,
-        bool requireTrackerConnected)
-    {
-        bool applied = false;
-        await _uiDispatcher
-            .InvokeAsync(() =>
-            {
-                if (!IsCurrentOperation(navigationGeneration, cancellationToken) ||
-                    (requireTrackerConnected &&
-                     _deviceTracker.Health != AdbDeviceTrackerHealth.Connected))
-                {
-                    return;
-                }
-
-                int targetPage = Math.Clamp(page, 1, CalculateTotalPages(catalog.Count));
-                // Remove visible tiles first so their Unloaded handlers can
-                // detach native children before obsolete items are disposed.
-                VisibleDevices.Clear();
-                OnlineDevices.Clear();
-                foreach (ViewMultipleDeviceItemViewModel item in catalog)
-                {
-                    item.SetTileSize(CalculateScaledTileWidth());
-                    OnlineDevices.Add(item);
-                }
-
-                foreach (ViewMultipleDeviceItemViewModel item in catalog
-                             .Skip((targetPage - 1) * PageSize)
-                             .Take(PageSize))
-                {
-                    VisibleDevices.Add(item);
-                }
-
-                _requestedPage = targetPage;
-                CurrentPage = targetPage;
-                NotifyCollectionSummary();
-                applied = true;
-            }, cancellationToken)
-            .ConfigureAwait(false);
-
-        return applied;
-    }
-
-    private async Task StartVisibleSessionsAsync(CancellationToken cancellationToken)
-    {
-        ViewMultipleDeviceItemViewModel[] visibleItems = await SnapshotVisibleItemsAsync()
-            .ConfigureAwait(false);
         try
         {
-            await Task.WhenAll(visibleItems.Select(item => item.StartAsync(cancellationToken)))
+            await Task.WhenAll(distinctItems.Select(item =>
+                    StartVisibleItemAsync(item, cancellationToken)))
                 .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            await StopItemsAsync(visibleItems).ConfigureAwait(false);
-            throw;
         }
         catch
         {
-            await StopItemsAsync(visibleItems).ConfigureAwait(false);
+            await StopItemsAsync(distinctItems).ConfigureAwait(false);
             throw;
         }
     }
 
-    private async Task<bool> RefreshCatalogAndStartPageAsync(
+    private async Task StartVisibleItemAsync(
+        ViewMultipleDeviceItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        if (_presentationCoordinator.IsDedicatedViewActive(item.Serial))
+        {
+            await item.SuspendForDedicatedViewAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await item.StartAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> ApplyVisiblePageAsync(
         int requestedPage,
         int? navigationGeneration,
         CancellationToken cancellationToken)
@@ -553,87 +485,301 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             return false;
         }
 
-        IReadOnlyList<ViewMultipleDeviceItemViewModel>? builtCatalog =
-            await BuildOnlineCatalogAsync(cancellationToken).ConfigureAwait(false);
-        if (builtCatalog is null)
-            return false;
-
-        bool catalogPublished = false;
-        try
-        {
-            if (!IsCurrentOperation(navigationGeneration, cancellationToken))
-                return false;
-
-            int targetPage = Math.Clamp(
-                requestedPage,
-                1,
-                CalculateTotalPages(builtCatalog.Count));
-            bool applied = await ReplaceCatalogAndPageAsync(
-                    builtCatalog,
-                    targetPage,
-                    navigationGeneration,
-                    cancellationToken,
-                    requireTrackerConnected: true)
-                .ConfigureAwait(false);
-            if (!applied)
-                return false;
-
-            catalogPublished = true;
-            try
-            {
-                await StartVisibleSessionsAsync(cancellationToken).ConfigureAwait(false);
-                if (navigationGeneration.HasValue &&
-                    !IsCurrentOperation(navigationGeneration, cancellationToken))
-                {
-                    await RemovePublishedCatalogAsync(builtCatalog).ConfigureAwait(false);
-                    await StopItemsAsync(builtCatalog).ConfigureAwait(false);
-                    catalogPublished = false;
-                    return false;
-                }
-
-                return true;
-            }
-            catch
-            {
-                try
-                {
-                    await RemovePublishedCatalogAsync(builtCatalog).ConfigureAwait(false);
-                }
-                finally
-                {
-                    await StopItemsAsync(builtCatalog).ConfigureAwait(false);
-                    catalogPublished = false;
-                }
-
-                throw;
-            }
-        }
-        finally
-        {
-            if (!catalogPublished)
-                await DisposeItemsAsync(builtCatalog).ConfigureAwait(false);
-        }
-    }
-
-    private async Task RemovePublishedCatalogAsync(
-        IReadOnlyList<ViewMultipleDeviceItemViewModel> catalog)
-    {
+        ViewMultipleDeviceItemViewModel[] oldVisibleItems =
+            await SnapshotVisibleItemsAsync().ConfigureAwait(false);
+        ViewMultipleDeviceItemViewModel[] catalog =
+            await SnapshotOnlineItemsAsync().ConfigureAwait(false);
+        int targetPage = Math.Clamp(
+            requestedPage,
+            1,
+            CalculateTotalPages(catalog.Length));
+        ViewMultipleDeviceItemViewModel[] desiredVisibleItems = catalog
+            .Skip((targetPage - 1) * PageSize)
+            .Take(PageSize)
+            .ToArray();
+        bool applied = false;
         await _uiDispatcher
             .InvokeAsync(() =>
             {
-                if (OnlineDevices.Count != catalog.Count ||
-                    !OnlineDevices.SequenceEqual(catalog))
+                if (!IsCurrentOperation(navigationGeneration, cancellationToken) ||
+                    _deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
                 {
                     return;
                 }
 
+                ApplyCollectionOrder(VisibleDevices, desiredVisibleItems);
+                _requestedPage = targetPage;
+                CurrentPage = targetPage;
+                NotifyCollectionSummary();
+                applied = true;
+            }, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!applied)
+            return false;
+
+        ViewMultipleDeviceItemViewModel[] noLongerVisibleItems = oldVisibleItems
+            .Except(desiredVisibleItems)
+            .ToArray();
+        ViewMultipleDeviceItemViewModel[] newlyVisibleItems = desiredVisibleItems
+            .Except(oldVisibleItems)
+            .ToArray();
+        await StopItemsAsync(noLongerVisibleItems).ConfigureAwait(false);
+        await StartItemsAsync(newlyVisibleItems, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    private async Task<bool> ReconcileOnlineCatalogAsync(
+        int requestedPage,
+        int? navigationGeneration,
+        CancellationToken cancellationToken)
+    {
+        if (!IsCurrentOperation(navigationGeneration, cancellationToken) ||
+            _deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
+        {
+            return false;
+        }
+
+        IReadOnlyList<StoredDeviceConfig> savedDevices =
+            await _deviceStoreService.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (_deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
+            return false;
+
+        HashSet<string> onlineSerials = _deviceTracker.CurrentSnapshot
+            .Where(device => device.Status == AdbDeviceStatus.Online)
+            .Select(device => device.Serial)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        StoredDeviceConfig[] desiredConfigs = savedDevices
+            .Where(device => onlineSerials.Contains(device.Serial))
+            .ToArray();
+
+        ViewMultipleDeviceItemViewModel[] existingItems = await SnapshotOnlineItemsAsync()
+            .ConfigureAwait(false);
+        Dictionary<string, ViewMultipleDeviceItemViewModel> existingBySerial = existingItems
+            .ToDictionary(item => item.Serial, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> desiredNames = new(StringComparer.OrdinalIgnoreCase);
+        List<ViewMultipleDeviceItemViewModel> addedItems = [];
+        List<ViewMultipleDeviceItemViewModel> desiredItems = [];
+        foreach (StoredDeviceConfig device in desiredConfigs)
+        {
+            if (existingBySerial.TryGetValue(device.Serial, out ViewMultipleDeviceItemViewModel? existing))
+            {
+                desiredNames[existing.Serial] = device.Name;
+                desiredItems.Add(existing);
+                continue;
+            }
+
+            ViewMultipleDeviceItemViewModel added = CreateItem(device);
+            addedItems.Add(added);
+            desiredNames[added.Serial] = device.Name;
+            desiredItems.Add(added);
+        }
+
+        ViewMultipleDeviceItemViewModel[] oldVisibleItems = await SnapshotVisibleItemsAsync()
+            .ConfigureAwait(false);
+        int targetPage = Math.Clamp(
+            requestedPage,
+            1,
+            CalculateTotalPages(desiredItems.Count));
+        ViewMultipleDeviceItemViewModel[] desiredVisibleItems = desiredItems
+            .Skip((targetPage - 1) * PageSize)
+            .Take(PageSize)
+            .ToArray();
+        bool applied = false;
+        try
+        {
+            await _uiDispatcher
+                .InvokeAsync(() =>
+                {
+                    if (!IsCurrentOperation(navigationGeneration, cancellationToken) ||
+                        _deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
+                    {
+                        return;
+                    }
+
+                    ApplyCollectionOrder(OnlineDevices, desiredItems);
+                    ApplyCollectionOrder(VisibleDevices, desiredVisibleItems);
+                    double tileWidth = CalculateScaledTileWidth();
+                    foreach (ViewMultipleDeviceItemViewModel item in desiredItems)
+                    {
+                        if (desiredNames.TryGetValue(item.Serial, out string? desiredName))
+                            item.UpdateDeviceName(desiredName ?? item.Serial);
+                        item.SetTileSize(tileWidth);
+                    }
+
+                    _requestedPage = targetPage;
+                    CurrentPage = targetPage;
+                    NotifyCollectionSummary();
+                    applied = true;
+                }, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!applied)
+            {
+                await DisposeItemsAsync(addedItems).ConfigureAwait(false);
+                return false;
+            }
+
+            ViewMultipleDeviceItemViewModel[] removedItems = existingItems
+                .Except(desiredItems)
+                .ToArray();
+            ViewMultipleDeviceItemViewModel[] noLongerVisibleItems = oldVisibleItems
+                .Except(desiredVisibleItems)
+                .Except(removedItems)
+                .ToArray();
+            await StopItemsAsync(removedItems.Concat(noLongerVisibleItems))
+                .ConfigureAwait(false);
+            await DisposeItemsAsync(removedItems).ConfigureAwait(false);
+            ViewMultipleDeviceItemViewModel[] newlyVisibleItems = desiredVisibleItems
+                .Except(oldVisibleItems)
+                .ToArray();
+            await StartItemsAsync(newlyVisibleItems, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch
+        {
+            if (!applied)
+                await DisposeItemsAsync(addedItems).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task ClearCatalogAsync()
+    {
+        ViewMultipleDeviceItemViewModel[] items = await SnapshotOnlineItemsAsync()
+            .ConfigureAwait(false);
+        await _uiDispatcher
+            .InvokeAsync(() =>
+            {
                 VisibleDevices.Clear();
                 OnlineDevices.Clear();
                 _requestedPage = 1;
                 CurrentPage = 1;
+                _fitPending = true;
                 NotifyCollectionSummary();
             })
             .ConfigureAwait(false);
+        await StopItemsAsync(items).ConfigureAwait(false);
+        await DisposeItemsAsync(items).ConfigureAwait(false);
+    }
+
+    private async Task SuspendMultiViewAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return;
+
+        await _transitionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ViewMultipleDeviceItemViewModel[] items = await SnapshotOnlineItemsAsync()
+                .ConfigureAwait(false);
+            ViewMultipleDeviceItemViewModel? item = items.FirstOrDefault(candidate =>
+                string.Equals(candidate.Serial, serial, StringComparison.OrdinalIgnoreCase));
+            if (item is not null)
+                await item.SuspendForDedicatedViewAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
+    }
+
+    private async Task ResumeMultiViewAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
+        if (!Volatile.Read(ref _isActive) ||
+            Volatile.Read(ref _disposed) != 0 ||
+            _deviceTracker.Health != AdbDeviceTrackerHealth.Connected ||
+            _deviceTracker.GetDevice(serial)?.Status != AdbDeviceStatus.Online)
+        {
+            return;
+        }
+
+        await _transitionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ViewMultipleDeviceItemViewModel[] items = await SnapshotOnlineItemsAsync()
+                .ConfigureAwait(false);
+            ViewMultipleDeviceItemViewModel? item = items.FirstOrDefault(candidate =>
+                string.Equals(candidate.Serial, serial, StringComparison.OrdinalIgnoreCase));
+            if (item is null)
+                return;
+
+            ViewMultipleDeviceItemViewModel[] visibleItems = await SnapshotVisibleItemsAsync()
+                .ConfigureAwait(false);
+            if (visibleItems.Contains(item) &&
+                !_presentationCoordinator.IsDedicatedViewActive(serial))
+            {
+                await item.StartAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
+    }
+
+    private async Task OpenViewDeviceAsync(
+        ViewMultipleDeviceItemViewModel item,
+        CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _disposed) != 0 ||
+            !Volatile.Read(ref _isActive) ||
+            _deviceTracker.Health != AdbDeviceTrackerHealth.Connected ||
+            _deviceTracker.GetDevice(item.Serial)?.Status != AdbDeviceStatus.Online)
+        {
+            return;
+        }
+
+        bool stillPublished = false;
+        await _uiDispatcher
+            .InvokeAsync(() => stillPublished = OnlineDevices.Contains(item), cancellationToken)
+            .ConfigureAwait(false);
+        if (!stillPublished ||
+            Volatile.Read(ref _disposed) != 0 ||
+            !Volatile.Read(ref _isActive) ||
+            _deviceTracker.Health != AdbDeviceTrackerHealth.Connected ||
+            _deviceTracker.GetDevice(item.Serial)?.Status != AdbDeviceStatus.Online)
+        {
+            return;
+        }
+
+        await _viewDeviceWindowService.OpenAsync(
+            item.Serial,
+            item.DeviceName,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ApplyCollectionOrder<T>(
+        ObservableCollection<T> target,
+        IReadOnlyList<T> desired)
+    {
+        for (int index = target.Count - 1; index >= 0; index--)
+        {
+            if (!desired.Contains(target[index]))
+                target.RemoveAt(index);
+        }
+
+        for (int index = 0; index < desired.Count; index++)
+        {
+            if (index < target.Count &&
+                EqualityComparer<T>.Default.Equals(target[index], desired[index]))
+            {
+                continue;
+            }
+
+            int existingIndex = target.IndexOf(desired[index]);
+            if (existingIndex >= 0)
+                target.Move(existingIndex, index);
+            else
+                target.Insert(index, desired[index]);
+        }
+
+        while (target.Count > desired.Count)
+            target.RemoveAt(target.Count - 1);
     }
 
     private async Task TransitionToPageAsync(
@@ -657,21 +803,11 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
                     return;
                 }
 
-                Volatile.Write(ref _trackerRefreshInProgress, 1);
-                try
-                {
-                    completed = await RefreshCatalogAndStartPageAsync(
-                            requestedPage,
-                            generation,
-                            navigationCancellation.Token)
-                        .ConfigureAwait(false);
-                }
-                finally
-                {
-                    Volatile.Write(ref _trackerRefreshInProgress, 0);
-                    if (Interlocked.Exchange(ref _trackerDirtyDuringRefresh, 0) != 0)
-                        QueueCatalogRefreshAfterRefresh();
-                }
+                completed = await ApplyVisiblePageAsync(
+                        requestedPage,
+                        generation,
+                        navigationCancellation.Token)
+                    .ConfigureAwait(false);
                 if (!completed &&
                     _deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
                 {
@@ -769,45 +905,18 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         NotifyPaginationCommands();
     }
 
-    private void QueueTrackerTransition(
-        TrackerTransitionKind kind,
-        string? serial = null)
+    private void QueueTrackerRefresh()
     {
         if (Volatile.Read(ref _disposed) != 0 || !Volatile.Read(ref _isActive))
             return;
 
+        Interlocked.Exchange(ref _trackerRefreshPending, 1);
         lock (_trackerSchedulingGate)
         {
             if (Volatile.Read(ref _disposed) != 0 || !Volatile.Read(ref _isActive))
                 return;
-
-            switch (kind)
-            {
-                case TrackerTransitionKind.DeviceOffline:
-                case TrackerTransitionKind.DeviceOnline:
-                    if (!string.IsNullOrWhiteSpace(serial))
-                        _pendingTrackerWork.DeviceSerials.Add(serial);
-                    break;
-
-                case TrackerTransitionKind.TrackerReconnecting:
-                    _pendingTrackerWork.TrackerReconnecting = true;
-                    break;
-
-                case TrackerTransitionKind.TrackerConnected:
-                    _pendingTrackerWork.RequiresCatalogRefresh = true;
-                    break;
-            }
-
-            if (Volatile.Read(ref _initializationInProgress) != 0)
-                _pendingTrackerWork.RequiresCatalogRefresh = true;
-
-            if (Volatile.Read(ref _trackerRefreshInProgress) != 0)
-                Interlocked.Exchange(ref _trackerDirtyDuringRefresh, 1);
-
             EnsureTrackerWorkerLocked();
         }
-
-        _ = NotifyOnlineDeviceCountAsync();
     }
 
     private void EnsureTrackerWorkerIfPending()
@@ -818,21 +927,10 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         }
     }
 
-    private void QueueCatalogRefreshAfterRefresh()
-    {
-        lock (_trackerSchedulingGate)
-        {
-            if (!Volatile.Read(ref _isActive) || Volatile.Read(ref _disposed) != 0)
-                return;
-
-            _pendingTrackerWork.RequiresCatalogRefresh = true;
-            EnsureTrackerWorkerLocked();
-        }
-    }
-
     private void EnsureTrackerWorkerLocked()
     {
-        if (!_pendingTrackerWork.HasWork || !_trackerTask.IsCompleted ||
+        if (Volatile.Read(ref _trackerRefreshPending) == 0 ||
+            !_trackerTask.IsCompleted ||
             Volatile.Read(ref _disposed) != 0 ||
             !Volatile.Read(ref _isActive) ||
             Volatile.Read(ref _initializationInProgress) != 0)
@@ -848,29 +946,12 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         _trackerTask = Task.Run(() => ProcessTrackerWorkAsync(workerCancellation));
     }
 
-    private PendingTrackerWork? TakePendingTrackerWork()
-    {
-        lock (_trackerSchedulingGate)
-        {
-            if (!_pendingTrackerWork.HasWork)
-                return null;
-
-            PendingTrackerWork work = _pendingTrackerWork;
-            _pendingTrackerWork = new PendingTrackerWork();
-            return work;
-        }
-    }
-
     private async Task ProcessTrackerWorkAsync(CancellationTokenSource workerCancellation)
     {
         try
         {
-            while (true)
+            while (Interlocked.Exchange(ref _trackerRefreshPending, 0) != 0)
             {
-                PendingTrackerWork? work = TakePendingTrackerWork();
-                if (work is null)
-                    break;
-
                 workerCancellation.Token.ThrowIfCancellationRequested();
                 await _transitionGate.WaitAsync(workerCancellation.Token).ConfigureAwait(false);
                 try
@@ -878,76 +959,17 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
                     if (!Volatile.Read(ref _isActive))
                         break;
 
-                    if (work.TrackerReconnecting)
+                    if (_deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
                     {
-                        await MarkVisibleDevicesDisconnectedAsync().ConfigureAwait(false);
-                        await NotifyOnlineDeviceCountAsync().ConfigureAwait(false);
+                        await ClearCatalogAsync().ConfigureAwait(false);
+                        continue;
                     }
 
-                    bool requiresRefresh = work.RequiresCatalogRefresh;
-                    if (!requiresRefresh &&
-                        _deviceTracker.Health == AdbDeviceTrackerHealth.Connected)
-                    {
-                        requiresRefresh = await HasUncataloguedOnlineDeviceAsync(
-                                work.DeviceSerials,
-                                workerCancellation.Token)
-                            .ConfigureAwait(false);
-                    }
-
-                    if (requiresRefresh &&
-                        _deviceTracker.Health == AdbDeviceTrackerHealth.Connected)
-                    {
-                        Volatile.Write(ref _trackerRefreshInProgress, 1);
-                        try
-                        {
-                            await RefreshCatalogAndStartPageAsync(
-                                    Volatile.Read(ref _requestedPage),
-                                    navigationGeneration: null,
-                                    cancellationToken: workerCancellation.Token)
-                                .ConfigureAwait(false);
-                        }
-                        finally
-                        {
-                            Volatile.Write(ref _trackerRefreshInProgress, 0);
-                        }
-
-                        bool dirtyDuringRefresh = Interlocked.Exchange(
-                                ref _trackerDirtyDuringRefresh,
-                                0) != 0;
-                        if (dirtyDuringRefresh)
-                        {
-                            lock (_trackerSchedulingGate)
-                            {
-                                if (Volatile.Read(ref _isActive))
-                                    _pendingTrackerWork.RequiresCatalogRefresh = true;
-                            }
-                        }
-                    }
-                    else if (_deviceTracker.Health == AdbDeviceTrackerHealth.Connected)
-                    {
-                        foreach (string serial in work.DeviceSerials)
-                        {
-                            if (_deviceTracker.GetDevice(serial)?.Status == AdbDeviceStatus.Online)
-                            {
-                                await RecoverDeviceAsync(
-                                        serial,
-                                        workerCancellation.Token)
-                                    .ConfigureAwait(false);
-                            }
-                            else
-                            {
-                                await MarkVisibleDeviceDisconnectedAsync(serial)
-                                    .ConfigureAwait(false);
-                            }
-                        }
-
-                        await NotifyOnlineDeviceCountAsync().ConfigureAwait(false);
-                    }
-                    else if (work.DeviceSerials.Count > 0)
-                    {
-                        await MarkVisibleDevicesDisconnectedAsync().ConfigureAwait(false);
-                        await NotifyOnlineDeviceCountAsync().ConfigureAwait(false);
-                    }
+                    await ReconcileOnlineCatalogAsync(
+                            Volatile.Read(ref _requestedPage),
+                            navigationGeneration: null,
+                            cancellationToken: workerCancellation.Token)
+                        .ConfigureAwait(false);
                 }
                 finally
                 {
@@ -964,15 +986,14 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         }
         finally
         {
-            Volatile.Write(ref _trackerRefreshInProgress, 0);
-            Interlocked.Exchange(ref _trackerDirtyDuringRefresh, 0);
             lock (_trackerSchedulingGate)
             {
                 if (ReferenceEquals(_trackerCancellation, workerCancellation))
                 {
                     _trackerCancellation = null;
                     _trackerTask = Task.CompletedTask;
-                    if (Volatile.Read(ref _isActive) && _pendingTrackerWork.HasWork)
+                    if (Volatile.Read(ref _isActive) &&
+                        Volatile.Read(ref _trackerRefreshPending) != 0)
                         EnsureTrackerWorkerLocked();
                 }
             }
@@ -982,57 +1003,11 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         }
     }
 
-    private async Task<bool> HasUncataloguedOnlineDeviceAsync(
-        IEnumerable<string> serials,
-        CancellationToken cancellationToken)
-    {
-        string[] requestedSerials = serials
-            .Where(serial => !string.IsNullOrWhiteSpace(serial))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (requestedSerials.Length == 0)
-            return false;
-
-        ViewMultipleDeviceItemViewModel[] catalogItems = await SnapshotOnlineItemsAsync()
-            .ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        HashSet<string> catalogSerials = catalogItems
-            .Select(item => item.Serial)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return requestedSerials.Any(serial =>
-            _deviceTracker.GetDevice(serial)?.Status == AdbDeviceStatus.Online &&
-            !catalogSerials.Contains(serial));
-    }
-
-    private async Task RecoverDeviceAsync(
-        string serial,
-        CancellationToken cancellationToken)
-    {
-        if (!Volatile.Read(ref _isActive) ||
-            _deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
-        {
-            return;
-        }
-
-        ViewMultipleDeviceItemViewModel[] catalogItems = await SnapshotOnlineItemsAsync()
-            .ConfigureAwait(false);
-        ViewMultipleDeviceItemViewModel? catalogItem = catalogItems.FirstOrDefault(item =>
-            string.Equals(item.Serial, serial, StringComparison.OrdinalIgnoreCase));
-        if (catalogItem is null)
-            return;
-
-        ViewMultipleDeviceItemViewModel[] visibleItems = await SnapshotVisibleItemsAsync()
-            .ConfigureAwait(false);
-        ViewMultipleDeviceItemViewModel? visibleItem = visibleItems.FirstOrDefault(item =>
-            string.Equals(item.Serial, serial, StringComparison.OrdinalIgnoreCase));
-        if (visibleItem is not null)
-            await visibleItem.StartAsync(cancellationToken).ConfigureAwait(false);
-    }
-
     private void RequestItemRetry(ViewMultipleDeviceItemViewModel item, int attempt)
     {
-        if (Volatile.Read(ref _disposed) != 0 || !Volatile.Read(ref _isActive))
+        if (Volatile.Read(ref _disposed) != 0 ||
+            !Volatile.Read(ref _isActive) ||
+            _presentationCoordinator.IsDedicatedViewActive(item.Serial))
             return;
 
         int navigationGeneration;
@@ -1153,6 +1128,17 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             CancelCancellation(cancellation);
     }
 
+    private void CancelRetryForItem(ViewMultipleDeviceItemViewModel item)
+    {
+        CancellationTokenSource? retryCancellation;
+        lock (_retrySchedulingGate)
+        {
+            _retryCancellations.Remove(item, out retryCancellation);
+        }
+
+        CancelCancellation(retryCancellation);
+    }
+
     private async Task CancelItemRetriesAsync()
     {
         ViewMultipleDeviceItemViewModel[] items = await SnapshotOnlineItemsAsync()
@@ -1180,8 +1166,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         Task trackerTask;
         lock (_trackerSchedulingGate)
         {
-            _pendingTrackerWork.Clear();
-            Interlocked.Exchange(ref _trackerDirtyDuringRefresh, 0);
+            Interlocked.Exchange(ref _trackerRefreshPending, 0);
             trackerCancellation = _trackerCancellation;
             _trackerCancellation = null;
             trackerTask = _trackerTask;
@@ -1249,8 +1234,13 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     private async Task StopItemsAsync(IEnumerable<ViewMultipleDeviceItemViewModel> items)
     {
-        Task[] stopTasks = items
+        ViewMultipleDeviceItemViewModel[] distinctItems = items
             .Distinct()
+            .ToArray();
+        foreach (ViewMultipleDeviceItemViewModel item in distinctItems)
+            CancelRetryForItem(item);
+
+        Task[] stopTasks = distinctItems
             .Select(StopItemSafelyAsync)
             .ToArray();
         await Task.WhenAll(stopTasks).ConfigureAwait(false);
@@ -1307,65 +1297,16 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         return items;
     }
 
-    private async Task MarkVisibleDeviceDisconnectedAsync(string serial)
-    {
-        try
-        {
-            if (!Volatile.Read(ref _isActive) || Volatile.Read(ref _disposed) != 0)
-                return;
-
-            ViewMultipleDeviceItemViewModel[] visibleItems = await SnapshotVisibleItemsAsync()
-                .ConfigureAwait(false);
-            ViewMultipleDeviceItemViewModel? item = visibleItems.FirstOrDefault(device =>
-                string.Equals(device.Serial, serial, StringComparison.OrdinalIgnoreCase));
-            if (item is not null)
-                await item.MarkDisconnectedAsync().ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogDebug(exception, "Could not update disconnected state for multi-view device {Serial}.", serial);
-        }
-    }
-
-    private async Task MarkVisibleDevicesDisconnectedAsync()
-    {
-        try
-        {
-            if (!Volatile.Read(ref _isActive) || Volatile.Read(ref _disposed) != 0)
-                return;
-
-            ViewMultipleDeviceItemViewModel[] visibleItems = await SnapshotVisibleItemsAsync()
-                .ConfigureAwait(false);
-            await Task.WhenAll(visibleItems.Select(item => item.MarkDisconnectedAsync()))
-                .ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogDebug(exception, "Could not update disconnected state for multi-view devices.");
-        }
-    }
-
     private void OnDeviceStateChanged(object? sender, AdbDeviceStateChangedEventArgs eventArgs)
     {
-        _ = NotifyOnlineDeviceCountAsync();
-        QueueTrackerTransition(
-            eventArgs.Current?.Status == AdbDeviceStatus.Online
-                ? TrackerTransitionKind.DeviceOnline
-                : TrackerTransitionKind.DeviceOffline,
-            eventArgs.Serial);
+        QueueTrackerRefresh();
     }
 
     private void OnTrackerHealthChanged(
         object? sender,
         AdbDeviceTrackerHealthChangedEventArgs eventArgs)
     {
-        _ = NotifyOnlineDeviceCountAsync();
-        QueueTrackerTransition(eventArgs.Current switch
-        {
-            AdbDeviceTrackerHealth.Reconnecting => TrackerTransitionKind.TrackerReconnecting,
-            AdbDeviceTrackerHealth.Connected => TrackerTransitionKind.TrackerConnected,
-            _ => TrackerTransitionKind.TrackerReconnecting
-        });
+        QueueTrackerRefresh();
     }
 
     private void SubscribeToTracker()
@@ -1515,20 +1456,6 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         catch (Exception exception)
         {
             _logger.LogDebug(exception, "Could not refresh multi-view pagination commands.");
-        }
-    }
-
-    private async Task NotifyOnlineDeviceCountAsync()
-    {
-        try
-        {
-            await _uiDispatcher
-                .InvokeAsync(() => OnPropertyChanged(nameof(OnlineDeviceCount)))
-                .ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogDebug(exception, "Could not refresh the multi-view online device count.");
         }
     }
 

@@ -126,11 +126,17 @@ public sealed partial class App : Application
         services.AddSingleton<IRandomService, RandomService>();
         services.AddSingleton<IProcessRunnerService, ProcessRunnerService>();
         services.AddSingleton<AdbToolPathResolver>();
-        services.AddSingleton(serviceProvider => new ScrcpyRuntimeResolver(
+        services.AddSingleton<ScrcpyNetRuntimeResolver>(serviceProvider => new ScrcpyNetRuntimeResolver(
             AppContext.BaseDirectory,
             serviceProvider.GetRequiredService<AdbToolPathResolver>().GetAdbPath()));
-        services.AddSingleton<IViewDeviceSessionFactory, ViewDeviceSessionFactory>();
+        services.AddSingleton<ISharpAdbDeviceResolver>(serviceProvider => new SharpAdbDeviceResolver(
+            serviceProvider.GetRequiredService<AdbToolPathResolver>().GetAdbPath()));
+        services.AddSingleton<IScrcpyNetClientFactory, ScrcpyNetClientFactory>();
+        services.AddSingleton<IScrcpyNetDeviceLeaseCoordinator, ScrcpyNetDeviceLeaseCoordinator>();
+        services.AddSingleton<ISingleViewDeviceSessionFactory, ScrcpyNetSingleViewDeviceSessionFactory>();
+        services.AddSingleton<IViewDevicePresentationCoordinator, ViewDevicePresentationCoordinator>();
         services.AddSingleton<IViewDeviceWindowService, ViewDeviceWindowService>();
+        services.AddSingleton<IDeviceMetadataChangeNotifier, DeviceMetadataChangeNotifier>();
         services.AddSingleton<IViewDeviceScreenshotService, ViewDeviceScreenshotService>();
         services.AddSingleton<IUiDispatcherService, UiDispatcherService>();
         services.AddSingleton<IPollingService, PollingService>();
@@ -172,7 +178,11 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceActionFeedbackService, DeviceActionFeedbackService>();
         services.AddSingleton<IDeviceActionService, DeviceActionService>();
         services.AddSingleton<IProxyWorkflowService, ProxyWorkflowService>();
-        services.AddSingleton<IClipboardService, ClipboardService>();
+        services.AddSingleton<ClipboardService>();
+        services.AddSingleton<IClipboardService>(serviceProvider =>
+            serviceProvider.GetRequiredService<ClipboardService>());
+        services.AddSingleton<IViewDeviceClipboardService>(serviceProvider =>
+            serviceProvider.GetRequiredService<ClipboardService>());
         services.AddTransient<IAddDevicesDialogService, AddDevicesDialogService>();
         services.AddTransient<ILoginDialogService, LoginDialogService>();
         services.AddTransient<IChangeLocationDialogService, ChangeLocationDialogService>();

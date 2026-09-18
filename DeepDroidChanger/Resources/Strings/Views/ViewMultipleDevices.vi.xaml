@@ -16,6 +16,10 @@
     <sys:String x:Key="ViewMultipleDevices_Next">Tiếp</sys:String>
     <sys:String x:Key="ViewMultipleDevices_Connecting">Đang kết nối...</sys:String>
     <sys:String x:Key="ViewMultipleDevices_Online">Trực tuyến</sys:String>
-    <sys:String x:Key="ViewMultipleDevices_Disconnected">Đã ngắt kết nối</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OpenedInViewDevice">Đang mở ở cửa sổ View Device</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OpenView">Mở riêng</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_OpenViewDevice">Mở thiết bị trong cửa sổ View Device riêng</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Stopped">Đã dừng</sys:String>
     <sys:String x:Key="ViewMultipleDevices_Failed">Thất bại</sys:String>
+    <sys:String x:Key="ViewMultipleDevices_Busy">Thiết bị đang được mở ở cửa sổ xem khác</sys:String>
 </ResourceDictionary>

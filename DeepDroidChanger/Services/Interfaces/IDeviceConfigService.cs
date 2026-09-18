@@ -5,6 +5,10 @@ namespace DeepDroidChanger.Services;
 public interface IDeviceConfigService
 {
     Task SaveSettingsAsync(CancellationToken cancellationToken);
+    Task<bool> RenameDeviceAsync(
+        string serial,
+        string name,
+        CancellationToken cancellationToken);
 
     Task<bool> SaveDeviceRowAsync(
         IList<StoredDeviceConfig> storedDevices,
