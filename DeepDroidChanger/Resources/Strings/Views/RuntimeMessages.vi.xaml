@@ -63,7 +63,7 @@
     <sys:String x:Key="Log_UpdatingKeybox">Đang cập nhật Keybox...</sys:String>
     <sys:String x:Key="Log_UpdateIntegritySuccess">Cập nhật Integrity thành công</sys:String>
     <sys:String x:Key="Log_UpdateIntegrityFailed">Cập nhật Integrity thất bại</sys:String>
-    <sys:String x:Key="Log_InstallPackageOpening">Đang mở cài APK/XAPK...</sys:String>
+    <sys:String x:Key="Log_InstallPackageOpening">Đang chọn tệp APK/XAPK...</sys:String>
     <sys:String x:Key="Log_InstallPackageFilePickerTitle">Chọn tệp APK/XAPK</sys:String>
     <sys:String x:Key="Log_InstallPackageFilePickerFilter">Tệp gói Android (*.apk;*.xapk)|*.apk;*.xapk</sys:String>
     <sys:String x:Key="Log_InstallPackageInstalling">Đang cài...</sys:String>

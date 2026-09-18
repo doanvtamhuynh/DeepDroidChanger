@@ -39,7 +39,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IFakeProxyBatchDialogService _fakeProxyBatchDialogService;
     private readonly IProxyService _proxyService;
     private readonly IProxyWorkflowService _proxyWorkflowService;
-    private readonly IInstallPackageDialogService _installPackageDialogService;
+    private readonly IFilePickerDialogService _filePickerDialogService;
     private readonly IPackageInstallService _packageInstallService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
@@ -157,7 +157,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IFakeProxyBatchDialogService fakeProxyBatchDialogService,
         IProxyService proxyService,
         IProxyWorkflowService proxyWorkflowService,
-        IInstallPackageDialogService installPackageDialogService,
+        IFilePickerDialogService filePickerDialogService,
         IPackageInstallService packageInstallService,
         IDeviceActionEligibilityService deviceActionEligibilityService,
         IDeviceActionFeedbackService deviceActionFeedbackService,
@@ -187,7 +187,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _fakeProxyBatchDialogService = fakeProxyBatchDialogService;
         _proxyService = proxyService;
         _proxyWorkflowService = proxyWorkflowService;
-        _installPackageDialogService = installPackageDialogService;
+        _filePickerDialogService = filePickerDialogService;
         _packageInstallService = packageInstallService;
         _localizationService = localizationService;
         _multipleDeviceConfigService = multipleDeviceConfigService;
@@ -974,10 +974,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             if (targets.Count == 0)
                 return;
 
-            InstallPackageBatchRequest? request = await _installPackageDialogService
-                .ShowInstallPackageBatchAsync(targets.Count, cancellationToken)
-                .ConfigureAwait(true);
-            if (request == null)
+            IReadOnlyList<string> filePaths = _filePickerDialogService
+                .ShowOpenFileDialogMulti(
+                    _localizationService.GetString("Log_InstallPackageFilePickerFilter"),
+                    _localizationService.GetString("Log_InstallPackageFilePickerTitle"));
+            if (filePaths.Count == 0)
             {
                 await SetBatchDialogDismissalResultsAsync(targets)
                     .ConfigureAwait(true);
@@ -991,8 +992,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     target,
                     () => ExecuteInstallPackageTargetAsync(
                         target,
-                        request,
-                        cancellationToken)))
+                        filePaths)))
                 .ToArray();
             await Task.WhenAll(operations).ConfigureAwait(true);
         }
@@ -1294,8 +1294,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private async Task ExecuteInstallPackageTargetAsync(
         BatchActionTarget target,
-        InstallPackageBatchRequest request,
-        CancellationToken cancellationToken)
+        IReadOnlyList<string> filePaths)
     {
         using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             target.OperationToken,
@@ -1325,8 +1324,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 InstallPackageSetResult result = await _packageInstallService
                     .InstallManyAsync(
                         target.Serial,
-                        request.FilePaths,
-                        request.Options,
+                        filePaths,
+                        new InstallPackageOptions(
+                            grantPermissions: false,
+                            allowDowngrade: false),
                         targetCancellation.Token)
                     .ConfigureAwait(false);
                 await RunOnUiContextAsync(() => SetTargetLog(

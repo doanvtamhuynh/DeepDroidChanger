@@ -26,7 +26,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IProxyWorkflowService _proxyWorkflowService;
         private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
-        private readonly IInstallPackageDialogService _installPackageDialogService;
+        private readonly IFilePickerDialogService _filePickerDialogService;
         private readonly IPackageInstallService _packageInstallService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
         private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
@@ -110,7 +110,7 @@ namespace DeepDroidChanger.ViewModels
             IProxyWorkflowService proxyWorkflowService,
             IUpdateIntegrityDialogService updateIntegrityDialogService,
             IDeviceIntegrityService deviceIntegrityService,
-            IInstallPackageDialogService installPackageDialogService,
+            IFilePickerDialogService filePickerDialogService,
             IPackageInstallService packageInstallService,
             IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
             IAdvancedChangeConfigDialogService advancedChangeConfigDialogService,
@@ -146,7 +146,7 @@ namespace DeepDroidChanger.ViewModels
             _proxyWorkflowService = proxyWorkflowService;
             _updateIntegrityDialogService = updateIntegrityDialogService;
             _deviceIntegrityService = deviceIntegrityService;
-            _installPackageDialogService = installPackageDialogService;
+            _filePickerDialogService = filePickerDialogService;
             _packageInstallService = packageInstallService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
             _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
@@ -2221,21 +2221,16 @@ namespace DeepDroidChanger.ViewModels
 
                 try
                 {
-                    var dialogResult = await _installPackageDialogService
-                        .ShowInstallPackageAsync(device.Serial, device.Name, cancellationToken)
-                        .ConfigureAwait(true);
+                    IReadOnlyList<string> filePaths = _filePickerDialogService
+                        .ShowOpenFileDialogMulti(
+                            _localizationService.GetString("Log_InstallPackageFilePickerFilter"),
+                            _localizationService.GetString("Log_InstallPackageFilePickerTitle"));
 
-                    if (dialogResult == null)
+                    if (filePaths.Count == 0)
                     {
                         await SetDialogDismissalLogAsync(device, operation);
                         return;
                     }
-
-                    var request = new InstallPackageRequest(
-                        dialogResult.FilePaths.ToArray(),
-                        new InstallPackageOptions(
-                            dialogResult.Options.GrantPermissions,
-                            dialogResult.Options.AllowDowngrade));
 
                     if (!await IsOperationTargetOnlineAsync(device, cancellationToken).ConfigureAwait(true))
                         return;
@@ -2244,8 +2239,10 @@ namespace DeepDroidChanger.ViewModels
                     InstallPackageSetResult result = await _packageInstallService
                         .InstallManyAsync(
                             device.Serial,
-                            request.FilePaths,
-                            request.Options,
+                            filePaths,
+                            new InstallPackageOptions(
+                                grantPermissions: false,
+                                allowDowngrade: false),
                             cancellationToken)
                         .ConfigureAwait(true);
                     SetDeviceLog(

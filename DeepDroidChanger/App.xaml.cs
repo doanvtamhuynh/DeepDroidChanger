@@ -195,7 +195,6 @@ public sealed partial class App : Application
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
         services.AddTransient<IFakeProxyBatchDialogService, FakeProxyBatchDialogService>();
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
-        services.AddTransient<IInstallPackageDialogService, InstallPackageDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ChangeSingleDeviceViewModel>();
         services.AddSingleton<ChangeMultipleDevicesViewModel>();
@@ -222,8 +221,6 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyViewModel>();
         services.AddTransient<FakeProxyBatchViewModel>();
         services.AddTransient<UpdateIntegrityViewModel>();
-        services.AddTransient<InstallPackageViewModel>();
-        services.AddTransient<InstallPackageBatchViewModel>();
 
         services.AddTransient<LoginDialog>();
         services.AddTransient<AddDevicesDialog>();
@@ -235,8 +232,6 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyDialog>();
         services.AddTransient<FakeProxyBatchDialog>();
         services.AddTransient<UpdateIntegrityDialog>();
-        services.AddTransient<InstallPackageDialog>();
-        services.AddTransient<InstallPackageBatchDialog>();
     }
 
     private static void CopySettings(AppSettings source, AppSettings target)
