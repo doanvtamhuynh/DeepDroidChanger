@@ -19,6 +19,7 @@ public enum DeviceActionKind
     UpdateIntegrity,
     FakeProxy,
     StopFakeProxy,
+    StopChangeSim,
     ViewRandomDeviceInfo,
     BatchRandomDevice,
     BatchRandomChangeAndWipe,
@@ -32,7 +33,8 @@ public enum DeviceActionKind
     BatchInstallPackages,
     BatchUpdateIntegrity,
     BatchFakeProxy,
-    BatchStopFakeProxy
+    BatchStopFakeProxy,
+    BatchStopChangeSim
 }
 
 public static class DeviceActionKindExtensions
@@ -51,7 +53,8 @@ public static class DeviceActionKindExtensions
             or DeviceActionKind.BatchInstallPackages
             or DeviceActionKind.BatchUpdateIntegrity
             or DeviceActionKind.BatchFakeProxy
-            or DeviceActionKind.BatchStopFakeProxy;
+            or DeviceActionKind.BatchStopFakeProxy
+            or DeviceActionKind.BatchStopChangeSim;
     }
 
     /// <summary>
@@ -75,6 +78,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.BatchUpdateIntegrity => DeviceActionKind.UpdateIntegrity,
             DeviceActionKind.BatchFakeProxy => DeviceActionKind.FakeProxy,
             DeviceActionKind.BatchStopFakeProxy => DeviceActionKind.StopFakeProxy,
+            DeviceActionKind.BatchStopChangeSim => DeviceActionKind.StopChangeSim,
             _ => kind
         };
     }
@@ -103,6 +107,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.UpdateIntegrity => DeviceActionKind.BatchUpdateIntegrity,
             DeviceActionKind.FakeProxy => DeviceActionKind.BatchFakeProxy,
             DeviceActionKind.StopFakeProxy => DeviceActionKind.BatchStopFakeProxy,
+            DeviceActionKind.StopChangeSim => DeviceActionKind.BatchStopChangeSim,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }
@@ -125,6 +130,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.UpdateIntegrity => "DeviceAction_Name_UpdateIntegrity",
             DeviceActionKind.FakeProxy => "DeviceAction_Name_FakeProxy",
             DeviceActionKind.StopFakeProxy => "DeviceAction_Name_StopFakeProxy",
+            DeviceActionKind.StopChangeSim => "DeviceAction_Name_StopChangeSim",
             DeviceActionKind.ViewRandomDeviceInfo => "DeviceAction_Name_ViewRandomDeviceInfo",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };

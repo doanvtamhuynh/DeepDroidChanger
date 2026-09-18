@@ -69,10 +69,6 @@ public static class PropertyConstants
         public const string SimOperatorName = Prefix + "sim.operator.name";
         public const string SimOperatorCountry = Prefix + "sim.operator.country";
         public const string SimOperatorNumeric = Prefix + "sim.operator.numeric";
-        public const string Sim2Enabled = Prefix + "sim2.enabled";
-        public const string Sim2Iccid = Prefix + "sim2.iccid";
-        public const string Sim2Imsi = Prefix + "sim2.imsi";
-        public const string Sim2PhoneNumber = Prefix + "sim2.phone_number";
     }
 
     public static class Integrity

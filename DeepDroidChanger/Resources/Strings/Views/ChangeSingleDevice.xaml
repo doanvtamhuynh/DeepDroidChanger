@@ -56,6 +56,8 @@
     <sys:String x:Key="ChangeSingleDevice_ActionRandomSimTooltip">Generate random SIM information for the selected device.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeSim">Change SIM</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeSimTooltip">Apply generated SIM information to the selected device.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ActionStopChangeSim">Stop Change SIM</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ActionStopChangeSimTooltip">Clear applied SIM spoof information and reboot the selected online device.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_AdvancedConfigTooltip">Configure advanced options for the selected device.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeWithoutWipeCaption">Confirm Change Without Wipe: {0} - {1}</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeWithoutWipeMessage">Applies new device information while preserving app data.</sys:String>
@@ -66,6 +68,9 @@
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeSimCaption">Confirm Change SIM: {0} - {1}</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeSimMessage">Applies the generated SIM information.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeSimWarning">This action will change the current SIM information.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ConfirmStopChangeSimCaption">Stop Change SIM: {0} - {1}?</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ConfirmStopChangeSimMessage">This will clear the applied SIM spoof information on the selected device.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ConfirmStopChangeSimWarning">This action will reboot the device.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeLocation">Change Location</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeLocationTooltip">Apply a location to the selected online device.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeTimezone">Change Timezone</sys:String>

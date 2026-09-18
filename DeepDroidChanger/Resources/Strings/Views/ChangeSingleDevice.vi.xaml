@@ -56,6 +56,8 @@
     <sys:String x:Key="ChangeSingleDevice_ActionRandomSimTooltip">Tạo ngẫu nhiên thông tin SIM cho thiết bị được chọn.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeSim">Đổi SIM</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeSimTooltip">Áp dụng thông tin SIM đã tạo cho thiết bị được chọn.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ActionStopChangeSim">Dừng đổi SIM</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ActionStopChangeSimTooltip">Xóa thông tin SIM spoof đang áp dụng và khởi động lại thiết bị online được chọn.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_AdvancedConfigTooltip">Cấu hình nâng cao cho thiết bị được chọn.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeWithoutWipeCaption">Xác nhận đổi không wipe: {0} - {1}</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeWithoutWipeMessage">Chức năng này áp dụng thông tin thiết bị mới và giữ nguyên dữ liệu ứng dụng.</sys:String>
@@ -66,6 +68,9 @@
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeSimCaption">Xác nhận đổi SIM: {0} - {1}</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeSimMessage">Chức năng này áp dụng thông tin SIM đã tạo.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ConfirmChangeSimWarning">Hành động này sẽ thay đổi thông tin SIM.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ConfirmStopChangeSimCaption">Dừng đổi SIM: {0} - {1}?</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ConfirmStopChangeSimMessage">Thao tác này sẽ xóa thông tin SIM spoof đang áp dụng trên thiết bị.</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_ConfirmStopChangeSimWarning">Thiết bị sẽ khởi động lại.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeLocation">Đổi Location</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeLocationTooltip">Áp dụng Location cho thiết bị online được chọn.</sys:String>
     <sys:String x:Key="ChangeSingleDevice_ActionChangeTimezone">Đổi Timezone</sys:String>

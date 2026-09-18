@@ -52,6 +52,9 @@
     <sys:String x:Key="Log_ChangeSim">Changing SIM information...</sys:String>
     <sys:String x:Key="Log_ChangeSimSuccess">SIM information changed successfully</sys:String>
     <sys:String x:Key="Log_ChangeSimFailed">Failed to change SIM information</sys:String>
+    <sys:String x:Key="Log_StopChangeSim">Clearing SIM spoof and rebooting...</sys:String>
+    <sys:String x:Key="Log_StopChangeSimSuccess">SIM spoof stopped successfully</sys:String>
+    <sys:String x:Key="Log_StopChangeSimFailed">Failed to stop SIM spoof</sys:String>
     <sys:String x:Key="Log_ResolvingByIp">Resolving by IP...</sys:String>
     <sys:String x:Key="Log_ApplyingLocation">Applying location...</sys:String>
     <sys:String x:Key="Log_ChangeLocationSuccess">Location changed successfully</sys:String>
@@ -115,6 +118,7 @@
     <sys:String x:Key="DeviceAction_Name_Wipe">Wipe Without Change</sys:String>
     <sys:String x:Key="DeviceAction_Name_RandomSim">Random SIM</sys:String>
     <sys:String x:Key="DeviceAction_Name_ChangeSim">Change SIM</sys:String>
+    <sys:String x:Key="DeviceAction_Name_StopChangeSim">Stop Change SIM</sys:String>
     <sys:String x:Key="DeviceAction_Name_ChangeLocation">Change Location</sys:String>
     <sys:String x:Key="DeviceAction_Name_ChangeTimezone">Change Timezone</sys:String>
     <sys:String x:Key="DeviceAction_Name_InstallPackages">Install APK/XAPK</sys:String>

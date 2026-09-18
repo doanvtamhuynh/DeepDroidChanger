@@ -701,6 +701,12 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task StopMultipleDevicesChangeSimAsync()
+    {
+        return StartTrackedBatchWorkflow(RunSelectedStopChangeSimWorkflowAsync);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task ChangeMultipleDevicesLocationAsync()
     {
         return StartLocationTimezoneWorkflowAsync(isLocation: true);
@@ -1133,6 +1139,61 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
+    private async Task RunSelectedStopChangeSimWorkflowAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        try
+        {
+            DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
+            if (selectedDevices.Length == 0)
+                return;
+
+            targets = await CreateReservedEligibleTargetsAsync(
+                    selectedDevices,
+                    cancellationToken,
+                    DeviceActionKind.StopChangeSim,
+                    sessionId)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            bool confirmed = await _deviceActionConfirmationDialogService
+                .ConfirmMultipleAsync(
+                    DeviceActionKind.StopChangeSim,
+                    targets.Count,
+                    cancellationToken)
+                .ConfigureAwait(true);
+            if (!confirmed)
+            {
+                await SetBatchDialogDismissalResultsAsync(targets)
+                    .ConfigureAwait(true);
+                return;
+            }
+
+            Task[] workers = targets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => ExecuteStopChangeSimBatchTargetAsync(target)))
+                .ToArray();
+            await Task.WhenAll(workers).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to execute Multiple Device Stop Change SIM action.");
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+        }
+    }
+
     private async Task ExecuteFakeProxyBatchTargetAsync(
         BatchActionTarget target,
         ProxyEndpoint proxy,
@@ -1284,6 +1345,68 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             await RunOnUiContextAsync(() => SetTargetLog(
                     target,
                     "Log_StopFakeProxyFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
+    private async Task ExecuteStopChangeSimBatchTargetAsync(BatchActionTarget target)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            target.OperationToken,
+            target.InvalidationToken);
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopChangeSim"))
+                    .ConfigureAwait(false);
+                await _deviceChangeService
+                    .StopChangeSimAsync(target.Serial, targetCancellation.Token)
+                    .ConfigureAwait(false);
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopChangeSimSuccess"))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await SetTargetCancellationResultAsync(target)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to stop SIM spoofing for device {Serial}.",
+                target.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_StopChangeSimFailed"))
                 .ConfigureAwait(false);
         }
         finally
@@ -3664,6 +3787,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         WipeMultipleDevicesWithoutChangeCommand.NotifyCanExecuteChanged();
         RandomizeMultipleDevicesSimInfoCommand.NotifyCanExecuteChanged();
         ChangeMultipleDevicesSimInfoCommand.NotifyCanExecuteChanged();
+        StopMultipleDevicesChangeSimCommand.NotifyCanExecuteChanged();
         ChangeMultipleDevicesLocationCommand.NotifyCanExecuteChanged();
         ChangeMultipleDevicesTimezoneCommand.NotifyCanExecuteChanged();
         UpdateMultipleDevicesIntegrityCommand.NotifyCanExecuteChanged();

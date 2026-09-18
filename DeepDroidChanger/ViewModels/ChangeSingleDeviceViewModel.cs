@@ -730,6 +730,7 @@ namespace DeepDroidChanger.ViewModels
             RandomizeChangeAndWipeSingleDeviceCommand.NotifyCanExecuteChanged();
             RandomizeSingleDeviceSimInfoCommand.NotifyCanExecuteChanged();
             ChangeSingleDeviceSimInfoCommand.NotifyCanExecuteChanged();
+            StopSingleDeviceChangeSimCommand.NotifyCanExecuteChanged();
             ChangeSingleDeviceLocationCommand.NotifyCanExecuteChanged();
             ChangeSingleDeviceTimezoneCommand.NotifyCanExecuteChanged();
             UpdateSingleDeviceIntegrityCommand.NotifyCanExecuteChanged();
@@ -1786,6 +1787,56 @@ namespace DeepDroidChanger.ViewModels
                 {
                     _logger.LogError(exception, "Failed to change SIM information on device {Serial}.", device.Serial);
                     SetDeviceLog(device, "Log_ChangeSimFailed");
+                }
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task StopSingleDeviceChangeSimAsync()
+        {
+            DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
+            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
+                return;
+
+            IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
+                selectedDevice!,
+                DeviceActionKind.StopChangeSim);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+
+                try
+                {
+                    bool confirmed = await _deviceActionConfirmationDialogService
+                        .ConfirmStopChangeSimAsync(device.Name, device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+                    if (!confirmed)
+                    {
+                        await SetDialogDismissalLogAsync(device, operation);
+                        return;
+                    }
+
+                    if (!await IsOperationTargetOnlineAsync(device, cancellationToken).ConfigureAwait(true))
+                        return;
+
+                    SetDeviceLog(device, "Log_StopChangeSim");
+                    await _deviceChangeService
+                        .StopChangeSimAsync(device.Serial, cancellationToken)
+                        .ConfigureAwait(true);
+                    SetDeviceLog(device, "Log_StopChangeSimSuccess");
+                }
+                catch (OperationCanceledException)
+                {
+                    await SetOperationCancellationLogAsync(device, operation, requiresOnline: true);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Failed to stop SIM spoofing on device {Serial}.", device.Serial);
+                    SetDeviceLog(device, "Log_StopChangeSimFailed");
                 }
             }
         }

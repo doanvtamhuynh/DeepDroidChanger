@@ -9,6 +9,10 @@ public interface IDeviceChangeService
         SimProfile profile,
         CancellationToken cancellationToken);
 
+    Task StopChangeSimAsync(
+        string serial,
+        CancellationToken cancellationToken);
+
     Task ChangeWithoutWipeAsync(
         string serial,
         DeviceInfoApiDevice profile,

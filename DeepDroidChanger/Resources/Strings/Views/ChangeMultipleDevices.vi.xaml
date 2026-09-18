@@ -45,6 +45,8 @@
     <sys:String x:Key="ChangeMultipleDevices_ActionRandomSimTooltip">Tạo ngẫu nhiên thông tin SIM cho các thiết bị được chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeSim">Đổi SIM</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeSimTooltip">Áp dụng thông tin SIM đã tạo cho các thiết bị được chọn.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionStopChangeSim">Dừng đổi SIM</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ActionStopChangeSimTooltip">Xóa thông tin SIM spoof đang áp dụng và khởi động lại các thiết bị online được chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeCaption">Đổi &amp; Wipe {0} thiết bị?</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeMessage">Thao tác sẽ đổi thông tin và wipe dữ liệu của {0} thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeAndWipeWarning">Thiết bị sẽ khởi động lại và dữ liệu ứng dụng sẽ bị xóa.</sys:String>
@@ -57,6 +59,9 @@
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeSimCaption">Đổi SIM cho {0} thiết bị?</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeSimMessage">Thao tác sẽ áp dụng thông tin SIM đã tạo cho {0} thiết bị đã chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ConfirmChangeSimWarning">Thiết bị sẽ khởi động lại.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ConfirmStopChangeSimCaption">Dừng đổi SIM trên {0} thiết bị?</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ConfirmStopChangeSimMessage">Thao tác này sẽ xóa thông tin SIM spoof đang áp dụng trên {0} thiết bị đã chọn.</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_ConfirmStopChangeSimWarning">Các thiết bị sẽ khởi động lại.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FieldBrand">Hãng</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FieldAndroidVersion">Phiên bản OS</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FieldModel">Model</sys:String>

@@ -90,6 +90,11 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
                 "ChangeMultipleDevices_ConfirmChangeSimMessage",
                 "ChangeMultipleDevices_ConfirmChangeSimWarning",
                 ConfirmationDialogIcon.Sim),
+            DeviceActionKind.StopChangeSim => (
+                "ChangeMultipleDevices_ConfirmStopChangeSimCaption",
+                "ChangeMultipleDevices_ConfirmStopChangeSimMessage",
+                "ChangeMultipleDevices_ConfirmStopChangeSimWarning",
+                ConfirmationDialogIcon.Sim),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
         };
 
@@ -133,6 +138,21 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
             "ChangeSingleDevice_ConfirmChangeSimCaption",
             "ChangeSingleDevice_ConfirmChangeSimMessage",
             "ChangeSingleDevice_ConfirmChangeSimWarning",
+            ConfirmationDialogIcon.Sim,
+            deviceName,
+            deviceSerial,
+            cancellationToken);
+    }
+
+    public Task<bool> ConfirmStopChangeSimAsync(
+        string deviceName,
+        string deviceSerial,
+        CancellationToken cancellationToken)
+    {
+        return ShowConfirmationAsync(
+            "ChangeSingleDevice_ConfirmStopChangeSimCaption",
+            "ChangeSingleDevice_ConfirmStopChangeSimMessage",
+            "ChangeSingleDevice_ConfirmStopChangeSimWarning",
             ConfirmationDialogIcon.Sim,
             deviceName,
             deviceSerial,

@@ -1049,14 +1049,14 @@
                                 </Button>
                                 <Button Grid.Row="3"
                                         Grid.Column="1"
-                                        Command="{Binding InstallPackagesOnMultipleDevicesCommand}"
-                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionInstallApkTooltip}"
+                                        Command="{Binding StopMultipleDevicesChangeSimCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionStopChangeSimTooltip}"
                                         Style="{StaticResource MultipleDeviceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <materialDesign:PackIcon Kind="Android" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1"
-                                                   Text="{DynamicResource ChangeMultipleDevices_ActionInstallApk}"
+                                                   Text="{DynamicResource ChangeMultipleDevices_ActionStopChangeSim}"
                                                    Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
@@ -1113,6 +1113,19 @@
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="ShieldCheck" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionUpdateIntegrity}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                                </Button>
+                                <Button Grid.Row="6"
+                                        Grid.Column="1"
+                                        Command="{Binding InstallPackagesOnMultipleDevicesCommand}"
+                                        ToolTip="{DynamicResource ChangeMultipleDevices_ActionInstallApkTooltip}"
+                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Kind="Android" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{DynamicResource ChangeMultipleDevices_ActionInstallApk}"
+                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>

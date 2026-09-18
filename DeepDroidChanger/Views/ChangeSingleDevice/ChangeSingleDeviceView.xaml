@@ -1218,6 +1218,26 @@
                             </Button>
                             <Button Grid.Row="3"
                                     Grid.Column="1"
+                                    Command="{Binding StopSingleDeviceChangeSimCommand}"
+                                    ToolTip="{DynamicResource ChangeSingleDevice_ActionStopChangeSimTooltip}"
+                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="SimCard"
+                                                             Width="16"
+                                                             Height="16"
+                                                             VerticalAlignment="Center"
+                                                             Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{DynamicResource ChangeSingleDevice_ActionStopChangeSim}"
+                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                </Grid>
+                            </Button>
+                            <Button Grid.Row="6"
+                                    Grid.Column="1"
                                     Command="{Binding InstallPackagesOnSingleDeviceCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionInstallApkTooltip}"
                                     Style="{StaticResource DeviceActionButtonStyle}">

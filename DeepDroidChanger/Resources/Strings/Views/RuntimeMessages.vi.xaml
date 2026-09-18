@@ -52,6 +52,9 @@
     <sys:String x:Key="Log_ChangeSim">Đang đổi thông tin SIM...</sys:String>
     <sys:String x:Key="Log_ChangeSimSuccess">Đổi SIM thành công</sys:String>
     <sys:String x:Key="Log_ChangeSimFailed">Đổi SIM thất bại</sys:String>
+    <sys:String x:Key="Log_StopChangeSim">Đang xóa spoof SIM và khởi động lại...</sys:String>
+    <sys:String x:Key="Log_StopChangeSimSuccess">Đã dừng đổi SIM thành công</sys:String>
+    <sys:String x:Key="Log_StopChangeSimFailed">Dừng đổi SIM thất bại</sys:String>
     <sys:String x:Key="Log_ResolvingByIp">Đang lấy dữ liệu theo IP...</sys:String>
     <sys:String x:Key="Log_ApplyingLocation">Đang áp dụng Location...</sys:String>
     <sys:String x:Key="Log_ChangeLocationSuccess">Đổi Location thành công</sys:String>
@@ -115,6 +118,7 @@
     <sys:String x:Key="DeviceAction_Name_Wipe">Wipe không đổi</sys:String>
     <sys:String x:Key="DeviceAction_Name_RandomSim">Tạo SIM random</sys:String>
     <sys:String x:Key="DeviceAction_Name_ChangeSim">Đổi SIM</sys:String>
+    <sys:String x:Key="DeviceAction_Name_StopChangeSim">Dừng đổi SIM</sys:String>
     <sys:String x:Key="DeviceAction_Name_ChangeLocation">Đổi vị trí</sys:String>
     <sys:String x:Key="DeviceAction_Name_ChangeTimezone">Đổi múi giờ</sys:String>
     <sys:String x:Key="DeviceAction_Name_InstallPackages">Cài APK/XAPK</sys:String>

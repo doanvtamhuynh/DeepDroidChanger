@@ -8,6 +8,11 @@ namespace DeepDroidChanger.Services;
 
 public sealed class DeviceChangeService : IDeviceChangeService
 {
+    private const string LegacySim2EnabledProperty = "persist.props.config.sim2.enabled";
+    private const string LegacySim2IccidProperty = "persist.props.config.sim2.iccid";
+    private const string LegacySim2ImsiProperty = "persist.props.config.sim2.imsi";
+    private const string LegacySim2PhoneNumberProperty = "persist.props.config.sim2.phone_number";
+
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _deviceLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly IAdbCommandService _adb;
     private readonly IDeviceDataCleanupService _cleanupService;
@@ -99,6 +104,34 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 .ConfigureAwait(false);
             await RebootAndWaitAsync(serial, progress: null, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Changed SIM information and rebooted device {Serial}.", serial);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task StopChangeSimAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        await ExecuteWithDeviceLockAsync(serial, async () =>
+        {
+            await SetPropertiesAsync(
+                    serial,
+                    CreateDisabledSimProperties(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await SetPropertiesAsync(
+                    serial,
+                    CreateLegacySim2CleanupProperties(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await RunRequiredShellAsync(
+                    serial,
+                    "sync",
+                    "sync cleared SIM spoof information",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await RebootAndWaitAsync(serial, progress: null, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Stopped SIM spoofing and rebooted device {Serial}.", serial);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -526,11 +559,30 @@ public sealed class DeviceChangeService : IDeviceChangeService
             Pair(PropertyConstants.Spoof.SimPhoneNumber, phoneNumber),
             Pair(PropertyConstants.Spoof.SimOperatorName, operatorName),
             Pair(PropertyConstants.Spoof.SimOperatorCountry, operatorCountry),
-            Pair(PropertyConstants.Spoof.SimOperatorNumeric, operatorNumeric),
-            Pair(PropertyConstants.Spoof.Sim2Enabled, "0"),
-            Pair(PropertyConstants.Spoof.Sim2Iccid, string.Empty),
-            Pair(PropertyConstants.Spoof.Sim2Imsi, string.Empty),
-            Pair(PropertyConstants.Spoof.Sim2PhoneNumber, string.Empty)
+            Pair(PropertyConstants.Spoof.SimOperatorNumeric, operatorNumeric)
+        ];
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> CreateDisabledSimProperties()
+    {
+        return CreateSimProperties(
+            false,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty);
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> CreateLegacySim2CleanupProperties()
+    {
+        return
+        [
+            Pair(LegacySim2EnabledProperty, "0"),
+            Pair(LegacySim2IccidProperty, string.Empty),
+            Pair(LegacySim2ImsiProperty, string.Empty),
+            Pair(LegacySim2PhoneNumberProperty, string.Empty)
         ];
     }
 

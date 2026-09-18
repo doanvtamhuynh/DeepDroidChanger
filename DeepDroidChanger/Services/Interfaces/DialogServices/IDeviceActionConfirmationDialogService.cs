@@ -34,4 +34,9 @@ public interface IDeviceActionConfirmationDialogService
         string deviceName,
         string deviceSerial,
         CancellationToken cancellationToken);
+
+    Task<bool> ConfirmStopChangeSimAsync(
+        string deviceName,
+        string deviceSerial,
+        CancellationToken cancellationToken);
 }
