@@ -20,6 +20,7 @@ namespace DeepDroidChanger.Services
         private const int KeyboxMaximumBytes = 1024 * 1024;
         private readonly IAdbCommandService _adbCommandService;
         private readonly IRandomService _randomService;
+        private readonly IAdbRootAccessService _rootAccessService;
         private readonly ILogger<DeviceIntegrityService> _logger;
         private readonly Func<string, int, CancellationToken, Task<string>> _downloadString;
 
@@ -27,7 +28,26 @@ namespace DeepDroidChanger.Services
             IAdbCommandService adbCommandService,
             IRandomService randomService,
             ILogger<DeviceIntegrityService> logger)
-            : this(adbCommandService, randomService, logger, null)
+            : this(
+                adbCommandService,
+                randomService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService),
+                null)
+        {
+        }
+
+        public DeviceIntegrityService(
+            IAdbCommandService adbCommandService,
+            IRandomService randomService,
+            ILogger<DeviceIntegrityService> logger,
+            IAdbRootAccessService rootAccessService)
+            : this(
+                adbCommandService,
+                randomService,
+                logger,
+                rootAccessService,
+                null)
         {
         }
 
@@ -36,9 +56,25 @@ namespace DeepDroidChanger.Services
             IRandomService randomService,
             ILogger<DeviceIntegrityService> logger,
             Func<string, int, CancellationToken, Task<string>>? downloadString)
+            : this(
+                adbCommandService,
+                randomService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService),
+                downloadString)
+        {
+        }
+
+        private DeviceIntegrityService(
+            IAdbCommandService adbCommandService,
+            IRandomService randomService,
+            ILogger<DeviceIntegrityService> logger,
+            IAdbRootAccessService rootAccessService,
+            Func<string, int, CancellationToken, Task<string>>? downloadString)
         {
             _adbCommandService = adbCommandService;
             _randomService = randomService;
+            _rootAccessService = rootAccessService;
             _logger = logger;
             _downloadString = downloadString ?? DownloadStringBoundedAsync;
         }
@@ -273,7 +309,21 @@ namespace DeepDroidChanger.Services
                 .ConfigureAwait(false);
         }
 
-        private async Task ApplyIntegrityCandidateAsync(
+        private Task ApplyIntegrityCandidateAsync(
+            string serial,
+            Integrity pifData,
+            CancellationToken cancellationToken)
+        {
+            return _rootAccessService.ExecuteAsRootAsync(
+                serial,
+                rootCancellationToken => ApplyIntegrityCandidateCoreAsync(
+                    serial,
+                    pifData,
+                    rootCancellationToken),
+                cancellationToken);
+        }
+
+        private async Task ApplyIntegrityCandidateCoreAsync(
             string serial,
             Integrity pifData,
             CancellationToken cancellationToken)

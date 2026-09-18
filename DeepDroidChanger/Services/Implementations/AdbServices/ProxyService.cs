@@ -25,6 +25,7 @@ namespace DeepDroidChanger.Services
 
         private readonly IAdbCommandService _adbCommandService;
         private readonly IRandomService _randomService;
+        private readonly IAdbRootAccessService _rootAccessService;
         private readonly ILogger<ProxyService> _logger;
         private readonly Func<string, int, string, string, CancellationToken, Task<SocksProxyCheckResult?>> _proxyChecker;
         private readonly Func<string, SocksProxyCheckResult?, CancellationToken, Task<string>> _interfaceIpResolver;
@@ -34,7 +35,30 @@ namespace DeepDroidChanger.Services
             IAdbCommandService adbCommandService,
             IRandomService randomService,
             ILogger<ProxyService> logger)
-            : this(adbCommandService, randomService, logger, null, null, null)
+            : this(
+                adbCommandService,
+                randomService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService),
+                null,
+                null,
+                null)
+        {
+        }
+
+        public ProxyService(
+            IAdbCommandService adbCommandService,
+            IRandomService randomService,
+            ILogger<ProxyService> logger,
+            IAdbRootAccessService rootAccessService)
+            : this(
+                adbCommandService,
+                randomService,
+                logger,
+                rootAccessService,
+                null,
+                null,
+                null)
         {
         }
 
@@ -45,9 +69,29 @@ namespace DeepDroidChanger.Services
             Func<string, int, string, string, CancellationToken, Task<SocksProxyCheckResult?>>? proxyChecker,
             Func<string, SocksProxyCheckResult?, CancellationToken, Task<string>>? interfaceIpResolver,
             Func<TimeSpan, CancellationToken, Task>? delay)
+            : this(
+                adbCommandService,
+                randomService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService),
+                proxyChecker,
+                interfaceIpResolver,
+                delay)
+        {
+        }
+
+        private ProxyService(
+            IAdbCommandService adbCommandService,
+            IRandomService randomService,
+            ILogger<ProxyService> logger,
+            IAdbRootAccessService rootAccessService,
+            Func<string, int, string, string, CancellationToken, Task<SocksProxyCheckResult?>>? proxyChecker,
+            Func<string, SocksProxyCheckResult?, CancellationToken, Task<string>>? interfaceIpResolver,
+            Func<TimeSpan, CancellationToken, Task>? delay)
         {
             _adbCommandService = adbCommandService;
             _randomService = randomService;
+            _rootAccessService = rootAccessService;
             _logger = logger;
             _proxyChecker = proxyChecker ?? CheckSocksProxyAsync;
             _interfaceIpResolver = interfaceIpResolver ?? ResolveInterfaceIpAsync;
@@ -82,6 +126,32 @@ namespace DeepDroidChanger.Services
             var interfaceIp = await _interfaceIpResolver(host, proxyCheck, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Selected an interface IP for device {Serial}.", serial);
 
+            await _rootAccessService
+                .ExecuteAsRootAsync(
+                    serial,
+                    rootCancellationToken => StartProxyMutationAsync(
+                        serial,
+                        host,
+                        port,
+                        username,
+                        password,
+                        interfaceIp,
+                        rootCancellationToken),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            _logger.LogInformation("SOCKS5 fake proxy completed for device {Serial}.", serial);
+        }
+
+        private async Task StartProxyMutationAsync(
+            string serial,
+            string host,
+            int port,
+            string username,
+            string password,
+            string interfaceIp,
+            CancellationToken cancellationToken)
+        {
             var wifiDisableAttempted = false;
             var proxySetupStarted = false;
             try
@@ -111,8 +181,6 @@ namespace DeepDroidChanger.Services
                 await RollbackFailedStartAsync(serial, proxySetupStarted, wifiDisableAttempted).ConfigureAwait(false);
                 throw;
             }
-
-            _logger.LogInformation("SOCKS5 fake proxy completed for device {Serial}.", serial);
         }
 
         public async Task WaitForInternetAndOpenBrowserLeaksAsync(
@@ -209,7 +277,17 @@ namespace DeepDroidChanger.Services
             }
         }
 
-        public async Task StopProxyAsync(string serial, CancellationToken cancellationToken)
+        public Task StopProxyAsync(string serial, CancellationToken cancellationToken)
+        {
+            return _rootAccessService.ExecuteAsRootAsync(
+                serial,
+                rootCancellationToken => StopProxyCoreAsync(serial, rootCancellationToken),
+                cancellationToken);
+        }
+
+        private async Task StopProxyCoreAsync(
+            string serial,
+            CancellationToken cancellationToken)
         {
             _logger.LogInformation("Stopping SOCKS5 fake proxy on device {Serial}.", serial);
 

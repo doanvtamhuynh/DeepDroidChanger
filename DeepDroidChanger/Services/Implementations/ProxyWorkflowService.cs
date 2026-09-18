@@ -9,6 +9,7 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
     private readonly IDeviceLocationService _locationService;
     private readonly IDeviceTimezoneService _timezoneService;
     private readonly IDeviceConfigService _deviceConfigService;
+    private readonly IAdbRootAccessService? _rootAccessService;
     private readonly ILogger<ProxyWorkflowService> _logger;
 
     public ProxyWorkflowService(
@@ -17,11 +18,29 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
         IDeviceTimezoneService timezoneService,
         IDeviceConfigService deviceConfigService,
         ILogger<ProxyWorkflowService> logger)
+        : this(
+            proxyService,
+            locationService,
+            timezoneService,
+            deviceConfigService,
+            logger,
+            null)
+    {
+    }
+
+    public ProxyWorkflowService(
+        IProxyService proxyService,
+        IDeviceLocationService locationService,
+        IDeviceTimezoneService timezoneService,
+        IDeviceConfigService deviceConfigService,
+        ILogger<ProxyWorkflowService> logger,
+        IAdbRootAccessService? rootAccessService)
     {
         _proxyService = proxyService;
         _locationService = locationService;
         _timezoneService = timezoneService;
         _deviceConfigService = deviceConfigService;
+        _rootAccessService = rootAccessService;
         _logger = logger;
     }
 
@@ -31,6 +50,27 @@ public sealed class ProxyWorkflowService : IProxyWorkflowService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        if (_rootAccessService is null)
+        {
+            return await ApplyCoreAsync(serial, configuration, cancellationToken).ConfigureAwait(false);
+        }
+
+        return await _rootAccessService
+            .ExecuteAsRootAsync(
+                serial,
+                rootCancellationToken => ApplyCoreAsync(
+                    serial,
+                    configuration,
+                    rootCancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<ProxyWorkflowResult> ApplyCoreAsync(
+        string serial,
+        FakeProxyDialogResult configuration,
+        CancellationToken cancellationToken)
+    {
         await _proxyService.StartProxyAsync(
                 serial,
                 configuration.Host,

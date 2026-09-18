@@ -17,6 +17,7 @@ namespace DeepDroidChanger.Services
         private readonly IIpGeolocationService _adbIpGeolocationService;
         private readonly ILocationDataService? _locationDataService;
         private readonly IRandomService _randomService;
+        private readonly IAdbRootAccessService _rootAccessService;
         private readonly ILogger<DeviceLocationService> _logger;
 
         public DeviceLocationService(
@@ -24,7 +25,13 @@ namespace DeepDroidChanger.Services
             IIpGeolocationService adbIpGeolocationService,
             IRandomService randomService,
             ILogger<DeviceLocationService> logger)
-            : this(adbCommandService, adbIpGeolocationService, null, randomService, logger)
+            : this(
+                adbCommandService,
+                adbIpGeolocationService,
+                null,
+                randomService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService))
         {
         }
 
@@ -34,15 +41,37 @@ namespace DeepDroidChanger.Services
             ILocationDataService? locationDataService,
             IRandomService randomService,
             ILogger<DeviceLocationService> logger)
+            : this(
+                adbCommandService,
+                adbIpGeolocationService,
+                locationDataService,
+                randomService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService))
+        {
+        }
+
+        public DeviceLocationService(
+            IAdbCommandService adbCommandService,
+            IIpGeolocationService adbIpGeolocationService,
+            ILocationDataService? locationDataService,
+            IRandomService randomService,
+            ILogger<DeviceLocationService> logger,
+            IAdbRootAccessService rootAccessService)
         {
             _adbCommandService = adbCommandService;
             _adbIpGeolocationService = adbIpGeolocationService;
             _locationDataService = locationDataService;
             _randomService = randomService;
+            _rootAccessService = rootAccessService;
             _logger = logger;
         }
 
-        public async Task ApplyLocationAsync(string serial, string latitude, string longitude, CancellationToken cancellationToken)
+        public Task ApplyLocationAsync(
+            string serial,
+            string latitude,
+            string longitude,
+            CancellationToken cancellationToken)
         {
             if (!TryParseLatitude(latitude, out var lat))
                 throw new ArgumentException("Invalid latitude format or range.", nameof(latitude));
@@ -53,6 +82,22 @@ namespace DeepDroidChanger.Services
             var safeLat = lat.ToString("F4", CultureInfo.InvariantCulture);
             var safeLon = lon.ToString("F4", CultureInfo.InvariantCulture);
 
+            return _rootAccessService.ExecuteAsRootAsync(
+                serial,
+                rootCancellationToken => ApplyLocationCoreAsync(
+                    serial,
+                    safeLat,
+                    safeLon,
+                    rootCancellationToken),
+                cancellationToken);
+        }
+
+        private async Task ApplyLocationCoreAsync(
+            string serial,
+            string safeLat,
+            string safeLon,
+            CancellationToken cancellationToken)
+        {
             _logger.LogInformation("Applying configured location to device {Serial}.", serial);
 
             await _adbCommandService.SetPropertyAsync(serial, PropertyConstants.Latitude, safeLat, cancellationToken).ConfigureAwait(false);

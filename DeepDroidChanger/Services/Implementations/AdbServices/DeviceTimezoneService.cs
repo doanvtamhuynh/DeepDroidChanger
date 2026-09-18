@@ -8,24 +8,56 @@ namespace DeepDroidChanger.Services
     {
         private readonly IAdbCommandService _adbCommandService;
         private readonly IIpGeolocationService _adbIpGeolocationService;
+        private readonly IAdbRootAccessService _rootAccessService;
         private readonly ILogger<DeviceTimezoneService> _logger;
 
         public DeviceTimezoneService(
             IAdbCommandService adbCommandService,
             IIpGeolocationService adbIpGeolocationService,
             ILogger<DeviceTimezoneService> logger)
+            : this(
+                adbCommandService,
+                adbIpGeolocationService,
+                logger,
+                AdbRootAccessService.GetShared(adbCommandService))
+        {
+        }
+
+        public DeviceTimezoneService(
+            IAdbCommandService adbCommandService,
+            IIpGeolocationService adbIpGeolocationService,
+            ILogger<DeviceTimezoneService> logger,
+            IAdbRootAccessService rootAccessService)
         {
             _adbCommandService = adbCommandService;
             _adbIpGeolocationService = adbIpGeolocationService;
+            _rootAccessService = rootAccessService;
             _logger = logger;
         }
 
-        public async Task ApplyTimezoneAsync(string serial, string timezone, CancellationToken cancellationToken)
+        public Task ApplyTimezoneAsync(
+            string serial,
+            string timezone,
+            CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(timezone))
                 throw new ArgumentException("Timezone cannot be empty.", nameof(timezone));
 
             timezone = timezone.Trim();
+            return _rootAccessService.ExecuteAsRootAsync(
+                serial,
+                rootCancellationToken => ApplyTimezoneCoreAsync(
+                    serial,
+                    timezone,
+                    rootCancellationToken),
+                cancellationToken);
+        }
+
+        private async Task ApplyTimezoneCoreAsync(
+            string serial,
+            string timezone,
+            CancellationToken cancellationToken)
+        {
             _logger.LogInformation("Applying timezone {Timezone} to device {Serial}.", timezone, serial);
 
             await _adbCommandService.PutSettingAsync(serial, "global", "auto_time_zone", "0", cancellationToken).ConfigureAwait(false);

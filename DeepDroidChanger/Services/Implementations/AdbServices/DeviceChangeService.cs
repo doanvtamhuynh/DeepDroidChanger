@@ -16,6 +16,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private readonly IDeviceTimezoneService? _timezoneService;
     private readonly ILocationDataService? _locationDataService;
     private readonly IRandomService? _randomService;
+    private readonly IAdbRootAccessService _rootAccessService;
     private readonly ILogger<DeviceChangeService> _logger;
 
     public DeviceChangeService(
@@ -23,7 +24,16 @@ public sealed class DeviceChangeService : IDeviceChangeService
         IDeviceDataCleanupService cleanupService,
         IDeviceIntegrityService integrityService,
         ILogger<DeviceChangeService> logger)
-        : this(adb, cleanupService, integrityService, null, null, null, null, logger)
+        : this(
+            adb,
+            cleanupService,
+            integrityService,
+            null,
+            null,
+            null,
+            null,
+            logger,
+            AdbRootAccessService.GetShared(adb))
     {
     }
 
@@ -36,6 +46,29 @@ public sealed class DeviceChangeService : IDeviceChangeService
         ILocationDataService? locationDataService,
         IRandomService? randomService,
         ILogger<DeviceChangeService> logger)
+        : this(
+            adb,
+            cleanupService,
+            integrityService,
+            locationService,
+            timezoneService,
+            locationDataService,
+            randomService,
+            logger,
+            AdbRootAccessService.GetShared(adb))
+    {
+    }
+
+    public DeviceChangeService(
+        IAdbCommandService adb,
+        IDeviceDataCleanupService cleanupService,
+        IDeviceIntegrityService integrityService,
+        IDeviceLocationService? locationService,
+        IDeviceTimezoneService? timezoneService,
+        ILocationDataService? locationDataService,
+        IRandomService? randomService,
+        ILogger<DeviceChangeService> logger,
+        IAdbRootAccessService rootAccessService)
     {
         _adb = adb;
         _cleanupService = cleanupService;
@@ -44,6 +77,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
         _timezoneService = timezoneService;
         _locationDataService = locationDataService;
         _randomService = randomService;
+        _rootAccessService = rootAccessService;
         _logger = logger;
     }
 
@@ -56,7 +90,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
         ValidateSimProfile(profile);
         await ExecuteWithDeviceLockAsync(serial, async () =>
         {
-            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
             await SetPropertiesAsync(serial, CreateSimProperties(profile), cancellationToken).ConfigureAwait(false);
             await RunRequiredShellAsync(
                     serial,
@@ -81,8 +114,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
         await ExecuteWithDeviceLockAsync(serial, async () =>
         {
             progress?.Report(DeviceChangeStage.Preparing);
-            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
-
             bool changeAndroidId = ShouldChangeAndroidId(options);
             string? originalAndroidId = changeAndroidId
                 ? await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false)
@@ -156,13 +187,11 @@ public sealed class DeviceChangeService : IDeviceChangeService
         await ExecuteWithDeviceLockAsync(serial, async () =>
         {
             progress?.Report(DeviceChangeStage.Preparing);
-            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
             progress?.Report(DeviceChangeStage.ClearingData);
             await _cleanupService
                 .CleanPreservingSsaidAsync(serial, options, cancellationToken)
                 .ConfigureAwait(false);
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
-            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
             await _cleanupService
                 .CleanPostRebootAsync(serial, cancellationToken)
                 .ConfigureAwait(false);
@@ -187,7 +216,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
         await ExecuteWithDeviceLockAsync(serial, async () =>
         {
             progress?.Report(DeviceChangeStage.Preparing);
-            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
             await _adb.SetWifiAsync(serial, false, cancellationToken).ConfigureAwait(false);
 
             bool changeAndroidId = ShouldChangeAndroidId(options);
@@ -226,7 +254,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
                 await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
-            await EnsureRootAsync(serial, cancellationToken).ConfigureAwait(false);
             await _cleanupService
                 .CleanPostRebootAsync(serial, cancellationToken)
                 .ConfigureAwait(false);
@@ -266,7 +293,9 @@ public sealed class DeviceChangeService : IDeviceChangeService
 
         try
         {
-            await operation().ConfigureAwait(false);
+            await _rootAccessService
+                .ExecuteAsRootAsync(serial, _ => operation(), cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -283,29 +312,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
         await _adb.RebootAsync(serial, cancellationToken).ConfigureAwait(false);
         progress?.Report(DeviceChangeStage.WaitingForDevice);
         await WaitForBootCompletedAsync(serial, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task EnsureRootAsync(string serial, CancellationToken cancellationToken)
-    {
-        CommandResult rootResult = await _adb
-            .RunAdbAsync(serial, "root", cancellationToken)
-            .ConfigureAwait(false);
-        EnsureSuccess(rootResult, serial, "restart adbd as root");
-
-        CommandResult waitResult = await _adb
-            .RunAdbAsync(serial, "wait-for-device", cancellationToken)
-            .ConfigureAwait(false);
-        EnsureSuccess(waitResult, serial, "wait for rooted device");
-
-        CommandResult identityResult = await _adb
-            .RunAdbShellAsync(serial, "id -u", cancellationToken)
-            .ConfigureAwait(false);
-        EnsureSuccess(identityResult, serial, "verify root access");
-        if (!string.Equals(
-                identityResult.StandardOutput.Trim(),
-                "0",
-                StringComparison.Ordinal))
-            throw new InvalidOperationException($"Device {serial} does not provide ADB root access.");
     }
 
     private async Task ApplyProfileAsync(

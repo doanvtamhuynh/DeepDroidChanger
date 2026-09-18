@@ -155,6 +155,7 @@ public sealed partial class App : Application
             .Validate(DeviceInfoApiOptionsHelper.IsValid, "Device Info API configuration is invalid.");
 
         services.AddSingleton<IAdbCommandService, AdbCommandService>();
+        services.AddSingleton<IAdbRootAccessService, AdbRootAccessService>();
         services.AddSingleton<IAdbDeviceService, AdbDeviceService>();
         services.AddSingleton<IAdbDeviceTrackerService, AdbDeviceTrackerService>();
         services.AddSingleton<IDeviceTimezoneService, DeviceTimezoneService>();

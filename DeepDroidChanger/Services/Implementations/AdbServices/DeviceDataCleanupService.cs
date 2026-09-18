@@ -126,15 +126,30 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
 
     private readonly IDevicePackageService _packageService;
     private readonly IAdbCommandService _adb;
+    private readonly IAdbRootAccessService _rootAccessService;
     private readonly ILogger<DeviceDataCleanupService> _logger;
 
     public DeviceDataCleanupService(
         IDevicePackageService packageService,
         IAdbCommandService adb,
         ILogger<DeviceDataCleanupService> logger)
+        : this(
+            packageService,
+            adb,
+            logger,
+            AdbRootAccessService.GetShared(adb))
+    {
+    }
+
+    public DeviceDataCleanupService(
+        IDevicePackageService packageService,
+        IAdbCommandService adb,
+        ILogger<DeviceDataCleanupService> logger,
+        IAdbRootAccessService rootAccessService)
     {
         _packageService = packageService;
         _adb = adb;
+        _rootAccessService = rootAccessService;
         _logger = logger;
     }
 
@@ -143,11 +158,16 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         DeviceChangeOptions options,
         CancellationToken cancellationToken)
     {
-        return CleanAsync(
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(options);
+        return _rootAccessService.ExecuteAsRootAsync(
             serial,
-            options,
-            resetSharedIdentityState: true,
-            preserveSsaid: false,
+            rootCancellationToken => CleanCoreAsync(
+                serial,
+                options,
+                resetSharedIdentityState: true,
+                preserveSsaid: false,
+                rootCancellationToken),
             cancellationToken);
     }
 
@@ -156,19 +176,34 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         DeviceChangeOptions options,
         CancellationToken cancellationToken)
     {
-        return CleanAsync(
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(options);
+        return _rootAccessService.ExecuteAsRootAsync(
             serial,
-            options,
-            resetSharedIdentityState: false,
-            preserveSsaid: true,
+            rootCancellationToken => CleanCoreAsync(
+                serial,
+                options,
+                resetSharedIdentityState: false,
+                preserveSsaid: true,
+                rootCancellationToken),
             cancellationToken);
     }
 
-    public async Task CleanPostRebootAsync(
+    public Task CleanPostRebootAsync(
         string serial,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        return _rootAccessService.ExecuteAsRootAsync(
+            serial,
+            rootCancellationToken => CleanPostRebootCoreAsync(serial, rootCancellationToken),
+            cancellationToken);
+    }
+
+    private async Task CleanPostRebootCoreAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
         string[] commands =
         [
             CreateDeleteDirectoryContentsCommand(DropBoxDirectoryPath),
@@ -178,11 +213,21 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         _logger.LogInformation("Deleted post-reboot DropBox files while preserving its directory on {Serial}.", serial);
     }
 
-    public async Task DeleteSsaidAsync(
+    public Task DeleteSsaidAsync(
         string serial,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        return _rootAccessService.ExecuteAsRootAsync(
+            serial,
+            rootCancellationToken => DeleteSsaidCoreAsync(serial, rootCancellationToken),
+            cancellationToken);
+    }
+
+    private async Task DeleteSsaidCoreAsync(
+        string serial,
+        CancellationToken cancellationToken)
+    {
         string[] commands =
         [
             CreateRemoveFileCommand(SsaidFilePattern),
@@ -300,7 +345,7 @@ public sealed class DeviceDataCleanupService : IDeviceDataCleanupService
         return commands;
     }
 
-    private async Task CleanAsync(
+    private async Task CleanCoreAsync(
         string serial,
         DeviceChangeOptions options,
         bool resetSharedIdentityState,
