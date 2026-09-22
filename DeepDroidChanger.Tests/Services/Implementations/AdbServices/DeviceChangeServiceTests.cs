@@ -91,6 +91,11 @@ public sealed partial class DeviceChangeServiceTests
             Arg.Any<CancellationToken>());
         await adb.Received(1).SetPropertyAsync(
             "SERIAL",
+            PropertyConstants.Spoof.BootKey,
+            profile.BootKey,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
             PropertyConstants.Spoof.SimIccid,
             profile.Iccid,
             Arg.Any<CancellationToken>());
@@ -269,6 +274,11 @@ public sealed partial class DeviceChangeServiceTests
             "SERIAL",
             PropertyConstants.Spoof.Bootloader,
             profile.Bootloader!,
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Spoof.BootKey,
+            profile.BootKey,
             Arg.Any<CancellationToken>());
         await adb.DidNotReceive().PutSettingAsync(
             "SERIAL",
@@ -922,6 +932,7 @@ public sealed partial class DeviceChangeServiceTests
             BuildDate = "Thu Jun 04 00:00:00 UTC 2026",
             BuildDateUtc = "1780531200",
             Bootloader = "test",
+            BootKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             Serial = "NEW-SERIAL",
             Imei = "123456789012345",
             Imei1 = "123456789012352",

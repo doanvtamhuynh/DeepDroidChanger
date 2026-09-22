@@ -85,6 +85,7 @@ namespace DeepDroidChanger.Models
         public string WifiBssid { get; set; } = string.Empty;
         public string WifiSsid { get; set; } = string.Empty;
         public string VbmetaDigest { get; set; } = string.Empty;
+        public string BootKey { get; set; } = string.Empty;
 
         /// <summary>
         /// Creates an independent snapshot of this mutable device profile.

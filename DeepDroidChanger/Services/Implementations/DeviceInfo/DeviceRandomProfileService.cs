@@ -171,6 +171,7 @@ namespace DeepDroidChanger.Services
             device.WifiBssid = _randomService.GenerateWifiMacAddress(device.Manufacturer ?? selection.Brand);
             device.WifiSsid = CreateRandomDeviceName(deviceNamePrefix);
             device.VbmetaDigest = _randomService.GetRandomHexString(64)[..64];
+            device.BootKey = _randomService.GetRandomHexString(64)[..64];
         }
 
         private void ApplyGeneratedValues(DeviceInfoApiDevice device, RandomDeviceRequest request)
@@ -379,6 +380,7 @@ namespace DeepDroidChanger.Services
                 (nameof(device.WifiBssid), device.WifiBssid),
                 (nameof(device.WifiSsid), device.WifiSsid),
                 (nameof(device.VbmetaDigest), device.VbmetaDigest),
+                (nameof(device.BootKey), device.BootKey),
                 (nameof(device.Imsi), device.Imsi),
                 (nameof(device.Iccid), device.Iccid),
                 (nameof(device.SimPhoneNumber), device.SimPhoneNumber),

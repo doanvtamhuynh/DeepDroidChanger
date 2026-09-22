@@ -55,6 +55,7 @@ public static class PropertyConstants
         public const string SerialNumber = Prefix + "serial_number";
         public const string DeviceName = Prefix + "device.name";
         public const string VbmetaDigest = Prefix + "vbmeta.digest";
+        public const string BootKey = Prefix + "boot_key";
         public const string Imei0 = Prefix + "imei0";
         public const string Imei1 = Prefix + "imei1";
         public const string BluetoothMac = Prefix + "bluetooth.mac";

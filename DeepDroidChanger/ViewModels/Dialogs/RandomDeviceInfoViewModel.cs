@@ -69,7 +69,8 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
             Field("SettingBluetoothName", device.SettingBluetoothName),
             Field("WifiBssid", device.WifiBssid),
             Field("WifiSsid", device.WifiSsid),
-            Field("VbmetaDigest", device.VbmetaDigest)
+            Field("VbmetaDigest", device.VbmetaDigest),
+            Field("BootKey", device.BootKey)
         ];
     }
 
@@ -123,6 +124,7 @@ public sealed partial class RandomDeviceInfoViewModel : ObservableObject
         _device.WifiBssid = values["WifiBssid"];
         _device.WifiSsid = values["WifiSsid"];
         _device.VbmetaDigest = values["VbmetaDigest"];
+        _device.BootKey = values["BootKey"];
         UpdateRequested?.Invoke(this, EventArgs.Empty);
     }
 

@@ -67,6 +67,8 @@ public sealed class DeviceRandomProfileServiceTests
         Assert.AreEqual("66:77:88:99:aa:bb", result.WifiBssid);
         Assert.AreEqual("Pixel8_Potter", result.WifiSsid);
         Assert.HasCount(64, result.VbmetaDigest);
+        Assert.HasCount(64, result.BootKey);
+        Assert.IsTrue(result.BootKey.All(Uri.IsHexDigit));
         Assert.AreEqual("45204", result.SimOperatorNumeric);
         Assert.AreEqual("vn", result.SimOperatorCountry);
         Assert.AreEqual("Viettel", result.SimOperatorName);

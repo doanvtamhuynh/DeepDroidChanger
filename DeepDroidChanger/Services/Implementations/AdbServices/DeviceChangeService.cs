@@ -498,6 +498,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             Pair(PropertyConstants.Spoof.SerialNumber, profile.Serial),
             Pair(PropertyConstants.Spoof.DeviceName, FirstValue(profile.SettingDeviceName, profile.Name, profile.Model)),
             Pair(PropertyConstants.Spoof.VbmetaDigest, profile.VbmetaDigest),
+            Pair(PropertyConstants.Spoof.BootKey, profile.BootKey),
             Pair(PropertyConstants.Spoof.Imei0, profile.Imei),
             Pair(PropertyConstants.Spoof.Imei1, profile.Imei1),
             Pair(PropertyConstants.Spoof.BluetoothName, profile.SettingBluetoothName),
