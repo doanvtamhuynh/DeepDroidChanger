@@ -74,6 +74,16 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
+        <Style x:Key="UpdateIntegrityClearButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource DialogPrimaryButtonStyle}">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="MinWidth" Value="116"/>
+            <Setter Property="Padding" Value="16,0,16,0"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
 
     </Window.Resources>
 
@@ -119,12 +129,26 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
                 <CheckBox Grid.Row="0"
+                          Grid.Column="0"
                           Content="{DynamicResource UpdateIntegrity_TargetIntegrity}"
                           IsChecked="{Binding UpdateIntegrityEnabled, Mode=TwoWay}"
                           ToolTip="{DynamicResource Shared_TooltipOption}"
                           Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
+                <CheckBox Grid.Row="0"
+                          Grid.Column="1"
+                          Content="{DynamicResource UpdateIntegrity_FakeDroidGuardSdk}"
+                          IsChecked="{Binding FakeDroidGuardSdkEnabled, Mode=TwoWay}"
+                          IsEnabled="{Binding UpdateIntegrityEnabled}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
+                          Style="{StaticResource UpdateIntegrityCheckBoxStyle}"
+                          Margin="16,4,0,4"/>
                 <CheckBox Grid.Row="1"
+                          Grid.Column="0"
                           Content="{DynamicResource UpdateIntegrity_TargetKeybox}"
                           IsChecked="{Binding UpdateKeyboxEnabled, Mode=TwoWay}"
                           ToolTip="{DynamicResource Shared_TooltipOption}"
@@ -210,22 +234,37 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="1"
-                    Command="{Binding UpdateCommand}"
-                    ToolTip="{DynamicResource Shared_TooltipAction}"
-                    Style="{StaticResource DialogPrimaryButtonStyle}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <materialDesign:PackIcon Kind="Play"
-                                             Style="{StaticResource PrimaryButtonIconStyle}"/>
-                    <TextBlock Grid.Column="1"
-                               Text="{DynamicResource UpdateIntegrity_UpdateButton}"
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Command="{Binding ClearIntegrityCommand}"
+                        ToolTip="{DynamicResource Shared_TooltipAction}"
+                        Style="{StaticResource UpdateIntegrityClearButtonStyle}">
+                    <TextBlock Text="{DynamicResource UpdateIntegrity_ClearIntegrityButton}"
                                Style="{StaticResource PrimaryButtonTextStyle}"/>
-                </Grid>
-            </Button>
+                </Button>
+                <Button Command="{Binding ClearKeyboxCommand}"
+                        ToolTip="{DynamicResource Shared_TooltipAction}"
+                        Style="{StaticResource UpdateIntegrityClearButtonStyle}">
+                    <TextBlock Text="{DynamicResource UpdateIntegrity_ClearKeyboxButton}"
+                               Style="{StaticResource PrimaryButtonTextStyle}"/>
+                </Button>
+                <Button Command="{Binding UpdateCommand}"
+                        ToolTip="{DynamicResource Shared_TooltipAction}"
+                        Style="{StaticResource DialogPrimaryButtonStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <materialDesign:PackIcon Kind="Play"
+                                                 Style="{StaticResource PrimaryButtonIconStyle}"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{DynamicResource UpdateIntegrity_UpdateButton}"
+                                   Style="{StaticResource PrimaryButtonTextStyle}"/>
+                    </Grid>
+                </Button>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

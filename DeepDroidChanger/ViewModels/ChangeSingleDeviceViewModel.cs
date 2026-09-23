@@ -2218,23 +2218,46 @@ namespace DeepDroidChanger.ViewModels
                         return;
                     }
 
-                    await SaveUpdateIntegrityConfigAsync(
-                            device,
-                            dialogResult,
-                            cancellationToken)
-                        .ConfigureAwait(true);
+                    if (dialogResult.Action == UpdateIntegrityDialogAction.Update)
+                    {
+                        await SaveUpdateIntegrityConfigAsync(
+                                device,
+                                dialogResult,
+                                cancellationToken)
+                            .ConfigureAwait(true);
+                    }
 
                     if (!await IsOperationTargetOnlineAsync(device, cancellationToken).ConfigureAwait(true))
                         return;
 
-                    SetDeviceLog(
-                        device,
-                        dialogResult.UpdateIntegrityEnabled
+                    string statusKey = dialogResult.Action switch
+                    {
+                        UpdateIntegrityDialogAction.ClearIntegrity => "Log_UpdatingIntegrity",
+                        UpdateIntegrityDialogAction.ClearKeybox => "Log_UpdatingKeybox",
+                        _ => dialogResult.UpdateIntegrityEnabled
                             ? "Log_UpdatingIntegrity"
-                            : "Log_UpdatingKeybox");
-                    await _deviceIntegrityService
-                        .ApplyAsync(device.Serial, dialogResult, cancellationToken)
-                        .ConfigureAwait(true);
+                            : "Log_UpdatingKeybox"
+                    };
+                    SetDeviceLog(device, statusKey);
+
+                    switch (dialogResult.Action)
+                    {
+                        case UpdateIntegrityDialogAction.ClearIntegrity:
+                            await _deviceIntegrityService
+                                .ClearIntegrityAsync(device.Serial, cancellationToken)
+                                .ConfigureAwait(true);
+                            break;
+                        case UpdateIntegrityDialogAction.ClearKeybox:
+                            await _deviceIntegrityService
+                                .ClearKeyboxAsync(device.Serial, cancellationToken)
+                                .ConfigureAwait(true);
+                            break;
+                        default:
+                            await _deviceIntegrityService
+                                .ApplyAsync(device.Serial, dialogResult, cancellationToken)
+                                .ConfigureAwait(true);
+                            break;
+                    }
 
                     SetDeviceLog(device, "Log_UpdateIntegritySuccess");
                 }

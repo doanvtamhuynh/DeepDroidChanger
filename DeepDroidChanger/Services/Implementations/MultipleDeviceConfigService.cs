@@ -285,7 +285,8 @@ public sealed class MultipleDeviceConfigService : IMultipleDeviceConfigService
             IntegrityFile = source.IntegrityFile?.Trim() ?? string.Empty,
             KeyboxFile = source.KeyboxFile?.Trim() ?? string.Empty,
             IntegrityEnabled = source.IntegrityEnabled,
-            KeyboxEnabled = source.KeyboxEnabled
+            KeyboxEnabled = source.KeyboxEnabled,
+            FakeDroidGuardSdkEnabled = source.FakeDroidGuardSdkEnabled
         };
     }
 

@@ -75,6 +75,7 @@ public sealed class DeviceIntegrityServiceTests
         try
         {
             IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+            ConfigureRootAccess(adb);
             IRandomService random = Substitute.For<IRandomService>();
             random.PickRandom(Arg.Any<IReadOnlyList<Integrity>>())
                 .Returns(callInfo => callInfo.Arg<IReadOnlyList<Integrity>>()[0]);
@@ -123,6 +124,7 @@ public sealed class DeviceIntegrityServiceTests
         const string pifJson = "{\"FINGERPRINT\":\"google/redfin/redfin:13/TQ3A/123456:user/release-keys\","
             + "\"SECURITY_PATCH\":\"2025-01-05\",\"MODEL\":\"Pixel 5\"}";
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        ConfigureRootAccess(adb);
         IRandomService random = Substitute.For<IRandomService>();
         random.PickRandom(Arg.Any<IReadOnlyList<Integrity>>())
             .Returns(callInfo => callInfo.Arg<IReadOnlyList<Integrity>>()[0]);
@@ -142,19 +144,17 @@ public sealed class DeviceIntegrityServiceTests
     }
 
     [TestMethod]
-    public async Task UpdateKeyboxAsync_ServerMode_DeletesTemporaryDownloadAfterPush()
+    public async Task UpdateKeyboxAsync_ServerMode_WhenIntegrityIsNotSelected_OnlyUpdatesKeybox()
     {
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        ConfigureRootAccess(adb);
         string? pushedLocalPath = null;
-        adb.RunAdbAsync("SERIAL", Arg.Any<string>(), Arg.Any<CancellationToken>())
+        adb.PushFileAsync("SERIAL", Arg.Any<string>(), "/data/system/keybox.xml", Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                string arguments = callInfo.ArgAt<string>(1);
-                int firstQuote = arguments.IndexOf('"');
-                int secondQuote = arguments.IndexOf('"', firstQuote + 1);
-                pushedLocalPath = arguments[(firstQuote + 1)..secondQuote];
+                pushedLocalPath = callInfo.ArgAt<string>(1);
                 Assert.IsTrue(File.Exists(pushedLocalPath));
-                return new CommandResult(0, string.Empty, string.Empty);
+                return Task.FromResult(new CommandResult(0, string.Empty, string.Empty));
             });
         var service = new DeviceIntegrityService(
             adb,
@@ -166,6 +166,26 @@ public sealed class DeviceIntegrityServiceTests
 
         Assert.IsNotNull(pushedLocalPath);
         Assert.IsFalse(File.Exists(pushedLocalPath));
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Keybox.Enabled,
+            "true",
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.SdkInt,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.Enabled,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.DroidGuardSdk,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [DataRow("<AndroidAttestation>")]
@@ -219,5 +239,263 @@ public sealed class DeviceIntegrityServiceTests
             service.UpdateIntegrityAsync("SERIAL", fromServer: true, jsonPath: null, CancellationToken.None));
 
         await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
+    }
+
+    [TestMethod]
+    public async Task ClearIntegrityAsync_DisablesOnlyIntegrityEnableProperties()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        DeviceIntegrityService service = CreateService(adb);
+
+        await service.ClearIntegrityAsync("SERIAL", CancellationToken.None);
+
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.Enabled,
+            "false",
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.DroidGuardSdk,
+            "false",
+            Arg.Any<CancellationToken>());
+        await adb.Received(2).SetPropertyAsync(
+            "SERIAL",
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.SdkInt,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.Fingerprint,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Keybox.Enabled,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ClearKeyboxAsync_DisablesOnlyKeyboxProperty()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        DeviceIntegrityService service = CreateService(adb);
+
+        await service.ClearKeyboxAsync("SERIAL", CancellationToken.None);
+
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Keybox.Enabled,
+            "false",
+            Arg.Any<CancellationToken>());
+        await adb.Received(1).SetPropertyAsync(
+            "SERIAL",
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.Enabled,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await adb.DidNotReceive().SetPropertyAsync(
+            "SERIAL",
+            PropertyConstants.Integrity.DroidGuardSdk,
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [TestMethod]
+    public async Task ApplyAsyncAndApplyPreparedAsync_WhenNoTargetsAreSelected_DoNotWriteProperties()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        DeviceIntegrityService service = CreateService(adb);
+        var result = new UpdateIntegrityDialogResult(
+            updateIntegrityFromServer: false,
+            updateIntegrityEnabled: false,
+            updateKeyboxEnabled: false,
+            updateIntegrityFile: string.Empty,
+            updateKeyboxFile: string.Empty,
+            fakeDroidGuardSdkEnabled: true);
+
+        await service.ApplyAsync("SERIAL", result, CancellationToken.None);
+        await service.ApplyPreparedAsync(
+            "SERIAL",
+            new PreparedIntegrityData(Array.Empty<Integrity>(), null, fakeDroidGuardSdkEnabled: true),
+            CancellationToken.None);
+
+        await adb.DidNotReceiveWithAnyArgs().SetPropertyAsync(default!, default!, default!, default);
+        await adb.DidNotReceiveWithAnyArgs().RunAdbAsync(default!, default!, default);
+    }
+
+    [TestMethod]
+    public async Task ApplyAsyncAndApplyPreparedAsync_WhenFakeSdkIsDisabled_SetFalseAndPreserveSdkInt()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        DeviceIntegrityService service = CreateService(adb);
+        string pifPath = await WritePifFileAsync("35");
+        UpdateIntegrityDialogResult result = CreateIntegrityResult(pifPath, fakeDroidGuardSdkEnabled: false);
+
+        try
+        {
+            await service.ApplyAsync("SERIAL", result, CancellationToken.None);
+            await ApplyPreparedIntegrityAsync(service, result);
+
+            await adb.Received(2).SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Integrity.Enabled,
+                "true",
+                Arg.Any<CancellationToken>());
+            await adb.Received(2).SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Integrity.DroidGuardSdk,
+                "false",
+                Arg.Any<CancellationToken>());
+            await adb.DidNotReceive().SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Integrity.SdkInt,
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>());
+            await adb.DidNotReceive().SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Keybox.Enabled,
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            File.Delete(pifPath);
+        }
+    }
+
+    [TestMethod]
+    public async Task ApplyAsyncAndApplyPreparedAsync_WhenFakeSdkIsEnabled_UsePifSdkIntOrFallback32()
+    {
+        IAdbCommandService adb = Substitute.For<IAdbCommandService>();
+        DeviceIntegrityService service = CreateService(adb);
+        string pifWithSdkIntPath = await WritePifFileAsync("35");
+        string pifWithoutSdkIntPath = await WritePifFileAsync(null);
+        string pifWithBlankSdkIntPath = await WritePifFileAsync("   ");
+
+        try
+        {
+            UpdateIntegrityDialogResult singleResult =
+                CreateIntegrityResult(pifWithSdkIntPath, fakeDroidGuardSdkEnabled: true);
+            await service.ApplyAsync("SERIAL", singleResult, CancellationToken.None);
+
+            UpdateIntegrityDialogResult batchResult =
+                CreateIntegrityResult(pifWithoutSdkIntPath, fakeDroidGuardSdkEnabled: true);
+            await ApplyPreparedIntegrityAsync(service, batchResult);
+
+            UpdateIntegrityDialogResult batchBlankResult =
+                CreateIntegrityResult(pifWithBlankSdkIntPath, fakeDroidGuardSdkEnabled: true);
+            await ApplyPreparedIntegrityAsync(service, batchBlankResult);
+
+            await adb.Received(1).SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Integrity.SdkInt,
+                "35",
+                Arg.Any<CancellationToken>());
+            await adb.Received(2).SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Integrity.SdkInt,
+                "32",
+                Arg.Any<CancellationToken>());
+            await adb.Received(3).SetPropertyAsync(
+                "SERIAL",
+                PropertyConstants.Integrity.DroidGuardSdk,
+                "true",
+                Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            File.Delete(pifWithSdkIntPath);
+            File.Delete(pifWithoutSdkIntPath);
+            File.Delete(pifWithBlankSdkIntPath);
+        }
+    }
+
+    private static void ConfigureRootAccess(IAdbCommandService adb)
+    {
+        adb.RunAdbAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new CommandResult(0, string.Empty, string.Empty)));
+        int identityCallCount = 0;
+        adb.RunAdbShellAsync(Arg.Any<string>(), "whoami", Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(new CommandResult(
+                0,
+                identityCallCount++ % 2 == 0 ? "root" : "shell",
+                string.Empty)));
+    }
+
+    private static DeviceIntegrityService CreateService(IAdbCommandService adb)
+    {
+        IRandomService random = Substitute.For<IRandomService>();
+        random.PickRandom(Arg.Any<IReadOnlyList<Integrity>>())
+            .Returns(callInfo => callInfo.Arg<IReadOnlyList<Integrity>>()[0]);
+
+        return new DeviceIntegrityService(
+            adb,
+            random,
+            NullLogger<DeviceIntegrityService>.Instance,
+            new ImmediateRootAccessService());
+    }
+
+    private static UpdateIntegrityDialogResult CreateIntegrityResult(
+        string pifPath,
+        bool fakeDroidGuardSdkEnabled)
+    {
+        return new UpdateIntegrityDialogResult(
+            updateIntegrityFromServer: false,
+            updateIntegrityEnabled: true,
+            updateKeyboxEnabled: false,
+            updateIntegrityFile: pifPath,
+            updateKeyboxFile: string.Empty,
+            fakeDroidGuardSdkEnabled);
+    }
+
+    private static async Task ApplyPreparedIntegrityAsync(
+        DeviceIntegrityService service,
+        UpdateIntegrityDialogResult result)
+    {
+        PreparedIntegrityData preparedData = await service.PrepareAsync(result, CancellationToken.None);
+        await service.ApplyPreparedAsync("SERIAL", preparedData, CancellationToken.None);
+    }
+
+    private static async Task<string> WritePifFileAsync(string? sdkInt)
+    {
+        string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".json");
+        var integrity = new Integrity
+        {
+            FINGERPRINT = "google/redfin/redfin:13/TQ3A/123456:user/release-keys",
+            SECURITY_PATCH = "2025-01-05",
+            SDK_INT = sdkInt
+        };
+        await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(integrity));
+        return path;
+    }
+
+    private sealed class ImmediateRootAccessService : IAdbRootAccessService
+    {
+        public Task ExecuteAsRootAsync(
+            string serial,
+            Func<CancellationToken, Task> action,
+            CancellationToken cancellationToken)
+        {
+            return action(cancellationToken);
+        }
+
+        public Task<T> ExecuteAsRootAsync<T>(
+            string serial,
+            Func<CancellationToken, Task<T>> action,
+            CancellationToken cancellationToken)
+        {
+            return action(cancellationToken);
+        }
     }
 }

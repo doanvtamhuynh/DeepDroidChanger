@@ -27,6 +27,7 @@ public static class StoredDeviceConfigSnapshot
             UpdateKeyboxFile = source.UpdateKeyboxFile,
             UpdateIntegrityEnabled = source.UpdateIntegrityEnabled,
             UpdateKeyboxEnabled = source.UpdateKeyboxEnabled,
+            FakeDroidGuardSdkEnabled = source.FakeDroidGuardSdkEnabled,
             LocationMode = source.LocationMode,
             LocationLatitude = source.LocationLatitude,
             LocationLongitude = source.LocationLongitude,

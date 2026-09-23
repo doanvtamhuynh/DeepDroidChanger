@@ -93,6 +93,7 @@ namespace DeepDroidChanger.Services
                 device.UpdateIntegrityFromServer = result.UpdateIntegrityFromServer;
                 device.UpdateIntegrityEnabled = result.UpdateIntegrityEnabled;
                 device.UpdateKeyboxEnabled = result.UpdateKeyboxEnabled;
+                device.FakeDroidGuardSdkEnabled = result.FakeDroidGuardSdkEnabled;
                 device.UpdateIntegrityFile = result.UpdateIntegrityFile;
                 device.UpdateKeyboxFile = result.UpdateKeyboxFile;
             }

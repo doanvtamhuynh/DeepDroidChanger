@@ -146,6 +146,41 @@ namespace DeepDroidChanger.Services
                 cancellationToken);
         }
 
+        public Task ClearIntegrityAsync(string serial, CancellationToken cancellationToken)
+        {
+            return _rootAccessService.ExecuteAsRootAsync(
+                serial,
+                async rootCancellationToken =>
+                {
+                    await _adbCommandService.SetPropertyAsync(
+                            serial,
+                            PropertyConstants.Integrity.Enabled,
+                            "false",
+                            rootCancellationToken)
+                        .ConfigureAwait(false);
+                    await _adbCommandService.SetPropertyAsync(
+                            serial,
+                            PropertyConstants.Integrity.DroidGuardSdk,
+                            "false",
+                            rootCancellationToken)
+                        .ConfigureAwait(false);
+                },
+                cancellationToken);
+        }
+
+        public Task ClearKeyboxAsync(string serial, CancellationToken cancellationToken)
+        {
+            return _rootAccessService.ExecuteAsRootAsync(
+                serial,
+                rootCancellationToken => _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Keybox.Enabled,
+                    "false",
+                    rootCancellationToken),
+                cancellationToken);
+        }
+
+
         public async Task<PreparedIntegrityData> PrepareAsync(
             UpdateIntegrityDialogResult result,
             CancellationToken cancellationToken)
@@ -212,7 +247,10 @@ namespace DeepDroidChanger.Services
                 ValidateKeyboxXml(keyboxXml);
             }
 
-            return new PreparedIntegrityData(integrityCandidates, keyboxXml);
+            return new PreparedIntegrityData(
+                integrityCandidates,
+                keyboxXml,
+                result.UpdateIntegrityEnabled && result.FakeDroidGuardSdkEnabled);
         }
 
         public async Task ApplyPreparedAsync(
@@ -227,6 +265,7 @@ namespace DeepDroidChanger.Services
                 await ApplyPreparedIntegrityAsync(
                         serial,
                         preparedData.IntegrityCandidates,
+                        preparedData.FakeDroidGuardSdkEnabled,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -274,6 +313,7 @@ namespace DeepDroidChanger.Services
                 await ApplyIntegrityCandidateAsync(
                         serial,
                         pifData,
+                        result.FakeDroidGuardSdkEnabled,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -302,16 +342,18 @@ namespace DeepDroidChanger.Services
         private async Task ApplyPreparedIntegrityAsync(
             string serial,
             IReadOnlyList<Integrity> integrityCandidates,
+            bool fakeDroidGuardSdkEnabled,
             CancellationToken cancellationToken)
         {
             Integrity pifData = _randomService.PickRandom(integrityCandidates);
-            await ApplyIntegrityCandidateAsync(serial, pifData, cancellationToken)
+            await ApplyIntegrityCandidateAsync(serial, pifData, fakeDroidGuardSdkEnabled, cancellationToken)
                 .ConfigureAwait(false);
         }
 
         private Task ApplyIntegrityCandidateAsync(
             string serial,
             Integrity pifData,
+            bool fakeDroidGuardSdkEnabled,
             CancellationToken cancellationToken)
         {
             return _rootAccessService.ExecuteAsRootAsync(
@@ -319,6 +361,7 @@ namespace DeepDroidChanger.Services
                 rootCancellationToken => ApplyIntegrityCandidateCoreAsync(
                     serial,
                     pifData,
+                    fakeDroidGuardSdkEnabled,
                     rootCancellationToken),
                 cancellationToken);
         }
@@ -326,6 +369,7 @@ namespace DeepDroidChanger.Services
         private async Task ApplyIntegrityCandidateCoreAsync(
             string serial,
             Integrity pifData,
+            bool fakeDroidGuardSdkEnabled,
             CancellationToken cancellationToken)
         {
             string fingerprint = pifData.FINGERPRINT!;
@@ -400,16 +444,34 @@ namespace DeepDroidChanger.Services
                     pifData.DEVICE_INITIAL_SDK_INT ?? "21",
                     cancellationToken)
                 .ConfigureAwait(false);
-            await _adbCommandService.SetPropertyAsync(
-                    serial,
-                    PropertyConstants.Integrity.SdkInt,
-                    pifData.SDK_INT ?? "32",
-                    cancellationToken)
-                .ConfigureAwait(false);
+            if (fakeDroidGuardSdkEnabled)
+            {
+                string sdkInt = string.IsNullOrWhiteSpace(pifData.SDK_INT)
+                    ? "32"
+                    : pifData.SDK_INT.Trim();
+                await _adbCommandService.SetPropertyAsync(
+                        serial,
+                        PropertyConstants.Integrity.SdkInt,
+                        sdkInt,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
             await _adbCommandService.SetPropertyAsync(
                     serial,
                     PropertyConstants.Integrity.Release,
                     releaseVersion,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.Enabled,
+                    "true",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adbCommandService.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Integrity.DroidGuardSdk,
+                    fakeDroidGuardSdkEnabled ? "true" : "false",
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -429,20 +491,35 @@ namespace DeepDroidChanger.Services
                         keyboxXml,
                         cancellationToken)
                     .ConfigureAwait(false);
-                CommandResult pushResult = await _adbCommandService
-                    .RunAdbAsync(
+                await _rootAccessService.ExecuteAsRootAsync(
                         serial,
-                        $"push \"{localPath}\" \"/data/local/tmp/keybox.xml\"",
+                        async rootCancellationToken =>
+                        {
+                            CommandResult pushResult = await _adbCommandService
+                                .PushFileAsync(
+                                    serial,
+                                    localPath,
+                                    "/data/system/keybox.xml",
+                                    rootCancellationToken)
+                                .ConfigureAwait(false);
+                            if (pushResult.ExitCode != 0)
+                            {
+                                throw new InvalidOperationException(
+                                    $"ADB push keybox.xml failed with exit code {pushResult.ExitCode}.");
+                            }
+
+                            await _adbCommandService.SetPropertyAsync(
+                                    serial,
+                                    PropertyConstants.Keybox.Enabled,
+                                    "true",
+                                    rootCancellationToken)
+                                .ConfigureAwait(false);
+                        },
                         cancellationToken)
                     .ConfigureAwait(false);
-                if (pushResult.ExitCode != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"ADB push keybox.xml failed with exit code {pushResult.ExitCode}.");
-                }
 
                 _logger.LogInformation(
-                    "Successfully pushed keybox.xml to /data/local/tmp/ on device {Serial}.",
+                    "Successfully pushed keybox.xml to /data/system/ on device {Serial}.",
                     serial);
             }
             finally

@@ -11,9 +11,12 @@
     <system:String x:Key="UpdateIntegrity_SourceServer">Dùng dữ liệu từ server</system:String>
     <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Tùy chọn mục tiêu</system:String>
     <system:String x:Key="UpdateIntegrity_TargetIntegrity">Integrity (PIF)</system:String>
+    <system:String x:Key="UpdateIntegrity_FakeDroidGuardSdk">Giả lập SDK DroidGuard</system:String>
     <system:String x:Key="UpdateIntegrity_TargetKeybox">Keybox</system:String>
     <system:String x:Key="UpdateIntegrity_IntegrityFileLabel">Tệp PIF JSON</system:String>
     <system:String x:Key="UpdateIntegrity_KeyboxFileLabel">Tệp Keybox XML</system:String>
     <system:String x:Key="UpdateIntegrity_BrowseButton">Chọn tệp...</system:String>
     <system:String x:Key="UpdateIntegrity_UpdateButton">Cập nhật</system:String>
+    <system:String x:Key="UpdateIntegrity_ClearIntegrityButton">Xóa Integrity</system:String>
+    <system:String x:Key="UpdateIntegrity_ClearKeyboxButton">Xóa Keybox</system:String>
 </ResourceDictionary>

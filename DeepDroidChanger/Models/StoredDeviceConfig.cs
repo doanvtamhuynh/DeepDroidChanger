@@ -20,6 +20,7 @@ namespace DeepDroidChanger.Models
         public string UpdateKeyboxFile { get; set; } = string.Empty;
         public bool UpdateIntegrityEnabled { get; set; } = true;
         public bool UpdateKeyboxEnabled { get; set; } = true;
+        public bool FakeDroidGuardSdkEnabled { get; set; }
         public string LocationMode { get; set; } = string.Empty;
         public string LocationLatitude { get; set; } = string.Empty;
         public string LocationLongitude { get; set; } = string.Empty;

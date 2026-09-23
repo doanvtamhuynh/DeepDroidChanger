@@ -281,6 +281,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
             UpdateKeyboxFile = updateIntegrity.KeyboxFile,
             UpdateIntegrityEnabled = updateIntegrity.IntegrityEnabled,
             UpdateKeyboxEnabled = updateIntegrity.KeyboxEnabled,
+            FakeDroidGuardSdkEnabled = updateIntegrity.FakeDroidGuardSdkEnabled,
             LocationMode = location.Mode,
             LocationLatitude = location.Latitude,
             LocationLongitude = location.Longitude,
@@ -435,7 +436,8 @@ public sealed class DeviceStoreService : IDeviceStoreService
                 IntegrityFile = device.UpdateIntegrityFile,
                 KeyboxFile = device.UpdateKeyboxFile,
                 IntegrityEnabled = device.UpdateIntegrityEnabled,
-                KeyboxEnabled = device.UpdateKeyboxEnabled
+                KeyboxEnabled = device.UpdateKeyboxEnabled,
+                FakeDroidGuardSdkEnabled = device.FakeDroidGuardSdkEnabled
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
@@ -589,6 +591,7 @@ public sealed class DeviceStoreService : IDeviceStoreService
                 UpdateKeyboxFile = NormalizeValue(device.UpdateKeyboxFile),
                 UpdateIntegrityEnabled = device.UpdateIntegrityEnabled,
                 UpdateKeyboxEnabled = device.UpdateKeyboxEnabled,
+                FakeDroidGuardSdkEnabled = device.FakeDroidGuardSdkEnabled,
                 LocationMode = NormalizeValue(device.LocationMode),
                 LocationLatitude = NormalizeValue(device.LocationLatitude),
                 LocationLongitude = NormalizeValue(device.LocationLongitude),

@@ -7,6 +7,8 @@ namespace DeepDroidChanger.Services
         Task<string?> TryGetRandomSecurityPatchAsync(CancellationToken cancellationToken);
         Task UpdateIntegrityAsync(string serial, bool fromServer, string? jsonPath, CancellationToken cancellationToken);
         Task UpdateKeyboxAsync(string serial, bool fromServer, string? keyboxPath, CancellationToken cancellationToken);
+        Task ClearIntegrityAsync(string serial, CancellationToken cancellationToken);
+        Task ClearKeyboxAsync(string serial, CancellationToken cancellationToken);
         Task<PreparedIntegrityData> PrepareAsync(
             UpdateIntegrityDialogResult result,
             CancellationToken cancellationToken);

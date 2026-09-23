@@ -11,9 +11,12 @@
     <system:String x:Key="UpdateIntegrity_SourceServer">Use data from server</system:String>
     <system:String x:Key="UpdateIntegrity_TargetGroupHeader">Update targets</system:String>
     <system:String x:Key="UpdateIntegrity_TargetIntegrity">Integrity (PIF)</system:String>
+    <system:String x:Key="UpdateIntegrity_FakeDroidGuardSdk">Fake SDK DroidGuard</system:String>
     <system:String x:Key="UpdateIntegrity_TargetKeybox">Keybox</system:String>
     <system:String x:Key="UpdateIntegrity_IntegrityFileLabel">PIF JSON file path</system:String>
     <system:String x:Key="UpdateIntegrity_KeyboxFileLabel">Keybox XML file path</system:String>
     <system:String x:Key="UpdateIntegrity_BrowseButton">Browse...</system:String>
     <system:String x:Key="UpdateIntegrity_UpdateButton">Update</system:String>
+    <system:String x:Key="UpdateIntegrity_ClearIntegrityButton">Clear Integrity</system:String>
+    <system:String x:Key="UpdateIntegrity_ClearKeyboxButton">Clear Keybox</system:String>
 </ResourceDictionary>

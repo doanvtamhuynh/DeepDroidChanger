@@ -12,6 +12,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly ILocalizationService _localizationService;
         private readonly IFileSystemService _fileSystemService;
         private bool _isInitializing;
+        private UpdateIntegrityDialogAction _dialogAction = UpdateIntegrityDialogAction.Update;
 
         [ObservableProperty]
         private string _deviceSerial = string.Empty;
@@ -36,6 +37,9 @@ namespace DeepDroidChanger.ViewModels
 
         [ObservableProperty]
         private bool _updateKeyboxEnabled = true;
+
+        [ObservableProperty]
+        private bool _fakeDroidGuardSdkEnabled;
 
         [ObservableProperty]
         private string _updateIntegrityFile = string.Empty;
@@ -66,6 +70,7 @@ namespace DeepDroidChanger.ViewModels
                 config.UpdateIntegrityFromServer,
                 config.UpdateIntegrityEnabled,
                 config.UpdateKeyboxEnabled,
+                config.FakeDroidGuardSdkEnabled,
                 config.UpdateIntegrityFile,
                 config.UpdateKeyboxFile);
         }
@@ -77,6 +82,7 @@ namespace DeepDroidChanger.ViewModels
                 config.FromServer,
                 config.IntegrityEnabled,
                 config.KeyboxEnabled,
+                config.FakeDroidGuardSdkEnabled,
                 config.IntegrityFile,
                 config.KeyboxFile);
         }
@@ -85,6 +91,7 @@ namespace DeepDroidChanger.ViewModels
             bool configuredFromServer,
             bool configuredIntegrityEnabled,
             bool configuredKeyboxEnabled,
+            bool configuredFakeDroidGuardSdkEnabled,
             string? integrityFile,
             string? keyboxFile)
         {
@@ -114,12 +121,15 @@ namespace DeepDroidChanger.ViewModels
                 }
             }
 
+            bool fakeDroidGuardSdkEnabled =
+                configuredFakeDroidGuardSdkEnabled && updateIntegrityEnabled;
             var shouldSaveSanitizedPaths =
                 !string.Equals(integrityFile?.Trim() ?? string.Empty, updateIntegrityFile, StringComparison.Ordinal) ||
                 !string.Equals(keyboxFile?.Trim() ?? string.Empty, updateKeyboxFile, StringComparison.Ordinal) ||
                 configuredFromServer != updateIntegrityFromServer ||
                 configuredIntegrityEnabled != updateIntegrityEnabled ||
-                configuredKeyboxEnabled != updateKeyboxEnabled;
+                configuredKeyboxEnabled != updateKeyboxEnabled ||
+                configuredFakeDroidGuardSdkEnabled != fakeDroidGuardSdkEnabled;
 
             _isInitializing = true;
             try
@@ -129,6 +139,7 @@ namespace DeepDroidChanger.ViewModels
                 UpdateKeyboxFile = updateKeyboxFile;
                 UpdateIntegrityEnabled = updateIntegrityEnabled;
                 UpdateKeyboxEnabled = updateKeyboxEnabled;
+                FakeDroidGuardSdkEnabled = fakeDroidGuardSdkEnabled;
                 UpdateDeviceInfoText();
             }
             finally
@@ -157,10 +168,15 @@ namespace DeepDroidChanger.ViewModels
 
         partial void OnUpdateIntegrityEnabledChanged(bool value)
         {
+            if (!value)
+                FakeDroidGuardSdkEnabled = false;
+
             OnPropertyChanged(nameof(IsIntegrityFilePickerEnabled));
             UpdateCommand.NotifyCanExecuteChanged();
             NotifySettingsChanged();
         }
+
+        partial void OnFakeDroidGuardSdkEnabledChanged(bool value) => NotifySettingsChanged();
 
         partial void OnUpdateKeyboxEnabledChanged(bool value)
         {
@@ -234,7 +250,9 @@ namespace DeepDroidChanger.ViewModels
                 UpdateIntegrityEnabled,
                 UpdateKeyboxEnabled,
                 UpdateIntegrityFile?.Trim() ?? string.Empty,
-                UpdateKeyboxFile?.Trim() ?? string.Empty
+                UpdateKeyboxFile?.Trim() ?? string.Empty,
+                FakeDroidGuardSdkEnabled,
+                _dialogAction
             );
         }
 
@@ -257,8 +275,28 @@ namespace DeepDroidChanger.ViewModels
         [RelayCommand(CanExecute = nameof(CanUpdate))]
         private Task UpdateAsync()
         {
-            CloseRequested?.Invoke(this, true);
+            CloseWithAction(UpdateIntegrityDialogAction.Update);
             return Task.CompletedTask;
+        }
+
+        [RelayCommand]
+        private Task ClearIntegrityAsync()
+        {
+            CloseWithAction(UpdateIntegrityDialogAction.ClearIntegrity);
+            return Task.CompletedTask;
+        }
+
+        [RelayCommand]
+        private Task ClearKeyboxAsync()
+        {
+            CloseWithAction(UpdateIntegrityDialogAction.ClearKeybox);
+            return Task.CompletedTask;
+        }
+
+        private void CloseWithAction(UpdateIntegrityDialogAction action)
+        {
+            _dialogAction = action;
+            CloseRequested?.Invoke(this, true);
         }
 
         private void NotifySettingsChanged()

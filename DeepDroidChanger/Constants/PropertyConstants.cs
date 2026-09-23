@@ -8,6 +8,11 @@ public static class PropertyConstants
     public const string Latitude = "persist.props.config.location.latitude";
     public const string Longitude = "persist.props.config.location.longitude";
 
+    public static class Keybox
+    {
+        public const string Enabled = "persist.props.config.keybox.enabled";
+    }
+
     public static class Runtime
     {
         public const string ProductBrand = "ro.product.brand";
@@ -76,6 +81,8 @@ public static class PropertyConstants
     {
         private const string Prefix = "persist.props.config.integrity.";
 
+        public const string Enabled = Prefix + "enabled";
+        public const string DroidGuardSdk = Prefix + "droidguard.sdk";
         public const string Brand = Prefix + "BRAND";
         public const string Device = Prefix + "DEVICE";
         public const string DeviceInitialSdkInt = Prefix + "DEVICE_INITIAL_SDK_INT";

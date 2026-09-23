@@ -7,4 +7,5 @@ public sealed class DeviceUpdateIntegrityConfig
     public string KeyboxFile { get; set; } = string.Empty;
     public bool IntegrityEnabled { get; set; } = true;
     public bool KeyboxEnabled { get; set; } = true;
+    public bool FakeDroidGuardSdkEnabled { get; set; }
 }
