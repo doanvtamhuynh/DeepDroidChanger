@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:String x:Key="BackupDevice_WindowTitle">Sao lưu thiết bị</sys:String>
+    <sys:String x:Key="BackupDevice_Header">Cấu hình sao lưu thiết bị</sys:String>
+    <sys:String x:Key="BackupDevice_Subtitle">Tạo tệp lưu trữ .ddcbak đã được kiểm tra. Giá trị nhạy cảm chỉ được lưu bên trong tệp.</sys:String>
+    <sys:String x:Key="BackupDevice_ComponentsHeader">Thành phần sao lưu</sys:String>
+    <sys:String x:Key="BackupDevice_DeviceProperties">Thuộc tính thiết bị và cấu hình thay đổi</sys:String>
+    <sys:String x:Key="BackupDevice_ManagedSettings">Cài đặt hệ thống được quản lý</sys:String>
+    <sys:String x:Key="BackupDevice_UserAppData">Dữ liệu ứng dụng người dùng</sys:String>
+    <sys:String x:Key="BackupDevice_ExperimentalHeader">Thành phần thử nghiệm</sys:String>
+    <sys:String x:Key="BackupDevice_ExperimentalWarning">Các mục này có thể chứa dữ liệu tài khoản, định danh hoặc integrity. Chỉ chọn khi cần.</sys:String>
+    <sys:String x:Key="BackupDevice_Keybox">Keybox</sys:String>
+    <sys:String x:Key="BackupDevice_Ssaid">SSAID</sys:String>
+    <sys:String x:Key="BackupDevice_GoogleAppData">Dữ liệu ứng dụng Google</sys:String>
+    <sys:String x:Key="BackupDevice_GoogleAccountState">Trạng thái tài khoản Google</sys:String>
+    <sys:String x:Key="BackupDevice_DestinationHeader">Thư mục lưu</sys:String>
+    <sys:String x:Key="BackupDevice_Browse">Duyệt...</sys:String>
+    <sys:String x:Key="BackupDevice_DefaultLocationHint">Để trống để dùng {0}</sys:String>
+    <sys:String x:Key="BackupDevice_DestinationTooltip">Chọn nơi lưu tệp .ddcbak.</sys:String>
+    <sys:String x:Key="BackupDevice_DestinationInvalid">Nhập đường dẫn thư mục hợp lệ, không phải đường dẫn tới tệp.</sys:String>
+    <sys:String x:Key="BackupDevice_Cancel">Hủy</sys:String>
+    <sys:String x:Key="BackupDevice_Start">Bắt đầu sao lưu</sys:String>
+    <sys:String x:Key="BackupDevice_BrowseFolderTitle">Chọn thư mục sao lưu</sys:String>
+    <sys:String x:Key="BackupDevice_Action">Sao lưu thiết bị</sys:String>
+    <sys:String x:Key="BackupDevice_ActionTooltip">Sao lưu dữ liệu thiết bị đã chọn thành tệp .ddcbak.</sys:String>
+</ResourceDictionary>

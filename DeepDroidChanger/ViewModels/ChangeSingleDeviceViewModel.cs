@@ -1,3 +1,4 @@
+using System.IO;
 using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Helpers;
@@ -25,7 +26,9 @@ namespace DeepDroidChanger.ViewModels
         private readonly IProxyService _adbProxyService;
         private readonly IProxyWorkflowService _proxyWorkflowService;
         private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
+        private readonly IBackupConfigDialogService _backupConfigDialogService;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
+        private readonly IDeviceBackupService _deviceBackupService;
         private readonly IFilePickerDialogService _filePickerDialogService;
         private readonly IPackageInstallService _packageInstallService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
@@ -109,7 +112,9 @@ namespace DeepDroidChanger.ViewModels
             IProxyService adbProxyService,
             IProxyWorkflowService proxyWorkflowService,
             IUpdateIntegrityDialogService updateIntegrityDialogService,
+            IBackupConfigDialogService backupConfigDialogService,
             IDeviceIntegrityService deviceIntegrityService,
+            IDeviceBackupService deviceBackupService,
             IFilePickerDialogService filePickerDialogService,
             IPackageInstallService packageInstallService,
             IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
@@ -145,7 +150,9 @@ namespace DeepDroidChanger.ViewModels
             _adbProxyService = adbProxyService;
             _proxyWorkflowService = proxyWorkflowService;
             _updateIntegrityDialogService = updateIntegrityDialogService;
+            _backupConfigDialogService = backupConfigDialogService;
             _deviceIntegrityService = deviceIntegrityService;
+            _deviceBackupService = deviceBackupService;
             _filePickerDialogService = filePickerDialogService;
             _packageInstallService = packageInstallService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
@@ -2167,6 +2174,76 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task BackupSingleDeviceAsync()
+        {
+            DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
+            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
+                return;
+
+            IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
+                selectedDevice!,
+                DeviceActionKind.BackupDevice);
+            if (operation == null)
+                return;
+
+            using (operation)
+            {
+                DeviceRowViewModel device = selectedDevice!;
+                CancellationToken cancellationToken = operation.CancellationToken;
+                SetDeviceLog(device, "Log_BackupDeviceOpening");
+
+                try
+                {
+                    DeviceBackupOptions? options = await _backupConfigDialogService
+                        .ShowBackupConfigAsync(cancellationToken)
+                        .ConfigureAwait(true);
+                    if (options == null)
+                    {
+                        await SetDialogDismissalLogAsync(device, operation);
+                        return;
+                    }
+
+                    var progress = new Progress<DeviceBackupProgress>(backupProgress =>
+                    {
+                        string? resourceKey = backupProgress.Stage switch
+                        {
+                            DeviceBackupStage.Preparing => "Log_BackupDevicePreparing",
+                            DeviceBackupStage.ReadingProperties => "Log_BackupDeviceReadingProperties",
+                            DeviceBackupStage.ReadingSettings => "Log_BackupDeviceReadingSettings",
+                            DeviceBackupStage.BackingUpApps => "Log_BackupDeviceBackingUpApps",
+                            DeviceBackupStage.BackingUpOptionalData => "Log_BackupDeviceBackingUpOptionalData",
+                            DeviceBackupStage.Finalizing => "Log_BackupDeviceFinalizing",
+                            _ => null
+                        };
+                        if (resourceKey != null)
+                            SetDeviceLog(device, resourceKey);
+                    });
+                    DeviceBackupResult result = await _deviceBackupService
+                        .BackupAsync(device.Serial, options, progress, cancellationToken)
+                        .ConfigureAwait(true);
+                    SetDeviceLog(
+                        device,
+                        "Log_BackupDeviceSuccessFormat",
+                        Path.GetFileName(result.ArchivePath));
+                }
+                catch (OperationCanceledException)
+                {
+                    await SetOperationCancellationLogAsync(
+                        device,
+                        operation,
+                        requiresOnline: true);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(
+                        "Backup failed for device {Serial} ({ExceptionType}).",
+                        device.Serial,
+                        exception.GetType().Name);
+                    SetDeviceLog(device, "Log_BackupDeviceFailed");
+                }
+            }
+        }
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task UpdateSingleDeviceIntegrityAsync()
         {

@@ -1007,6 +1007,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                             <Button x:Name="RandomDeviceButton"
@@ -1254,6 +1255,17 @@
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionInstallApk}"
                                                Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                </Grid>
+                            </Button>
+                            <Button Grid.Row="7"
+                                    Grid.Column="0"
+                                    Command="{Binding BackupSingleDeviceCommand}"
+                                    ToolTip="{DynamicResource BackupDevice_ActionTooltip}"
+                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="ArchiveArrowDown" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1" Text="{DynamicResource BackupDevice_Action}" Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="5"

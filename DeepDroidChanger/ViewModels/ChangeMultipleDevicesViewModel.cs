@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -36,11 +37,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IChangeLocationDialogService _changeLocationDialogService;
     private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
     private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
+    private readonly IBackupConfigDialogService _backupConfigDialogService;
     private readonly IFakeProxyBatchDialogService _fakeProxyBatchDialogService;
     private readonly IProxyService _proxyService;
     private readonly IProxyWorkflowService _proxyWorkflowService;
     private readonly IFilePickerDialogService _filePickerDialogService;
     private readonly IPackageInstallService _packageInstallService;
+    private readonly IDeviceBackupService _deviceBackupService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
     private readonly IRandomDeviceService _randomDeviceService;
@@ -154,11 +157,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IChangeLocationDialogService changeLocationDialogService,
         IChangeTimezoneDialogService changeTimezoneDialogService,
         IUpdateIntegrityDialogService updateIntegrityDialogService,
+        IBackupConfigDialogService backupConfigDialogService,
         IFakeProxyBatchDialogService fakeProxyBatchDialogService,
         IProxyService proxyService,
         IProxyWorkflowService proxyWorkflowService,
         IFilePickerDialogService filePickerDialogService,
         IPackageInstallService packageInstallService,
+        IDeviceBackupService deviceBackupService,
         IDeviceActionEligibilityService deviceActionEligibilityService,
         IDeviceActionFeedbackService deviceActionFeedbackService,
         IClipboardService clipboardService,
@@ -184,11 +189,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _changeLocationDialogService = changeLocationDialogService;
         _changeTimezoneDialogService = changeTimezoneDialogService;
         _updateIntegrityDialogService = updateIntegrityDialogService;
+        _backupConfigDialogService = backupConfigDialogService;
         _fakeProxyBatchDialogService = fakeProxyBatchDialogService;
         _proxyService = proxyService;
         _proxyWorkflowService = proxyWorkflowService;
         _filePickerDialogService = filePickerDialogService;
         _packageInstallService = packageInstallService;
+        _deviceBackupService = deviceBackupService;
         _localizationService = localizationService;
         _multipleDeviceConfigService = multipleDeviceConfigService;
         _randomDeviceService = randomDeviceService;
@@ -747,6 +754,19 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private Task BackupMultipleDevicesAsync()
+    {
+        DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
+        if (selectedDevices.Length == 0)
+            return Task.CompletedTask;
+
+        return StartTrackedBatchWorkflow(
+            (sessionId, workflowCancellation) => RunSelectedBackupDeviceWorkflowAsync(
+                selectedDevices,
+                sessionId,
+                workflowCancellation));
+    }
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task StartMultipleDevicesFakeProxyAsync()
     {
         return StartTrackedBatchWorkflow(RunSelectedFakeProxyWorkflowAsync);
@@ -971,6 +991,149 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
     }
 
+    private async Task RunSelectedBackupDeviceWorkflowAsync(
+        IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        try
+        {
+            targets = await CreateReservedEligibleTargetsAsync(
+                    selectedDevices,
+                    cancellationToken,
+                    DeviceActionKind.BackupDevice,
+                    sessionId)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            DeviceBackupOptions? options = await _backupConfigDialogService
+                .ShowBackupConfigAsync(cancellationToken)
+                .ConfigureAwait(true);
+            if (options == null)
+            {
+                await SetBatchDialogDismissalResultsAsync(targets)
+                    .ConfigureAwait(true);
+                return;
+            }
+
+            Task[] operations = targets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => ExecuteBackupDeviceBatchTargetAsync(target, options)))
+                .ToArray();
+            await Task.WhenAll(operations).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Multiple Device backup workflow failed ({ExceptionType}).",
+                exception.GetType().Name);
+            await RunOnUiContextAsync(() =>
+            {
+                foreach (BatchActionTarget target in targets)
+                    SetTargetLog(target, "Log_BackupDeviceFailed");
+            }).ConfigureAwait(true);
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+        }
+    }
+
+    private async Task ExecuteBackupDeviceBatchTargetAsync(
+        BatchActionTarget target,
+        DeviceBackupOptions options)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            target.OperationToken,
+            target.InvalidationToken);
+        var progress = new Progress<DeviceBackupProgress>(backupProgress =>
+        {
+            string? resourceKey = backupProgress.Stage switch
+            {
+                DeviceBackupStage.Preparing => "Log_BackupDevicePreparing",
+                DeviceBackupStage.ReadingProperties => "Log_BackupDeviceReadingProperties",
+                DeviceBackupStage.ReadingSettings => "Log_BackupDeviceReadingSettings",
+                DeviceBackupStage.BackingUpApps => "Log_BackupDeviceBackingUpApps",
+                DeviceBackupStage.BackingUpOptionalData => "Log_BackupDeviceBackingUpOptionalData",
+                DeviceBackupStage.Finalizing => "Log_BackupDeviceFinalizing",
+                _ => null
+            };
+            if (resourceKey != null)
+                SetTargetLog(target, resourceKey);
+        });
+
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        "Log_BackupDevicePreparing"))
+                    .ConfigureAwait(false);
+                DeviceBackupResult result = await _deviceBackupService
+                    .BackupAsync(
+                        target.Serial,
+                        options,
+                        progress,
+                        targetCancellation.Token)
+                    .ConfigureAwait(false);
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        "Log_BackupDeviceSuccessFormat",
+                        Path.GetFileName(result.ArchivePath)))
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await SetTargetCancellationResultAsync(target)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                "Backup failed for device {Serial} ({ExceptionType}).",
+                target.Serial,
+                exception.GetType().Name);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_BackupDeviceFailed"))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
     private async Task RunSelectedInstallPackageWorkflowAsync(
         IReadOnlyList<DeviceRowViewModel> selectedDevices,
         Guid sessionId,

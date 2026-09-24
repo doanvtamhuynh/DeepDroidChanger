@@ -225,4 +225,13 @@
     <sys:String x:Key="ViewDevice_InstallFileInvalid">Hãy chọn một file APK hoặc XAPK</sys:String>
     <sys:String x:Key="ViewDevice_InstallSucceeded">Cài đặt gói hoàn tất</sys:String>
     <sys:String x:Key="ViewDevice_InstallFailed">Cài đặt gói thất bại</sys:String>
-</ResourceDictionary>
+    <sys:String x:Key="DeviceAction_Name_BackupDevice">Sao lưu thiết bị</sys:String>
+    <sys:String x:Key="Log_BackupDeviceOpening">Đang mở cấu hình sao lưu thiết bị...</sys:String>
+    <sys:String x:Key="Log_BackupDevicePreparing">Đang chuẩn bị sao lưu...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceReadingProperties">Đang đọc thuộc tính thiết bị được quản lý...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceReadingSettings">Đang đọc cài đặt hệ thống được quản lý...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceBackingUpApps">Đang sao lưu dữ liệu ứng dụng...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceBackingUpOptionalData">Đang sao lưu dữ liệu tùy chọn...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceFinalizing">Đang kiểm tra tệp sao lưu...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceSuccessFormat">Đã sao lưu: {0}</sys:String>
+    <sys:String x:Key="Log_BackupDeviceFailed">Sao lưu thất bại. Hãy kiểm tra kết nối thiết bị và thư mục lưu.</sys:String></ResourceDictionary>

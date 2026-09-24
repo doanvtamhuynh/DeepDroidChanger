@@ -225,4 +225,13 @@
     <sys:String x:Key="ViewDevice_InstallFileInvalid">Choose one APK or XAPK file</sys:String>
     <sys:String x:Key="ViewDevice_InstallSucceeded">Package installation completed</sys:String>
     <sys:String x:Key="ViewDevice_InstallFailed">Package installation failed</sys:String>
-</ResourceDictionary>
+    <sys:String x:Key="DeviceAction_Name_BackupDevice">Backup Device</sys:String>
+    <sys:String x:Key="Log_BackupDeviceOpening">Opening Backup Device configuration...</sys:String>
+    <sys:String x:Key="Log_BackupDevicePreparing">Preparing backup...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceReadingProperties">Reading managed device properties...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceReadingSettings">Reading managed system settings...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceBackingUpApps">Backing up app data...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceBackingUpOptionalData">Backing up optional data...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceFinalizing">Validating backup archive...</sys:String>
+    <sys:String x:Key="Log_BackupDeviceSuccessFormat">Backup completed: {0}</sys:String>
+    <sys:String x:Key="Log_BackupDeviceFailed">Backup failed. Check device connection and destination folder.</sys:String></ResourceDictionary>

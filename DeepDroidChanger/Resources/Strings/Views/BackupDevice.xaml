@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <sys:String x:Key="BackupDevice_WindowTitle">Backup Device</sys:String>
+    <sys:String x:Key="BackupDevice_Header">Configure device backup</sys:String>
+    <sys:String x:Key="BackupDevice_Subtitle">Create a validated .ddcbak archive. Sensitive values are stored only inside the archive.</sys:String>
+    <sys:String x:Key="BackupDevice_ComponentsHeader">Backup components</sys:String>
+    <sys:String x:Key="BackupDevice_DeviceProperties">Device and Change Properties</sys:String>
+    <sys:String x:Key="BackupDevice_ManagedSettings">Managed System Settings</sys:String>
+    <sys:String x:Key="BackupDevice_UserAppData">User App Data</sys:String>
+    <sys:String x:Key="BackupDevice_ExperimentalHeader">Experimental components</sys:String>
+    <sys:String x:Key="BackupDevice_ExperimentalWarning">These components may contain account, identity, or integrity data. Include them only when needed.</sys:String>
+    <sys:String x:Key="BackupDevice_Keybox">Keybox</sys:String>
+    <sys:String x:Key="BackupDevice_Ssaid">SSAID</sys:String>
+    <sys:String x:Key="BackupDevice_GoogleAppData">Google App Data</sys:String>
+    <sys:String x:Key="BackupDevice_GoogleAccountState">Google Account State</sys:String>
+    <sys:String x:Key="BackupDevice_DestinationHeader">Destination folder</sys:String>
+    <sys:String x:Key="BackupDevice_Browse">Browse...</sys:String>
+    <sys:String x:Key="BackupDevice_DefaultLocationHint">Leave blank to use {0}</sys:String>
+    <sys:String x:Key="BackupDevice_DestinationTooltip">Choose where the .ddcbak archive will be saved.</sys:String>
+    <sys:String x:Key="BackupDevice_DestinationInvalid">Enter a valid folder path that is not a file.</sys:String>
+    <sys:String x:Key="BackupDevice_Cancel">Cancel</sys:String>
+    <sys:String x:Key="BackupDevice_Start">Start Backup</sys:String>
+    <sys:String x:Key="BackupDevice_BrowseFolderTitle">Choose backup folder</sys:String>
+    <sys:String x:Key="BackupDevice_Action">Backup Device</sys:String>
+    <sys:String x:Key="BackupDevice_ActionTooltip">Back up selected device data to a validated .ddcbak archive.</sys:String>
+</ResourceDictionary>

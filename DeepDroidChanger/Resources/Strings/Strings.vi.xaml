@@ -13,6 +13,7 @@
         <ResourceDictionary Source="Views/FakeProxy.vi.xaml" />
         <ResourceDictionary Source="Views/FakeProxyBatch.vi.xaml" />
         <ResourceDictionary Source="Views/UpdateIntegrity.vi.xaml" />
+        <ResourceDictionary Source="Views/BackupDevice.vi.xaml" />
         <ResourceDictionary Source="Views/DeleteDeviceConfirmation.vi.xaml" />
         <ResourceDictionary Source="Views/ChangeDeviceConfirmation.vi.xaml" />
         <ResourceDictionary Source="Views/ConfirmationDialog.vi.xaml" />
