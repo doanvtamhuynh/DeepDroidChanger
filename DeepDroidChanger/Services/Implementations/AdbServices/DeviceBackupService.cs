@@ -152,8 +152,8 @@ public sealed class DeviceBackupService : IDeviceBackupService
                         FormatVersion: 1,
                         CreatedAtUtc: createdAtUtc,
                         SourceSerial: serial,
-                        SourceDeviceRole: null,
-                        AndroidSdkVersion: null,
+                        SourceDeviceRole: context.SourceDeviceRole,
+                        AndroidSdkVersion: context.AndroidSdkVersion,
                         SelectedComponents: new BackupSelectedComponents(
                             options.IncludeDeviceProperties,
                             options.IncludeManagedSystemSettings,
@@ -233,6 +233,17 @@ public sealed class DeviceBackupService : IDeviceBackupService
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            context.SourceDeviceRole = await ReadSourceDeviceRoleAsync(
+                    serial,
+                    context.Warnings,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            context.AndroidSdkVersion = await ReadAndroidSdkVersionAsync(
+                    serial,
+                    context.Warnings,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
             bool captureProperties = options.IncludeDeviceProperties || options.IncludeKeybox;
             if (captureProperties)
             {
@@ -273,11 +284,9 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 {
                     throw;
                 }
-                catch (Exception exception) when (options.IncludeKeybox)
+                catch (Exception exception) when (!options.IncludeDeviceProperties && options.IncludeKeybox)
                 {
                     propertyGateReady = false;
-                    if (options.IncludeDeviceProperties)
-                        context.PropertiesStatus = "partial";
                     context.KeyboxEnabledPropertyPresent = null;
                     context.KeyboxEnabledPropertyState = "read_failed";
                     context.Warnings.Add("keybox_enabled_property_read_failed");
@@ -340,9 +349,17 @@ public sealed class DeviceBackupService : IDeviceBackupService
                                 context.KeyboxEnabledPropertyState = "missing";
                             }
                         }
-                        else if (value.Length == 0 && !isKeyboxProperty)
+                        else if (value.Length == 0)
                         {
-                            context.PropertyStatuses.Add(new(propertyName, "skipped_empty", "value_empty"));
+                            context.PropertyStatuses.Add(new(
+                                propertyName,
+                                isKeyboxProperty ? "empty" : "skipped_empty",
+                                "value_empty"));
+                            if (options.IncludeKeybox && isKeyboxProperty)
+                            {
+                                context.KeyboxEnabledPropertyPresent = true;
+                                context.KeyboxEnabledPropertyState = "empty";
+                            }
                         }
                         else
                         {
@@ -740,31 +757,6 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 cancellationToken)
             .ConfigureAwait(false);
         string manifestPath = $"{packageGroup}/{packageName}/manifest.json";
-        IReadOnlyList<string> installedPackages = await _devicePackageService
-            .GetInstalledPackagesAsync(serial, cancellationToken)
-            .ConfigureAwait(false);
-        if (!installedPackages.Contains(packageName, StringComparer.Ordinal))
-        {
-            var skippedManifest = new PackageBackupManifest(
-                packageGroup,
-                packageName,
-                "skipped_missing",
-                "package_not_installed",
-                metadata.VersionCode,
-                metadata.SourceUid,
-                metadata.TargetSdk,
-                metadata.SigningCertificateSha256,
-                [],
-                null,
-                []);
-            await writer.AddJsonEntryAsync(
-                    manifestPath,
-                    skippedManifest,
-                    includeChecksum: false,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            return skippedManifest;
-        }
 
         await _adb.ForceStopPackageAsync(serial, packageName, cancellationToken)
             .ConfigureAwait(false);
@@ -1144,6 +1136,78 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 serial,
                 exception.GetType().Name);
             return new(null, null, null, null);
+        }
+    }
+
+    private async Task<string?> ReadSourceDeviceRoleAsync(
+        string serial,
+        List<string> warnings,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            string value = await _adb.GetPropertyAsync(
+                    serial,
+                    PropertyConstants.DeepDroidDevice,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            string normalized = value.Trim().ToLowerInvariant();
+            if (normalized is "sargo" or "starlte" or "tissot")
+                return normalized;
+
+            warnings.Add(string.IsNullOrWhiteSpace(normalized)
+                ? "source_device_role_unavailable"
+                : "source_device_role_unrecognized");
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add("source_device_role_unavailable");
+            _logger.LogWarning(
+                "The source device role could not be read on {Serial} ({ExceptionType}).",
+                serial,
+                exception.GetType().Name);
+            return null;
+        }
+    }
+
+    private async Task<int?> ReadAndroidSdkVersionAsync(
+        string serial,
+        List<string> warnings,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            string value = await _adb.GetPropertyAsync(
+                    serial,
+                    PropertyConstants.Runtime.AndroidSdkVersion,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (int.TryParse(value, out int sdkVersion) && sdkVersion > 0)
+                return sdkVersion;
+
+            warnings.Add("android_sdk_version_unavailable");
+            _logger.LogWarning(
+                "The Android SDK version was unavailable on {Serial}.",
+                serial);
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add("android_sdk_version_unavailable");
+            _logger.LogWarning(
+                "The Android SDK version could not be read on {Serial} ({ExceptionType}).",
+                serial,
+                exception.GetType().Name);
+            return null;
         }
     }
 
@@ -1624,6 +1688,8 @@ public sealed class DeviceBackupService : IDeviceBackupService
 
     private sealed class BackupExecutionContext
     {
+        public string? SourceDeviceRole { get; set; }
+        public int? AndroidSdkVersion { get; set; }
         public string PropertiesStatus { get; set; } = "not_selected";
         public bool? KeyboxEnabledPropertyPresent { get; set; }
         public string? KeyboxEnabledPropertyState { get; set; }

@@ -26,6 +26,7 @@ public static class PropertyConstants
         public const string ProductDevice = "ro.product.device";
         public const string ProductName = "ro.product.name";
         public const string AndroidRelease = "ro.build.version.release";
+        public const string AndroidSdkVersion = "ro.build.version.sdk";
         public const string BuildFingerprint = "ro.build.fingerprint";
         public const string BuildId = "ro.build.id";
         public const string SecurityPatch = "ro.build.version.security_patch";
