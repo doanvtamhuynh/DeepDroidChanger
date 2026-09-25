@@ -234,4 +234,5 @@
     <sys:String x:Key="Log_BackupDeviceBackingUpOptionalData">Đang sao lưu dữ liệu tùy chọn...</sys:String>
     <sys:String x:Key="Log_BackupDeviceFinalizing">Đang kiểm tra tệp sao lưu...</sys:String>
     <sys:String x:Key="Log_BackupDeviceSuccessFormat">Đã sao lưu: {0}</sys:String>
-    <sys:String x:Key="Log_BackupDeviceFailed">Sao lưu thất bại. Hãy kiểm tra kết nối thiết bị và thư mục lưu.</sys:String></ResourceDictionary>
+    <sys:String x:Key="Log_BackupDeviceFailedFormat">Sao lưu thất bại: {0}</sys:String>
+</ResourceDictionary>

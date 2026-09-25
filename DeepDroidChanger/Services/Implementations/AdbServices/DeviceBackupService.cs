@@ -25,8 +25,8 @@ public sealed class DeviceBackupService : IDeviceBackupService
     private static readonly Regex SourceUidPattern = new(
         @"\buserId=(\d+)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex SigningDigestPattern = new(
-        @"\bsigningCertificateSha256=([A-Fa-f0-9]{64})\b",
+    private static readonly Regex SigningDigestLabelPattern = new(
+        @"(?im)\b(?:signingCertificateSha256|signing[ \t_-]*certificate[ \t_-]*sha[ \t_-]*256|signer(?:'s)?[ \t_-]*(?:certificate|cert)(?:'s)?[ \t_-]*sha[ \t_-]*256(?:[ \t_-]*digest)?|certificate[ \t_-]*sha[ \t_-]*256(?:[ \t_-]*digest)?|sha[ \t_-]*256[ \t_-]*(?:signing|certificate)[ \t_-]*digest)\b[ \t]*[:=][ \t]*(?<value>[^\r\n,;]+)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -162,6 +162,7 @@ public sealed class DeviceBackupService : IDeviceBackupService
                             options.IncludeSsaid,
                             options.IncludeGoogleAppData,
                             options.IncludeGoogleAccountState),
+                        Keybox: context.KeyboxState,
                         PropertiesStatus: context.PropertiesStatus,
                         PropertyStatuses: context.PropertyStatuses,
                         SettingsStatus: context.SettingsStatus,
@@ -221,6 +222,8 @@ public sealed class DeviceBackupService : IDeviceBackupService
         IProgress<DeviceBackupProgress>? progress,
         CancellationToken cancellationToken)
     {
+        bool debugGateTouched = false;
+        Exception? backupFailure = null;
         try
         {
             await RunRequiredShellAsync(
@@ -230,77 +233,166 @@ public sealed class DeviceBackupService : IDeviceBackupService
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            if (options.IncludeDeviceProperties)
+            bool captureProperties = options.IncludeDeviceProperties || options.IncludeKeybox;
+            if (captureProperties)
             {
-                progress?.Report(new(DeviceBackupStage.ReadingProperties));
-                context.PropertiesStatus = "backed_up";
+                if (options.IncludeDeviceProperties)
+                    progress?.Report(new(DeviceBackupStage.ReadingProperties));
+                context.PropertiesStatus = options.IncludeDeviceProperties
+                    ? "backed_up"
+                    : "keybox_property_only";
                 var values = new SortedDictionary<string, string>(StringComparer.Ordinal);
                 string missingSentinel = $"__DDC_BACKUP_MISSING_{Guid.NewGuid():N}__";
+                IEnumerable<string> propertyNames = options.IncludeDeviceProperties
+                    ? ManagedDevicePropertyCatalog.Properties
+                    : [PropertyConstants.Keybox.Enabled];
 
-                await _adb.SetPropertyAsync(
-                        serial,
-                        PropertyConstants.Debug.Enabled,
-                        "true",
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                string debugValue = await ReadPropertyValueAsync(
-                        serial,
-                        PropertyConstants.Debug.Enabled,
-                        missingSentinel,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                if (!string.Equals(debugValue, "true", StringComparison.OrdinalIgnoreCase))
+                bool propertyGateReady = true;
+                debugGateTouched = true;
+                try
                 {
-                    throw new InvalidOperationException(
-                        "The persisted property debug gate could not be enabled and verified.");
-                }
-
-                foreach (string propertyName in ManagedDevicePropertyCatalog.Properties)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    string value = await ReadPropertyValueAsync(
+                    await _adb.SetPropertyAsync(
                             serial,
-                            propertyName,
+                            PropertyConstants.Debug.Enabled,
+                            "true",
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    string debugValue = await ReadPropertyValueAsync(
+                            serial,
+                            PropertyConstants.Debug.Enabled,
                             missingSentinel,
                             cancellationToken)
                         .ConfigureAwait(false);
-                    if (value == missingSentinel)
+                    if (!string.Equals(debugValue, "true", StringComparison.OrdinalIgnoreCase))
                     {
-                        context.PropertyStatuses.Add(new(propertyName, "skipped_missing", "property_not_present"));
+                        throw new InvalidOperationException(
+                            "The persisted property debug gate could not be enabled and verified.");
                     }
-                    else if (value.Length == 0)
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception) when (options.IncludeKeybox)
+                {
+                    propertyGateReady = false;
+                    if (options.IncludeDeviceProperties)
+                        context.PropertiesStatus = "partial";
+                    context.KeyboxEnabledPropertyPresent = null;
+                    context.KeyboxEnabledPropertyState = "read_failed";
+                    context.Warnings.Add("keybox_enabled_property_read_failed");
+                    _logger.LogWarning(
+                        "The Keybox enabled property could not be read on {Serial} ({ExceptionType}).",
+                        serial,
+                        exception.GetType().Name);
+                }
+
+                if (propertyGateReady)
+                {
+                    foreach (string propertyName in propertyNames)
                     {
-                        context.PropertyStatuses.Add(new(propertyName, "skipped_empty", "value_empty"));
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string value;
+                        try
+                        {
+                            value = await ReadPropertyValueAsync(
+                                    serial,
+                                    propertyName,
+                                    missingSentinel,
+                                    cancellationToken)
+                                .ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception exception) when (
+                            options.IncludeKeybox
+                            && string.Equals(
+                                propertyName,
+                                PropertyConstants.Keybox.Enabled,
+                                StringComparison.Ordinal))
+                        {
+                            context.KeyboxEnabledPropertyPresent = null;
+                            context.KeyboxEnabledPropertyState = "read_failed";
+                            context.PropertyStatuses.Add(new(
+                                propertyName,
+                                "read_failed",
+                                "property_read_failed"));
+                            context.Warnings.Add("keybox_enabled_property_read_failed");
+                            _logger.LogWarning(
+                                "The Keybox enabled property could not be read on {Serial} ({ExceptionType}).",
+                                serial,
+                                exception.GetType().Name);
+                            continue;
+                        }
+
+                        bool isKeyboxProperty = string.Equals(
+                            propertyName,
+                            PropertyConstants.Keybox.Enabled,
+                            StringComparison.Ordinal);
+                        if (value == missingSentinel)
+                        {
+                            context.PropertyStatuses.Add(new(propertyName, "skipped_missing", "property_not_present"));
+                            if (options.IncludeKeybox && isKeyboxProperty)
+                            {
+                                context.KeyboxEnabledPropertyPresent = false;
+                                context.KeyboxEnabledPropertyState = "missing";
+                            }
+                        }
+                        else if (value.Length == 0 && !isKeyboxProperty)
+                        {
+                            context.PropertyStatuses.Add(new(propertyName, "skipped_empty", "value_empty"));
+                        }
+                        else
+                        {
+                            values[propertyName] = value;
+                            context.PropertyStatuses.Add(new(propertyName, "backed_up", null));
+                            if (options.IncludeKeybox && isKeyboxProperty)
+                            {
+                                context.KeyboxEnabledPropertyPresent = true;
+                                context.KeyboxEnabledPropertyState = "backed_up";
+                            }
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    foreach (string propertyName in propertyNames)
                     {
-                        values[propertyName] = value;
-                        context.PropertyStatuses.Add(new(propertyName, "backed_up", null));
+                        context.PropertyStatuses.Add(new(
+                            propertyName,
+                            "read_failed",
+                            "debug_gate_unavailable"));
                     }
                 }
 
-                foreach (string propertyName in ManagedDevicePropertyCatalog.ExcludedProperties)
+                if (options.IncludeDeviceProperties)
                 {
-                    if (propertyName.StartsWith("persist.props.config.sim2.", StringComparison.Ordinal))
+                    foreach (string propertyName in ManagedDevicePropertyCatalog.ExcludedProperties)
                     {
-                        string legacyValue = await ReadPropertyValueAsync(
-                                serial,
-                                propertyName,
-                                missingSentinel,
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                        if (legacyValue != missingSentinel && legacyValue.Length > 0)
+                        if (propertyGateReady
+                            && propertyName.StartsWith("persist.props.config.sim2.", StringComparison.Ordinal))
                         {
-                            _logger.LogDebug(
-                                "Legacy property {PropertyName} is present and excluded from backup.",
-                                propertyName);
+                            string legacyValue = await ReadPropertyValueAsync(
+                                    serial,
+                                    propertyName,
+                                    missingSentinel,
+                                    cancellationToken)
+                                .ConfigureAwait(false);
+                            if (legacyValue != missingSentinel && legacyValue.Length > 0)
+                            {
+                                _logger.LogDebug(
+                                    "Legacy property {PropertyName} is present and excluded from backup.",
+                                    propertyName);
+                            }
                         }
-                    }
 
-                    context.PropertyStatuses.Add(new(
-                        propertyName,
-                        "excluded",
-                        "control_or_legacy_property"));
+                        context.PropertyStatuses.Add(new(
+                            propertyName,
+                            "excluded",
+                            "control_or_legacy_property"));
+                    }
                 }
 
                 await writer.AddJsonEntryAsync(
@@ -437,11 +529,12 @@ public sealed class DeviceBackupService : IDeviceBackupService
                             cancellationToken)
                         .ConfigureAwait(false);
                     context.Packages.Add(package);
-                    backedUpGooglePackages++;
+                    if (string.Equals(package.Status, "backed_up", StringComparison.Ordinal))
+                        backedUpGooglePackages++;
                     context.OptionalComponents.Add(new(
                         $"google_app:{packageName}",
-                        "backed_up",
-                        null));
+                        package.Status,
+                        package.Reason));
                 }
 
                 context.OptionalComponents.Add(new(
@@ -465,7 +558,8 @@ public sealed class DeviceBackupService : IDeviceBackupService
                         keyboxPath,
                         cancellationToken)
                     .ConfigureAwait(false);
-                if (identity is null)
+                bool filePresent = identity is not null;
+                if (!filePresent)
                 {
                     context.OptionalComponents.Add(new(
                         "keybox",
@@ -485,6 +579,12 @@ public sealed class DeviceBackupService : IDeviceBackupService
                         .ConfigureAwait(false);
                     context.OptionalComponents.Add(new("keybox", "backed_up", null));
                 }
+
+                context.KeyboxState = new BackupKeyboxState(
+                    filePresent,
+                    PropertyConstants.Keybox.Enabled,
+                    context.KeyboxEnabledPropertyPresent,
+                    context.KeyboxEnabledPropertyState ?? "read_failed");
             }
             else
             {
@@ -593,10 +693,30 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 context.OptionalComponents.Add(new("googleAccountState", "not_selected", null));
             }
         }
+        catch (Exception exception)
+        {
+            backupFailure = exception;
+            throw;
+        }
         finally
         {
-            await CleanupRootOperationAsync(serial, remoteSessionPath)
-                .ConfigureAwait(false);
+            try
+            {
+                await CleanupRootOperationAsync(serial, remoteSessionPath, debugGateTouched)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception cleanupException)
+            {
+                if (backupFailure is null)
+                    throw;
+
+                backupFailure.Data["DeepDroidChanger.DeviceBackup.CleanupFailure"] = cleanupException;
+                _logger.LogError(
+                    cleanupException,
+                    "Device backup cleanup failed for {Serial} after the primary backup failure ({ExceptionType}).",
+                    serial,
+                    backupFailure.GetType().Name);
+            }
         }
     }
 
@@ -611,10 +731,42 @@ public sealed class DeviceBackupService : IDeviceBackupService
         string localTemporaryDirectory,
         CancellationToken cancellationToken)
     {
+        if (!IsValidPackageName(packageName))
+            throw new ArgumentException("The package name is invalid.", nameof(packageName));
+
         PackageMetadata metadata = await ReadPackageMetadataAsync(
                 serial,
                 packageName,
                 cancellationToken)
+            .ConfigureAwait(false);
+        string manifestPath = $"{packageGroup}/{packageName}/manifest.json";
+        IReadOnlyList<string> installedPackages = await _devicePackageService
+            .GetInstalledPackagesAsync(serial, cancellationToken)
+            .ConfigureAwait(false);
+        if (!installedPackages.Contains(packageName, StringComparer.Ordinal))
+        {
+            var skippedManifest = new PackageBackupManifest(
+                packageGroup,
+                packageName,
+                "skipped_missing",
+                "package_not_installed",
+                metadata.VersionCode,
+                metadata.SourceUid,
+                metadata.TargetSdk,
+                metadata.SigningCertificateSha256,
+                [],
+                null,
+                []);
+            await writer.AddJsonEntryAsync(
+                    manifestPath,
+                    skippedManifest,
+                    includeChecksum: false,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return skippedManifest;
+        }
+
+        await _adb.ForceStopPackageAsync(serial, packageName, cancellationToken)
             .ConfigureAwait(false);
         var pathStatuses = new List<BackupDataPathStatus>();
         var logicalAliases = new List<string>();
@@ -755,10 +907,11 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 .ConfigureAwait(false);
         }
 
-        string manifestPath = $"{packageGroup}/{packageName}/manifest.json";
         var manifest = new PackageBackupManifest(
             packageGroup,
             packageName,
+            "backed_up",
+            null,
             metadata.VersionCode,
             metadata.SourceUid,
             metadata.TargetSdk,
@@ -973,12 +1126,11 @@ public sealed class DeviceBackupService : IDeviceBackupService
             }
 
             string output = result.StandardOutput;
-            Match digest = SigningDigestPattern.Match(output);
             return new(
                 ParseLong(VersionCodePattern, output),
                 ParseLong(SourceUidPattern, output),
                 ParseInt(TargetSdkPattern, output),
-                digest.Success ? digest.Groups[1].Value.ToUpperInvariant() : null);
+                ParseSigningCertificateSha256(output));
         }
         catch (OperationCanceledException)
         {
@@ -993,6 +1145,60 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 exception.GetType().Name);
             return new(null, null, null, null);
         }
+    }
+
+    private static string? ParseSigningCertificateSha256(string output)
+    {
+        MatchCollection matches = SigningDigestLabelPattern.Matches(output);
+        if (matches.Count == 0)
+            return null;
+
+        var digests = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Match match in matches)
+        {
+            if (!TryNormalizeSigningDigest(match.Groups["value"].Value, out string digest))
+                return null;
+            digests.Add(digest);
+        }
+
+        return digests.Count == 1 ? digests.First() : null;
+    }
+
+    private static bool TryNormalizeSigningDigest(string value, out string digest)
+    {
+        string trimmed = value.Trim().Trim('"', (char)39);
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed[2..];
+
+        string compactHex = string.Concat(trimmed.Where(character =>
+            character != ':' && !char.IsWhiteSpace(character)));
+        if (compactHex.Length == 64 && compactHex.All(Uri.IsHexDigit))
+        {
+            digest = compactHex.ToUpperInvariant();
+            return true;
+        }
+
+        string compactBase64 = string.Concat(trimmed.Where(character => !char.IsWhiteSpace(character)));
+        if (compactBase64.Length == 43)
+            compactBase64 += "=";
+        if (compactBase64.Length == 44)
+        {
+            try
+            {
+                byte[] decoded = Convert.FromBase64String(compactBase64);
+                if (decoded.Length == 32)
+                {
+                    digest = Convert.ToHexString(decoded);
+                    return true;
+                }
+            }
+            catch (FormatException)
+            {
+            }
+        }
+
+        digest = string.Empty;
+        return false;
     }
 
     private async Task<string?> ProbePathIdentityAsync(
@@ -1055,7 +1261,10 @@ public sealed class DeviceBackupService : IDeviceBackupService
         EnsureCommandSuccess(result, purpose);
     }
 
-    private async Task CleanupRootOperationAsync(string serial, string remoteSessionPath)
+    private async Task CleanupRootOperationAsync(
+        string serial,
+        string remoteSessionPath,
+        bool debugGateTouched)
     {
         Exception? cleanupFailure = null;
 
@@ -1076,8 +1285,9 @@ public sealed class DeviceBackupService : IDeviceBackupService
             }
         }
 
-        using (var gateCleanup = new CancellationTokenSource(CleanupTimeout))
+        if (debugGateTouched)
         {
+            using var gateCleanup = new CancellationTokenSource(CleanupTimeout);
             try
             {
                 await _adb.SetPropertyAsync(
@@ -1415,6 +1625,9 @@ public sealed class DeviceBackupService : IDeviceBackupService
     private sealed class BackupExecutionContext
     {
         public string PropertiesStatus { get; set; } = "not_selected";
+        public bool? KeyboxEnabledPropertyPresent { get; set; }
+        public string? KeyboxEnabledPropertyState { get; set; }
+        public BackupKeyboxState? KeyboxState { get; set; }
         public List<BackupPropertyStatus> PropertyStatuses { get; } = [];
         public string SettingsStatus { get; set; } = "not_selected";
         public List<BackupSettingStatus> SettingsStatuses { get; } = [];
@@ -1441,6 +1654,11 @@ public sealed class DeviceBackupService : IDeviceBackupService
     private sealed record BackupSettingStatus(string Name, string State, string? Reason);
     private sealed record BackupDataPathStatus(string DevicePath, string State, string? Payload);
     private sealed record BackupComponentStatus(string Component, string State, string? Reason);
+    private sealed record BackupKeyboxState(
+        bool FilePresent,
+        string EnabledPropertyName,
+        bool? EnabledPropertyPresent,
+        string EnabledPropertyState);
     private sealed record BackupSelectedComponents(
         bool DeviceProperties,
         bool ManagedSystemSettings,
@@ -1452,6 +1670,8 @@ public sealed class DeviceBackupService : IDeviceBackupService
     private sealed record PackageBackupManifest(
         string Group,
         string PackageName,
+        string Status,
+        string? Reason,
         long? VersionCode,
         long? SourceUid,
         int? TargetSdk,
@@ -1466,6 +1686,7 @@ public sealed class DeviceBackupService : IDeviceBackupService
         string? SourceDeviceRole,
         int? AndroidSdkVersion,
         BackupSelectedComponents SelectedComponents,
+        BackupKeyboxState? Keybox,
         string PropertiesStatus,
         IReadOnlyList<BackupPropertyStatus> PropertyStatuses,
         string SettingsStatus,

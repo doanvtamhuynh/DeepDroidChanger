@@ -2178,72 +2178,112 @@ namespace DeepDroidChanger.ViewModels
         private async Task BackupSingleDeviceAsync()
         {
             DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
-            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
-                return;
-
-            IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
-                selectedDevice!,
-                DeviceActionKind.BackupDevice);
-            if (operation == null)
-                return;
-
-            using (operation)
+            try
             {
-                DeviceRowViewModel device = selectedDevice!;
-                CancellationToken cancellationToken = operation.CancellationToken;
-                SetDeviceLog(device, "Log_BackupDeviceOpening");
+                if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
+                    return;
+            }
+            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+            {
+                return;
+            }
 
-                try
+            DeviceRowViewModel device = selectedDevice!;
+            _deviceActionFeedbackService.SetNonOwningProcess(device.Serial, "Log_BackupDeviceOpening");
+
+            DeviceBackupOptions? options;
+            try
+            {
+                options = await _backupConfigDialogService
+                    .ShowBackupConfigAsync(_actionLifetimeCancellation.Token)
+                    .ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to open Backup Device configuration for {Serial}.", device.Serial);
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_BackupDeviceFailedFormat",
+                    exception.Message);
+                return;
+            }
+
+            if (options == null)
+            {
+                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+                return;
+            }
+
+            try
+            {
+                if (!await CheckInitialOnlineIdleEligibilityAsync(device).ConfigureAwait(true))
+                    return;
+
+                IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
+                    device,
+                    DeviceActionKind.BackupDevice);
+                if (operation == null)
+                    return;
+
+                using (operation)
                 {
-                    DeviceBackupOptions? options = await _backupConfigDialogService
-                        .ShowBackupConfigAsync(cancellationToken)
-                        .ConfigureAwait(true);
-                    if (options == null)
+                    CancellationToken cancellationToken = operation.CancellationToken;
+                    try
                     {
-                        await SetDialogDismissalLogAsync(device, operation);
-                        return;
-                    }
-
-                    var progress = new Progress<DeviceBackupProgress>(backupProgress =>
-                    {
-                        string? resourceKey = backupProgress.Stage switch
+                        var progress = new Progress<DeviceBackupProgress>(backupProgress =>
                         {
-                            DeviceBackupStage.Preparing => "Log_BackupDevicePreparing",
-                            DeviceBackupStage.ReadingProperties => "Log_BackupDeviceReadingProperties",
-                            DeviceBackupStage.ReadingSettings => "Log_BackupDeviceReadingSettings",
-                            DeviceBackupStage.BackingUpApps => "Log_BackupDeviceBackingUpApps",
-                            DeviceBackupStage.BackingUpOptionalData => "Log_BackupDeviceBackingUpOptionalData",
-                            DeviceBackupStage.Finalizing => "Log_BackupDeviceFinalizing",
-                            _ => null
-                        };
-                        if (resourceKey != null)
-                            SetDeviceLog(device, resourceKey);
-                    });
-                    DeviceBackupResult result = await _deviceBackupService
-                        .BackupAsync(device.Serial, options, progress, cancellationToken)
-                        .ConfigureAwait(true);
-                    SetDeviceLog(
-                        device,
-                        "Log_BackupDeviceSuccessFormat",
-                        Path.GetFileName(result.ArchivePath));
-                }
-                catch (OperationCanceledException)
-                {
-                    await SetOperationCancellationLogAsync(
-                        device,
-                        operation,
-                        requiresOnline: true);
-                }
-                catch (Exception exception)
-                {
-                    _logger.LogError(
-                        "Backup failed for device {Serial} ({ExceptionType}).",
-                        device.Serial,
-                        exception.GetType().Name);
-                    SetDeviceLog(device, "Log_BackupDeviceFailed");
+                            string? resourceKey = backupProgress.Stage switch
+                            {
+                                DeviceBackupStage.Preparing => "Log_BackupDevicePreparing",
+                                DeviceBackupStage.ReadingProperties => "Log_BackupDeviceReadingProperties",
+                                DeviceBackupStage.ReadingSettings => "Log_BackupDeviceReadingSettings",
+                                DeviceBackupStage.BackingUpApps => "Log_BackupDeviceBackingUpApps",
+                                DeviceBackupStage.BackingUpOptionalData => "Log_BackupDeviceBackingUpOptionalData",
+                                DeviceBackupStage.Finalizing => "Log_BackupDeviceFinalizing",
+                                _ => null
+                            };
+                            if (resourceKey != null)
+                                SetDeviceLog(device, resourceKey);
+                        });
+                        DeviceBackupResult result = await _deviceBackupService
+                            .BackupAsync(device.Serial, options, progress, cancellationToken)
+                            .ConfigureAwait(true);
+                        SetDeviceLog(
+                            device,
+                            "Log_BackupDeviceSuccessFormat",
+                            Path.GetFileName(result.ArchivePath));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        await SetOperationCancellationLogAsync(
+                            device,
+                            operation,
+                            requiresOnline: true);
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(exception, "Backup failed for device {Serial}.", device.Serial);
+                        SetDeviceLog(device, "Log_BackupDeviceFailedFormat", exception.Message);
+                    }
                 }
             }
+            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Backup preparation failed for device {Serial}.", device.Serial);
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_BackupDeviceFailedFormat",
+                    exception.Message);
+            }
         }
+
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private async Task UpdateSingleDeviceIntegrityAsync()
         {

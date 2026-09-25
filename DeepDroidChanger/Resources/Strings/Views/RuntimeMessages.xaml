@@ -234,4 +234,5 @@
     <sys:String x:Key="Log_BackupDeviceBackingUpOptionalData">Backing up optional data...</sys:String>
     <sys:String x:Key="Log_BackupDeviceFinalizing">Validating backup archive...</sys:String>
     <sys:String x:Key="Log_BackupDeviceSuccessFormat">Backup completed: {0}</sys:String>
-    <sys:String x:Key="Log_BackupDeviceFailed">Backup failed. Check device connection and destination folder.</sys:String></ResourceDictionary>
+    <sys:String x:Key="Log_BackupDeviceFailedFormat">Backup failed: {0}</sys:String>
+</ResourceDictionary>

@@ -1,0 +1,159 @@
+<Window x:Class="DeepDroidChanger.Views.BackupDeviceDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource BackupDevice_WindowTitle}"
+        Width="620"
+        Height="720"
+        MinWidth="560"
+        MinHeight="620"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid Style="{StaticResource DialogRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource DialogHeaderBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialDesign:PackIcon Kind="ContentSaveOutline"
+                                         Style="{StaticResource DialogHeaderIconStyle}"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{DynamicResource BackupDevice_Header}"
+                               Style="{StaticResource DialogHeaderTextStyle}"/>
+                    <TextBlock Text="{DynamicResource BackupDevice_Subtitle}"
+                               Style="{StaticResource SecondaryTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1"
+                  Header="{DynamicResource BackupDevice_ComponentsHeader}"
+                  Style="{StaticResource DialogOptionGroupBoxStyle}">
+            <StackPanel>
+                <CheckBox Content="{DynamicResource BackupDevice_DeviceProperties}"
+                          IsChecked="{Binding IncludeDeviceProperties, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
+                          Style="{StaticResource FlatCheckBoxStyle}"
+                          Margin="0,4"/>
+                <CheckBox Content="{DynamicResource BackupDevice_ManagedSettings}"
+                          IsChecked="{Binding IncludeManagedSystemSettings, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
+                          Style="{StaticResource FlatCheckBoxStyle}"
+                          Margin="0,4"/>
+                <CheckBox Content="{DynamicResource BackupDevice_UserAppData}"
+                          IsChecked="{Binding IncludeUserAppData, Mode=TwoWay}"
+                          ToolTip="{DynamicResource Shared_TooltipOption}"
+                          Style="{StaticResource FlatCheckBoxStyle}"
+                          Margin="0,4"/>
+            </StackPanel>
+        </GroupBox>
+
+        <ScrollViewer Grid.Row="2"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <GroupBox Header="{DynamicResource BackupDevice_ExperimentalHeader}"
+                          Style="{StaticResource DialogOptionGroupBoxStyle}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource BackupDevice_ExperimentalWarning}"
+                                   Style="{StaticResource SecondaryTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8"/>
+                        <CheckBox Content="{DynamicResource BackupDevice_Keybox}"
+                                  IsChecked="{Binding IncludeKeybox, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
+                                  Style="{StaticResource FlatCheckBoxStyle}"
+                                  Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource BackupDevice_Ssaid}"
+                                  IsChecked="{Binding IncludeSsaid, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
+                                  Style="{StaticResource FlatCheckBoxStyle}"
+                                  Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource BackupDevice_GoogleAppData}"
+                                  IsChecked="{Binding IncludeGoogleAppData, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
+                                  Style="{StaticResource FlatCheckBoxStyle}"
+                                  Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource BackupDevice_GoogleAccountState}"
+                                  IsChecked="{Binding IncludeGoogleAccountState, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource Shared_TooltipOption}"
+                                  Style="{StaticResource FlatCheckBoxStyle}"
+                                  Margin="0,4"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="{DynamicResource BackupDevice_DestinationHeader}"
+                          Style="{StaticResource DialogOptionGroupBoxStyle}"
+                          Margin="0,0,0,8">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding DestinationDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="{DynamicResource BackupDevice_DestinationTooltip}"
+                                     Style="{StaticResource FlatTextBoxStyle}"
+                                     Margin="0,0,8,0"/>
+                            <Button Grid.Column="1"
+                                    Command="{Binding BrowseFolderCommand}"
+                                    Content="{DynamicResource BackupDevice_Browse}"
+                                    ToolTip="{DynamicResource Shared_TooltipAction}"
+                                    Style="{StaticResource FlatButtonStyle}"/>
+                        </Grid>
+                        <TextBlock Text="{Binding DefaultLocationHint}"
+                                   Style="{StaticResource SecondaryTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0"/>
+                        <TextBlock Text="{DynamicResource BackupDevice_DestinationInvalid}"
+                                   Foreground="{DynamicResource Brush.Danger}"
+                                   Style="{StaticResource SecondaryTextStyle}"
+                                   Visibility="{Binding IsDestinationInvalid, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                   Margin="0,6,0,0"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="3" Style="{StaticResource DialogActionGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1"
+                    Content="{DynamicResource BackupDevice_Cancel}"
+                    ToolTip="{DynamicResource Shared_TooltipCancel}"
+                    IsCancel="True"
+                    Style="{StaticResource FlatButtonStyle}"
+                    Margin="0,0,8,0"/>
+            <Button Grid.Column="2"
+                    Command="{Binding ConfirmCommand}"
+                    IsEnabled="{Binding CanConfirm}"
+                    IsDefault="True"
+                    ToolTip="{DynamicResource Shared_TooltipConfirm}"
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
+                <TextBlock Text="{DynamicResource BackupDevice_Start}"
+                           Style="{StaticResource PrimaryButtonTextStyle}"/>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

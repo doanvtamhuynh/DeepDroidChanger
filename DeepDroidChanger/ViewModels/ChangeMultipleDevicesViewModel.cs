@@ -754,18 +754,83 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
-    private Task BackupMultipleDevicesAsync()
+    private async Task BackupMultipleDevicesAsync()
     {
         DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
         if (selectedDevices.Length == 0)
-            return Task.CompletedTask;
+            return;
 
-        return StartTrackedBatchWorkflow(
-            (sessionId, workflowCancellation) => RunSelectedBackupDeviceWorkflowAsync(
-                selectedDevices,
-                sessionId,
-                workflowCancellation));
+        HashSet<DeviceRowViewModel> initiallyEligible;
+        try
+        {
+            initiallyEligible = await CheckInitialTargetEligibilityAsync(
+                    selectedDevices,
+                    _actionLifetimeCancellation.Token)
+                .ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to preflight Multiple Device backup targets.");
+            foreach (DeviceRowViewModel device in selectedDevices)
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_BackupDeviceFailedFormat",
+                    exception.Message);
+            }
+            return;
+        }
+
+        if (initiallyEligible.Count == 0)
+            return;
+
+        DeviceBackupOptions? options;
+        try
+        {
+            options = await _backupConfigDialogService
+                .ShowBackupConfigAsync(_actionLifetimeCancellation.Token)
+                .ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to open Multiple Device Backup configuration.");
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_BackupDeviceFailedFormat",
+                    exception.Message);
+            }
+            return;
+        }
+
+        if (options == null)
+        {
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+            return;
+        }
+
+        DeviceRowViewModel[] eligibleDevices = selectedDevices
+            .Where(initiallyEligible.Contains)
+            .ToArray();
+        await StartTrackedBatchWorkflow(
+                (sessionId, workflowCancellation) => RunSelectedBackupDeviceWorkflowAsync(
+                    eligibleDevices,
+                    options,
+                    sessionId,
+                    workflowCancellation))
+            .ConfigureAwait(true);
     }
+
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task StartMultipleDevicesFakeProxyAsync()
     {
@@ -993,6 +1058,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private async Task RunSelectedBackupDeviceWorkflowAsync(
         IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        DeviceBackupOptions options,
         Guid sessionId,
         CancellationToken cancellationToken)
     {
@@ -1008,16 +1074,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             if (targets.Count == 0)
                 return;
 
-            DeviceBackupOptions? options = await _backupConfigDialogService
-                .ShowBackupConfigAsync(cancellationToken)
-                .ConfigureAwait(true);
-            if (options == null)
-            {
-                await SetBatchDialogDismissalResultsAsync(targets)
-                    .ConfigureAwait(true);
-                return;
-            }
-
             Task[] operations = targets
                 .Select(target => StartBatchTargetWorker(
                     target,
@@ -1032,13 +1088,21 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
         catch (Exception exception)
         {
-            _logger.LogError(
-                "Multiple Device backup workflow failed ({ExceptionType}).",
-                exception.GetType().Name);
+            _logger.LogError(exception, "Multiple Device backup workflow failed.");
             await RunOnUiContextAsync(() =>
             {
                 foreach (BatchActionTarget target in targets)
-                    SetTargetLog(target, "Log_BackupDeviceFailed");
+                    SetTargetLog(target, "Log_BackupDeviceFailedFormat", exception.Message);
+                if (targets.Count == 0)
+                {
+                    foreach (DeviceRowViewModel device in selectedDevices)
+                    {
+                        _deviceActionFeedbackService.SetNonOwningProcess(
+                            device.Serial,
+                            "Log_BackupDeviceFailedFormat",
+                            exception.Message);
+                    }
+                }
             }).ConfigureAwait(true);
         }
         finally
@@ -1120,13 +1184,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         }
         catch (Exception exception)
         {
-            _logger.LogError(
-                "Backup failed for device {Serial} ({ExceptionType}).",
-                target.Serial,
-                exception.GetType().Name);
+            _logger.LogError(exception, "Backup failed for device {Serial}.", target.Serial);
             await RunOnUiContextAsync(() => SetTargetLog(
                     target,
-                    "Log_BackupDeviceFailed"))
+                    "Log_BackupDeviceFailedFormat",
+                    exception.Message))
                 .ConfigureAwait(false);
         }
         finally
