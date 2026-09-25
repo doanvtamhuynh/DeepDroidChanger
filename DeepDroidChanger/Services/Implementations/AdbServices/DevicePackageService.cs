@@ -25,6 +25,23 @@ public sealed class DevicePackageService : IDevicePackageService
         return await ListPackagesAsync(serial, "pm list packages -3", cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<bool> IsPackageInstalledAsync(
+        string serial,
+        string packageName,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentException.ThrowIfNullOrWhiteSpace(packageName);
+
+        CommandResult result = await _adb
+            .RunAdbShellAsync(serial, $"pm path \"{packageName}\"", cancellationToken)
+            .ConfigureAwait(false);
+        return result.ExitCode == 0
+            && result.StandardOutput
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(line => line.StartsWith("package:", StringComparison.Ordinal));
+    }
+
     public async Task<IReadOnlyList<string>> GetDisabledPackagesAsync(
         string serial,
         CancellationToken cancellationToken)

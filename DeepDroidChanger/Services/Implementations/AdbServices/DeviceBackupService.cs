@@ -256,7 +256,10 @@ public sealed class DeviceBackupService : IDeviceBackupService
                 string missingSentinel = $"__DDC_BACKUP_MISSING_{Guid.NewGuid():N}__";
                 IEnumerable<string> propertyNames = options.IncludeDeviceProperties
                     ? ManagedDevicePropertyCatalog.Properties
-                    : [PropertyConstants.Keybox.Enabled];
+                    : Enumerable.Empty<string>();
+                if (options.IncludeKeybox)
+                    propertyNames = propertyNames.Append(PropertyConstants.Keybox.Enabled);
+                propertyNames = propertyNames.Distinct(StringComparer.Ordinal);
 
                 bool propertyGateReady = true;
                 debugGateTouched = true;
@@ -751,12 +754,38 @@ public sealed class DeviceBackupService : IDeviceBackupService
         if (!IsValidPackageName(packageName))
             throw new ArgumentException("The package name is invalid.", nameof(packageName));
 
+        string manifestPath = $"{packageGroup}/{packageName}/manifest.json";
+        bool packageInstalled = await _devicePackageService
+            .IsPackageInstalledAsync(serial, packageName, cancellationToken)
+            .ConfigureAwait(false);
+        if (!packageInstalled)
+        {
+            var skippedManifest = new PackageBackupManifest(
+                packageGroup,
+                packageName,
+                "skipped_missing",
+                "package_not_installed",
+                null,
+                null,
+                null,
+                null,
+                [],
+                null,
+                []);
+            await writer.AddJsonEntryAsync(
+                    manifestPath,
+                    skippedManifest,
+                    includeChecksum: false,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return skippedManifest;
+        }
+
         PackageMetadata metadata = await ReadPackageMetadataAsync(
                 serial,
                 packageName,
                 cancellationToken)
             .ConfigureAwait(false);
-        string manifestPath = $"{packageGroup}/{packageName}/manifest.json";
 
         await _adb.ForceStopPackageAsync(serial, packageName, cancellationToken)
             .ConfigureAwait(false);

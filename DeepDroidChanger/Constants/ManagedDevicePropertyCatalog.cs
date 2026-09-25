@@ -64,8 +64,7 @@ public static class ManagedDevicePropertyCatalog
         PropertyConstants.Integrity.SecurityPatch,
         PropertyConstants.Integrity.Tags,
         PropertyConstants.Integrity.Type,
-        PropertyConstants.Integrity.SdkInt,
-        PropertyConstants.Keybox.Enabled
+        PropertyConstants.Integrity.SdkInt
     ]);
 
     public static IReadOnlyList<string> ExcludedProperties { get; } = Array.AsReadOnly(
