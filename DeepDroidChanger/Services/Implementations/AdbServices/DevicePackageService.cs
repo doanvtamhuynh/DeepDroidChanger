@@ -32,14 +32,29 @@ public sealed class DevicePackageService : IDevicePackageService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         ArgumentException.ThrowIfNullOrWhiteSpace(packageName);
+        if (!IsValidPackageName(packageName))
+            throw new ArgumentException("The package name is invalid.", nameof(packageName));
 
         CommandResult result = await _adb
-            .RunAdbShellAsync(serial, $"pm path \"{packageName}\"", cancellationToken)
+            .RunAdbShellAsync(serial, $"pm list packages {packageName}", cancellationToken)
             .ConfigureAwait(false);
-        return result.ExitCode == 0
-            && result.StandardOutput
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(line => line.StartsWith("package:", StringComparison.Ordinal));
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Unable to check package {packageName} on device {serial} (exit code {result.ExitCode}).");
+        }
+
+        return result.StandardOutput
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(line =>
+            {
+                const string prefix = "package:";
+                return line.StartsWith(prefix, StringComparison.Ordinal)
+                    && string.Equals(
+                        line[prefix.Length..].Trim(),
+                        packageName,
+                        StringComparison.Ordinal);
+            });
     }
 
     public async Task<IReadOnlyList<string>> GetDisabledPackagesAsync(
@@ -95,5 +110,17 @@ public sealed class DevicePackageService : IDevicePackageService
 
         string packageName = value[prefix.Length..].Trim();
         return packageName.EndsWith('_') ? string.Empty : packageName;
+    }
+
+    private static bool IsValidPackageName(string packageName)
+    {
+        return packageName.Length <= 255
+            && packageName.Split('.').All(segment =>
+                segment.Length > 0
+                && segment.All(character =>
+                    character is >= 'A' and <= 'Z'
+                        or >= 'a' and <= 'z'
+                        or >= '0' and <= '9'
+                        or '_'));
     }
 }
