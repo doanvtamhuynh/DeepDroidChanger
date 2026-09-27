@@ -10,6 +10,11 @@ public interface IDevicePackageService
         string serial,
         CancellationToken cancellationToken);
 
+    Task<bool> IsPackageInstalledAsync(
+        string serial,
+        string packageName,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<string>> GetDisabledPackagesAsync(
         string serial,
         CancellationToken cancellationToken);

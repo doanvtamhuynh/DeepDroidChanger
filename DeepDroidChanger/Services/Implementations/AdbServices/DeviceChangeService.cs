@@ -8,10 +8,10 @@ namespace DeepDroidChanger.Services;
 
 public sealed class DeviceChangeService : IDeviceChangeService
 {
-    private const string LegacySim2EnabledProperty = "persist.props.config.sim2.enabled";
-    private const string LegacySim2IccidProperty = "persist.props.config.sim2.iccid";
-    private const string LegacySim2ImsiProperty = "persist.props.config.sim2.imsi";
-    private const string LegacySim2PhoneNumberProperty = "persist.props.config.sim2.phone_number";
+    private const string LegacySim2EnabledProperty = PropertyConstants.LegacySim2.Enabled;
+    private const string LegacySim2IccidProperty = PropertyConstants.LegacySim2.Iccid;
+    private const string LegacySim2ImsiProperty = PropertyConstants.LegacySim2.Imsi;
+    private const string LegacySim2PhoneNumberProperty = PropertyConstants.LegacySim2.PhoneNumber;
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _deviceLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly IAdbCommandService _adb;

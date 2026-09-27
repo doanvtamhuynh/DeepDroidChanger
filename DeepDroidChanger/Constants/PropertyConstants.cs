@@ -8,6 +8,11 @@ public static class PropertyConstants
     public const string Latitude = "persist.props.config.location.latitude";
     public const string Longitude = "persist.props.config.location.longitude";
 
+    public static class Debug
+    {
+        public const string Enabled = "persist.props.config.debug.enabled";
+    }
+
     public static class Keybox
     {
         public const string Enabled = "persist.props.config.keybox.enabled";
@@ -21,6 +26,7 @@ public static class PropertyConstants
         public const string ProductDevice = "ro.product.device";
         public const string ProductName = "ro.product.name";
         public const string AndroidRelease = "ro.build.version.release";
+        public const string AndroidSdkVersion = "ro.build.version.sdk";
         public const string BuildFingerprint = "ro.build.fingerprint";
         public const string BuildId = "ro.build.id";
         public const string SecurityPatch = "ro.build.version.security_patch";
@@ -96,6 +102,16 @@ public static class PropertyConstants
         public const string Tags = Prefix + "TAGS";
         public const string Type = Prefix + "TYPE";
         public const string SdkInt = Prefix + "SDK_INT";
+    }
+
+    public static class LegacySim2
+    {
+        private const string Prefix = "persist.props.config.sim2.";
+
+        public const string Enabled = Prefix + "enabled";
+        public const string Iccid = Prefix + "iccid";
+        public const string Imsi = Prefix + "imsi";
+        public const string PhoneNumber = Prefix + "phone_number";
     }
 
     public static class Proxy

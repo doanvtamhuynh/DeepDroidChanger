@@ -21,6 +21,7 @@ public enum DeviceActionKind
     StopFakeProxy,
     StopChangeSim,
     ViewRandomDeviceInfo,
+    BackupDevice,
     BatchRandomDevice,
     BatchRandomChangeAndWipe,
     BatchChangeDevice,
@@ -34,7 +35,8 @@ public enum DeviceActionKind
     BatchUpdateIntegrity,
     BatchFakeProxy,
     BatchStopFakeProxy,
-    BatchStopChangeSim
+    BatchStopChangeSim,
+    BatchBackupDevice
 }
 
 public static class DeviceActionKindExtensions
@@ -54,7 +56,8 @@ public static class DeviceActionKindExtensions
             or DeviceActionKind.BatchUpdateIntegrity
             or DeviceActionKind.BatchFakeProxy
             or DeviceActionKind.BatchStopFakeProxy
-            or DeviceActionKind.BatchStopChangeSim;
+            or DeviceActionKind.BatchStopChangeSim
+            or DeviceActionKind.BatchBackupDevice;
     }
 
     /// <summary>
@@ -79,6 +82,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.BatchFakeProxy => DeviceActionKind.FakeProxy,
             DeviceActionKind.BatchStopFakeProxy => DeviceActionKind.StopFakeProxy,
             DeviceActionKind.BatchStopChangeSim => DeviceActionKind.StopChangeSim,
+            DeviceActionKind.BatchBackupDevice => DeviceActionKind.BackupDevice,
             _ => kind
         };
     }
@@ -108,6 +112,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.FakeProxy => DeviceActionKind.BatchFakeProxy,
             DeviceActionKind.StopFakeProxy => DeviceActionKind.BatchStopFakeProxy,
             DeviceActionKind.StopChangeSim => DeviceActionKind.BatchStopChangeSim,
+            DeviceActionKind.BackupDevice => DeviceActionKind.BatchBackupDevice,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }
@@ -132,6 +137,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.StopFakeProxy => "DeviceAction_Name_StopFakeProxy",
             DeviceActionKind.StopChangeSim => "DeviceAction_Name_StopChangeSim",
             DeviceActionKind.ViewRandomDeviceInfo => "DeviceAction_Name_ViewRandomDeviceInfo",
+            DeviceActionKind.BackupDevice => "DeviceAction_Name_BackupDevice",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }

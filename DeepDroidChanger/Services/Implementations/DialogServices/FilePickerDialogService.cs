@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Win32;
 
 namespace DeepDroidChanger.Services
@@ -49,6 +50,23 @@ namespace DeepDroidChanger.Services
             };
 
             return dialog.ShowDialog() == true ? dialog.FileName : null;
+        }
+
+        public string? ShowOpenFolderDialog(string title, string? initialDirectory = null)
+        {
+            var dialog = new OpenFolderDialog
+            {
+                Title = title,
+                Multiselect = false
+            };
+
+            if (!string.IsNullOrWhiteSpace(initialDirectory)
+                && Directory.Exists(initialDirectory))
+            {
+                dialog.InitialDirectory = initialDirectory;
+            }
+
+            return dialog.ShowDialog() == true ? dialog.FolderName : null;
         }
     }
 }
