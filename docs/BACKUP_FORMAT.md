@@ -100,3 +100,40 @@ The summary distinguishes the following states:
 - `backed_up` with `same_device_restore_only` when every existing source is
   captured according to policy; missing optional/legacy paths do not make it
   partial.
+
+## Restore behavior
+
+Restore consumes the same envelope and ZIP contract. It authenticates the
+complete header and ciphertext with HMAC-SHA256 before decrypting the ZIP to a
+short-lived restore temporary directory. It then rejects unsafe or duplicate
+ZIP paths, validates the manifest versions and required entries, and verifies
+every manifest SHA-256 checksum before any device mutation. Archive tar files
+are inspected locally with `System.Formats.Tar`; absolute paths, traversal,
+links, device nodes, FIFOs, and entries outside the expected component subtree
+are rejected.
+
+Restore options mirror all seven backup components. Properties and managed
+settings use their recorded status values: `backed_up` restores the exact
+value, while `skipped_missing` and `skipped_empty` clear only the known managed
+target. Excluded and unknown properties/settings are never replayed. App
+payloads require an installed target package, verifiable signing certificate,
+and a target version that is not older than the source; the target UID is
+queried on the target device and is never copied from the archive. CE aliases
+are extracted once to the canonical target path.
+
+Keybox, SSAID, Google App Data, and Google Account State remain explicit
+optional components. Keybox and SSAID payloads are validated and installed
+under root with target metadata and `restorecon`. SSAID replacement also stops
+the SettingsProvider process and is followed by the final reboot so its
+in-memory state is not retained. Account SQLite snapshots are staged and
+checked with `PRAGMA quick_check` when `sqlite3` is available; account files
+are replaced only while the framework is stopped, followed by one final
+reboot. Partial account archives restore only the payloads that are present
+and are reported as partial.
+
+The decrypted ZIP, extracted tar files, and remote staging directory are
+removed on success, failure, and cancellation with bounded cleanup tokens.
+Restore reports per-component and per-package outcomes (`Succeeded`,
+`Partial`, or `Failed`) and does not report success when a selected component
+or package was skipped because compatibility or validation could not be
+established.

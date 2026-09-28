@@ -27,8 +27,10 @@ namespace DeepDroidChanger.ViewModels
         private readonly IProxyWorkflowService _proxyWorkflowService;
         private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
         private readonly IBackupConfigDialogService _backupConfigDialogService;
+        private readonly IRestoreConfigDialogService? _restoreConfigDialogService;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IDeviceBackupService _deviceBackupService;
+        private readonly IDeviceRestoreService? _deviceRestoreService;
         private readonly IFilePickerDialogService _filePickerDialogService;
         private readonly IPackageInstallService _packageInstallService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
@@ -138,7 +140,9 @@ namespace DeepDroidChanger.ViewModels
             IDeviceActionFeedbackService deviceActionFeedbackService,
             IClipboardService clipboardService,
             IViewDeviceWindowService viewDeviceWindowService,
-            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
+            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null,
+            IRestoreConfigDialogService? restoreConfigDialogService = null,
+            IDeviceRestoreService? deviceRestoreService = null)
         {
             _addDevicesDialogService = addDevicesDialogService;
             _carrierDataService = carrierDataService;
@@ -151,8 +155,10 @@ namespace DeepDroidChanger.ViewModels
             _proxyWorkflowService = proxyWorkflowService;
             _updateIntegrityDialogService = updateIntegrityDialogService;
             _backupConfigDialogService = backupConfigDialogService;
+            _restoreConfigDialogService = restoreConfigDialogService;
             _deviceIntegrityService = deviceIntegrityService;
             _deviceBackupService = deviceBackupService;
+            _deviceRestoreService = deviceRestoreService;
             _filePickerDialogService = filePickerDialogService;
             _packageInstallService = packageInstallService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
@@ -742,6 +748,7 @@ namespace DeepDroidChanger.ViewModels
             ChangeSingleDeviceTimezoneCommand.NotifyCanExecuteChanged();
             UpdateSingleDeviceIntegrityCommand.NotifyCanExecuteChanged();
             BackupSingleDeviceCommand.NotifyCanExecuteChanged();
+            RestoreSingleDeviceCommand.NotifyCanExecuteChanged();
             InstallPackagesOnSingleDeviceCommand.NotifyCanExecuteChanged();
             StartSingleDeviceFakeProxyCommand.NotifyCanExecuteChanged();
             StopSingleDeviceFakeProxyCommand.NotifyCanExecuteChanged();
@@ -2281,6 +2288,133 @@ namespace DeepDroidChanger.ViewModels
                 _deviceActionFeedbackService.SetNonOwningProcess(
                     device.Serial,
                     "Log_BackupDeviceFailedFormat",
+                    exception.Message);
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
+        private async Task RestoreSingleDeviceAsync()
+        {
+            DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
+            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
+                return;
+
+            if (_restoreConfigDialogService is null || _deviceRestoreService is null)
+            {
+                SetDeviceLog(selectedDevice!, "Log_RestoreDeviceFailedFormat", "Restore service is unavailable.");
+                return;
+            }
+
+            DeviceRowViewModel device = selectedDevice!;
+            _deviceActionFeedbackService.SetNonOwningProcess(device.Serial, "Log_RestoreDeviceOpening");
+            DeviceRestoreOptions? options;
+            try
+            {
+                options = await _restoreConfigDialogService
+                    .ShowRestoreConfigAsync(
+                        device.Serial,
+                        _actionLifetimeCancellation.Token)
+                    .ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Failed to open Restore Device configuration for {Serial}.", device.Serial);
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
+                    exception.Message);
+                return;
+            }
+
+            if (options is null)
+            {
+                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+                return;
+            }
+
+            try
+            {
+                // The dialog is deliberately non-owning. Recheck before
+                // reserving the device so user interaction never leaves it
+                // busy while the archive is being selected or inspected.
+                if (!await CheckInitialOnlineIdleEligibilityAsync(device).ConfigureAwait(true))
+                    return;
+
+                IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
+                    device,
+                    DeviceActionKind.RestoreDevice);
+                if (operation is null)
+                    return;
+
+                using (operation)
+                {
+                    CancellationToken cancellationToken = operation.CancellationToken;
+                    try
+                    {
+                        var progress = new Progress<DeviceRestoreProgress>(restoreProgress =>
+                        {
+                            string? resourceKey = restoreProgress.Stage switch
+                            {
+                                DeviceRestoreStage.Preparing => "Log_RestoreDevicePreparing",
+                                DeviceRestoreStage.ValidatingArchive => "Log_RestoreDeviceValidatingArchive",
+                                DeviceRestoreStage.CheckingCompatibility => "Log_RestoreDeviceCheckingCompatibility",
+                                DeviceRestoreStage.RestoringProperties => "Log_RestoreDeviceRestoringProperties",
+                                DeviceRestoreStage.RestoringSettings => "Log_RestoreDeviceRestoringSettings",
+                                DeviceRestoreStage.RestoringApps => "Log_RestoreDeviceRestoringApps",
+                                DeviceRestoreStage.RestoringOptionalData => "Log_RestoreDeviceRestoringOptionalData",
+                                DeviceRestoreStage.Finalizing => "Log_RestoreDeviceFinalizing",
+                                DeviceRestoreStage.Rebooting => "Log_RestoreDeviceRebooting",
+                                _ => null
+                            };
+                            if (resourceKey is not null)
+                                SetDeviceLog(device, resourceKey);
+                        });
+
+                        DeviceRestoreResult result = await _deviceRestoreService
+                            .RestoreAsync(device.Serial, options, progress, cancellationToken)
+                            .ConfigureAwait(true);
+                        string resultKey = result.Outcome switch
+                        {
+                            DeviceRestoreOutcome.Succeeded => "Log_RestoreDeviceSuccess",
+                            DeviceRestoreOutcome.Partial => "Log_RestoreDevicePartial",
+                            _ => "Log_RestoreDeviceFailedFormat"
+                        };
+                        if (result.Outcome == DeviceRestoreOutcome.Failed)
+                        {
+                            SetDeviceLog(
+                                device,
+                                resultKey,
+                                result.FailureReason ?? "The restore operation did not complete.");
+                        }
+                        else
+                        {
+                            SetDeviceLog(device, resultKey);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        await SetOperationCancellationLogAsync(device, operation, requiresOnline: true);
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(exception, "Restore failed for device {Serial}.", device.Serial);
+                        SetDeviceLog(device, "Log_RestoreDeviceFailedFormat", exception.Message);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Restore preparation failed for device {Serial}.", device.Serial);
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
                     exception.Message);
             }
         }

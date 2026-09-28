@@ -1,0 +1,110 @@
+<Window x:Class="DeepDroidChanger.Views.RestoreDeviceDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="{DynamicResource RestoreDevice_WindowTitle}"
+        Width="680"
+        Height="760"
+        MinWidth="580"
+        MinHeight="640"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.WindowBackground}"
+        TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
+        FontFamily="{StaticResource Metric.FontFamily}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid Style="{StaticResource DialogRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource DialogHeaderBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialDesign:PackIcon Kind="ArchiveArrowUp" Style="{StaticResource DialogHeaderIconStyle}"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{DynamicResource RestoreDevice_Header}" Style="{StaticResource DialogHeaderTextStyle}"/>
+                    <TextBlock Text="{DynamicResource RestoreDevice_Subtitle}" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <GroupBox Grid.Row="1" Header="{DynamicResource RestoreDevice_ArchiveHeader}" Style="{StaticResource DialogOptionGroupBoxStyle}">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding ArchivePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding IsBatch}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="1" Command="{Binding BrowseArchiveCommand}" Content="{DynamicResource RestoreDevice_Browse}" Style="{StaticResource FlatButtonStyle}"/>
+                </Grid>
+                <TextBlock Text="{Binding SelectedArchiveName}" Style="{StaticResource SecondaryTextStyle}" Margin="0,5,0,0"/>
+                <TextBlock Text="{Binding InspectionError}" Foreground="{DynamicResource Brush.Danger}" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                <TextBlock Text="{DynamicResource RestoreDevice_PasswordLabel}" Style="{StaticResource SecondaryTextStyle}" Margin="0,8,0,3"/>
+                <PasswordBox x:Name="RestorePasswordBox" PasswordChanged="OnRestorePasswordChanged" ToolTip="{DynamicResource RestoreDevice_PasswordTooltip}"/>
+                <TextBlock Text="{DynamicResource RestoreDevice_PasswordTooShort}" Foreground="{DynamicResource Brush.Danger}" Style="{StaticResource SecondaryTextStyle}" Visibility="{Binding IsRestorePasswordTooShort, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,4,0,0"/>
+            </StackPanel>
+        </GroupBox>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <GroupBox Header="{DynamicResource RestoreDevice_SourceHeader}" Style="{StaticResource DialogOptionGroupBoxStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="{DynamicResource RestoreDevice_BackupDate}" Style="{StaticResource SecondaryTextStyle}" Margin="0,2,12,2"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Inspection.CreatedAtUtc}" Margin="0,2"/>
+                        <TextBlock Grid.Row="1" Text="{DynamicResource RestoreDevice_SourceSerial}" Style="{StaticResource SecondaryTextStyle}" Margin="0,2,12,2"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Inspection.SourceSerial}" Margin="0,2"/>
+                        <TextBlock Grid.Row="2" Text="{DynamicResource RestoreDevice_SourceRole}" Style="{StaticResource SecondaryTextStyle}" Margin="0,2,12,2"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Inspection.SourceDeviceRole}" Margin="0,2"/>
+                        <TextBlock Grid.Row="3" Text="{DynamicResource RestoreDevice_AndroidSdk}" Style="{StaticResource SecondaryTextStyle}" Margin="0,2,12,2"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Inspection.AndroidSdkVersion}" Margin="0,2"/>
+                        <TextBlock Grid.Row="4" Text="{DynamicResource RestoreDevice_TargetSerial}" Style="{StaticResource SecondaryTextStyle}" Margin="0,2,12,2"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding TargetDescription}" TextWrapping="Wrap" Margin="0,2"/>
+                        <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Text="{Binding PackageSummary}" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Margin="0,6,0,2"/>
+                    </Grid>
+                </GroupBox>
+
+                <Border Background="{DynamicResource Brush.DeviceStatusWarningBackground}" CornerRadius="4" Padding="8" Margin="8,0,8,4" Visibility="{Binding HasInspectionWarnings, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding InspectionWarnings}" Foreground="{DynamicResource Brush.TextPrimary}" TextWrapping="Wrap"/>
+                </Border>
+
+                <GroupBox Header="{DynamicResource RestoreDevice_ComponentsHeader}" Style="{StaticResource DialogOptionGroupBoxStyle}">
+                    <StackPanel>
+                        <CheckBox Content="{DynamicResource RestoreDevice_DeviceProperties}" IsChecked="{Binding RestoreDeviceProperties, Mode=TwoWay}" IsEnabled="{Binding CanRestoreDeviceProperties}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource RestoreDevice_ManagedSettings}" IsChecked="{Binding RestoreManagedSystemSettings, Mode=TwoWay}" IsEnabled="{Binding CanRestoreManagedSystemSettings}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource RestoreDevice_UserAppData}" IsChecked="{Binding RestoreUserAppData, Mode=TwoWay}" IsEnabled="{Binding CanRestoreUserAppData}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="{DynamicResource RestoreDevice_ExperimentalHeader}" Style="{StaticResource DialogOptionGroupBoxStyle}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource RestoreDevice_ExperimentalWarning}" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                        <CheckBox Content="{DynamicResource RestoreDevice_Keybox}" IsChecked="{Binding RestoreKeybox, Mode=TwoWay}" IsEnabled="{Binding CanRestoreKeybox}" ToolTip="{DynamicResource RestoreDevice_NotAvailableTooltip}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource RestoreDevice_Ssaid}" IsChecked="{Binding RestoreSsaid, Mode=TwoWay}" IsEnabled="{Binding CanRestoreSsaid}" ToolTip="{DynamicResource RestoreDevice_NotAvailableTooltip}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource RestoreDevice_GoogleAppData}" IsChecked="{Binding RestoreGoogleAppData, Mode=TwoWay}" IsEnabled="{Binding CanRestoreGoogleAppData}" ToolTip="{DynamicResource RestoreDevice_NotAvailableTooltip}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                        <CheckBox Content="{DynamicResource RestoreDevice_GoogleAccountState}" IsChecked="{Binding RestoreGoogleAccountState, Mode=TwoWay}" IsEnabled="{Binding CanRestoreGoogleAccountState}" ToolTip="{DynamicResource RestoreDevice_NotAvailableTooltip}" Style="{StaticResource FlatCheckBoxStyle}" Margin="0,4"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <TextBlock Text="{DynamicResource RestoreDevice_ConfirmationWarning}" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Margin="4,4,4,8"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="3" Style="{StaticResource DialogActionGridStyle}">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{DynamicResource RestoreDevice_Cancel}" IsCancel="True" Style="{StaticResource FlatButtonStyle}" Margin="0,0,8,0"/>
+            <Button Grid.Column="2" Command="{Binding ConfirmCommand}" IsDefault="True" IsEnabled="{Binding CanConfirm}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                <TextBlock Text="{DynamicResource RestoreDevice_Confirm}" Style="{StaticResource PrimaryButtonTextStyle}"/>
+            </Button>
+        </Grid>
+    </Grid>
+</Window>

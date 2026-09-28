@@ -235,4 +235,20 @@
     <sys:String x:Key="Log_BackupDeviceFinalizing">Đang kiểm tra tệp sao lưu...</sys:String>
     <sys:String x:Key="Log_BackupDeviceSuccessFormat">Đã sao lưu: {0}</sys:String>
     <sys:String x:Key="Log_BackupDeviceFailedFormat">Sao lưu thất bại: {0}</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RestoreDevice">Khôi phục thiết bị</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceOpening">Đang mở cấu hình khôi phục thiết bị...</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePreparing">Đang chuẩn bị khôi phục...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceValidatingArchive">Đang kiểm tra tệp sao lưu...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceCheckingCompatibility">Đang kiểm tra tương thích với thiết bị đích...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringProperties">Đang khôi phục thuộc tính thiết bị...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringSettings">Đang khôi phục cài đặt được quản lý...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringApps">Đang khôi phục dữ liệu ứng dụng...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringOptionalData">Đang khôi phục dữ liệu tùy chọn...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceFinalizing">Đang hoàn tất khôi phục...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRebooting">Đang khởi động lại để áp dụng trạng thái đã khôi phục...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceSuccess">Khôi phục hoàn tất.</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePartial">Khôi phục hoàn tất nhưng có cảnh báo.</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceFailedFormat">Khôi phục thất bại: {0}</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceArchiveNotProvided">Đã bỏ qua khôi phục: chưa cung cấp tệp cho thiết bị này.</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceDuplicateSourceSerial">Kiểm tra khôi phục thất bại: các tệp đã chọn có serial nguồn trùng nhau.</sys:String>
 </ResourceDictionary>

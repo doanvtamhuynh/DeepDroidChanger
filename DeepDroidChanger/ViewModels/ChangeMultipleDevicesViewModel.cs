@@ -44,6 +44,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IFilePickerDialogService _filePickerDialogService;
     private readonly IPackageInstallService _packageInstallService;
     private readonly IDeviceBackupService _deviceBackupService;
+    private readonly IRestoreConfigDialogService? _restoreConfigDialogService;
+    private readonly IDeviceRestoreService? _deviceRestoreService;
     private readonly ILocalizationService _localizationService;
     private readonly IMultipleDeviceConfigService _multipleDeviceConfigService;
     private readonly IRandomDeviceService _randomDeviceService;
@@ -167,7 +169,9 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceActionEligibilityService deviceActionEligibilityService,
         IDeviceActionFeedbackService deviceActionFeedbackService,
         IClipboardService clipboardService,
-        IViewDeviceWindowService viewDeviceWindowService)
+        IViewDeviceWindowService viewDeviceWindowService,
+        IRestoreConfigDialogService? restoreConfigDialogService = null,
+        IDeviceRestoreService? deviceRestoreService = null)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
@@ -196,6 +200,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         _filePickerDialogService = filePickerDialogService;
         _packageInstallService = packageInstallService;
         _deviceBackupService = deviceBackupService;
+        _restoreConfigDialogService = restoreConfigDialogService;
+        _deviceRestoreService = deviceRestoreService;
         _localizationService = localizationService;
         _multipleDeviceConfigService = multipleDeviceConfigService;
         _randomDeviceService = randomDeviceService;
@@ -832,6 +838,191 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
+    private async Task RestoreMultipleDevicesAsync()
+    {
+        DeviceRowViewModel[] selectedDevices = GetSelectedDevicesSnapshot();
+        if (selectedDevices.Length == 0)
+            return;
+
+        if (_restoreConfigDialogService is null || _deviceRestoreService is null)
+        {
+            foreach (DeviceRowViewModel device in selectedDevices)
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
+                    "Restore service is unavailable.");
+            }
+
+            return;
+        }
+
+        HashSet<DeviceRowViewModel> initiallyEligible;
+        try
+        {
+            initiallyEligible = await CheckInitialTargetEligibilityAsync(
+                    selectedDevices,
+                    _actionLifetimeCancellation.Token)
+                .ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to preflight Multiple Device restore targets.");
+            foreach (DeviceRowViewModel device in selectedDevices)
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
+                    exception.Message);
+            }
+
+            return;
+        }
+
+        if (initiallyEligible.Count == 0)
+            return;
+
+        foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+            _deviceActionFeedbackService.SetNonOwningProcess(device.Serial, "Log_RestoreDeviceOpening");
+
+        IReadOnlyList<string> archivePaths;
+        try
+        {
+            archivePaths = _filePickerDialogService.ShowOpenFileDialogMulti(
+                _localizationService.GetString("RestoreDevice_FileFilter"),
+                _localizationService.GetString("RestoreDevice_BrowseTitle"));
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to choose Multiple Device restore archives.");
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
+                    exception.Message);
+            }
+
+            return;
+        }
+
+        if (archivePaths.Count == 0)
+        {
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+            return;
+        }
+
+        DeviceRestoreBatchOptions? options;
+        try
+        {
+            options = await _restoreConfigDialogService
+                .ShowRestoreBatchConfigAsync(
+                    archivePaths,
+                    selectedDevices
+                        .Where(initiallyEligible.Contains)
+                        .Select(device => device.Serial)
+                        .ToArray(),
+                    _actionLifetimeCancellation.Token)
+                .ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to open Multiple Device Restore configuration.");
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
+                    exception.Message);
+            }
+
+            return;
+        }
+
+        if (options is null)
+        {
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+            return;
+        }
+
+        DeviceRestoreInspection[] inspections = options.Inspections.ToArray();
+        IGrouping<string, DeviceRestoreInspection>[] duplicateSourceSerials = inspections
+            .GroupBy(inspection => inspection.SourceSerial, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .ToArray();
+        if (duplicateSourceSerials.Length > 0)
+        {
+            string reason = _localizationService.GetString(
+                "Log_RestoreDeviceDuplicateSourceSerial");
+            _logger.LogWarning(
+                "Multiple restore archives contained duplicate source serials: {Serials}.",
+                string.Join(", ", duplicateSourceSerials.Select(group => group.Key)));
+            foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
+            {
+                _deviceActionFeedbackService.SetNonOwningProcess(
+                    device.Serial,
+                    "Log_RestoreDeviceFailedFormat",
+                    reason);
+            }
+
+            return;
+        }
+
+        Dictionary<string, string> archiveBySourceSerial = inspections
+            .ToDictionary(
+                inspection => inspection.SourceSerial,
+                inspection => inspection.ArchivePath,
+                StringComparer.OrdinalIgnoreCase);
+        HashSet<string> selectedSerials = selectedDevices
+            .Where(initiallyEligible.Contains)
+            .Select(device => device.Serial)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (DeviceRestoreInspection inspection in inspections
+                     .Where(inspection => !selectedSerials.Contains(inspection.SourceSerial)))
+        {
+            _logger.LogWarning(
+                "Ignoring restore archive {ArchivePath}; source serial {SourceSerial} is not selected.",
+                inspection.ArchivePath,
+                inspection.SourceSerial);
+        }
+
+        DeviceRowViewModel[] matchedDevices = selectedDevices
+            .Where(initiallyEligible.Contains)
+            .Where(device => archiveBySourceSerial.ContainsKey(device.Serial))
+            .ToArray();
+        foreach (DeviceRowViewModel device in selectedDevices
+                     .Where(initiallyEligible.Contains)
+                     .Where(device => !archiveBySourceSerial.ContainsKey(device.Serial)))
+        {
+            _deviceActionFeedbackService.SetNonOwningProcess(
+                device.Serial,
+                "Log_RestoreDeviceArchiveNotProvided");
+        }
+
+        if (matchedDevices.Length == 0)
+            return;
+
+        await StartTrackedBatchWorkflow(
+                (sessionId, workflowCancellation) => RunSelectedRestoreDeviceWorkflowAsync(
+                    matchedDevices,
+                    options,
+                    archiveBySourceSerial,
+                    sessionId,
+                    workflowCancellation))
+            .ConfigureAwait(true);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunSelectedDeviceBatchAction), AllowConcurrentExecutions = true)]
     private Task StartMultipleDevicesFakeProxyAsync()
     {
         return StartTrackedBatchWorkflow(RunSelectedFakeProxyWorkflowAsync);
@@ -1196,6 +1387,183 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             CompleteBatchTarget(target);
         }
     }
+
+    private async Task RunSelectedRestoreDeviceWorkflowAsync(
+        IReadOnlyList<DeviceRowViewModel> selectedDevices,
+        DeviceRestoreBatchOptions options,
+        IReadOnlyDictionary<string, string> archiveBySourceSerial,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var targets = new List<BatchActionTarget>();
+        try
+        {
+            targets = await CreateReservedEligibleTargetsAsync(
+                    selectedDevices,
+                    cancellationToken,
+                    DeviceActionKind.RestoreDevice,
+                    sessionId)
+                .ConfigureAwait(true);
+            if (targets.Count == 0)
+                return;
+
+            Task[] operations = targets
+                .Select(target => StartBatchTargetWorker(
+                    target,
+                    () => ExecuteRestoreDeviceBatchTargetAsync(
+                        target,
+                        options,
+                        archiveBySourceSerial[target.Serial])))
+                .ToArray();
+            await Task.WhenAll(operations).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            await SetBatchCancellationResultsAsync(targets)
+                .ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Multiple Device restore workflow failed.");
+            await RunOnUiContextAsync(() =>
+            {
+                foreach (BatchActionTarget target in targets)
+                {
+                    SetTargetLog(
+                        target,
+                        "Log_RestoreDeviceFailedFormat",
+                        exception.Message);
+                }
+            }).ConfigureAwait(true);
+        }
+        finally
+        {
+            CompleteBatchOwnedTargets(targets);
+        }
+    }
+
+    private async Task ExecuteRestoreDeviceBatchTargetAsync(
+        BatchActionTarget target,
+        DeviceRestoreBatchOptions options,
+        string archivePath)
+    {
+        using var targetCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            target.OperationToken,
+            target.InvalidationToken);
+        var progress = new Progress<DeviceRestoreProgress>(restoreProgress =>
+        {
+            string? resourceKey = restoreProgress.Stage switch
+            {
+                DeviceRestoreStage.Preparing => "Log_RestoreDevicePreparing",
+                DeviceRestoreStage.ValidatingArchive => "Log_RestoreDeviceValidatingArchive",
+                DeviceRestoreStage.CheckingCompatibility => "Log_RestoreDeviceCheckingCompatibility",
+                DeviceRestoreStage.RestoringProperties => "Log_RestoreDeviceRestoringProperties",
+                DeviceRestoreStage.RestoringSettings => "Log_RestoreDeviceRestoringSettings",
+                DeviceRestoreStage.RestoringApps => "Log_RestoreDeviceRestoringApps",
+                DeviceRestoreStage.RestoringOptionalData => "Log_RestoreDeviceRestoringOptionalData",
+                DeviceRestoreStage.Finalizing => "Log_RestoreDeviceFinalizing",
+                DeviceRestoreStage.Rebooting => "Log_RestoreDeviceRebooting",
+                _ => null
+            };
+            if (resourceKey is not null)
+                SetTargetLog(target, resourceKey);
+        });
+
+        try
+        {
+            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
+            try
+            {
+                targetCancellation.Token.ThrowIfCancellationRequested();
+                if (!target.TryStartExecution())
+                    return;
+
+                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                        .ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                if (!IsCurrentTarget(target))
+                    return;
+
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        "Log_RestoreDevicePreparing"))
+                    .ConfigureAwait(false);
+
+                IDeviceRestoreService restoreService = _deviceRestoreService
+                    ?? throw new InvalidOperationException("Restore service is unavailable.");
+                var deviceOptions = new DeviceRestoreOptions(
+                    archivePath,
+                    options.RestoreDeviceProperties,
+                    options.RestoreManagedSystemSettings,
+                    options.RestoreUserAppData,
+                    options.RestoreKeybox,
+                    options.RestoreSsaid,
+                    options.RestoreGoogleAppData,
+                    options.RestoreGoogleAccountState)
+                {
+                    RestorePassword = options.RestorePassword
+                };
+                DeviceRestoreResult result = await restoreService
+                    .RestoreAsync(
+                        target.Serial,
+                        deviceOptions,
+                        progress,
+                        targetCancellation.Token)
+                    .ConfigureAwait(false);
+                switch (result.Outcome)
+                {
+                    case DeviceRestoreOutcome.Succeeded:
+                        await RunOnUiContextAsync(() => SetTargetLog(
+                                target,
+                                "Log_RestoreDeviceSuccess"))
+                            .ConfigureAwait(false);
+                        break;
+                    case DeviceRestoreOutcome.Partial:
+                        await RunOnUiContextAsync(() => SetTargetLog(
+                                target,
+                                "Log_RestoreDevicePartial"))
+                            .ConfigureAwait(false);
+                        break;
+                    default:
+                        await RunOnUiContextAsync(() => SetTargetLog(
+                                target,
+                                "Log_RestoreDeviceFailedFormat",
+                                result.FailureReason ?? "Restore did not complete."))
+                            .ConfigureAwait(false);
+                        break;
+                }
+            }
+            finally
+            {
+                _batchActionThrottle.Release();
+            }
+        }
+        catch (OperationCanceledException) when (target.IsInvalidated)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            await SetTargetCancellationResultAsync(target)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Restore failed for device {Serial}.", target.Serial);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_RestoreDeviceFailedFormat",
+                    exception.Message))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            CompleteBatchTarget(target);
+        }
+    }
+
     private async Task RunSelectedInstallPackageWorkflowAsync(
         IReadOnlyList<DeviceRowViewModel> selectedDevices,
         Guid sessionId,
@@ -4046,6 +4414,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         ChangeMultipleDevicesTimezoneCommand.NotifyCanExecuteChanged();
         UpdateMultipleDevicesIntegrityCommand.NotifyCanExecuteChanged();
         BackupMultipleDevicesCommand.NotifyCanExecuteChanged();
+        RestoreMultipleDevicesCommand.NotifyCanExecuteChanged();
         InstallPackagesOnMultipleDevicesCommand.NotifyCanExecuteChanged();
         StartMultipleDevicesFakeProxyCommand.NotifyCanExecuteChanged();
         StopMultipleDevicesFakeProxyCommand.NotifyCanExecuteChanged();

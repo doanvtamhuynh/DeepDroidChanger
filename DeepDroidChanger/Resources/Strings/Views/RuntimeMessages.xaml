@@ -235,4 +235,20 @@
     <sys:String x:Key="Log_BackupDeviceFinalizing">Validating backup archive...</sys:String>
     <sys:String x:Key="Log_BackupDeviceSuccessFormat">Backup completed: {0}</sys:String>
     <sys:String x:Key="Log_BackupDeviceFailedFormat">Backup failed: {0}</sys:String>
+    <sys:String x:Key="DeviceAction_Name_RestoreDevice">Restore Device</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceOpening">Opening Restore Device configuration...</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePreparing">Preparing restore...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceValidatingArchive">Validating backup archive...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceCheckingCompatibility">Checking target compatibility...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringProperties">Restoring device properties...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringSettings">Restoring managed settings...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringApps">Restoring application data...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRestoringOptionalData">Restoring optional data...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceFinalizing">Finalizing restore...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceRebooting">Rebooting device to apply restored state...</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceSuccess">Restore completed.</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePartial">Restore completed with warnings.</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceFailedFormat">Restore failed: {0}</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceArchiveNotProvided">Restore skipped: no archive was provided for this device.</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceDuplicateSourceSerial">Restore validation failed: duplicate source serials were selected.</sys:String>
 </ResourceDictionary>

@@ -165,6 +165,133 @@ internal static class BackupEnvelopeCrypto
         }
     }
 
+    /// <summary>
+    /// Authenticates an encrypted backup before decrypting any payload bytes.
+    /// The plaintext destination is created only after the envelope HMAC has
+    /// been verified, so callers can safely use this method during restore
+    /// preflight without exposing unauthenticated ZIP data to later stages.
+    /// </summary>
+    public static async Task VerifyAndDecryptAsync(
+        string encryptedArchivePath,
+        string plaintextOutputPath,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        ValidatePassword(password);
+        ArgumentException.ThrowIfNullOrWhiteSpace(encryptedArchivePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(plaintextOutputPath);
+
+        bool outputCreated = false;
+        try
+        {
+            await using FileStream source = new(
+                encryptedArchivePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 81920,
+                useAsync: true);
+            EnvelopeHeader header = await ReadHeaderAsync(source, cancellationToken)
+                .ConfigureAwait(false);
+            long authenticatedLength = checked(header.HeaderLength + header.CiphertextLength);
+            long expectedFileLength = checked(authenticatedLength + MacLength);
+            if (source.Length != expectedFileLength)
+                throw new InvalidDataException("The encrypted backup envelope length is invalid.");
+
+            (byte[] encryptionKey, byte[] macKey) = DeriveKeys(
+                password,
+                header.Salt,
+                header.KdfIterations);
+            try
+            {
+                // Authenticate the header and ciphertext before opening the
+                // decrypting stream or creating the plaintext destination.
+                byte[] actualMac = await ComputeHmacAsync(
+                        source,
+                        authenticatedLength,
+                        macKey,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                byte[] expectedMac = new byte[MacLength];
+                try
+                {
+                    source.Position = authenticatedLength;
+                    await ReadExactlyAsync(source, expectedMac, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!CryptographicOperations.FixedTimeEquals(actualMac, expectedMac))
+                    {
+                        throw new CryptographicException(
+                            "The encrypted backup authentication failed.");
+                    }
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(actualMac);
+                    CryptographicOperations.ZeroMemory(expectedMac);
+                }
+
+                string? outputDirectory = Path.GetDirectoryName(
+                    Path.GetFullPath(plaintextOutputPath));
+                if (!string.IsNullOrWhiteSpace(outputDirectory))
+                    Directory.CreateDirectory(outputDirectory);
+
+                await using FileStream destination = new(
+                    plaintextOutputPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 81920,
+                    useAsync: true);
+                outputCreated = true;
+
+                source.Position = header.HeaderLength;
+                using Aes aes = Aes.Create();
+                aes.KeySize = 256;
+                aes.BlockSize = 128;
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+                aes.Key = encryptionKey;
+                aes.IV = header.Iv;
+
+                using ICryptoTransform decryptor = aes.CreateDecryptor();
+                using var ciphertext = new LimitedReadStream(source, header.CiphertextLength);
+                await using var cryptoStream = new CryptoStream(
+                    ciphertext,
+                    decryptor,
+                    CryptoStreamMode.Read,
+                    leaveOpen: false);
+                await cryptoStream.CopyToAsync(
+                        destination,
+                        81920,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(encryptionKey);
+                CryptographicOperations.ZeroMemory(macKey);
+            }
+        }
+        catch
+        {
+            if (outputCreated)
+            {
+                try
+                {
+                    File.Delete(plaintextOutputPath);
+                }
+                catch
+                {
+                    // Preserve the authentication/decryption failure. The
+                    // restore operation's bounded cleanup reports leftovers.
+                }
+            }
+
+            throw;
+        }
+    }
+
     private static void ValidatePassword(string password)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
@@ -360,5 +487,80 @@ internal static class BackupEnvelopeCrypto
         long CiphertextLength)
     {
         public int HeaderLength => HeaderBytes.Length;
+    }
+
+    private sealed class LimitedReadStream : Stream
+    {
+        private readonly Stream _inner;
+        private long _remaining;
+
+        public LimitedReadStream(Stream inner, long length)
+        {
+            _inner = inner;
+            _remaining = length;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _remaining;
+        public override long Position
+        {
+            get => 0;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int requested = (int)Math.Min(count, _remaining);
+            if (requested == 0)
+                return 0;
+
+            int read = _inner.Read(buffer, offset, requested);
+            if (read == 0)
+                throw new InvalidDataException("The encrypted backup ciphertext ended unexpectedly.");
+
+            _remaining -= read;
+            return read;
+        }
+
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            int requested = (int)Math.Min(buffer.Length, _remaining);
+            if (requested == 0)
+                return ValueTask.FromResult(0);
+
+            return ReadLimitedAsync(buffer[..requested], cancellationToken);
+        }
+
+        private async ValueTask<int> ReadLimitedAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken)
+        {
+            int read = await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (read == 0)
+                throw new InvalidDataException("The encrypted backup ciphertext ended unexpectedly.");
+
+            _remaining -= read;
+            return read;
+        }
+
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+        public override Task FlushAsync(CancellationToken cancellationToken) =>
+            Task.FromException(new NotSupportedException());
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
