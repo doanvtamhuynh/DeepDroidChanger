@@ -66,31 +66,44 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         new("account.registered_services", "/data/system/users/0", "registered_services", "account/users/registered_services.tar", false)
     ];
 
-    private static readonly string[] IntegrityProperties =
+    private static readonly HashSet<string> ValidPropertyStates =
     [
-        PropertyConstants.Integrity.Brand,
-        PropertyConstants.Integrity.Device,
-        PropertyConstants.Integrity.DeviceInitialSdkInt,
-        PropertyConstants.Integrity.Fingerprint,
-        PropertyConstants.Integrity.Id,
-        PropertyConstants.Integrity.Manufacturer,
-        PropertyConstants.Integrity.Model,
-        PropertyConstants.Integrity.Product,
-        PropertyConstants.Integrity.Release,
-        PropertyConstants.Integrity.SecurityPatch,
-        PropertyConstants.Integrity.Tags,
-        PropertyConstants.Integrity.Type,
-        PropertyConstants.Integrity.SdkInt
+        "backed_up",
+        "skipped_missing",
+        "skipped_empty",
+        "empty",
+        "excluded",
+        "read_failed"
     ];
 
-    private static readonly string[] SimProperties =
+    private static readonly HashSet<string> ValidSettingStates =
     [
-        PropertyConstants.Spoof.SimIccid,
-        PropertyConstants.Spoof.SimImsi,
-        PropertyConstants.Spoof.SimPhoneNumber,
-        PropertyConstants.Spoof.SimOperatorName,
-        PropertyConstants.Spoof.SimOperatorCountry,
-        PropertyConstants.Spoof.SimOperatorNumeric
+        "backed_up",
+        "skipped_missing",
+        "skipped_empty"
+    ];
+
+    private static readonly HashSet<string> ValidOptionalComponentStates =
+    [
+        "not_selected",
+        "backed_up",
+        "skipped_missing",
+        "snapshot_unavailable",
+        "partial"
+    ];
+
+    private static readonly HashSet<string> ValidPackageStates =
+    [
+        "backed_up",
+        "skipped_missing"
+    ];
+
+    private static readonly HashSet<string> ValidPackagePathStates =
+    [
+        "backed_up",
+        "present_alias",
+        "skipped_missing",
+        "skipped_empty"
     ];
 
     private readonly IAdbCommandService _adb;
@@ -133,6 +146,45 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                     cancellationToken)
                 .ConfigureAwait(false);
             return CreateInspection(archivePath, manifest);
+        }
+        finally
+        {
+            TryDeleteDirectory(sessionDirectory);
+        }
+    }
+
+    public async Task<DeviceRestoreCompatibility> PreflightAsync(
+        string serial,
+        DeviceRestoreOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(options);
+        ValidateArchiveArguments(options.ArchivePath, options.RestorePassword);
+        if (!options.HasSelectedComponent)
+            throw new ArgumentException("At least one restore component must be selected.", nameof(options));
+
+        string sessionDirectory = CreateLocalSessionDirectory();
+        string plaintextPath = Path.Combine(sessionDirectory, "payload.zip");
+        try
+        {
+            await BackupEnvelopeCrypto.VerifyAndDecryptAsync(
+                    options.ArchivePath,
+                    plaintextPath,
+                    options.RestorePassword,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
+                    plaintextPath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            RestorePlan plan = await BuildRestorePlanAsync(
+                    serial,
+                    options,
+                    manifest,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return CreateCompatibility(plan, options);
         }
         finally
         {
@@ -1056,7 +1108,8 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                     packagePlan.Manifest.PackageName,
                     packagePlan.Manifest.Group,
                     packagePlan.Compatibility.Outcome,
-                    packagePlan.Compatibility.Reason));
+                    packagePlan.Compatibility.Reason,
+                    Warning: packagePlan.Compatibility.Warning));
                 continue;
             }
 
@@ -1077,7 +1130,8 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                     packagePlan.Manifest.Group,
                     DeviceRestoreOutcome.Succeeded,
                     null,
-                    restoredPayloads));
+                    RestoredPayloadCount: restoredPayloads,
+                    Warning: packagePlan.Compatibility.Warning));
             }
             catch (OperationCanceledException)
             {
@@ -1322,6 +1376,16 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         const string targetPath = "/data/system/keybox.xml";
         string metadata = await ReadFileMetadataAsync(serial, targetPath, cancellationToken)
             .ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(metadata))
+        {
+            metadata = await BuildFallbackMetadataAsync(
+                    serial,
+                    "/data/system",
+                    fallbackOwner: "0:0",
+                    defaultMode: "600",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
         string remotePayloadPath = $"{remoteSessionPath}/keybox.xml";
         await PushZipEntryAsync(
                 serial,
@@ -1370,11 +1434,22 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         await ValidateXmlEntryAsync(entry, "SSAID", cancellationToken).ConfigureAwait(false);
 
         const string targetPath = "/data/system/users/0/settings_ssaid.xml";
-        string metadata = await ReadFileMetadataAsync(serial, targetPath, cancellationToken)
+        string targetMetadata = await ReadFileMetadataAsync(serial, targetPath, cancellationToken)
             .ConfigureAwait(false);
+        string metadata = targetMetadata;
+        if (string.IsNullOrWhiteSpace(metadata))
+        {
+            metadata = await BuildFallbackMetadataAsync(
+                    serial,
+                    "/data/system/users/0",
+                    fallbackOwner: "1000:1000",
+                    defaultMode: "600",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
         string remotePayloadPath = $"{remoteSessionPath}/settings_ssaid.xml";
         string remoteRollbackPath = $"{remoteSessionPath}/rollback-settings_ssaid.xml";
-        bool rollbackAvailable = !string.IsNullOrWhiteSpace(metadata);
+        bool rollbackAvailable = !string.IsNullOrWhiteSpace(targetMetadata);
         execution.MutationStarted = true;
 
         try
@@ -1483,7 +1558,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                 .ConfigureAwait(false);
             await RunRequiredShellAsync(
                     serial,
-                    $"mkdir -p {QuoteShellValue(stageDirectory)} && tar -xpf {QuoteShellValue(remoteTarPath)} -C {QuoteShellValue(stageDirectory)} && rm -f {QuoteShellValue(remoteTarPath)}",
+                    $"mkdir -p {QuoteShellValue(stageDirectory)} && tar -xpf {QuoteShellValue(remoteTarPath)} -C {QuoteShellValue(stageDirectory)}",
                     $"stage {descriptor.Component} payload",
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -1505,9 +1580,39 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             }
 
             string livePath = $"{descriptor.Directory}/{descriptor.FileName}";
-            string metadata = await ReadFileMetadataAsync(serial, livePath, cancellationToken)
+            string liveMetadata = await ReadFileMetadataAsync(serial, livePath, cancellationToken)
                 .ConfigureAwait(false);
-            staged.Add(new StagedAccountPayload(descriptor, stagedPath, livePath, metadata));
+            string metadata = liveMetadata;
+            if (string.IsNullOrWhiteSpace(metadata))
+            {
+                metadata = await BuildFallbackMetadataAsync(
+                        serial,
+                        descriptor.Directory,
+                        fallbackOwner: "1000:1000",
+                        defaultMode: descriptor.IsDirectory ? "700" : "660",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            string? rollbackTarPath = null;
+            if (!string.IsNullOrWhiteSpace(liveMetadata))
+            {
+                rollbackTarPath = $"{remoteSessionPath}/account-rollback-{index:D5}.tar";
+                await RunRequiredShellAsync(
+                        serial,
+                        $"tar -cpf {QuoteShellValue(rollbackTarPath)} -C {QuoteShellValue(descriptor.Directory)} {QuoteShellValue(descriptor.FileName)}",
+                        $"save the current {descriptor.Component} state",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            staged.Add(new StagedAccountPayload(
+                descriptor,
+                stagedPath,
+                livePath,
+                metadata,
+                remoteTarPath,
+                rollbackTarPath));
         }
 
         if (staged.Count == 0)
@@ -1536,21 +1641,15 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                 string parent = GetUnixDirectoryName(payload.LivePath);
                 await RunRequiredShellAsync(
                         serial,
-                        $"mkdir -p {QuoteShellValue(parent)} && cp -f {QuoteShellValue(payload.StagedPath)} {QuoteShellValue(payload.LivePath)}",
+                        $"rm -rf {QuoteShellValue(payload.LivePath)} && mkdir -p {QuoteShellValue(parent)} && tar -xpf {QuoteShellValue(payload.RemoteTarPath)} -C {QuoteShellValue(parent)}",
                         $"replace {payload.Descriptor.Component} state",
                         cancellationToken)
                     .ConfigureAwait(false);
-                await ApplyFileMetadataAsync(
+                await ApplyAccountMetadataAsync(
                         serial,
                         payload.LivePath,
                         payload.Metadata,
-                        defaultMode: payload.Descriptor.IsDatabase ? "600" : "600",
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                await RunRequiredShellAsync(
-                        serial,
-                        $"restorecon {QuoteShellValue(payload.LivePath)}",
-                        $"restore {payload.Descriptor.Component} SELinux context",
+                        payload.Descriptor.IsDirectory,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -1562,6 +1661,18 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         {
             if (frameworkStopped)
             {
+                try
+                {
+                    await RollbackAccountStateAsync(serial, staged).ConfigureAwait(false);
+                }
+                catch (Exception rollbackException)
+                {
+                    _logger.LogError(
+                        rollbackException,
+                        "Google Account State rollback failed for {Serial}.",
+                        serial);
+                }
+
                 try
                 {
                     using var recoveryCancellation = new CancellationTokenSource(CleanupTimeout);
@@ -1583,6 +1694,92 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
 
             throw;
         }
+    }
+
+    private async Task RollbackAccountStateAsync(
+        string serial,
+        IReadOnlyList<StagedAccountPayload> staged)
+    {
+        using var rollbackCancellation = new CancellationTokenSource(CleanupTimeout);
+        Exception? rollbackFailure = null;
+        foreach (StagedAccountPayload payload in staged.Reverse())
+        {
+            try
+            {
+                string parent = GetUnixDirectoryName(payload.LivePath);
+                string restoreCommand = payload.RollbackTarPath is null
+                    ? $"rm -rf {QuoteShellValue(payload.LivePath)}"
+                    : $"rm -rf {QuoteShellValue(payload.LivePath)} && mkdir -p {QuoteShellValue(parent)} && tar -xpf {QuoteShellValue(payload.RollbackTarPath)} -C {QuoteShellValue(parent)}";
+                await RunRequiredShellAsync(
+                        serial,
+                        restoreCommand,
+                        $"rollback {payload.Descriptor.Component} state",
+                        rollbackCancellation.Token)
+                    .ConfigureAwait(false);
+
+                if (payload.RollbackTarPath is not null)
+                {
+                    await ApplyAccountMetadataAsync(
+                            serial,
+                            payload.LivePath,
+                            payload.Metadata,
+                            payload.Descriptor.IsDirectory,
+                            rollbackCancellation.Token)
+                        .ConfigureAwait(false);
+                }
+            }
+            catch (Exception exception)
+            {
+                rollbackFailure ??= exception;
+                _logger.LogError(
+                    exception,
+                    "Could not rollback Google Account State component {Component} on {Serial}.",
+                    payload.Descriptor.Component,
+                    serial);
+            }
+        }
+
+        try
+        {
+            await RunRequiredShellAsync(
+                    serial,
+                    "sync",
+                    "flush rolled back account state",
+                    rollbackCancellation.Token)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            rollbackFailure ??= exception;
+        }
+
+        if (rollbackFailure is not null)
+            throw rollbackFailure;
+    }
+
+    private async Task ApplyAccountMetadataAsync(
+        string serial,
+        string path,
+        string metadata,
+        bool isDirectory,
+        CancellationToken cancellationToken)
+    {
+        await ApplyFileMetadataAsync(
+                serial,
+                path,
+                metadata,
+                defaultMode: isDirectory ? "700" : "660",
+                cancellationToken,
+                recursive: isDirectory)
+            .ConfigureAwait(false);
+        await RunRequiredShellAsync(
+                serial,
+                isDirectory
+                    ? $"restorecon -RF {QuoteShellValue(path)}"
+                    : $"restorecon {QuoteShellValue(path)}",
+                $"restore {GetUnixFileName(path)} SELinux context",
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<RestorePlan> BuildRestorePlanAsync(
@@ -1654,6 +1851,11 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         {
             if (package.Group is not ("apps" or "google"))
                 continue;
+            if ((package.Group == "apps" && !options.RestoreUserAppData)
+                || (package.Group == "google" && !options.RestoreGoogleAppData))
+            {
+                continue;
+            }
             if (!IsValidPackageName(package.PackageName))
                 throw new InvalidDataException("The archive contains an invalid package name.");
 
@@ -1671,6 +1873,17 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             accountStatePartial,
             targetRole,
             targetSdk);
+    }
+
+    private static DeviceRestoreCompatibility CreateCompatibility(
+        RestorePlan plan,
+        DeviceRestoreOptions options)
+    {
+        bool isCompatible = !options.RestoreGoogleAccountState || plan.AccountStateAllowed;
+        return new(
+            isCompatible,
+            plan.Warnings,
+            plan.Packages.Select(item => item.Compatibility).ToArray());
     }
 
     private async Task<DeviceRestorePackageCompatibility> CheckPackageCompatibilityAsync(
@@ -1721,13 +1934,18 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
 
         string output = metadataResult.StandardOutput;
         long? targetVersion = ParseLong(VersionCodePattern, output);
+        long? targetSdkLong = ParseLong(TargetSdkPattern, output);
+        int? targetSdk = targetSdkLong is > 0 and <= int.MaxValue
+            ? (int)targetSdkLong.Value
+            : null;
         long? targetUidLong = ParseLong(SourceUidPattern, output);
         int? targetUid = targetUidLong is >= 0 and <= int.MaxValue
             ? (int)targetUidLong.Value
             : null;
-        string? targetDigest = ParseSigningCertificateSha256(output);
+        string sourceDigest = NormalizeDigest(package.SigningCertificateSha256);
+        string targetDigest = NormalizeDigest(ParseSigningCertificateSha256(output));
 
-        if (package.SigningCertificateSha256 is null || targetDigest is null)
+        if (sourceDigest.Length == 0 || targetDigest.Length == 0)
         {
             return new(
                 package.PackageName,
@@ -1739,8 +1957,8 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         }
 
         if (!string.Equals(
-                NormalizeDigest(package.SigningCertificateSha256),
-                NormalizeDigest(targetDigest),
+                sourceDigest,
+                targetDigest,
                 StringComparison.OrdinalIgnoreCase))
         {
             return new(
@@ -1806,7 +2024,13 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             package.VersionCode,
             targetVersion,
             targetUid,
-            targetVersion > package.VersionCode ? "newer_target_version" : null);
+            targetVersion > package.VersionCode
+                ? "newer_target_version"
+                : package.TargetSdk.HasValue
+                    && targetSdk.HasValue
+                    && package.TargetSdk.Value != targetSdk.Value
+                    ? "target_sdk_differs"
+                    : null);
     }
 
     private async Task<BackupArchiveManifest> LoadAndValidateArchiveAsync(
@@ -1864,9 +2088,20 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         if (manifest.Checksums.Count != checksumNames.Count)
             throw new InvalidDataException("The backup manifest checksum table was inconsistent.");
 
+        var allowedUnchecksummedEntries = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "manifest.json"
+        };
+        foreach (PackageBackupManifest package in manifest.Packages)
+        {
+            allowedUnchecksummedEntries.Add(
+                NormalizeArchivePath($"{package.Group}/{package.PackageName}/manifest.json"));
+        }
+
         foreach (string entryPath in normalizedEntries.Keys)
         {
-            if (entryPath != "manifest.json" && !checksumNames.Contains(entryPath))
+            if (!checksumNames.Contains(entryPath)
+                && !allowedUnchecksummedEntries.Contains(entryPath))
             {
                 throw new InvalidDataException(
                     $"The backup ZIP contains an unlisted payload entry: {entryPath}.");
@@ -1981,6 +2216,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         {
             await ValidatePropertiesEntryAsync(
                     normalizedEntries["properties.json"],
+                    manifest.PropertyStatuses,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -1989,6 +2225,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         {
             await ValidateSettingsEntryAsync(
                     normalizedEntries["settings.json"],
+                    manifest.SettingsStatuses,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -2019,22 +2256,54 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             throw new InvalidDataException("The backup manifest component selection was missing.");
         if (manifest.Checksums is null)
             throw new InvalidDataException("The backup manifest checksums were missing.");
+        if (manifest.PropertyStatuses is null
+            || manifest.SettingsStatuses is null
+            || manifest.Packages is null
+            || manifest.OptionalComponents is null)
+        {
+            throw new InvalidDataException("The backup manifest contained a missing status collection.");
+        }
+        if (manifest.Warnings is null)
+            throw new InvalidDataException("The backup manifest warnings were missing.");
+
+        if (manifest.PropertiesStatus is not ("not_selected" or "backed_up" or "keybox_property_only")
+            || manifest.SettingsStatus is not ("not_selected" or "backed_up"))
+        {
+            throw new InvalidDataException("The backup manifest summary status was invalid.");
+        }
 
         CreateUniqueStatusMap(
-            manifest.PropertyStatuses ?? [],
+            manifest.PropertyStatuses,
             item => item.PropertyName,
             "property status");
+        foreach (BackupPropertyStatus status in manifest.PropertyStatuses)
+        {
+            if (!ValidPropertyStates.Contains(status.State))
+                throw new InvalidDataException($"The property status {status.PropertyName} was invalid.");
+        }
+
         CreateUniqueStatusMap(
-            manifest.SettingsStatuses ?? [],
+            manifest.SettingsStatuses,
             item => item.Name,
             "setting status");
+        foreach (BackupSettingStatus status in manifest.SettingsStatuses)
+        {
+            if (!ValidSettingStates.Contains(status.State))
+                throw new InvalidDataException($"The setting status {status.Name} was invalid.");
+        }
+
         CreateUniqueStatusMap(
-            manifest.OptionalComponents ?? [],
+            manifest.OptionalComponents,
             item => item.Component,
             "optional component");
+        foreach (BackupComponentStatus status in manifest.OptionalComponents)
+        {
+            if (!ValidOptionalComponentStates.Contains(status.State))
+                throw new InvalidDataException($"The optional component status {status.Component} was invalid.");
+        }
 
         var packageNames = new HashSet<string>(StringComparer.Ordinal);
-        foreach (PackageBackupManifest package in manifest.Packages ?? [])
+        foreach (PackageBackupManifest package in manifest.Packages)
         {
             if (!IsValidPackageName(package.PackageName)
                 || package.Group is not ("apps" or "google"))
@@ -2045,10 +2314,44 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             if (!packageNames.Add($"{package.Group}:{package.PackageName}"))
                 throw new InvalidDataException("The backup manifest contains a duplicate package entry.");
 
+            if (!ValidPackageStates.Contains(package.Status)
+                || package.VersionCode is < 0
+                || package.SourceUid is < 0
+                || package.TargetSdk is <= 0
+                || package.CeLogicalAliases is null
+                || package.Paths is null)
+            {
+                throw new InvalidDataException(
+                    $"The backup manifest metadata was invalid for {package.PackageName}.");
+            }
+
+            if (package.SigningCertificateSha256 is not null
+                && NormalizeDigest(package.SigningCertificateSha256).Length == 0)
+            {
+                throw new InvalidDataException(
+                    $"The signing certificate digest was invalid for {package.PackageName}.");
+            }
+
             CreateUniqueStatusMap(
-                package.Paths ?? [],
+                package.Paths,
                 item => item.DevicePath,
                 $"package data path for {package.PackageName}");
+            foreach (BackupDataPathStatus path in package.Paths)
+            {
+                if (!ValidPackagePathStates.Contains(path.State)
+                    || string.IsNullOrWhiteSpace(path.DevicePath))
+                {
+                    throw new InvalidDataException(
+                        $"The package data path status was invalid for {package.PackageName}.");
+                }
+
+                bool hasPayload = path.State is "backed_up" or "present_alias";
+                if (hasPayload != !string.IsNullOrWhiteSpace(path.Payload))
+                {
+                    throw new InvalidDataException(
+                        $"The package data payload mapping was invalid for {package.PackageName}.");
+                }
+            }
         }
     }
 
@@ -2060,12 +2363,15 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         await using Stream tarStream = zipEntry.Open();
         using var reader = new TarReader(tarStream, leaveOpen: false);
         bool sawEntry = false;
+        var paths = new HashSet<string>(StringComparer.Ordinal);
         TarEntry? entry;
         while ((entry = reader.GetNextEntry(copyData: false)) is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             sawEntry = true;
             string name = NormalizeTarPath(entry.Name);
+            if (!paths.Add(name))
+                throw new InvalidDataException($"The tar payload contains a duplicate entry: {name}.");
             if (name.Length == 0 || name == ".")
                 throw new InvalidDataException("A tar payload contained an empty path.");
             if (name != expectedRoot
@@ -2120,6 +2426,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
 
     private static async Task ValidatePropertiesEntryAsync(
         ZipArchiveEntry entry,
+        IReadOnlyList<BackupPropertyStatus> statuses,
         CancellationToken cancellationToken)
     {
         await using Stream stream = entry.Open();
@@ -2142,10 +2449,20 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                 throw new InvalidDataException(
                     $"The property payload value for {property.Name} was not a string.");
         }
+
+        foreach (BackupPropertyStatus status in statuses)
+        {
+            if (status.State == "backed_up" && !names.Contains(status.PropertyName))
+            {
+                throw new InvalidDataException(
+                    $"The properties payload was missing {status.PropertyName} marked backed_up.");
+            }
+        }
     }
 
     private static async Task ValidateSettingsEntryAsync(
         ZipArchiveEntry entry,
+        IReadOnlyList<BackupSettingStatus> statuses,
         CancellationToken cancellationToken)
     {
         await using Stream stream = entry.Open();
@@ -2177,6 +2494,15 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             if (settingValue.ValueKind != JsonValueKind.String)
                 throw new InvalidDataException(
                     $"The settings payload value for {settingName} was not a string.");
+        }
+
+        foreach (BackupSettingStatus status in statuses)
+        {
+            if (status.State == "backed_up" && !names.Contains(status.Name))
+            {
+                throw new InvalidDataException(
+                    $"The settings payload was missing {status.Name} marked backed_up.");
+            }
         }
     }
 
@@ -2309,12 +2635,43 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         if (!selected)
             return;
 
+        bool selectedInManifest = component switch
+        {
+            "keybox" => manifest.SelectedComponents.Keybox,
+            "ssaId" => manifest.SelectedComponents.Ssaid,
+            "googleAppData" => manifest.SelectedComponents.GoogleAppData,
+            "googleAccountState" => manifest.SelectedComponents.GoogleAccountState,
+            _ => false
+        };
         BackupComponentStatus? status = FindOptionalStatus(manifest, component);
-        if (status is null || status.State is not ("backed_up" or "partial"))
+        if (!selectedInManifest
+            || status is null
+            || status.State is not ("backed_up" or "partial")
+            || !HasRestorableOptionalPayload(manifest, component))
         {
             throw new InvalidOperationException(
                 $"The selected restore component {component} is not available in this backup.");
         }
+    }
+
+    private static bool HasRestorableOptionalPayload(
+        BackupArchiveManifest manifest,
+        string component)
+    {
+        return component switch
+        {
+            "keybox" => FindOptionalStatus(manifest, "keybox")?.State == "backed_up",
+            "ssaId" => FindOptionalStatus(manifest, "ssaId")?.State == "backed_up",
+            "googleAppData" => manifest.Packages.Any(package =>
+                string.Equals(package.Group, "google", StringComparison.Ordinal)
+                && string.Equals(package.Status, "backed_up", StringComparison.Ordinal)
+                && package.Paths.Any(path =>
+                    path.State is "backed_up" or "present_alias"
+                    && !string.IsNullOrWhiteSpace(path.Payload))),
+            "googleAccountState" => AccountPaths.Any(descriptor =>
+                FindOptionalStatus(manifest, descriptor.Component)?.State == "backed_up"),
+            _ => false
+        };
     }
 
     private static BackupComponentStatus FindRequiredOptionalStatus(
@@ -2455,21 +2812,42 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         return output == missing ? string.Empty : output;
     }
 
+    private async Task<string> BuildFallbackMetadataAsync(
+        string serial,
+        string parentPath,
+        string fallbackOwner,
+        string defaultMode,
+        CancellationToken cancellationToken)
+    {
+        string parentMetadata = await ReadFileMetadataAsync(
+                serial,
+                parentPath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        Match parentMatch = FileMetadataPattern.Match(parentMetadata);
+        string owner = parentMatch.Success
+            ? $"{parentMatch.Groups["uid"].Value}:{parentMatch.Groups["gid"].Value}"
+            : fallbackOwner;
+        return $"{owner}:{defaultMode}";
+    }
+
     private async Task ApplyFileMetadataAsync(
         string serial,
         string path,
         string metadata,
         string defaultMode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool recursive = false)
     {
         Match match = FileMetadataPattern.Match(metadata);
         string owner = match.Success
             ? $"{match.Groups["uid"].Value}:{match.Groups["gid"].Value}"
             : "0:0";
         string mode = match.Success ? match.Groups["mode"].Value : defaultMode;
+        string chownCommand = recursive ? "chown -R" : "chown";
         await RunRequiredShellAsync(
                 serial,
-                $"chown {QuoteShellValue(owner)} {QuoteShellValue(path)} && chmod {QuoteShellValue(mode)} {QuoteShellValue(path)}",
+                $"{chownCommand} {QuoteShellValue(owner)} {QuoteShellValue(path)} && chmod {QuoteShellValue(mode)} {QuoteShellValue(path)}",
                 $"apply metadata to {path}",
                 cancellationToken)
             .ConfigureAwait(false);
@@ -2733,7 +3111,10 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         string Directory,
         string FileName,
         string ArchivePath,
-        bool IsDatabase);
+        bool IsDatabase)
+    {
+        public bool IsDirectory => !IsDatabase;
+    }
 
     private sealed record PackagePlan(
         PackageBackupManifest Manifest,
@@ -2752,7 +3133,9 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         AccountRestoreDescriptor Descriptor,
         string StagedPath,
         string LivePath,
-        string Metadata);
+        string Metadata,
+        string RemoteTarPath,
+        string? RollbackTarPath);
 
     private sealed class RestoreExecution
     {

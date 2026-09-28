@@ -249,6 +249,22 @@
     <sys:String x:Key="Log_RestoreDeviceSuccess">Khôi phục hoàn tất.</sys:String>
     <sys:String x:Key="Log_RestoreDevicePartial">Khôi phục hoàn tất nhưng có cảnh báo.</sys:String>
     <sys:String x:Key="Log_RestoreDeviceFailedFormat">Khôi phục thất bại: {0}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageIssuesFormat">Tương thích gói khi khôi phục: {0}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageIssuesAndFailureFormat">Khôi phục thất bại: {0}. Tương thích gói: {1}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageIssueFormat">{0}: {1}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageNotInstalled">gói đích chưa được cài đặt</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageMetadataUnavailable">không đọc được metadata gói đích</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageSignatureUnavailable">không xác minh được chứng chỉ ký</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageSignatureMismatch">chứng chỉ ký không khớp</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageVersionUnavailable">không đọc được metadata phiên bản</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageTargetVersionOlder">phiên bản đích cũ hơn bản sao lưu</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageTargetUidUnavailable">không đọc được UID đích</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackagePayloadMissing">không có payload để khôi phục</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageSourceUnavailable">payload gói nguồn không khả dụng</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageNewerTargetVersion">phiên bản đích mới hơn bản sao lưu</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageTargetSdkDiffers">target SDK khác với bản sao lưu</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageRestoreFailed">khôi phục gói thất bại</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceServiceUnavailable">dịch vụ khôi phục không khả dụng</sys:String>
     <sys:String x:Key="Log_RestoreDeviceArchiveNotProvided">Đã bỏ qua khôi phục: chưa cung cấp tệp cho thiết bị này.</sys:String>
     <sys:String x:Key="Log_RestoreDeviceDuplicateSourceSerial">Kiểm tra khôi phục thất bại: các tệp đã chọn có serial nguồn trùng nhau.</sys:String>
 </ResourceDictionary>

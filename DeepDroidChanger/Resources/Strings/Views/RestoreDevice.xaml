@@ -9,6 +9,7 @@
     <sys:String x:Key="RestoreDevice_BrowseTitle">Choose a DeepDroid backup</sys:String>
     <sys:String x:Key="RestoreDevice_FileFilter">DeepDroid backup (*.ddcbak)|*.ddcbak</sys:String>
     <sys:String x:Key="RestoreDevice_ArchiveCountFormat">{0} backup archives selected</sys:String>
+    <sys:String x:Key="RestoreDevice_InspectionFailureFormat">{0}: archive inspection failed ({1})</sys:String>
     <sys:String x:Key="RestoreDevice_PasswordLabel">Backup Password</sys:String>
     <sys:String x:Key="RestoreDevice_PasswordTooltip">Enter the password used to encrypt this backup.</sys:String>
     <sys:String x:Key="RestoreDevice_PasswordTooShort">Password must contain at least 8 characters.</sys:String>
@@ -22,6 +23,12 @@
     <sys:String x:Key="RestoreDevice_PartialAccountWarning">Backup contains partial Google Account State.</sys:String>
     <sys:String x:Key="RestoreDevice_SameDeviceAccountWarning">Google Account State is restricted to a compatible same-device restore.</sys:String>
     <sys:String x:Key="RestoreDevice_AccountSnapshotUnavailableWarning">Some Google Account State snapshots were unavailable in this backup.</sys:String>
+    <sys:String x:Key="RestoreDevice_SourceSerialDiffersWarning">The backup source serial differs from the target.</sys:String>
+    <sys:String x:Key="RestoreDevice_SourceRoleDiffersWarning">The backup source device role differs from the target.</sys:String>
+    <sys:String x:Key="RestoreDevice_KeyboxSensitiveWarning">Keybox restore is sensitive and can change device identity state.</sys:String>
+    <sys:String x:Key="RestoreDevice_SsaidCrossDeviceWarning">SSAID restore is strongly discouraged across different device serials.</sys:String>
+    <sys:String x:Key="RestoreDevice_GoogleAppCrossDeviceWarning">Google App Data comes from a different source device or role.</sys:String>
+    <sys:String x:Key="RestoreDevice_AccountIncompatibleWarning">Google Account State is incompatible with this target and must be deselected.</sys:String>
     <sys:String x:Key="RestoreDevice_ComponentsHeader">Restore components</sys:String>
     <sys:String x:Key="RestoreDevice_DeviceProperties">Device and Change Properties</sys:String>
     <sys:String x:Key="RestoreDevice_ManagedSettings">Managed System Settings</sys:String>

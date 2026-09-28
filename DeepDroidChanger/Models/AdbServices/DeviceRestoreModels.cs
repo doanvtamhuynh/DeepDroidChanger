@@ -57,6 +57,9 @@ public sealed record DeviceRestoreBatchOptions(
     public IReadOnlyList<DeviceRestoreInspection> Inspections { get; init; } = [];
 
     [JsonIgnore]
+    public IReadOnlyList<DeviceRestoreInspectionFailure> FailedInspections { get; init; } = [];
+
+    [JsonIgnore]
     public bool HasSelectedComponent =>
         RestoreDeviceProperties
         || RestoreManagedSystemSettings
@@ -144,14 +147,30 @@ public sealed record DeviceRestoreInspection(
 
     public bool HasUserAppData =>
         SelectedComponents.UserAppData
-        && Packages.Any(package => string.Equals(package.Group, "apps", StringComparison.Ordinal));
+        && Packages.Any(package =>
+            string.Equals(package.Group, "apps", StringComparison.Ordinal)
+            && string.Equals(package.Status, "backed_up", StringComparison.Ordinal)
+            && package.Paths.Any(path =>
+                path.State is "backed_up" or "present_alias"
+                && !string.IsNullOrWhiteSpace(path.Payload)));
 
     public bool HasKeybox => SelectedComponents.Keybox && HasAvailableOptionalComponent("keybox");
     public bool HasSsaid => SelectedComponents.Ssaid && HasAvailableOptionalComponent("ssaId");
-    public bool HasGoogleAppData => SelectedComponents.GoogleAppData && HasAvailableOptionalComponent("googleAppData");
+    public bool HasGoogleAppData =>
+        SelectedComponents.GoogleAppData
+        && HasAvailableOptionalComponent("googleAppData")
+        && Packages.Any(package =>
+            string.Equals(package.Group, "google", StringComparison.Ordinal)
+            && string.Equals(package.Status, "backed_up", StringComparison.Ordinal)
+            && package.Paths.Any(path =>
+                path.State is "backed_up" or "present_alias"
+                && !string.IsNullOrWhiteSpace(path.Payload)));
 
     public bool HasGoogleAccountState => SelectedComponents.GoogleAccountState
-        && HasAvailableOptionalComponent("googleAccountState");
+        && HasAvailableOptionalComponent("googleAccountState")
+        && OptionalComponents.Any(item =>
+            item.Component.StartsWith("account.", StringComparison.Ordinal)
+            && string.Equals(item.State, "backed_up", StringComparison.Ordinal));
 
     public string PropertiesStatus { get; init; } = "not_selected";
     public IReadOnlyList<BackupPropertyStatus> PropertyStatuses { get; init; } = [];
@@ -162,7 +181,7 @@ public sealed record DeviceRestoreInspection(
     {
         return OptionalComponents.Any(item =>
             string.Equals(item.Component, component, StringComparison.Ordinal)
-            && item.State is "backed_up" or "partial");
+            && item.State is ("backed_up" or "partial"));
     }
 
     public BackupComponentStatus? FindOptionalComponent(string component)
@@ -172,13 +191,18 @@ public sealed record DeviceRestoreInspection(
     }
 }
 
+public sealed record DeviceRestoreInspectionFailure(
+    string ArchivePath,
+    string Reason);
+
 public sealed record DeviceRestorePackageResult(
     string PackageName,
     string Group,
     DeviceRestoreOutcome Outcome,
     string? Reason,
     int RestoredPayloadCount = 0,
-    int SkippedPayloadCount = 0);
+    int SkippedPayloadCount = 0,
+    string? Warning = null);
 
 public sealed record DeviceRestoreComponentResult(
     string Component,

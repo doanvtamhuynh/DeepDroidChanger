@@ -249,6 +249,22 @@
     <sys:String x:Key="Log_RestoreDeviceSuccess">Restore completed.</sys:String>
     <sys:String x:Key="Log_RestoreDevicePartial">Restore completed with warnings.</sys:String>
     <sys:String x:Key="Log_RestoreDeviceFailedFormat">Restore failed: {0}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageIssuesFormat">Restore package compatibility: {0}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageIssuesAndFailureFormat">Restore failed: {0}. Package compatibility: {1}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageIssueFormat">{0}: {1}</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageNotInstalled">target package is not installed</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageMetadataUnavailable">target package metadata is unavailable</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageSignatureUnavailable">signing certificate could not be verified</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageSignatureMismatch">signing certificate does not match</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageVersionUnavailable">version metadata is unavailable</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageTargetVersionOlder">target version is older than the backup</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageTargetUidUnavailable">target UID is unavailable</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackagePayloadMissing">no restorable payload is available</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageSourceUnavailable">source package payload is unavailable</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageNewerTargetVersion">target has a newer version than the backup</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageTargetSdkDiffers">target SDK differs from the backup</sys:String>
+    <sys:String x:Key="Log_RestoreDevicePackageRestoreFailed">package restore failed</sys:String>
+    <sys:String x:Key="Log_RestoreDeviceServiceUnavailable">restore service is unavailable</sys:String>
     <sys:String x:Key="Log_RestoreDeviceArchiveNotProvided">Restore skipped: no archive was provided for this device.</sys:String>
     <sys:String x:Key="Log_RestoreDeviceDuplicateSourceSerial">Restore validation failed: duplicate source serials were selected.</sys:String>
 </ResourceDictionary>

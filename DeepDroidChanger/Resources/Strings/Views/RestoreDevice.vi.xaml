@@ -9,6 +9,7 @@
     <sys:String x:Key="RestoreDevice_BrowseTitle">Chọn tệp sao lưu DeepDroid</sys:String>
     <sys:String x:Key="RestoreDevice_FileFilter">Bản sao lưu DeepDroid (*.ddcbak)|*.ddcbak</sys:String>
     <sys:String x:Key="RestoreDevice_ArchiveCountFormat">Đã chọn {0} tệp sao lưu</sys:String>
+    <sys:String x:Key="RestoreDevice_InspectionFailureFormat">{0}: kiểm tra tệp thất bại ({1})</sys:String>
     <sys:String x:Key="RestoreDevice_PasswordLabel">Mật khẩu sao lưu</sys:String>
     <sys:String x:Key="RestoreDevice_PasswordTooltip">Nhập mật khẩu dùng để mã hóa bản sao lưu này.</sys:String>
     <sys:String x:Key="RestoreDevice_PasswordTooShort">Mật khẩu phải có ít nhất 8 ký tự.</sys:String>
@@ -22,6 +23,12 @@
     <sys:String x:Key="RestoreDevice_PartialAccountWarning">Bản sao lưu chứa trạng thái tài khoản Google không đầy đủ.</sys:String>
     <sys:String x:Key="RestoreDevice_SameDeviceAccountWarning">Trạng thái tài khoản Google chỉ dành cho khôi phục cùng thiết bị tương thích.</sys:String>
     <sys:String x:Key="RestoreDevice_AccountSnapshotUnavailableWarning">Một số snapshot trạng thái tài khoản Google không khả dụng trong bản sao lưu.</sys:String>
+    <sys:String x:Key="RestoreDevice_SourceSerialDiffersWarning">Serial nguồn của bản sao lưu khác serial thiết bị đích.</sys:String>
+    <sys:String x:Key="RestoreDevice_SourceRoleDiffersWarning">Vai trò thiết bị nguồn khác vai trò thiết bị đích.</sys:String>
+    <sys:String x:Key="RestoreDevice_KeyboxSensitiveWarning">Khôi phục Keybox nhạy cảm và có thể thay đổi trạng thái định danh.</sys:String>
+    <sys:String x:Key="RestoreDevice_SsaidCrossDeviceWarning">Không nên khôi phục SSAID giữa các serial thiết bị khác nhau.</sys:String>
+    <sys:String x:Key="RestoreDevice_GoogleAppCrossDeviceWarning">Dữ liệu ứng dụng Google đến từ thiết bị hoặc vai trò nguồn khác.</sys:String>
+    <sys:String x:Key="RestoreDevice_AccountIncompatibleWarning">Trạng thái tài khoản Google không tương thích; hãy bỏ chọn thành phần này.</sys:String>
     <sys:String x:Key="RestoreDevice_ComponentsHeader">Thành phần khôi phục</sys:String>
     <sys:String x:Key="RestoreDevice_DeviceProperties">Thuộc tính thiết bị và cấu hình thay đổi</sys:String>
     <sys:String x:Key="RestoreDevice_ManagedSettings">Cài đặt hệ thống được quản lý</sys:String>

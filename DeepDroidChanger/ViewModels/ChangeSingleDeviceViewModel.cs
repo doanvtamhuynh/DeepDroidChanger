@@ -429,6 +429,38 @@ namespace DeepDroidChanger.ViewModels
             _deviceActionFeedbackService.SetProcess(device.Serial, resourceKey, formatArguments);
         }
 
+        private string? FormatRestorePackageIssues(DeviceRestoreResult result)
+        {
+            var issues = result.Packages
+                .Where(package => package.Outcome is DeviceRestoreOutcome.Skipped or DeviceRestoreOutcome.Failed
+                    || !string.IsNullOrWhiteSpace(package.Warning))
+                .Select(package => string.Format(
+                    _localizationService.GetString("Log_RestoreDevicePackageIssueFormat"),
+                    package.PackageName,
+                    _localizationService.GetString(GetRestorePackageReasonResourceKey(package.Warning ?? package.Reason))))
+                .ToArray();
+            return issues.Length == 0 ? null : string.Join("; ", issues);
+        }
+
+        private static string GetRestorePackageReasonResourceKey(string? reason)
+        {
+            return reason switch
+            {
+                "package_not_installed" => "Log_RestoreDevicePackageNotInstalled",
+                "package_metadata_unavailable" => "Log_RestoreDevicePackageMetadataUnavailable",
+                "signature_unavailable" => "Log_RestoreDevicePackageSignatureUnavailable",
+                "signature_mismatch" => "Log_RestoreDevicePackageSignatureMismatch",
+                "version_unavailable" => "Log_RestoreDevicePackageVersionUnavailable",
+                "target_version_older" => "Log_RestoreDevicePackageTargetVersionOlder",
+                "target_uid_unavailable" => "Log_RestoreDevicePackageTargetUidUnavailable",
+                "payload_missing" => "Log_RestoreDevicePackagePayloadMissing",
+                "source_package_unavailable" => "Log_RestoreDevicePackageSourceUnavailable",
+                "newer_target_version" => "Log_RestoreDevicePackageNewerTargetVersion",
+                "target_sdk_differs" => "Log_RestoreDevicePackageTargetSdkDiffers",
+                _ => "Log_RestoreDevicePackageRestoreFailed"
+            };
+        }
+
         private void SetContextDeviceLog(
             DeviceRowViewModel device,
             string resourceKey,
@@ -2301,7 +2333,10 @@ namespace DeepDroidChanger.ViewModels
 
             if (_restoreConfigDialogService is null || _deviceRestoreService is null)
             {
-                SetDeviceLog(selectedDevice!, "Log_RestoreDeviceFailedFormat", "Restore service is unavailable.");
+                SetDeviceLog(
+                    selectedDevice!,
+                    "Log_RestoreDeviceFailedFormat",
+                    _localizationService.GetString("Log_RestoreDeviceServiceUnavailable"));
                 return;
             }
 
@@ -2377,20 +2412,40 @@ namespace DeepDroidChanger.ViewModels
                         DeviceRestoreResult result = await _deviceRestoreService
                             .RestoreAsync(device.Serial, options, progress, cancellationToken)
                             .ConfigureAwait(true);
+                        string? packageIssues = FormatRestorePackageIssues(result);
+                        if (packageIssues is not null)
+                        {
+                            if (result.Outcome == DeviceRestoreOutcome.Failed)
+                            {
+                                SetDeviceLog(
+                                    device,
+                                    "Log_RestoreDevicePackageIssuesAndFailureFormat",
+                                    result.FailureReason ?? GetLogText("Log_RestoreDevicePackageRestoreFailed"),
+                                    packageIssues);
+                            }
+                            else
+                            {
+                                SetDeviceLog(
+                                    device,
+                                    "Log_RestoreDevicePackageIssuesFormat",
+                                    packageIssues);
+                            }
+                        }
+
                         string resultKey = result.Outcome switch
                         {
                             DeviceRestoreOutcome.Succeeded => "Log_RestoreDeviceSuccess",
                             DeviceRestoreOutcome.Partial => "Log_RestoreDevicePartial",
                             _ => "Log_RestoreDeviceFailedFormat"
                         };
-                        if (result.Outcome == DeviceRestoreOutcome.Failed)
+                        if (result.Outcome == DeviceRestoreOutcome.Failed && packageIssues is null)
                         {
                             SetDeviceLog(
                                 device,
                                 resultKey,
-                                result.FailureReason ?? "The restore operation did not complete.");
+                                result.FailureReason ?? GetLogText("Log_RestoreDevicePackageRestoreFailed"));
                         }
-                        else
+                        else if (packageIssues is null)
                         {
                             SetDeviceLog(device, resultKey);
                         }

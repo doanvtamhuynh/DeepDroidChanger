@@ -34,6 +34,7 @@ public sealed class RestoreConfigDialogService : IRestoreConfigDialogService
         window.Owner = Application.Current?.MainWindow;
         window.DataContext = viewModel;
         viewModel.SetTargetDescription(targetSerial);
+        viewModel.SetTargetSerials([targetSerial]);
 
         viewModel.CloseRequested += accepted => window.DialogResult = accepted;
         _logger.LogDebug("Opening the shared Restore Device configuration dialog.");
@@ -74,6 +75,7 @@ public sealed class RestoreConfigDialogService : IRestoreConfigDialogService
             .GetRequiredService<RestoreDeviceDialog>();
         viewModel.SetArchivePaths(archivePaths);
         viewModel.SetTargetDescription(string.Join(", ", targetSerials));
+        viewModel.SetTargetSerials(targetSerials);
         window.Owner = Application.Current?.MainWindow;
         window.DataContext = viewModel;
 

@@ -9,6 +9,11 @@ public interface IDeviceRestoreService
         string password,
         CancellationToken cancellationToken);
 
+    Task<DeviceRestoreCompatibility> PreflightAsync(
+        string serial,
+        DeviceRestoreOptions options,
+        CancellationToken cancellationToken);
+
     Task<DeviceRestoreResult> RestoreAsync(
         string serial,
         DeviceRestoreOptions options,

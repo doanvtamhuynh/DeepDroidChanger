@@ -1,8 +1,8 @@
 # Device backup format
 
 The backup writer stores an encrypted, versioned envelope around the existing
-ZIP payload. Restore is not implemented; this document defines the bytes a
-future restore workflow must read.
+ZIP payload. Restore consumes the same envelope and payload contract described
+below.
 
 ## Outer `.ddcbak` envelope, version 1
 
@@ -41,7 +41,9 @@ partial destination is renamed to its final `.ddcbak` name.
 
 The encrypted payload is the existing ZIP structure containing entries such as
 `manifest.json`, `properties.json`, `settings.json`, app payloads, optional
-payloads, and internal SHA-256 checksums. The internal manifest uses
+payloads, and internal SHA-256 checksums. The root and per-package
+`manifest.json` entries are structural and intentionally are not checksum
+entries. The internal manifest uses
 `FormatVersion = 2`; `EncryptionFormatVersion = 1` identifies the outer
 envelope. These are separate version numbers.
 
@@ -119,7 +121,8 @@ target. Excluded and unknown properties/settings are never replayed. App
 payloads require an installed target package, verifiable signing certificate,
 and a target version that is not older than the source; the target UID is
 queried on the target device and is never copied from the archive. CE aliases
-are extracted once to the canonical target path.
+are extracted once to the canonical target path. A newer target version is
+allowed and is reported as a compatibility warning.
 
 Keybox, SSAID, Google App Data, and Google Account State remain explicit
 optional components. Keybox and SSAID payloads are validated and installed
@@ -136,4 +139,6 @@ removed on success, failure, and cancellation with bounded cleanup tokens.
 Restore reports per-component and per-package outcomes (`Succeeded`,
 `Partial`, or `Failed`) and does not report success when a selected component
 or package was skipped because compatibility or validation could not be
-established.
+established. The dialog performs a target compatibility preflight after
+inspection and before the device action is reserved; a batch keeps valid
+archive inspections while reporting invalid archives separately.

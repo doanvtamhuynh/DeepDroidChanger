@@ -851,7 +851,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 _deviceActionFeedbackService.SetNonOwningProcess(
                     device.Serial,
                     "Log_RestoreDeviceFailedFormat",
-                    "Restore service is unavailable.");
+                    _localizationService.GetString("Log_RestoreDeviceServiceUnavailable"));
             }
 
             return;
@@ -953,6 +953,14 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             foreach (DeviceRowViewModel device in selectedDevices.Where(initiallyEligible.Contains))
                 _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
             return;
+        }
+
+        foreach (DeviceRestoreInspectionFailure failure in options.FailedInspections)
+        {
+            _logger.LogWarning(
+                "Ignoring restore archive {ArchivePath} after inspection failure: {Reason}.",
+                failure.ArchivePath,
+                failure.Reason);
         }
 
         DeviceRestoreInspection[] inspections = options.Inspections.ToArray();
@@ -1493,7 +1501,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                     .ConfigureAwait(false);
 
                 IDeviceRestoreService restoreService = _deviceRestoreService
-                    ?? throw new InvalidOperationException("Restore service is unavailable.");
+                    ?? throw new InvalidOperationException(
+                        _localizationService.GetString("Log_RestoreDeviceServiceUnavailable"));
                 var deviceOptions = new DeviceRestoreOptions(
                     archivePath,
                     options.RestoreDeviceProperties,
@@ -1513,26 +1522,57 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                         progress,
                         targetCancellation.Token)
                     .ConfigureAwait(false);
+                string? packageIssues = FormatRestorePackageIssues(result);
+                if (packageIssues is not null)
+                {
+                    if (result.Outcome == DeviceRestoreOutcome.Failed)
+                    {
+                        await RunOnUiContextAsync(() => SetTargetLog(
+                                target,
+                                "Log_RestoreDevicePackageIssuesAndFailureFormat",
+                                result.FailureReason ?? GetLogText("Log_RestoreDevicePackageRestoreFailed"),
+                                packageIssues))
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await RunOnUiContextAsync(() => SetTargetLog(
+                                target,
+                                "Log_RestoreDevicePackageIssuesFormat",
+                                packageIssues))
+                            .ConfigureAwait(false);
+                    }
+                }
+
                 switch (result.Outcome)
                 {
                     case DeviceRestoreOutcome.Succeeded:
-                        await RunOnUiContextAsync(() => SetTargetLog(
-                                target,
-                                "Log_RestoreDeviceSuccess"))
-                            .ConfigureAwait(false);
+                        if (packageIssues is null)
+                        {
+                            await RunOnUiContextAsync(() => SetTargetLog(
+                                    target,
+                                    "Log_RestoreDeviceSuccess"))
+                                .ConfigureAwait(false);
+                        }
                         break;
                     case DeviceRestoreOutcome.Partial:
-                        await RunOnUiContextAsync(() => SetTargetLog(
-                                target,
-                                "Log_RestoreDevicePartial"))
-                            .ConfigureAwait(false);
+                        if (packageIssues is null)
+                        {
+                            await RunOnUiContextAsync(() => SetTargetLog(
+                                    target,
+                                    "Log_RestoreDevicePartial"))
+                                .ConfigureAwait(false);
+                        }
                         break;
                     default:
-                        await RunOnUiContextAsync(() => SetTargetLog(
-                                target,
-                                "Log_RestoreDeviceFailedFormat",
-                                result.FailureReason ?? "Restore did not complete."))
-                            .ConfigureAwait(false);
+                        if (packageIssues is null)
+                        {
+                            await RunOnUiContextAsync(() => SetTargetLog(
+                                    target,
+                                    "Log_RestoreDeviceFailedFormat",
+                                    result.FailureReason ?? GetLogText("Log_RestoreDevicePackageRestoreFailed")))
+                                .ConfigureAwait(false);
+                        }
                         break;
                 }
             }
@@ -4217,6 +4257,38 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     {
         if (IsCurrentTarget(target) && IsActiveBatchTarget(target))
             SetDeviceLog(target.Device, resourceKey, formatArguments);
+    }
+
+    private string? FormatRestorePackageIssues(DeviceRestoreResult result)
+    {
+        var issues = result.Packages
+            .Where(package => package.Outcome is DeviceRestoreOutcome.Skipped or DeviceRestoreOutcome.Failed
+                || !string.IsNullOrWhiteSpace(package.Warning))
+            .Select(package => string.Format(
+                _localizationService.GetString("Log_RestoreDevicePackageIssueFormat"),
+                package.PackageName,
+                _localizationService.GetString(GetRestorePackageReasonResourceKey(package.Warning ?? package.Reason))))
+            .ToArray();
+        return issues.Length == 0 ? null : string.Join("; ", issues);
+    }
+
+    private static string GetRestorePackageReasonResourceKey(string? reason)
+    {
+        return reason switch
+        {
+            "package_not_installed" => "Log_RestoreDevicePackageNotInstalled",
+            "package_metadata_unavailable" => "Log_RestoreDevicePackageMetadataUnavailable",
+            "signature_unavailable" => "Log_RestoreDevicePackageSignatureUnavailable",
+            "signature_mismatch" => "Log_RestoreDevicePackageSignatureMismatch",
+            "version_unavailable" => "Log_RestoreDevicePackageVersionUnavailable",
+            "target_version_older" => "Log_RestoreDevicePackageTargetVersionOlder",
+            "target_uid_unavailable" => "Log_RestoreDevicePackageTargetUidUnavailable",
+            "payload_missing" => "Log_RestoreDevicePackagePayloadMissing",
+            "source_package_unavailable" => "Log_RestoreDevicePackageSourceUnavailable",
+            "newer_target_version" => "Log_RestoreDevicePackageNewerTargetVersion",
+            "target_sdk_differs" => "Log_RestoreDevicePackageTargetSdkDiffers",
+            _ => "Log_RestoreDevicePackageRestoreFailed"
+        };
     }
 
     private Task SetContextOperationCancellationLogAsync(
