@@ -41,18 +41,10 @@ public sealed class RestoreConfigDialogService : IRestoreConfigDialogService
 
         using CancellationTokenRegistration registration =
             DialogCancellation.RegisterClose(window, cancellationToken);
-        try
-        {
-            bool accepted = window.ShowDialog() == true;
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult<DeviceRestoreOptions?>(
-                accepted ? viewModel.BuildOptions() : null);
-        }
-        finally
-        {
-            window.ClearSensitiveInputs();
-            viewModel.ClearSensitiveInputs();
-        }
+        bool accepted = window.ShowDialog() == true;
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<DeviceRestoreOptions?>(
+            accepted ? viewModel.BuildOptions() : null);
     }
 
     public Task<DeviceRestoreBatchOptions?> ShowRestoreBatchConfigAsync(
@@ -86,17 +78,9 @@ public sealed class RestoreConfigDialogService : IRestoreConfigDialogService
 
         using CancellationTokenRegistration registration =
             DialogCancellation.RegisterClose(window, cancellationToken);
-        try
-        {
-            bool accepted = window.ShowDialog() == true;
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult<DeviceRestoreBatchOptions?>(
-                accepted ? viewModel.BuildBatchOptions() : null);
-        }
-        finally
-        {
-            window.ClearSensitiveInputs();
-            viewModel.ClearSensitiveInputs();
-        }
+        bool accepted = window.ShowDialog() == true;
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<DeviceRestoreBatchOptions?>(
+            accepted ? viewModel.BuildBatchOptions() : null);
     }
 }

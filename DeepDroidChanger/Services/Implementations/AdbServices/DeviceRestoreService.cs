@@ -125,32 +125,15 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
 
     public async Task<DeviceRestoreInspection> InspectAsync(
         string archivePath,
-        string password,
         CancellationToken cancellationToken)
     {
-        ValidateArchiveArguments(archivePath, password);
+        ValidateArchiveArguments(archivePath);
         cancellationToken.ThrowIfCancellationRequested();
-
-        string sessionDirectory = CreateLocalSessionDirectory();
-        string plaintextPath = Path.Combine(sessionDirectory, "payload.zip");
-        try
-        {
-            await BackupEnvelopeCrypto.VerifyAndDecryptAsync(
-                    archivePath,
-                    plaintextPath,
-                    password,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
-                    plaintextPath,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            return CreateInspection(archivePath, manifest);
-        }
-        finally
-        {
-            TryDeleteDirectory(sessionDirectory);
-        }
+        BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
+                archivePath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return CreateInspection(archivePath, manifest);
     }
 
     public async Task<DeviceRestoreCompatibility> PreflightAsync(
@@ -160,36 +143,22 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         ArgumentNullException.ThrowIfNull(options);
-        ValidateArchiveArguments(options.ArchivePath, options.RestorePassword);
+        ValidateArchiveArguments(options.ArchivePath);
         if (!options.HasSelectedComponent)
             throw new ArgumentException("At least one restore component must be selected.", nameof(options));
 
-        string sessionDirectory = CreateLocalSessionDirectory();
-        string plaintextPath = Path.Combine(sessionDirectory, "payload.zip");
-        try
-        {
-            await BackupEnvelopeCrypto.VerifyAndDecryptAsync(
-                    options.ArchivePath,
-                    plaintextPath,
-                    options.RestorePassword,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
-                    plaintextPath,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            RestorePlan plan = await BuildRestorePlanAsync(
-                    serial,
-                    options,
-                    manifest,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            return CreateCompatibility(plan, options);
-        }
-        finally
-        {
-            TryDeleteDirectory(sessionDirectory);
-        }
+        BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
+                options.ArchivePath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        RestorePlan plan = await BuildRestorePlanAsync(
+                serial,
+                options,
+                manifest,
+                options.ArchivePath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return CreateCompatibility(plan, options);
     }
 
     public async Task<DeviceRestoreResult> RestoreAsync(
@@ -200,13 +169,13 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         ArgumentNullException.ThrowIfNull(options);
-        ValidateArchiveArguments(options.ArchivePath, options.RestorePassword);
+        ValidateArchiveArguments(options.ArchivePath);
         if (!options.HasSelectedComponent)
             throw new ArgumentException("At least one restore component must be selected.", nameof(options));
 
         progress?.Report(new(DeviceRestoreStage.Preparing));
         string localSessionDirectory = CreateLocalSessionDirectory();
-        string plaintextPath = Path.Combine(localSessionDirectory, "payload.zip");
+        string plaintextPath = options.ArchivePath;
         string sessionId = Guid.NewGuid().ToString("N");
         string remoteSessionPath = $"/data/local/tmp/deepdroid-restore/{sessionId}";
         var execution = new RestoreExecution();
@@ -215,12 +184,6 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         try
         {
             progress?.Report(new(DeviceRestoreStage.ValidatingArchive));
-            await BackupEnvelopeCrypto.VerifyAndDecryptAsync(
-                    options.ArchivePath,
-                    plaintextPath,
-                    options.RestorePassword,
-                    cancellationToken)
-                .ConfigureAwait(false);
             BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
                     plaintextPath,
                     cancellationToken)
@@ -232,6 +195,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                     serial,
                     options,
                     manifest,
+                    plaintextPath,
                     cancellationToken)
                 .ConfigureAwait(false);
             execution.Warnings.AddRange(plan.Warnings);
@@ -311,6 +275,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         CancellationToken cancellationToken)
     {
         Exception? primaryFailure = null;
+        bool finalizationCompleted = false;
         try
         {
             await RunRequiredShellAsync(
@@ -429,6 +394,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                                 serial,
                                 archive,
                                 plan.Manifest,
+                                plan.KeyboxEnabledValue,
                                 remoteSessionPath,
                                 localSessionDirectory,
                                 execution,
@@ -547,15 +513,16 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                             execution,
                             cancellationToken)
                         .ConfigureAwait(false);
+                    finalizationCompleted = true;
                 }
                 catch (OperationCanceledException)
                 {
                     throw;
                 }
-                catch (Exception exception)
+                catch (Exception)
                 {
                     execution.Warnings.Add("final_property_states_failed");
-                    primaryFailure ??= exception;
+                    execution.Warnings.Add("final_property_states_retrying");
                 }
             }
 
@@ -574,6 +541,32 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         }
         finally
         {
+            if (!finalizationCompleted && execution.HasPendingFinalization)
+            {
+                try
+                {
+                    using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+                    await FinalizePropertyStatesAsync(
+                            serial,
+                            execution,
+                            cleanupCancellation.Token)
+                        .ConfigureAwait(false);
+                    finalizationCompleted = true;
+                    execution.Warnings.Add("final_property_states_recovered");
+                }
+                catch (Exception finalizationException)
+                {
+                    execution.Warnings.Add("final_property_states_failed");
+                    execution.FailureReason ??= "final_property_states_failed";
+                    primaryFailure ??= finalizationException;
+                    MarkFinalizationFailure(execution, finalizationException.Message);
+                    _logger.LogError(
+                        finalizationException,
+                        "Final property state recovery failed for {Serial}.",
+                        serial);
+                }
+            }
+
             try
             {
                 using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
@@ -647,6 +640,15 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         if (!needsDebugGate)
             return;
 
+        // Capture the desired final state before forcing temporary restore
+        // gates. This state must survive cancellation or an early component
+        // failure so the finalizer can always restore it.
+        execution.PendingPropertyValues = new Dictionary<string, string>(
+            values,
+            StringComparer.Ordinal);
+        execution.PendingPropertyStatuses = new Dictionary<string, BackupPropertyStatus>(
+            statuses,
+            StringComparer.Ordinal);
         execution.MutationStarted = true;
         bool debugGateTouched = false;
         Exception? primaryFailure = null;
@@ -728,9 +730,6 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                 handled.Add(propertyName);
             }
 
-            execution.PendingPropertyValues = values;
-            execution.PendingPropertyStatuses = statuses;
-            execution.PropertiesPrepared = true;
         }
         catch (Exception exception)
         {
@@ -885,10 +884,14 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
 
             if (execution.PendingKeyboxEnabledValue is not null)
             {
+                string finalKeyboxValue = execution.PendingKeyboxPayloadInstalled
+                    || !IsEnabledPropertyValue(execution.PendingKeyboxEnabledValue)
+                    ? execution.PendingKeyboxEnabledValue
+                    : "false";
                 await _adb.SetPropertyAsync(
                         serial,
                         PropertyConstants.Keybox.Enabled,
-                        execution.PendingKeyboxEnabledValue,
+                        finalKeyboxValue,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -1224,6 +1227,16 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         RestoreExecution execution,
         CancellationToken cancellationToken)
     {
+        // Capture target-side ownership before clearing or extracting any
+        // source archive data. Never derive the target GID from the tar tree.
+        string targetGroup = await ReadTargetGroupAsync(
+                serial,
+                $"/data/user/0/{package.PackageName}",
+                targetUid,
+                cancellationToken)
+            .ConfigureAwait(false);
+        string owner = $"{targetUid}:{targetGroup}";
+
         execution.MutationStarted = true;
         await _adb.ForceStopPackageAsync(serial, package.PackageName, cancellationToken)
             .ConfigureAwait(false);
@@ -1273,15 +1286,19 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                     "remove extracted package payload",
                     cancellationToken)
                 .ConfigureAwait(false);
-        }
 
-        string targetGroup = await ReadTargetGroupAsync(
-                serial,
-                $"/data/user/0/{package.PackageName}",
-                targetUid,
-                cancellationToken)
-            .ConfigureAwait(false);
-        string owner = $"{targetUid}:{targetGroup}";
+            if (destinationPath.StartsWith("/data/user/0/", StringComparison.Ordinal)
+                || destinationPath.StartsWith("/data/data/", StringComparison.Ordinal)
+                || destinationPath.StartsWith("/data/user_de/0/", StringComparison.Ordinal))
+            {
+                await RunRequiredShellAsync(
+                        serial,
+                        $"if [ -e {QuoteShellValue(destinationPath)} ]; then chown -R {QuoteShellValue(owner)} {QuoteShellValue(destinationPath)} && restorecon -RF {QuoteShellValue(destinationPath)}; fi",
+                        $"apply ownership to {package.PackageName} data payload",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
         var targetOwnedPaths = new List<string>();
         var externalPaths = new List<string>();
         foreach (string path in new[]
@@ -1343,29 +1360,28 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         string serial,
         ZipArchive archive,
         BackupArchiveManifest manifest,
+        string? keyboxEnabledValue,
         string remoteSessionPath,
         string localSessionDirectory,
         RestoreExecution execution,
         CancellationToken cancellationToken)
     {
         BackupComponentStatus status = FindRequiredOptionalStatus(manifest, "keybox");
-        if (status.State != "backed_up")
-            throw new InvalidOperationException("The Keybox payload is not available in this backup.");
+        bool hasPayload = status.State == "backed_up";
+        if (!hasPayload && IsEnabledPropertyValue(keyboxEnabledValue))
+            throw new InvalidOperationException("keybox_payload_missing_for_enabled_state");
+
+        string desiredValue = keyboxEnabledValue ?? "false";
+        execution.PendingKeyboxEnabledValue = desiredValue;
+        execution.PendingKeyboxPayloadInstalled = false;
+        execution.MutationStarted = true;
+
+        if (!hasPayload)
+            return;
 
         ZipArchiveEntry entry = GetRequiredEntry(archive, "optional/keybox.xml");
         await ValidateXmlEntryAsync(entry, "Keybox", cancellationToken).ConfigureAwait(false);
-        BackupPropertyPayload properties = await ReadJsonEntryAsync<BackupPropertyPayload>(
-                archive,
-                "properties.json",
-                cancellationToken)
-            .ConfigureAwait(false);
-        Dictionary<string, string> values = new(properties.Values, StringComparer.Ordinal);
-        Dictionary<string, BackupPropertyStatus> statuses = CreateUniqueStatusMap(
-            manifest.PropertyStatuses,
-            item => item.PropertyName,
-            "property status");
 
-        execution.MutationStarted = true;
         await _adb.SetPropertyAsync(
                 serial,
                 PropertyConstants.Keybox.Enabled,
@@ -1410,16 +1426,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                 cancellationToken)
             .ConfigureAwait(false);
 
-        if (statuses.TryGetValue(PropertyConstants.Keybox.Enabled, out BackupPropertyStatus? keyboxStatus))
-        {
-            execution.PendingKeyboxEnabledValue = keyboxStatus.State == "backed_up"
-                ? values.TryGetValue(PropertyConstants.Keybox.Enabled, out string? savedValue)
-                    ? savedValue
-                    : throw new InvalidDataException("The Keybox enabled property is missing from the backup.")
-                : keyboxStatus.State is "skipped_missing" or "skipped_empty" or "empty"
-                    ? string.Empty
-                    : "false";
-        }
+        execution.PendingKeyboxPayloadInstalled = true;
     }
 
     private async Task RestoreSsaidAsync(
@@ -1622,19 +1629,42 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         bool frameworkStopped = false;
         try
         {
+            string systemServerPid = await RunShellOutputAsync(
+                    serial,
+                    "pidof system_server 2>/dev/null || true",
+                    "verify Android framework is running before account-state replacement",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(systemServerPid))
+            {
+                throw new InvalidOperationException(
+                    "android_framework_not_running_before_account_restore");
+            }
+
             await RunRequiredShellAsync(
                     serial,
-                    "setprop ctl.stop system_server",
+                    "if [ \"$(getprop init.svc.zygote_secondary)\" = \"running\" ]; then stop zygote_secondary; fi; stop zygote",
                     "stop Android framework for account-state replacement",
                     cancellationToken)
                 .ConfigureAwait(false);
             frameworkStopped = true;
             await RunRequiredShellAsync(
                     serial,
-                    "for i in 1 2 3 4 5 6 7 8 9 10; do if ! pidof system_server >/dev/null 2>&1; then break; fi; sleep 1; done; if pidof system_server >/dev/null 2>&1; then exit 1; fi",
+                    "for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do if ! pidof system_server >/dev/null 2>&1; then exit 0; fi; sleep 1; done; exit 1",
                     "wait for Android framework shutdown",
                     cancellationToken)
                 .ConfigureAwait(false);
+            string remainingSystemServerPid = await RunShellOutputAsync(
+                    serial,
+                    "pidof system_server 2>/dev/null || true",
+                    "verify Android framework shutdown",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(remainingSystemServerPid))
+            {
+                throw new InvalidOperationException(
+                    "android_framework_stop_timeout");
+            }
 
             foreach (StagedAccountPayload payload in staged)
             {
@@ -1673,23 +1703,9 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
                         serial);
                 }
 
-                try
-                {
-                    using var recoveryCancellation = new CancellationTokenSource(CleanupTimeout);
-                    await RunRequiredShellAsync(
-                            serial,
-                            "setprop ctl.start system_server",
-                            "recover Android framework after account restore failure",
-                            recoveryCancellation.Token)
-                        .ConfigureAwait(false);
-                }
-                catch (Exception recoveryException)
-                {
-                    _logger.LogError(
-                        recoveryException,
-                        "Android framework recovery failed after account restore failure on {Serial}.",
-                        serial);
-                }
+                _logger.LogWarning(
+                    "Android framework remains stopped after account restore failure on {Serial}; the outer restore recovery will reboot the device.",
+                    serial);
             }
 
             throw;
@@ -1786,9 +1802,25 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         string serial,
         DeviceRestoreOptions options,
         BackupArchiveManifest manifest,
+        string archivePath,
         CancellationToken cancellationToken)
     {
         ValidateSelectedComponents(options, manifest);
+        string? keyboxEnabledValue = null;
+        if (options.RestoreKeybox)
+        {
+            keyboxEnabledValue = await ReadKeyboxEnabledValueAsync(
+                    archivePath,
+                    manifest,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (IsEnabledPropertyValue(keyboxEnabledValue)
+                && FindOptionalStatus(manifest, "keybox")?.State != "backed_up")
+            {
+                throw new InvalidOperationException(
+                    "keybox_payload_missing_for_enabled_state");
+            }
+        }
         string? targetRole = await TryReadPropertyAsync(
                 serial,
                 PropertyConstants.DeepDroidDevice,
@@ -1872,7 +1904,8 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             accountStateAllowed,
             accountStatePartial,
             targetRole,
-            targetSdk);
+            targetSdk,
+            keyboxEnabledValue);
     }
 
     private static DeviceRestoreCompatibility CreateCompatibility(
@@ -2243,9 +2276,9 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
 
     private static void ValidateManifestShape(BackupArchiveManifest manifest)
     {
-        if (manifest.FormatVersion != 2
-            || !manifest.Encrypted
-            || manifest.EncryptionFormatVersion != BackupEnvelopeCrypto.FormatVersion)
+        if (manifest.FormatVersion != 3
+            || manifest.Encrypted
+            || manifest.EncryptionFormatVersion != 0)
         {
             throw new InvalidDataException("The backup manifest format is not supported.");
         }
@@ -2644,6 +2677,23 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             _ => false
         };
         BackupComponentStatus? status = FindOptionalStatus(manifest, component);
+        if (component == "keybox")
+        {
+            bool hasKeyboxPropertyState = manifest.PropertyStatuses.Any(item =>
+                string.Equals(item.PropertyName, PropertyConstants.Keybox.Enabled, StringComparison.Ordinal)
+                && item.State is "backed_up" or "skipped_missing" or "skipped_empty" or "empty");
+            if (!selectedInManifest
+                || status is null
+                || status.State is not ("backed_up" or "partial" or "skipped_missing")
+                || (status.State is ("partial" or "skipped_missing") && !hasKeyboxPropertyState))
+            {
+                throw new InvalidOperationException(
+                    "The selected restore component keybox is not available in this backup.");
+            }
+
+            return;
+        }
+
         if (!selectedInManifest
             || status is null
             || status.State is not ("backed_up" or "partial")
@@ -2652,6 +2702,39 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
             throw new InvalidOperationException(
                 $"The selected restore component {component} is not available in this backup.");
         }
+    }
+
+    private async Task<string?> ReadKeyboxEnabledValueAsync(
+        string archivePath,
+        BackupArchiveManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        BackupPropertyStatus? status = manifest.PropertyStatuses.FirstOrDefault(item =>
+            string.Equals(item.PropertyName, PropertyConstants.Keybox.Enabled, StringComparison.Ordinal));
+        if (status is null)
+            return null;
+
+        if (status.State is "skipped_missing" or "skipped_empty" or "empty")
+            return string.Empty;
+        if (status.State != "backed_up")
+            return null;
+
+        using ZipArchive archive = ZipFile.OpenRead(archivePath);
+        BackupPropertyPayload properties = await ReadJsonEntryAsync<BackupPropertyPayload>(
+                archive,
+                "properties.json",
+                cancellationToken)
+            .ConfigureAwait(false);
+        return properties.Values.TryGetValue(PropertyConstants.Keybox.Enabled, out string? value)
+            ? value
+            : throw new InvalidDataException(
+                "The Keybox enabled property is marked backed_up but has no value.");
+    }
+
+    private static bool IsEnabledPropertyValue(string? value)
+    {
+        return value is not null
+            && value.Trim() is "1" or "true" or "on";
     }
 
     private static bool HasRestorableOptionalPayload(
@@ -2792,9 +2875,32 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         int fallbackUid,
         CancellationToken cancellationToken)
     {
-        string metadata = await ReadFileMetadataAsync(serial, path, cancellationToken).ConfigureAwait(false);
-        Match match = FileMetadataPattern.Match(metadata);
-        return match.Success ? match.Groups["gid"].Value : fallbackUid.ToString();
+        string packageName = GetUnixFileName(path);
+        string[] candidatePaths =
+        [
+            path,
+            $"/data/data/{packageName}",
+            $"/data/user_de/0/{packageName}",
+            GetUnixDirectoryName(path),
+            "/data/data",
+            "/data/user_de/0"
+        ];
+        foreach (string candidatePath in candidatePaths.Distinct(StringComparer.Ordinal))
+        {
+            string metadata = await ReadFileMetadataAsync(
+                    serial,
+                    candidatePath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            Match match = FileMetadataPattern.Match(metadata);
+            if (match.Success)
+                return match.Groups["gid"].Value;
+        }
+
+        // Application data normally uses the package UID as its group. This
+        // fallback is still target-derived and never reads ownership from the
+        // source tar archive.
+        return fallbackUid.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private async Task<string> ReadFileMetadataAsync(
@@ -3041,17 +3147,37 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         return directory;
     }
 
-    private static void ValidateArchiveArguments(string archivePath, string password)
+    private static void ValidateArchiveArguments(string archivePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
         if (!File.Exists(archivePath))
             throw new FileNotFoundException("The selected backup archive was not found.", archivePath);
-        if (string.IsNullOrWhiteSpace(password)
-            || password.Length < DeviceRestoreOptions.MinimumRestorePasswordLength)
+
+        if (BackupEnvelopeCrypto.IsLegacyEnvelope(archivePath))
         {
-            throw new ArgumentException(
-                $"A restore password of at least {DeviceRestoreOptions.MinimumRestorePasswordLength} characters is required.",
-                nameof(password));
+            throw new InvalidDataException(
+                "legacy_encrypted_backup_not_supported_without_password");
+        }
+
+        using var stream = new FileStream(
+            archivePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4,
+            useAsync: false);
+        Span<byte> signature = stackalloc byte[4];
+        int read = stream.Read(signature);
+        bool isZip = read == signature.Length
+            && signature[0] == (byte)'P'
+            && signature[1] == (byte)'K'
+            && (signature[2], signature[3]) is ((byte)3, (byte)4)
+                or ((byte)5, (byte)6)
+                or ((byte)7, (byte)8);
+        if (!isZip)
+        {
+            throw new InvalidDataException(
+                "unsupported_backup_archive_format");
         }
     }
 
@@ -3077,6 +3203,36 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         {
             throw new InvalidOperationException(
                 $"ADB failed while attempting to {purpose} (exit code {result.ExitCode}).");
+        }
+    }
+
+    private static void MarkFinalizationFailure(
+        RestoreExecution execution,
+        string reason)
+    {
+        string[] affectedComponents =
+        [
+            execution.HasPendingPropertyStates ? "deviceProperties" : string.Empty,
+            execution.PendingKeyboxEnabledValue is not null ? "keybox" : string.Empty
+        ];
+
+        foreach (string component in affectedComponents.Where(item => item.Length > 0))
+        {
+            DeviceRestoreComponentResult? existing = execution.Components.FirstOrDefault(item =>
+                string.Equals(item.Component, component, StringComparison.Ordinal));
+            DeviceRestoreOutcome outcome = existing is null
+                ? DeviceRestoreOutcome.Failed
+                : existing.Outcome == DeviceRestoreOutcome.Succeeded
+                    ? DeviceRestoreOutcome.Partial
+                    : DeviceRestoreOutcome.Failed;
+            execution.AddComponent(existing is null
+                ? new(component, outcome, reason, FailedCount: 1, Experimental: component == "keybox")
+                : existing with
+                {
+                    Outcome = outcome,
+                    Reason = reason,
+                    FailedCount = Math.Max(1, existing.FailedCount)
+                });
         }
     }
 
@@ -3127,7 +3283,8 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         bool AccountStateAllowed,
         bool AccountStatePartial,
         string? TargetDeviceRole,
-        int? TargetSdk);
+        int? TargetSdk,
+        string? KeyboxEnabledValue);
 
     private sealed record StagedAccountPayload(
         AccountRestoreDescriptor Descriptor,
@@ -3144,11 +3301,17 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         public List<string> Warnings { get; } = [];
         public bool MutationStarted { get; set; }
         public bool Rebooted { get; set; }
-        public bool PropertiesPrepared { get; set; }
         public IReadOnlyDictionary<string, string>? PendingPropertyValues { get; set; }
         public IReadOnlyDictionary<string, BackupPropertyStatus>? PendingPropertyStatuses { get; set; }
         public string? PendingKeyboxEnabledValue { get; set; }
+        public bool PendingKeyboxPayloadInstalled { get; set; }
         public string? FailureReason { get; set; }
+
+        public bool HasPendingPropertyStates =>
+            PendingPropertyValues is not null && PendingPropertyStatuses is not null;
+
+        public bool HasPendingFinalization =>
+            HasPendingPropertyStates || PendingKeyboxEnabledValue is not null;
 
         public void AddComponent(DeviceRestoreComponentResult component)
         {

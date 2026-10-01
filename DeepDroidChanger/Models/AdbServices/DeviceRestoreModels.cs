@@ -12,11 +12,6 @@ public sealed record DeviceRestoreOptions(
     bool RestoreGoogleAppData = false,
     bool RestoreGoogleAccountState = false)
 {
-    public const int MinimumRestorePasswordLength = DeviceBackupOptions.MinimumBackupPasswordLength;
-
-    [JsonIgnore]
-    public string RestorePassword { get; init; } = string.Empty;
-
     [JsonIgnore]
     public bool HasSelectedComponent =>
         RestoreDeviceProperties
@@ -27,14 +22,9 @@ public sealed record DeviceRestoreOptions(
         || RestoreGoogleAppData
         || RestoreGoogleAccountState;
 
-    [JsonIgnore]
-    public bool HasValidRestorePassword =>
-        !string.IsNullOrWhiteSpace(RestorePassword)
-        && RestorePassword.Length >= MinimumRestorePasswordLength;
-
     public override string ToString()
     {
-        return $"{nameof(DeviceRestoreOptions)}(encryptedArchive=true)";
+        return $"{nameof(DeviceRestoreOptions)}(format=3,passwordless=true)";
     }
 }
 
@@ -48,11 +38,6 @@ public sealed record DeviceRestoreBatchOptions(
     bool RestoreGoogleAppData = false,
     bool RestoreGoogleAccountState = false)
 {
-    public const int MinimumRestorePasswordLength = DeviceRestoreOptions.MinimumRestorePasswordLength;
-
-    [JsonIgnore]
-    public string RestorePassword { get; init; } = string.Empty;
-
     [JsonIgnore]
     public IReadOnlyList<DeviceRestoreInspection> Inspections { get; init; } = [];
 
@@ -69,14 +54,9 @@ public sealed record DeviceRestoreBatchOptions(
         || RestoreGoogleAppData
         || RestoreGoogleAccountState;
 
-    [JsonIgnore]
-    public bool HasValidRestorePassword =>
-        !string.IsNullOrWhiteSpace(RestorePassword)
-        && RestorePassword.Length >= MinimumRestorePasswordLength;
-
     public override string ToString()
     {
-        return $"{nameof(DeviceRestoreBatchOptions)}(encryptedArchives={ArchivePaths.Count})";
+        return $"{nameof(DeviceRestoreBatchOptions)}(format=3,passwordless=true,archives={ArchivePaths.Count})";
     }
 }
 
@@ -139,11 +119,13 @@ public sealed record DeviceRestoreInspection(
 {
     public bool HasDeviceProperties =>
         SelectedComponents.DeviceProperties
-        && !string.Equals(PropertiesStatus, "not_selected", StringComparison.Ordinal);
+        && PropertiesStatus is "backed_up" or "keybox_property_only"
+        && PropertyStatuses.Count > 0;
 
     public bool HasManagedSystemSettings =>
         SelectedComponents.ManagedSystemSettings
-        && !string.Equals(SettingsStatus, "not_selected", StringComparison.Ordinal);
+        && SettingsStatus == "backed_up"
+        && SettingsStatuses.Count > 0;
 
     public bool HasUserAppData =>
         SelectedComponents.UserAppData
@@ -154,8 +136,12 @@ public sealed record DeviceRestoreInspection(
                 path.State is "backed_up" or "present_alias"
                 && !string.IsNullOrWhiteSpace(path.Payload)));
 
-    public bool HasKeybox => SelectedComponents.Keybox && HasAvailableOptionalComponent("keybox");
-    public bool HasSsaid => SelectedComponents.Ssaid && HasAvailableOptionalComponent("ssaId");
+    public bool HasKeybox => SelectedComponents.Keybox
+        && (FindOptionalComponent("keybox")?.State == "backed_up"
+            || (FindOptionalComponent("keybox")?.State is "partial" or "skipped_missing"
+                && HasKeyboxEnabledPropertyState));
+    public bool HasSsaid => SelectedComponents.Ssaid
+        && FindOptionalComponent("ssaId")?.State == "backed_up";
     public bool HasGoogleAppData =>
         SelectedComponents.GoogleAppData
         && HasAvailableOptionalComponent("googleAppData")
@@ -176,6 +162,14 @@ public sealed record DeviceRestoreInspection(
     public IReadOnlyList<BackupPropertyStatus> PropertyStatuses { get; init; } = [];
     public string SettingsStatus { get; init; } = "not_selected";
     public IReadOnlyList<BackupSettingStatus> SettingsStatuses { get; init; } = [];
+
+    public bool HasKeyboxEnabledPropertyState =>
+        PropertyStatuses.Any(item =>
+            string.Equals(
+                item.PropertyName,
+                DeepDroidChanger.Constants.PropertyConstants.Keybox.Enabled,
+                StringComparison.Ordinal)
+            && item.State is "backed_up" or "skipped_missing" or "skipped_empty" or "empty");
 
     public bool HasAvailableOptionalComponent(string component)
     {

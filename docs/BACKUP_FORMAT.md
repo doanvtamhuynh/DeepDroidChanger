@@ -1,10 +1,34 @@
 # Device backup format
 
-The backup writer stores an encrypted, versioned envelope around the existing
-ZIP payload. Restore consumes the same envelope and payload contract described
-below.
+The current backup writer stores a versioned ZIP directly in the `.ddcbak`
+file. The archive is intentionally passwordless; callers must protect the
+file and its copies because it can contain device identity and account data.
 
-## Outer `.ddcbak` envelope, version 1
+## Current `.ddcbak` format, version 3
+
+The file is a normal ZIP archive beginning with a ZIP signature. It contains:
+
+- `manifest.json`
+- `properties.json` and `settings.json` when selected
+- `apps/<package>/...` and `google/<package>/...` payloads
+- `optional/keybox.xml`
+- `experimental/settings_ssaid.xml`
+- `account/...` Google Account State snapshots
+
+The root manifest records `FormatVersion = 3`, `Encrypted = false`, and
+`EncryptionFormatVersion = 0`. Internal SHA-256 checksums remain mandatory for
+all payload entries; the structural root and per-package manifests are not
+checksum entries. ZIP paths, duplicates, payload types, and checksums are
+validated before restore mutation.
+
+The writer creates and validates a temporary ZIP, copies it to a unique
+`.ddcbak.partial` file, validates that direct ZIP again, and atomically renames
+the partial file to the final `.ddcbak` name. Temporary payload files and the
+partial file are removed on failure or cancellation.
+
+## Legacy `DDCBACKUP` envelope, previous format
+
+Older releases wrote a password-protected outer envelope with this layout:
 
 All integer fields are little-endian. The envelope is laid out in this order:
 
@@ -33,32 +57,11 @@ are the AES encryption key; the second 32 bytes are the HMAC key. The password,
 derived keys, and account contents are not written to the envelope, manifest,
 settings, or logs.
 
-Encryption and HMAC are streaming operations, so the complete backup is not
-loaded into memory. HMAC is checked with a constant-time comparison before the
-partial destination is renamed to its final `.ddcbak` name.
-
-## Internal payload and lifecycle
-
-The encrypted payload is the existing ZIP structure containing entries such as
-`manifest.json`, `properties.json`, `settings.json`, app payloads, optional
-payloads, and internal SHA-256 checksums. The root and per-package
-`manifest.json` entries are structural and intentionally are not checksum
-entries. The internal manifest uses
-`FormatVersion = 2`; `EncryptionFormatVersion = 1` identifies the outer
-envelope. These are separate version numbers.
-
-The writer performs this sequence:
-
-1. Create the ZIP under `Path.GetTempPath()/DeepDroidChanger/Backup/<session>`.
-2. Close and validate the ZIP and its internal checksums.
-3. Stream-encrypt it into `<name>.ddcbak.partial`.
-4. Validate the envelope length and HMAC.
-5. Delete the plaintext temporary directory.
-6. Atomically rename the verified partial file to `<name>.ddcbak`.
-
-Failure and cancellation attempt to remove both the partial encrypted file and
-the plaintext temporary directory. The writer never falls back to a plaintext
-`.ddcbak`.
+This format is retained only for identification and documentation. Password
+entry is not part of the current Backup or Restore UI, and a legacy file is
+rejected with
+`legacy_encrypted_backup_not_supported_without_password` rather than being
+reported as a corrupt ZIP.
 
 ## Google Account State
 
@@ -105,11 +108,9 @@ The summary distinguishes the following states:
 
 ## Restore behavior
 
-Restore consumes the same envelope and ZIP contract. It authenticates the
-complete header and ciphertext with HMAC-SHA256 before decrypting the ZIP to a
-short-lived restore temporary directory. It then rejects unsafe or duplicate
-ZIP paths, validates the manifest versions and required entries, and verifies
-every manifest SHA-256 checksum before any device mutation. Archive tar files
+Restore opens the direct ZIP and validates its manifest versions, required
+entries, and every manifest SHA-256 checksum before any device mutation. It
+rejects unsafe or duplicate ZIP paths. Archive tar files
 are inspected locally with `System.Formats.Tar`; absolute paths, traversal,
 links, device nodes, FIFOs, and entries outside the expected component subtree
 are rejected.
@@ -125,17 +126,25 @@ are extracted once to the canonical target path. A newer target version is
 allowed and is reported as a compatibility warning.
 
 Keybox, SSAID, Google App Data, and Google Account State remain explicit
-optional components. Keybox and SSAID payloads are validated and installed
-under root with target metadata and `restorecon`. SSAID replacement also stops
+optional components. A Keybox selection is also meaningful when the archive
+contains only the captured `keybox.enabled` property: a missing keybox file
+with a saved disabled or empty value restores that property without inventing
+a file; a saved enabled value requires the keybox payload and is blocked when
+it is missing. Keybox and SSAID payloads are validated and installed under
+root with target metadata and `restorecon`. SSAID replacement also stops
 the SettingsProvider process and is followed by the final reboot so its
 in-memory state is not retained. Account SQLite snapshots are staged and
 checked with `PRAGMA quick_check` when `sqlite3` is available; account files
-are replaced only while the framework is stopped, followed by one final
-reboot. Partial account archives restore only the payloads that are present
+are replaced only after the target framework is confirmed alive, the supported
+`stop zygote` service flow has stopped it, and `system_server` is absent.
+Rollback is attempted while it is stopped; Restore never issues
+`ctl.start system_server`, and final recovery uses a reboot. Partial account
+archives restore only the payloads that are present
 and are reported as partial.
 
-The decrypted ZIP, extracted tar files, and remote staging directory are
-removed on success, failure, and cancellation with bounded cleanup tokens.
+The opened archive, extracted tar files, and remote staging directory are
+closed or removed on success, failure, and cancellation with bounded cleanup
+tokens.
 Restore reports per-component and per-package outcomes (`Succeeded`,
 `Partial`, or `Failed`) and does not report success when a selected component
 or package was skipped because compatibility or validation could not be

@@ -3,16 +3,13 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="RestoreDevice_WindowTitle">Restore Device</sys:String>
     <sys:String x:Key="RestoreDevice_Header">Configure device restore</sys:String>
-    <sys:String x:Key="RestoreDevice_Subtitle">Validate an encrypted .ddcbak archive before restoring selected device state.</sys:String>
+    <sys:String x:Key="RestoreDevice_Subtitle">Inspect a validated passwordless .ddcbak archive before restoring selected device state.</sys:String>
     <sys:String x:Key="RestoreDevice_ArchiveHeader">Backup archive</sys:String>
     <sys:String x:Key="RestoreDevice_Browse">Browse...</sys:String>
     <sys:String x:Key="RestoreDevice_BrowseTitle">Choose a DeepDroid backup</sys:String>
     <sys:String x:Key="RestoreDevice_FileFilter">DeepDroid backup (*.ddcbak)|*.ddcbak</sys:String>
     <sys:String x:Key="RestoreDevice_ArchiveCountFormat">{0} backup archives selected</sys:String>
     <sys:String x:Key="RestoreDevice_InspectionFailureFormat">{0}: archive inspection failed ({1})</sys:String>
-    <sys:String x:Key="RestoreDevice_PasswordLabel">Backup Password</sys:String>
-    <sys:String x:Key="RestoreDevice_PasswordTooltip">Enter the password used to encrypt this backup.</sys:String>
-    <sys:String x:Key="RestoreDevice_PasswordTooShort">Password must contain at least 8 characters.</sys:String>
     <sys:String x:Key="RestoreDevice_SourceHeader">Source backup</sys:String>
     <sys:String x:Key="RestoreDevice_BackupDate">Backup date</sys:String>
     <sys:String x:Key="RestoreDevice_SourceSerial">Source serial</sys:String>
@@ -44,5 +41,5 @@
     <sys:String x:Key="RestoreDevice_Cancel">Cancel</sys:String>
     <sys:String x:Key="RestoreDevice_Confirm">Inspect / Restore</sys:String>
     <sys:String x:Key="RestoreDevice_Action">Restore Device</sys:String>
-    <sys:String x:Key="RestoreDevice_ActionTooltip">Restore selected state from a validated encrypted .ddcbak archive.</sys:String>
+    <sys:String x:Key="RestoreDevice_ActionTooltip">Restore selected state from a validated passwordless .ddcbak archive.</sys:String>
 </ResourceDictionary>

@@ -3,6 +3,7 @@ using System.IO;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
@@ -894,7 +895,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         {
             archivePaths = _filePickerDialogService.ShowOpenFileDialogMulti(
                 _localizationService.GetString("RestoreDevice_FileFilter"),
-                _localizationService.GetString("RestoreDevice_BrowseTitle"));
+                _localizationService.GetString("RestoreDevice_BrowseTitle"),
+                BackupPathConstants.EnsureDefaultDirectory());
         }
         catch (Exception exception)
         {
@@ -1503,25 +1505,39 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 IDeviceRestoreService restoreService = _deviceRestoreService
                     ?? throw new InvalidOperationException(
                         _localizationService.GetString("Log_RestoreDeviceServiceUnavailable"));
+                DeviceRestoreInspection? inspection = options.Inspections.FirstOrDefault(item =>
+                    string.Equals(item.ArchivePath, archivePath, StringComparison.OrdinalIgnoreCase));
+                if (inspection is null)
+                    throw new InvalidOperationException("The restore archive was not successfully inspected for this target.");
+
                 var deviceOptions = new DeviceRestoreOptions(
                     archivePath,
-                    options.RestoreDeviceProperties,
-                    options.RestoreManagedSystemSettings,
-                    options.RestoreUserAppData,
-                    options.RestoreKeybox,
-                    options.RestoreSsaid,
-                    options.RestoreGoogleAppData,
-                    options.RestoreGoogleAccountState)
-                {
-                    RestorePassword = options.RestorePassword
-                };
-                DeviceRestoreResult result = await restoreService
-                    .RestoreAsync(
-                        target.Serial,
-                        deviceOptions,
-                        progress,
-                        targetCancellation.Token)
-                    .ConfigureAwait(false);
+                    options.RestoreDeviceProperties && inspection.HasDeviceProperties,
+                    options.RestoreManagedSystemSettings && inspection.HasManagedSystemSettings,
+                    options.RestoreUserAppData && inspection.HasUserAppData,
+                    options.RestoreKeybox && inspection.HasKeybox,
+                    options.RestoreSsaid && inspection.HasSsaid,
+                    options.RestoreGoogleAppData && inspection.HasGoogleAppData,
+                    options.RestoreGoogleAccountState && inspection.HasGoogleAccountState);
+                DeviceRestoreResult result = deviceOptions.HasSelectedComponent
+                    ? await restoreService
+                        .RestoreAsync(
+                            target.Serial,
+                            deviceOptions,
+                            progress,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false)
+                    : new DeviceRestoreResult(
+                        DeviceRestoreOutcome.Skipped,
+                        [],
+                        [],
+                        [],
+                        Rebooted: false,
+                        FailureReason: null);
+                result = AddMissingBatchComponents(
+                    result,
+                    options,
+                    inspection);
                 string? packageIssues = FormatRestorePackageIssues(result);
                 if (packageIssues is not null)
                 {
@@ -1601,6 +1617,86 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         finally
         {
             CompleteBatchTarget(target);
+        }
+    }
+
+    private static DeviceRestoreResult AddMissingBatchComponents(
+        DeviceRestoreResult result,
+        DeviceRestoreBatchOptions options,
+        DeviceRestoreInspection inspection)
+    {
+        var components = result.Components.ToList();
+        AddMissingComponent(
+            components,
+            options.RestoreDeviceProperties,
+            inspection.HasDeviceProperties,
+            "deviceProperties");
+        AddMissingComponent(
+            components,
+            options.RestoreManagedSystemSettings,
+            inspection.HasManagedSystemSettings,
+            "managedSystemSettings");
+        AddMissingComponent(
+            components,
+            options.RestoreUserAppData,
+            inspection.HasUserAppData,
+            "userAppData");
+        AddMissingComponent(
+            components,
+            options.RestoreKeybox,
+            inspection.HasKeybox,
+            "keybox",
+            experimental: true);
+        AddMissingComponent(
+            components,
+            options.RestoreSsaid,
+            inspection.HasSsaid,
+            "ssaId",
+            experimental: true);
+        AddMissingComponent(
+            components,
+            options.RestoreGoogleAppData,
+            inspection.HasGoogleAppData,
+            "googleAppData",
+            experimental: true);
+        AddMissingComponent(
+            components,
+            options.RestoreGoogleAccountState,
+            inspection.HasGoogleAccountState,
+            "googleAccountState",
+            experimental: true);
+
+        bool hasSkipped = components.Any(component =>
+            component.Outcome == DeviceRestoreOutcome.Skipped);
+        DeviceRestoreOutcome outcome = result.Outcome;
+        if (hasSkipped && outcome == DeviceRestoreOutcome.Succeeded)
+            outcome = DeviceRestoreOutcome.Partial;
+        else if (hasSkipped && outcome == DeviceRestoreOutcome.Skipped)
+            outcome = DeviceRestoreOutcome.Partial;
+
+        return result with
+        {
+            Outcome = outcome,
+            Components = components
+        };
+    }
+
+    private static void AddMissingComponent(
+        List<DeviceRestoreComponentResult> components,
+        bool requested,
+        bool available,
+        string component,
+        bool experimental = false)
+    {
+        if (requested
+            && !available
+            && !components.Any(item => string.Equals(item.Component, component, StringComparison.Ordinal)))
+        {
+            components.Add(new(
+                component,
+                DeviceRestoreOutcome.Skipped,
+                "not_in_backup",
+                Experimental: experimental));
         }
     }
 

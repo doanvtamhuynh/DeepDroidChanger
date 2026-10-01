@@ -3,7 +3,7 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="BackupDevice_WindowTitle">Backup Device</sys:String>
     <sys:String x:Key="BackupDevice_Header">Configure device backup</sys:String>
-    <sys:String x:Key="BackupDevice_Subtitle">Create an encrypted, validated .ddcbak archive. Sensitive values are protected by your password.</sys:String>
+    <sys:String x:Key="BackupDevice_Subtitle">Create a validated passwordless .ddcbak archive. Treat the file as sensitive.</sys:String>
     <sys:String x:Key="BackupDevice_ComponentsHeader">Backup components</sys:String>
     <sys:String x:Key="BackupDevice_DeviceProperties">Device and Change Properties</sys:String>
     <sys:String x:Key="BackupDevice_ManagedSettings">Managed System Settings</sys:String>
@@ -14,13 +14,7 @@
     <sys:String x:Key="BackupDevice_Ssaid">SSAID</sys:String>
     <sys:String x:Key="BackupDevice_GoogleAppData">Google App Data</sys:String>
     <sys:String x:Key="BackupDevice_GoogleAccountState">Google Account State</sys:String>
-    <sys:String x:Key="BackupDevice_SecurityHeader">Backup protection</sys:String>
-    <sys:String x:Key="BackupDevice_SecurityWarning">A password is required to encrypt this backup. Use at least 8 characters. The password is not saved in settings or the archive.</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordLabel">Backup Password</sys:String>
-    <sys:String x:Key="BackupDevice_ConfirmPasswordLabel">Confirm Password</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordTooltip">Enter the password used to encrypt this backup.</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordTooShort">Password must contain at least 8 characters.</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordMismatch">Passwords do not match.</sys:String>
+    <sys:String x:Key="BackupDevice_SensitiveDataWarning">This archive is not encrypted and may contain IMEI, SIM, app data, Google data, Keybox, SSAID, and account state. Store it securely.</sys:String>
     <sys:String x:Key="BackupDevice_DestinationHeader">Destination folder</sys:String>
     <sys:String x:Key="BackupDevice_Browse">Browse...</sys:String>
     <sys:String x:Key="BackupDevice_DefaultLocationHint">Leave blank to use {0}</sys:String>
@@ -30,5 +24,5 @@
     <sys:String x:Key="BackupDevice_Start">Start Backup</sys:String>
     <sys:String x:Key="BackupDevice_BrowseFolderTitle">Choose backup folder</sys:String>
     <sys:String x:Key="BackupDevice_Action">Backup Device</sys:String>
-    <sys:String x:Key="BackupDevice_ActionTooltip">Back up selected device data to an encrypted, validated .ddcbak archive.</sys:String>
+    <sys:String x:Key="BackupDevice_ActionTooltip">Back up selected device data to a validated passwordless .ddcbak archive.</sys:String>
 </ResourceDictionary>

@@ -4,7 +4,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{DynamicResource BackupDevice_WindowTitle}"
         Width="620"
-        Height="720"
+        Height="620"
         MinWidth="560"
         MinHeight="620"
         WindowStartupLocation="CenterOwner"
@@ -99,42 +99,6 @@
                     </StackPanel>
                 </GroupBox>
 
-                <GroupBox Header="{DynamicResource BackupDevice_SecurityHeader}"
-                          Style="{StaticResource DialogOptionGroupBoxStyle}"
-                          Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="{DynamicResource BackupDevice_SecurityWarning}"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"/>
-                        <TextBlock Text="{DynamicResource BackupDevice_PasswordLabel}"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   Margin="0,0,0,3"/>
-                        <PasswordBox x:Name="BackupPasswordBox"
-                                     PasswordChanged="OnBackupPasswordChanged"
-                                     ToolTip="{DynamicResource BackupDevice_PasswordTooltip}"
-                                     Margin="0,0,0,3"/>
-                        <TextBlock Text="{DynamicResource BackupDevice_PasswordTooShort}"
-                                   Foreground="{DynamicResource Brush.Danger}"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   Visibility="{Binding IsBackupPasswordTooShort, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,6"/>
-                        <TextBlock Text="{DynamicResource BackupDevice_ConfirmPasswordLabel}"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   Margin="0,0,0,3"/>
-                        <PasswordBox x:Name="BackupPasswordConfirmationBox"
-                                     PasswordChanged="OnBackupPasswordConfirmationChanged"
-                                     ToolTip="{DynamicResource BackupDevice_PasswordTooltip}"
-                                     Margin="0,0,0,3"/>
-                        <TextBlock Text="{DynamicResource BackupDevice_PasswordMismatch}"
-                                   Foreground="{DynamicResource Brush.Danger}"
-                                   Style="{StaticResource SecondaryTextStyle}"
-                                   Visibility="{Binding IsBackupPasswordMismatch, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-                </GroupBox>
-
                 <GroupBox Header="{DynamicResource BackupDevice_DestinationHeader}"
                           Style="{StaticResource DialogOptionGroupBoxStyle}"
                           Margin="0,0,0,8">
@@ -156,6 +120,10 @@
                                     Style="{StaticResource FlatButtonStyle}"/>
                         </Grid>
                         <TextBlock Text="{Binding DefaultLocationHint}"
+                                   Style="{StaticResource SecondaryTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0"/>
+                        <TextBlock Text="{DynamicResource BackupDevice_SensitiveDataWarning}"
                                    Style="{StaticResource SecondaryTextStyle}"
                                    TextWrapping="Wrap"
                                    Margin="0,6,0,0"/>

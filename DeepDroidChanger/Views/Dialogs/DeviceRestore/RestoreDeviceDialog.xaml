@@ -4,7 +4,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{DynamicResource RestoreDevice_WindowTitle}"
         Width="680"
-        Height="760"
+        Height="700"
         MinWidth="580"
         MinHeight="640"
         WindowStartupLocation="CenterOwner"
@@ -47,9 +47,6 @@
                 </Grid>
                 <TextBlock Text="{Binding SelectedArchiveName}" Style="{StaticResource SecondaryTextStyle}" Margin="0,5,0,0"/>
                 <TextBlock Text="{Binding InspectionError}" Foreground="{DynamicResource Brush.Danger}" Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-                <TextBlock Text="{DynamicResource RestoreDevice_PasswordLabel}" Style="{StaticResource SecondaryTextStyle}" Margin="0,8,0,3"/>
-                <PasswordBox x:Name="RestorePasswordBox" PasswordChanged="OnRestorePasswordChanged" ToolTip="{DynamicResource RestoreDevice_PasswordTooltip}"/>
-                <TextBlock Text="{DynamicResource RestoreDevice_PasswordTooShort}" Foreground="{DynamicResource Brush.Danger}" Style="{StaticResource SecondaryTextStyle}" Visibility="{Binding IsRestorePasswordTooShort, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,4,0,0"/>
             </StackPanel>
         </GroupBox>
 

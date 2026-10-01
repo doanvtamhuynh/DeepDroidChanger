@@ -5,13 +5,22 @@ namespace DeepDroidChanger.Services
 {
     public sealed class FilePickerDialogService : IFilePickerDialogService
     {
-        public string? ShowOpenFileDialog(string filter, string title)
+        public string? ShowOpenFileDialog(
+            string filter,
+            string title,
+            string? initialDirectory = null)
         {
             var dialog = new OpenFileDialog
             {
                 Filter = filter,
                 Title = title
             };
+
+            if (!string.IsNullOrWhiteSpace(initialDirectory)
+                && Directory.Exists(initialDirectory))
+            {
+                dialog.InitialDirectory = initialDirectory;
+            }
 
             if (dialog.ShowDialog() == true)
             {
@@ -21,7 +30,10 @@ namespace DeepDroidChanger.Services
             return null;
         }
 
-        public IReadOnlyList<string> ShowOpenFileDialogMulti(string filter, string title)
+        public IReadOnlyList<string> ShowOpenFileDialogMulti(
+            string filter,
+            string title,
+            string? initialDirectory = null)
         {
             var dialog = new OpenFileDialog
             {
@@ -29,6 +41,12 @@ namespace DeepDroidChanger.Services
                 Title = title,
                 Multiselect = true
             };
+
+            if (!string.IsNullOrWhiteSpace(initialDirectory)
+                && Directory.Exists(initialDirectory))
+            {
+                dialog.InitialDirectory = initialDirectory;
+            }
 
             if (dialog.ShowDialog() == true)
             {

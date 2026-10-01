@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace DeepDroidChanger.Models;
 
 public sealed record DeviceBackupOptions(
@@ -12,11 +10,6 @@ public sealed record DeviceBackupOptions(
     bool IncludeGoogleAccountState = false,
     string? DestinationDirectory = null)
 {
-    public const int MinimumBackupPasswordLength = 8;
-
-    [JsonIgnore]
-    public string BackupPassword { get; init; } = string.Empty;
-
     public bool HasSelectedComponent =>
         IncludeDeviceProperties
         || IncludeManagedSystemSettings
@@ -26,14 +19,9 @@ public sealed record DeviceBackupOptions(
         || IncludeGoogleAppData
         || IncludeGoogleAccountState;
 
-    [JsonIgnore]
-    public bool HasValidBackupPassword =>
-        !string.IsNullOrWhiteSpace(BackupPassword)
-        && BackupPassword.Length >= MinimumBackupPasswordLength;
-
     public override string ToString()
     {
-        return $"{nameof(DeviceBackupOptions)}(encrypted=true)";
+        return $"{nameof(DeviceBackupOptions)}(format=3,passwordless=true)";
     }
 }
 
@@ -57,8 +45,8 @@ public sealed record DeviceBackupResult(
     DateTime CreatedAtUtc);
 
 // These archive contracts are intentionally shared by backup and restore.
-// Keep their member names and ordering stable because the encrypted payload
-// format is a persisted interchange contract.
+// Keep their member names and ordering stable because the ZIP payload format
+// is a persisted interchange contract.
 public sealed record BackupPropertyPayload(IReadOnlyDictionary<string, string> Values);
 
 public sealed record BackupSettingsPayload(IReadOnlyList<BackupSettingValue> Values);

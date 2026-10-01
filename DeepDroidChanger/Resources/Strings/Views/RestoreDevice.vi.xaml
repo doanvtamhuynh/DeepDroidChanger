@@ -3,16 +3,13 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="RestoreDevice_WindowTitle">Khôi phục thiết bị</sys:String>
     <sys:String x:Key="RestoreDevice_Header">Cấu hình khôi phục thiết bị</sys:String>
-    <sys:String x:Key="RestoreDevice_Subtitle">Kiểm tra tệp .ddcbak được mã hóa trước khi khôi phục trạng thái đã chọn.</sys:String>
+    <sys:String x:Key="RestoreDevice_Subtitle">Kiểm tra tệp .ddcbak không mật khẩu trước khi khôi phục trạng thái đã chọn.</sys:String>
     <sys:String x:Key="RestoreDevice_ArchiveHeader">Tệp sao lưu</sys:String>
     <sys:String x:Key="RestoreDevice_Browse">Duyệt...</sys:String>
     <sys:String x:Key="RestoreDevice_BrowseTitle">Chọn tệp sao lưu DeepDroid</sys:String>
     <sys:String x:Key="RestoreDevice_FileFilter">Bản sao lưu DeepDroid (*.ddcbak)|*.ddcbak</sys:String>
     <sys:String x:Key="RestoreDevice_ArchiveCountFormat">Đã chọn {0} tệp sao lưu</sys:String>
     <sys:String x:Key="RestoreDevice_InspectionFailureFormat">{0}: kiểm tra tệp thất bại ({1})</sys:String>
-    <sys:String x:Key="RestoreDevice_PasswordLabel">Mật khẩu sao lưu</sys:String>
-    <sys:String x:Key="RestoreDevice_PasswordTooltip">Nhập mật khẩu dùng để mã hóa bản sao lưu này.</sys:String>
-    <sys:String x:Key="RestoreDevice_PasswordTooShort">Mật khẩu phải có ít nhất 8 ký tự.</sys:String>
     <sys:String x:Key="RestoreDevice_SourceHeader">Nguồn sao lưu</sys:String>
     <sys:String x:Key="RestoreDevice_BackupDate">Ngày sao lưu</sys:String>
     <sys:String x:Key="RestoreDevice_SourceSerial">Serial nguồn</sys:String>
@@ -44,5 +41,5 @@
     <sys:String x:Key="RestoreDevice_Cancel">Hủy</sys:String>
     <sys:String x:Key="RestoreDevice_Confirm">Kiểm tra / Khôi phục</sys:String>
     <sys:String x:Key="RestoreDevice_Action">Khôi phục thiết bị</sys:String>
-    <sys:String x:Key="RestoreDevice_ActionTooltip">Khôi phục trạng thái đã chọn từ tệp .ddcbak được mã hóa và kiểm tra.</sys:String>
+    <sys:String x:Key="RestoreDevice_ActionTooltip">Khôi phục trạng thái đã chọn từ tệp .ddcbak không mật khẩu đã kiểm tra.</sys:String>
 </ResourceDictionary>

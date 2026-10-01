@@ -1,6 +1,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 
@@ -22,9 +23,6 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
 
     [ObservableProperty]
     private string _archivePath = string.Empty;
-
-    [ObservableProperty]
-    private string _restorePassword = string.Empty;
 
     [ObservableProperty]
     private bool _restoreDeviceProperties = true;
@@ -149,12 +147,7 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
         && !_compatibilityBlocked
         && _archivePaths.Count > 0
         && _archivePaths.All(File.Exists)
-        && RestorePassword.Length >= DeviceRestoreOptions.MinimumRestorePasswordLength
         && (Inspection is null || HasSelectedAvailableComponent());
-
-    public bool IsRestorePasswordTooShort =>
-        !string.IsNullOrEmpty(RestorePassword)
-        && RestorePassword.Length < DeviceRestoreOptions.MinimumRestorePasswordLength;
 
     public string SelectedArchiveName =>
         _archivePaths.Count switch
@@ -171,7 +164,8 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
     {
         string? selected = _filePickerDialogService.ShowOpenFileDialog(
             _localizationService.GetString("RestoreDevice_FileFilter"),
-            _localizationService.GetString("RestoreDevice_BrowseTitle"));
+            _localizationService.GetString("RestoreDevice_BrowseTitle"),
+            BackupPathConstants.EnsureDefaultDirectory());
         if (!string.IsNullOrWhiteSpace(selected))
             SetArchivePaths([selected]);
     }
@@ -296,10 +290,7 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
             RestoreKeybox,
             RestoreSsaid,
             RestoreGoogleAppData,
-            RestoreGoogleAccountState)
-        {
-            RestorePassword = RestorePassword
-        };
+            RestoreGoogleAccountState);
     }
 
     public DeviceRestoreBatchOptions BuildBatchOptions()
@@ -321,15 +312,9 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
             RestoreGoogleAppData,
             RestoreGoogleAccountState)
         {
-            RestorePassword = RestorePassword,
             Inspections = _inspections,
             FailedInspections = _inspectionFailures
         };
-    }
-
-    public void ClearSensitiveInputs()
-    {
-        RestorePassword = string.Empty;
     }
 
     partial void OnArchivePathChanged(string value)
@@ -341,18 +326,6 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
             _archivePaths = string.IsNullOrWhiteSpace(value) ? [] : [value];
         }
 
-        _inspections = [];
-        _inspectionFailures = [];
-        _compatibilityWarnings = [];
-        _compatibilityChecked = false;
-        _compatibilityBlocked = false;
-        Inspection = null;
-        InspectionError = string.Empty;
-        NotifyStateChanged();
-    }
-
-    partial void OnRestorePasswordChanged(string value)
-    {
         _inspections = [];
         _inspectionFailures = [];
         _compatibilityWarnings = [];
@@ -390,7 +363,9 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
                 if (targetSerial is null)
                     continue;
 
-                DeviceRestoreOptions options = CreateOptions(inspection.ArchivePath);
+                DeviceRestoreOptions options = CreateOptions(inspection);
+                if (!options.HasSelectedComponent)
+                    continue;
                 preflightTasks.Add(_deviceRestoreService
                     .PreflightAsync(targetSerial, options, CancellationToken.None));
             }
@@ -440,20 +415,17 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
         }
     }
 
-    private DeviceRestoreOptions CreateOptions(string archivePath)
+    private DeviceRestoreOptions CreateOptions(DeviceRestoreInspection inspection)
     {
         return new DeviceRestoreOptions(
-            archivePath,
-            RestoreDeviceProperties,
-            RestoreManagedSystemSettings,
-            RestoreUserAppData,
-            RestoreKeybox,
-            RestoreSsaid,
-            RestoreGoogleAppData,
-            RestoreGoogleAccountState)
-        {
-            RestorePassword = RestorePassword
-        };
+            inspection.ArchivePath,
+            RestoreDeviceProperties && inspection.HasDeviceProperties,
+            RestoreManagedSystemSettings && inspection.HasManagedSystemSettings,
+            RestoreUserAppData && inspection.HasUserAppData,
+            RestoreKeybox && inspection.HasKeybox,
+            RestoreSsaid && inspection.HasSsaid,
+            RestoreGoogleAppData && inspection.HasGoogleAppData,
+            RestoreGoogleAccountState && inspection.HasGoogleAccountState);
     }
 
     private string FormatWarning(string warning)
@@ -506,7 +478,7 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
         try
         {
             DeviceRestoreInspection inspection = await _deviceRestoreService
-                .InspectAsync(archivePath, RestorePassword, CancellationToken.None)
+                .InspectAsync(archivePath, CancellationToken.None)
                 .ConfigureAwait(true);
             return new(inspection, null);
         }
@@ -545,8 +517,21 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
 
     private bool IsAvailableAcrossArchives(Func<DeviceRestoreInspection, bool> selector)
     {
-        return Inspection is not null
-            && (_inspections.Count == 0 || _inspections.All(selector));
+        return GetAvailableInspections().Any(selector);
+    }
+
+    private IEnumerable<DeviceRestoreInspection> GetAvailableInspections()
+    {
+        if (_inspections.Count == 0)
+            return Inspection is null ? [] : [Inspection];
+
+        if (!IsBatch)
+            return _inspections;
+
+        HashSet<string> mappedSerials = _targetSerials
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return _inspections.Where(inspection =>
+            mappedSerials.Contains(inspection.SourceSerial));
     }
 
     private void ResetCompatibilityAndNotify()
@@ -560,7 +545,6 @@ public sealed partial class RestoreDeviceViewModel : ObservableObject
     private void NotifyStateChanged()
     {
         OnPropertyChanged(nameof(CanConfirm));
-        OnPropertyChanged(nameof(IsRestorePasswordTooShort));
         OnPropertyChanged(nameof(SelectedArchiveName));
         OnPropertyChanged(nameof(IsBatch));
         OnPropertyChanged(nameof(TargetDescription));

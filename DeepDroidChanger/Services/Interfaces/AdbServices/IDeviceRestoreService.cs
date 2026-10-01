@@ -6,7 +6,6 @@ public interface IDeviceRestoreService
 {
     Task<DeviceRestoreInspection> InspectAsync(
         string archivePath,
-        string password,
         CancellationToken cancellationToken);
 
     Task<DeviceRestoreCompatibility> PreflightAsync(
