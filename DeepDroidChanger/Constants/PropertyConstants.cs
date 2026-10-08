@@ -69,6 +69,8 @@ public static class PropertyConstants
         public const string BootKey = Prefix + "boot_key";
         public const string Imei0 = Prefix + "imei0";
         public const string Imei1 = Prefix + "imei1";
+        public const string Meid0 = Prefix + "meid0";
+        public const string Meid1 = Prefix + "meid1";
         public const string BluetoothMac = Prefix + "bluetooth.mac";
         public const string BluetoothName = Prefix + "bluetooth.name";
         public const string WifiMac = Prefix + "wifi.mac";

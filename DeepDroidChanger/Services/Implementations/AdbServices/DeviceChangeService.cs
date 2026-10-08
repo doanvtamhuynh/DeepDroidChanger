@@ -501,6 +501,8 @@ public sealed class DeviceChangeService : IDeviceChangeService
             Pair(PropertyConstants.Spoof.BootKey, profile.BootKey),
             Pair(PropertyConstants.Spoof.Imei0, profile.Imei),
             Pair(PropertyConstants.Spoof.Imei1, profile.Imei1),
+            Pair(PropertyConstants.Spoof.Meid0, profile.Meid0),
+            Pair(PropertyConstants.Spoof.Meid1, profile.Meid1),
             Pair(PropertyConstants.Spoof.BluetoothName, profile.SettingBluetoothName),
             Pair(PropertyConstants.Spoof.WifiSsid, profile.WifiSsid)
         ];

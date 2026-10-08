@@ -49,6 +49,12 @@ namespace DeepDroidChanger.Models
         [JsonPropertyName("imei1")]
         public string? Imei1 { get; set; }
 
+        [JsonIgnore]
+        public string Meid0 => DeriveMeid(Imei);
+
+        [JsonIgnore]
+        public string Meid1 => DeriveMeid(Imei1);
+
         [JsonPropertyName("buildHost")]
         public string? BuildHost { get; set; }
 
@@ -94,6 +100,12 @@ namespace DeepDroidChanger.Models
         public DeviceInfoApiDevice Clone()
         {
             return (DeviceInfoApiDevice)MemberwiseClone();
+        }
+
+        private static string DeriveMeid(string? imei)
+        {
+            string value = imei?.Trim() ?? string.Empty;
+            return value.Length > 0 ? value[..^1] : string.Empty;
         }
     }
 }

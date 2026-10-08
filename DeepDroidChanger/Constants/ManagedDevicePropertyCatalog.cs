@@ -36,6 +36,8 @@ public static class ManagedDevicePropertyCatalog
         PropertyConstants.Spoof.BootKey,
         PropertyConstants.Spoof.Imei0,
         PropertyConstants.Spoof.Imei1,
+        PropertyConstants.Spoof.Meid0,
+        PropertyConstants.Spoof.Meid1,
         PropertyConstants.Spoof.BluetoothMac,
         PropertyConstants.Spoof.BluetoothName,
         PropertyConstants.Spoof.WifiMac,
