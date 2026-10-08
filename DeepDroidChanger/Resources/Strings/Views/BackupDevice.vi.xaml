@@ -3,7 +3,7 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
     <sys:String x:Key="BackupDevice_WindowTitle">Sao lưu thiết bị</sys:String>
     <sys:String x:Key="BackupDevice_Header">Cấu hình sao lưu thiết bị</sys:String>
-    <sys:String x:Key="BackupDevice_Subtitle">Tạo tệp .ddcbak được mã hóa và kiểm tra. Dữ liệu nhạy cảm được bảo vệ bằng mật khẩu của bạn.</sys:String>
+    <sys:String x:Key="BackupDevice_Subtitle">Tạo tệp .ddcbak không mật khẩu đã kiểm tra. Hãy coi tệp là dữ liệu nhạy cảm.</sys:String>
     <sys:String x:Key="BackupDevice_ComponentsHeader">Thành phần sao lưu</sys:String>
     <sys:String x:Key="BackupDevice_DeviceProperties">Thuộc tính thiết bị và cấu hình thay đổi</sys:String>
     <sys:String x:Key="BackupDevice_ManagedSettings">Cài đặt hệ thống được quản lý</sys:String>
@@ -14,13 +14,7 @@
     <sys:String x:Key="BackupDevice_Ssaid">SSAID</sys:String>
     <sys:String x:Key="BackupDevice_GoogleAppData">Dữ liệu ứng dụng Google</sys:String>
     <sys:String x:Key="BackupDevice_GoogleAccountState">Trạng thái tài khoản Google</sys:String>
-    <sys:String x:Key="BackupDevice_SecurityHeader">Bảo vệ bản sao lưu</sys:String>
-    <sys:String x:Key="BackupDevice_SecurityWarning">Cần có mật khẩu để mã hóa bản sao lưu. Dùng ít nhất 8 ký tự. Mật khẩu không được lưu trong cài đặt hoặc trong tệp.</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordLabel">Mật khẩu sao lưu</sys:String>
-    <sys:String x:Key="BackupDevice_ConfirmPasswordLabel">Xác nhận mật khẩu</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordTooltip">Nhập mật khẩu dùng để mã hóa bản sao lưu.</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordTooShort">Mật khẩu phải có ít nhất 8 ký tự.</sys:String>
-    <sys:String x:Key="BackupDevice_PasswordMismatch">Mật khẩu không khớp.</sys:String>
+    <sys:String x:Key="BackupDevice_SensitiveDataWarning">Tệp này không được mã hóa và có thể chứa IMEI, SIM, dữ liệu ứng dụng, dữ liệu Google, Keybox, SSAID và trạng thái tài khoản. Hãy lưu trữ an toàn.</sys:String>
     <sys:String x:Key="BackupDevice_DestinationHeader">Thư mục lưu</sys:String>
     <sys:String x:Key="BackupDevice_Browse">Duyệt...</sys:String>
     <sys:String x:Key="BackupDevice_DefaultLocationHint">Để trống để dùng {0}</sys:String>
@@ -30,5 +24,5 @@
     <sys:String x:Key="BackupDevice_Start">Bắt đầu sao lưu</sys:String>
     <sys:String x:Key="BackupDevice_BrowseFolderTitle">Chọn thư mục sao lưu</sys:String>
     <sys:String x:Key="BackupDevice_Action">Sao lưu thiết bị</sys:String>
-    <sys:String x:Key="BackupDevice_ActionTooltip">Sao lưu dữ liệu thiết bị đã chọn thành tệp .ddcbak được mã hóa và kiểm tra.</sys:String>
+    <sys:String x:Key="BackupDevice_ActionTooltip">Sao lưu dữ liệu thiết bị đã chọn thành tệp .ddcbak không mật khẩu đã kiểm tra.</sys:String>
 </ResourceDictionary>

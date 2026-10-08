@@ -92,18 +92,12 @@ public sealed class DeviceBackupService : IDeviceBackupService
         ArgumentNullException.ThrowIfNull(options);
         if (!options.HasSelectedComponent)
             throw new ArgumentException("At least one backup component must be selected.", nameof(options));
-        if (!options.HasValidBackupPassword)
-        {
-            throw new ArgumentException(
-                $"A backup password of at least {DeviceBackupOptions.MinimumBackupPasswordLength} characters is required.",
-                nameof(options));
-        }
 
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(new(DeviceBackupStage.Preparing));
 
         string destinationDirectory = string.IsNullOrWhiteSpace(options.DestinationDirectory)
-            ? Path.Combine(AppContext.BaseDirectory, "Backup")
+            ? BackupPathConstants.DefaultDirectory
             : Path.GetFullPath(options.DestinationDirectory.Trim());
         Directory.CreateDirectory(destinationDirectory);
 
@@ -157,9 +151,9 @@ public sealed class DeviceBackupService : IDeviceBackupService
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var manifest = new BackupArchiveManifest(
-                        FormatVersion: 2,
-                        Encrypted: true,
-                        EncryptionFormatVersion: BackupEnvelopeCrypto.FormatVersion,
+                        FormatVersion: 3,
+                        Encrypted: false,
+                        EncryptionFormatVersion: 0,
                         CreatedAtUtc: createdAtUtc,
                         SourceSerial: serial,
                         SourceDeviceRole: context.SourceDeviceRole,
@@ -203,25 +197,29 @@ public sealed class DeviceBackupService : IDeviceBackupService
                     snapshot ?? throw new InvalidDataException("The backup manifest could not be finalized."),
                     cancellationToken)
                 .ConfigureAwait(false);
-            using (FileStream encryptedOutput = CreatePartialArchive(
+            await using (FileStream directOutput = CreatePartialArchive(
                        destinationDirectory,
                        serial,
                        createdAtUtc,
                        out finalPath,
                        out partialPath))
+            await using (FileStream plaintextInput = new(
+                               plaintextArchivePath,
+                               FileMode.Open,
+                               FileAccess.Read,
+                               FileShare.Read,
+                               bufferSize: 81920,
+                               useAsync: true))
             {
-                await BackupEnvelopeCrypto.EncryptAsync(
-                        plaintextArchivePath,
-                        encryptedOutput,
-                        options.BackupPassword,
-                        cancellationToken)
+                await plaintextInput.CopyToAsync(directOutput, cancellationToken)
                     .ConfigureAwait(false);
-                encryptedOutput.Flush(flushToDisk: true);
+                await directOutput.FlushAsync(cancellationToken).ConfigureAwait(false);
+                directOutput.Flush(flushToDisk: true);
             }
 
-            await BackupEnvelopeCrypto.VerifyAsync(
+            await ValidateArchiveAsync(
                     partialPath!,
-                    options.BackupPassword,
+                    snapshot ?? throw new InvalidDataException("The backup manifest could not be finalized."),
                     cancellationToken)
                 .ConfigureAwait(false);
             DeleteTemporaryDirectory(localTemporaryDirectory);
@@ -1983,61 +1981,5 @@ public sealed class DeviceBackupService : IDeviceBackupService
         long? SourceUid,
         int? TargetSdk,
         string? SigningCertificateSha256);
-    private sealed record BackupPropertyPayload(IReadOnlyDictionary<string, string> Values);
-    private sealed record BackupSettingsPayload(IReadOnlyList<BackupSettingValue> Values);
-    private sealed record BackupSettingValue(string Name, string Value);
-    private sealed record BackupPropertyStatus(string PropertyName, string State, string? Reason);
-    private sealed record BackupSettingStatus(string Name, string State, string? Reason);
-    private sealed record BackupDataPathStatus(string DevicePath, string State, string? Payload);
-    private sealed record BackupComponentStatus(
-        string Component,
-        string State,
-        string? Reason,
-        bool? Experimental = null,
-        bool? ConsistencyGuaranteed = null,
-        string? SnapshotMethod = null);
-    private sealed record BackupKeyboxState(
-        bool FilePresent,
-        string EnabledPropertyName,
-        bool? EnabledPropertyPresent,
-        string EnabledPropertyState);
-    private sealed record BackupSelectedComponents(
-        bool DeviceProperties,
-        bool ManagedSystemSettings,
-        bool UserAppData,
-        bool Keybox,
-        bool Ssaid,
-        bool GoogleAppData,
-        bool GoogleAccountState);
-    private sealed record PackageBackupManifest(
-        string Group,
-        string PackageName,
-        string Status,
-        string? Reason,
-        long? VersionCode,
-        long? SourceUid,
-        int? TargetSdk,
-        string? SigningCertificateSha256,
-        IReadOnlyList<string> CeLogicalAliases,
-        bool? SameUnderlyingCeData,
-        IReadOnlyList<BackupDataPathStatus> Paths);
-    private sealed record BackupArchiveManifest(
-        int FormatVersion,
-        bool Encrypted,
-        int EncryptionFormatVersion,
-        DateTime CreatedAtUtc,
-        string SourceSerial,
-        string? SourceDeviceRole,
-        int? AndroidSdkVersion,
-        BackupSelectedComponents SelectedComponents,
-        BackupKeyboxState? Keybox,
-        string PropertiesStatus,
-        IReadOnlyList<BackupPropertyStatus> PropertyStatuses,
-        string SettingsStatus,
-        IReadOnlyList<BackupSettingStatus> SettingsStatuses,
-        IReadOnlyList<PackageBackupManifest> Packages,
-        IReadOnlyList<BackupComponentStatus> OptionalComponents,
-        IReadOnlyList<string> Warnings,
-        IReadOnlyDictionary<string, string> Checksums);
     private sealed record ArchiveWriterSnapshot(IReadOnlyDictionary<string, string> Checksums);
 }

@@ -1266,6 +1266,17 @@
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                     <materialDesign:PackIcon Kind="ArchiveArrowDown" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1" Text="{DynamicResource BackupDevice_Action}" Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                    </Grid>
+                            </Button>
+                            <Button Grid.Row="7"
+                                    Grid.Column="1"
+                                    Command="{Binding RestoreSingleDeviceCommand}"
+                                    ToolTip="{DynamicResource RestoreDevice_ActionTooltip}"
+                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Kind="ArchiveArrowUp" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1" Text="{DynamicResource RestoreDevice_Action}" Style="{StaticResource DeviceActionButtonTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="5"

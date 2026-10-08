@@ -1,0 +1,3643 @@
+using System.Formats.Tar;
+using System.IO;
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Xml;
+using DeepDroidChanger.Constants;
+using DeepDroidChanger.Models;
+using Microsoft.Extensions.Logging;
+
+namespace DeepDroidChanger.Services;
+
+/// <summary>
+/// Restores a validated Device Backup archive. Archive validation is kept in
+/// this service so DeviceBackupService remains responsible only for writing
+/// the existing format.
+/// </summary>
+public sealed class DeviceRestoreService : IDeviceRestoreService
+{
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(25);
+    private static readonly Regex ValidPackageName = new(
+        @"^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex VersionCodePattern = new(
+        @"\bversionCode=(\d+)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex TargetSdkPattern = new(
+        @"\btargetSdk=(\d+)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex SourceUidPattern = new(
+        @"\buserId=(\d+)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex FileMetadataPattern = new(
+        @"^(?<uid>\d+):(?<gid>\d+):(?<mode>[0-7]{3,4})$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly SettingDescriptor[] ManagedSettings =
+    [
+        new(DeviceSettingsInfoConstants.GlobalNamespace, DeviceSettingsInfoConstants.DeviceName),
+        new(DeviceSettingsInfoConstants.SecureNamespace, DeviceSettingsInfoConstants.BluetoothName),
+        new(DeviceSettingsInfoConstants.GlobalNamespace, DeviceSettingsInfoConstants.WifiP2pDeviceName),
+        new(DeviceSettingsInfoConstants.SystemNamespace, DeviceSettingsInfoConstants.ScreenTimeout),
+        new(DeviceSettingsInfoConstants.SecureNamespace, DeviceSettingsInfoConstants.BluetoothAddress),
+        new(DeviceSettingsInfoConstants.SecureNamespace, DeviceSettingsInfoConstants.BluetoothAddressValid),
+        new(DeviceSettingsInfoConstants.GlobalNamespace, DeviceSettingsInfoConstants.RandomMac),
+        new(DeviceSettingsInfoConstants.GlobalNamespace, "auto_time_zone"),
+        new(DeviceSettingsInfoConstants.SystemNamespace, "time_12_24")
+    ];
+
+    private static readonly AccountRestoreDescriptor[] AccountPaths =
+    [
+        new("account.accounts_ce", "/data/system_ce/0", "accounts_ce.db", "account/system_ce/accounts_ce.tar", true),
+        new("account.accounts_de", "/data/system_de/0", "accounts_de.db", "account/system_de/accounts_de.tar", true),
+        new("account.accounts_legacy", "/data/system/users/0", "accounts.db", "account/users/accounts.tar", true),
+        new("account.syncmanager", "/data/system", "syncmanager.db", "account/syncmanager/syncmanager.tar", true),
+        new("account.sync", "/data/system", "sync", "account/sync/sync.tar", false),
+        new("account.registered_services", "/data/system/users/0", "registered_services", "account/users/registered_services.tar", false)
+    ];
+
+    private static readonly HashSet<string> ValidPropertyStates =
+    [
+        "backed_up",
+        "skipped_missing",
+        "skipped_empty",
+        "empty",
+        "excluded",
+        "read_failed"
+    ];
+
+    private static readonly HashSet<string> ValidSettingStates =
+    [
+        "backed_up",
+        "skipped_missing",
+        "skipped_empty"
+    ];
+
+    private static readonly HashSet<string> ValidOptionalComponentStates =
+    [
+        "not_selected",
+        "backed_up",
+        "skipped_missing",
+        "snapshot_unavailable",
+        "partial"
+    ];
+
+    private static readonly HashSet<string> ValidPackageStates =
+    [
+        "backed_up",
+        "skipped_missing"
+    ];
+
+    private static readonly HashSet<string> ValidPackagePathStates =
+    [
+        "backed_up",
+        "present_alias",
+        "skipped_missing",
+        "skipped_empty"
+    ];
+
+    private readonly IAdbCommandService _adb;
+    private readonly IAdbRootAccessService _rootAccessService;
+    private readonly IDevicePackageService _devicePackageService;
+    private readonly ILogger<DeviceRestoreService> _logger;
+
+    public DeviceRestoreService(
+        IAdbCommandService adb,
+        IAdbRootAccessService rootAccessService,
+        IDevicePackageService devicePackageService,
+        ILogger<DeviceRestoreService> logger)
+    {
+        _adb = adb;
+        _rootAccessService = rootAccessService;
+        _devicePackageService = devicePackageService;
+        _logger = logger;
+    }
+
+    public async Task<DeviceRestoreInspection> InspectAsync(
+        string archivePath,
+        CancellationToken cancellationToken)
+    {
+        ValidateArchiveArguments(archivePath);
+        cancellationToken.ThrowIfCancellationRequested();
+        BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
+                archivePath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return CreateInspection(archivePath, manifest);
+    }
+
+    public async Task<DeviceRestoreCompatibility> PreflightAsync(
+        string serial,
+        DeviceRestoreOptions options,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(options);
+        ValidateArchiveArguments(options.ArchivePath);
+        if (!options.HasSelectedComponent)
+            throw new ArgumentException("At least one restore component must be selected.", nameof(options));
+
+        BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
+                options.ArchivePath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        RestorePlan plan = await BuildRestorePlanAsync(
+                serial,
+                options,
+                manifest,
+                options.ArchivePath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return CreateCompatibility(plan, options);
+    }
+
+    public async Task<DeviceRestoreResult> RestoreAsync(
+        string serial,
+        DeviceRestoreOptions options,
+        IProgress<DeviceRestoreProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+        ArgumentNullException.ThrowIfNull(options);
+        ValidateArchiveArguments(options.ArchivePath);
+        if (!options.HasSelectedComponent)
+            throw new ArgumentException("At least one restore component must be selected.", nameof(options));
+
+        progress?.Report(new(DeviceRestoreStage.Preparing));
+        string localSessionDirectory = CreateLocalSessionDirectory();
+        string plaintextPath = options.ArchivePath;
+        string sessionId = Guid.NewGuid().ToString("N");
+        string remoteSessionPath = $"/data/local/tmp/deepdroid-restore/{sessionId}";
+        var execution = new RestoreExecution();
+        bool archiveValidated = false;
+
+        try
+        {
+            progress?.Report(new(DeviceRestoreStage.ValidatingArchive));
+            BackupArchiveManifest manifest = await LoadAndValidateArchiveAsync(
+                    plaintextPath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            archiveValidated = true;
+
+            progress?.Report(new(DeviceRestoreStage.CheckingCompatibility));
+            RestorePlan plan = await BuildRestorePlanAsync(
+                    serial,
+                    options,
+                    manifest,
+                    plaintextPath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            execution.Warnings.AddRange(plan.Warnings);
+
+            await _rootAccessService.ExecuteAsRootAsync(
+                    serial,
+                    rootCancellationToken => RestoreUnderRootAsync(
+                        serial,
+                        options,
+                        plan,
+                        plaintextPath,
+                        localSessionDirectory,
+                        remoteSessionPath,
+                        progress,
+                        execution,
+                        rootCancellationToken),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (execution.MutationStarted)
+            {
+                progress?.Report(new(DeviceRestoreStage.Rebooting));
+                try
+                {
+                    using var rebootCancellation = new CancellationTokenSource(CleanupTimeout);
+                    await _adb.RebootAsync(serial, rebootCancellation.Token).ConfigureAwait(false);
+                    execution.Rebooted = true;
+                }
+                catch (Exception exception)
+                {
+                    execution.Warnings.Add("final_reboot_failed");
+                    execution.FailureReason ??= exception.Message;
+                    _logger.LogError(
+                        exception,
+                        "Restore changed device {Serial} but the final reboot failed.",
+                        serial);
+                }
+            }
+
+            progress?.Report(new(DeviceRestoreStage.Completed));
+            return execution.CreateResult(forceFailed: execution.ForceFailed);
+        }
+        catch (OperationCanceledException)
+        {
+            if (execution.MutationStarted && !execution.Rebooted)
+                await TryRecoverWithRebootAsync(serial).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            if (execution.MutationStarted && !execution.Rebooted)
+                await TryRecoverWithRebootAsync(serial).ConfigureAwait(false);
+
+            if (!archiveValidated)
+                throw;
+
+            execution.FailureReason ??= exception.Message;
+            execution.Warnings.Add("restore_failed");
+            _logger.LogError(exception, "Restore failed for device {Serial}.", serial);
+            return execution.CreateResult(forceFailed: true);
+        }
+        finally
+        {
+            TryDeleteDirectory(localSessionDirectory);
+        }
+    }
+
+    private async Task<RestoreExecution> RestoreUnderRootAsync(
+        string serial,
+        DeviceRestoreOptions options,
+        RestorePlan plan,
+        string plaintextPath,
+        string localSessionDirectory,
+        string remoteSessionPath,
+        IProgress<DeviceRestoreProgress>? progress,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        Exception? primaryFailure = null;
+        bool finalizationCompleted = false;
+        try
+        {
+            await RunRequiredShellAsync(
+                    serial,
+                    $"mkdir -p {QuoteShellValue(remoteSessionPath)}",
+                    "create device restore staging directory",
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            using ZipArchive archive = ZipFile.OpenRead(plaintextPath);
+
+            if (options.RestoreDeviceProperties)
+            {
+                progress?.Report(new(DeviceRestoreStage.RestoringProperties, Component: "deviceProperties"));
+                try
+                {
+                    await RestorePropertiesAsync(
+                            serial,
+                            archive,
+                            plan.Manifest,
+                            execution,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    BackupPropertyStatus[] propertyStatuses = plan.Manifest.PropertyStatuses
+                        .Where(item => item.State != "excluded"
+                            && item.PropertyName != PropertyConstants.Keybox.Enabled)
+                        .ToArray();
+                    int restoredProperties = propertyStatuses.Count(item =>
+                        ManagedDevicePropertyCatalog.Properties.Contains(item.PropertyName)
+                        && item.State is "backed_up" or "skipped_missing" or "skipped_empty" or "empty");
+                    execution.AddComponent(CreateInfoComponentResult(
+                        "deviceProperties",
+                        restoredProperties,
+                        propertyStatuses.Length - restoredProperties));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    execution.AddComponent(new(
+                        "deviceProperties",
+                        DeviceRestoreOutcome.Failed,
+                        exception.Message));
+                    primaryFailure = exception;
+                }
+            }
+
+            if (primaryFailure is null && options.RestoreManagedSystemSettings)
+            {
+                progress?.Report(new(DeviceRestoreStage.RestoringSettings, Component: "managedSystemSettings"));
+                try
+                {
+                    await RestoreSettingsAsync(
+                            serial,
+                            archive,
+                            plan.Manifest,
+                            execution,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    HashSet<string> settingNames = ManagedSettings
+                        .Select(item => $"{item.Namespace}.{item.Key}")
+                        .Append(PropertyConstants.Timezone)
+                        .ToHashSet(StringComparer.Ordinal);
+                    int restoredSettings = plan.Manifest.SettingsStatuses.Count(item => settingNames.Contains(item.Name));
+                    execution.AddComponent(CreateInfoComponentResult(
+                        "managedSystemSettings",
+                        restoredSettings,
+                        plan.Manifest.SettingsStatuses.Count - restoredSettings));
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    execution.AddComponent(new(
+                        "managedSystemSettings",
+                        DeviceRestoreOutcome.Failed,
+                        exception.Message));
+                    primaryFailure = exception;
+                }
+            }
+
+            bool restoreApps = options.RestoreUserAppData || options.RestoreGoogleAppData;
+            if (primaryFailure is null && restoreApps)
+            {
+                progress?.Report(new(DeviceRestoreStage.RestoringApps));
+                try
+                {
+                    await RestorePackagesAsync(
+                            serial,
+                            archive,
+                            plan,
+                            localSessionDirectory,
+                            remoteSessionPath,
+                            options,
+                            progress,
+                            execution,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    execution.AddComponent(new(
+                        "applications",
+                        DeviceRestoreOutcome.Failed,
+                        exception.Message));
+                    primaryFailure = exception;
+                }
+            }
+
+            if (primaryFailure is null &&
+                (options.RestoreKeybox || options.RestoreSsaid || options.RestoreGoogleAccountState))
+            {
+                progress?.Report(new(DeviceRestoreStage.RestoringOptionalData));
+
+                if (options.RestoreKeybox)
+                {
+                    try
+                    {
+                        await RestoreKeyboxAsync(
+                                serial,
+                                archive,
+                                plan.Manifest,
+                                plan.KeyboxEnabledValue,
+                                remoteSessionPath,
+                                localSessionDirectory,
+                                execution,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        execution.AddComponent(new(
+                            "keybox",
+                            plan.KeyboxEnabledValue is null
+                                ? DeviceRestoreOutcome.Partial
+                                : DeviceRestoreOutcome.Succeeded,
+                            plan.KeyboxEnabledValue is null ? "enabled_property_not_backed_up" : null,
+                            RestoredCount: (execution.PendingKeyboxPayloadInstalled ? 1 : 0)
+                                + (plan.KeyboxEnabledValue is null ? 0 : 1),
+                            SkippedCount: plan.KeyboxEnabledValue is null ? 1 : 0,
+                            Experimental: true));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        execution.AddComponent(new(
+                            "keybox",
+                            DeviceRestoreOutcome.Failed,
+                            exception.Message,
+                            Experimental: true));
+                        primaryFailure = exception;
+                    }
+                }
+
+                if (primaryFailure is null && options.RestoreSsaid)
+                {
+                    try
+                    {
+                        await RestoreSsaidAsync(
+                                serial,
+                                archive,
+                                remoteSessionPath,
+                                localSessionDirectory,
+                                execution,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        execution.AddComponent(new(
+                            "ssaId",
+                            DeviceRestoreOutcome.Succeeded,
+                            null,
+                            Experimental: true));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        execution.AddComponent(new(
+                            "ssaId",
+                            DeviceRestoreOutcome.Failed,
+                            exception.Message,
+                            Experimental: true));
+                        primaryFailure = exception;
+                    }
+                }
+
+                if (primaryFailure is null && options.RestoreGoogleAccountState)
+                {
+                    try
+                    {
+                        if (!plan.AccountStateAllowed)
+                        {
+                            execution.AddComponent(new(
+                                "googleAccountState",
+                                DeviceRestoreOutcome.Skipped,
+                                "incompatible_source",
+                                Experimental: true));
+                        }
+                        else
+                        {
+                            await RestoreGoogleAccountStateAsync(
+                                    serial,
+                                    archive,
+                                    plan.Manifest,
+                                    remoteSessionPath,
+                                    localSessionDirectory,
+                                    execution,
+                                    cancellationToken)
+                                .ConfigureAwait(false);
+                            execution.AddComponent(new(
+                                "googleAccountState",
+                                plan.AccountStatePartial
+                                    ? DeviceRestoreOutcome.Partial
+                                    : DeviceRestoreOutcome.Succeeded,
+                                plan.AccountStatePartial
+                                    ? "partial_archive"
+                                    : null,
+                                Experimental: true));
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        execution.ForceFailed = true;
+                        execution.AddComponent(new(
+                            "googleAccountState",
+                            DeviceRestoreOutcome.Failed,
+                            exception.Message,
+                            Experimental: true));
+                        primaryFailure = exception;
+                    }
+                }
+            }
+
+            if (execution.MutationStarted)
+            {
+                try
+                {
+                    await FinalizePropertyStatesAsync(
+                            serial,
+                            execution,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    finalizationCompleted = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    execution.Warnings.Add("final_property_states_failed");
+                    execution.Warnings.Add("final_property_states_retrying");
+                }
+            }
+
+            progress?.Report(new(DeviceRestoreStage.Finalizing));
+            execution.FailureReason ??= primaryFailure?.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            execution.FailureReason ??= "restore_cancelled";
+            throw;
+        }
+        catch (Exception exception)
+        {
+            execution.FailureReason ??= exception.Message;
+            primaryFailure ??= exception;
+        }
+        finally
+        {
+            if (!finalizationCompleted && execution.HasPendingFinalization)
+            {
+                try
+                {
+                    using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+                    await FinalizePropertyStatesAsync(
+                            serial,
+                            execution,
+                            cleanupCancellation.Token)
+                        .ConfigureAwait(false);
+                    finalizationCompleted = true;
+                    execution.Warnings.Add("final_property_states_recovered");
+                }
+                catch (Exception finalizationException)
+                {
+                    execution.Warnings.Add("final_property_states_failed");
+                    execution.FailureReason ??= "final_property_states_failed";
+                    primaryFailure ??= finalizationException;
+                    MarkFinalizationFailure(execution, finalizationException.Message);
+                    _logger.LogError(
+                        finalizationException,
+                        "Final property state recovery failed for {Serial}.",
+                        serial);
+                }
+            }
+
+            try
+            {
+                using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+                CommandResult cleanupResult = await _adb.RunAdbShellAsync(
+                        serial,
+                        $"rm -rf {QuoteShellValue(remoteSessionPath)}",
+                        cleanupCancellation.Token)
+                    .ConfigureAwait(false);
+                EnsureCommandSuccess(cleanupResult, "remove device restore temporary files");
+            }
+            catch (Exception cleanupException)
+            {
+                execution.Warnings.Add("remote_restore_cleanup_failed");
+                _logger.LogWarning(
+                    cleanupException,
+                    "Could not remove restore staging files for {Serial}.",
+                    serial);
+            }
+        }
+
+        if (primaryFailure is not null)
+            execution.FailureReason ??= primaryFailure.Message;
+        foreach ((string component, bool selected) in new[]
+                 {
+                     ("deviceProperties", options.RestoreDeviceProperties),
+                     ("managedSystemSettings", options.RestoreManagedSystemSettings),
+                     ("userAppData", options.RestoreUserAppData),
+                     ("keybox", options.RestoreKeybox),
+                     ("ssaId", options.RestoreSsaid),
+                     ("googleAppData", options.RestoreGoogleAppData),
+                     ("googleAccountState", options.RestoreGoogleAccountState)
+                 })
+        {
+            if (selected && !execution.Components.Any(item => item.Component == component))
+                execution.AddComponent(new(component, DeviceRestoreOutcome.Skipped, "restore_aborted"));
+        }
+        foreach (PackagePlan packagePlan in plan.Packages)
+        {
+            PackageBackupManifest package = packagePlan.Manifest;
+            if (!execution.Packages.Any(item => item.Group == package.Group
+                    && item.PackageName == package.PackageName))
+            {
+                execution.AddPackage(new(
+                    package.PackageName,
+                    package.Group,
+                    DeviceRestoreOutcome.Skipped,
+                    "restore_aborted",
+                    SkippedPayloadCount: package.Paths
+                        .Where(path => path.State is "backed_up" or "present_alias")
+                        .Select(path => path.Payload)
+                        .Distinct(StringComparer.Ordinal)
+                        .Count()));
+            }
+        }
+        return execution;
+    }
+
+    private static DeviceRestoreComponentResult CreateInfoComponentResult(
+        string component,
+        int restoredCount,
+        int skippedCount)
+    {
+        return new(
+            component,
+            restoredCount == 0 && skippedCount == 0
+                ? DeviceRestoreOutcome.Skipped
+                : skippedCount > 0
+                    ? DeviceRestoreOutcome.Partial
+                    : DeviceRestoreOutcome.Succeeded,
+            skippedCount > 0 ? "info_not_restored" : restoredCount == 0 ? "no_payload" : null,
+            RestoredCount: restoredCount,
+            SkippedCount: skippedCount);
+    }
+
+    private async Task RestorePropertiesAsync(
+        string serial,
+        ZipArchive archive,
+        BackupArchiveManifest manifest,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(manifest.PropertiesStatus, "keybox_property_only", StringComparison.Ordinal)
+            && !manifest.SelectedComponents.DeviceProperties)
+        {
+            throw new InvalidOperationException("Device properties are not available in this backup.");
+        }
+
+        BackupPropertyPayload payload = await ReadJsonEntryAsync<BackupPropertyPayload>(
+                archive,
+                "properties.json",
+                cancellationToken)
+            .ConfigureAwait(false);
+        Dictionary<string, string> values = new(payload.Values, StringComparer.Ordinal);
+        Dictionary<string, BackupPropertyStatus> statuses = CreateUniqueStatusMap(
+            manifest.PropertyStatuses,
+            item => item.PropertyName,
+            "property status");
+        HashSet<string> allowed = new(
+            ManagedDevicePropertyCatalog.Properties,
+            StringComparer.Ordinal);
+
+        HashSet<string> explicitlyExcluded = new(
+            ManagedDevicePropertyCatalog.ExcludedProperties,
+            StringComparer.Ordinal);
+        foreach (string propertyName in statuses.Keys)
+        {
+            if (!allowed.Contains(propertyName)
+                && !explicitlyExcluded.Contains(propertyName)
+                && !string.Equals(propertyName, PropertyConstants.Keybox.Enabled, StringComparison.Ordinal))
+            {
+                execution.Warnings.Add($"property_not_whitelisted:{propertyName}");
+            }
+        }
+
+        // Keybox is handled after its payload has been installed, so it can
+        // never be enabled before the backing file is ready.
+        allowed.Remove(PropertyConstants.Keybox.Enabled);
+
+        bool needsDebugGate = allowed.Any(statuses.ContainsKey);
+        if (!needsDebugGate)
+            return;
+
+        // Capture the desired final state before forcing temporary restore
+        // gates. This state must survive cancellation or an early component
+        // failure so the finalizer can always restore it.
+        execution.PendingPropertyValues = new Dictionary<string, string>(
+            values,
+            StringComparer.Ordinal);
+        execution.PendingPropertyStatuses = new Dictionary<string, BackupPropertyStatus>(
+            statuses,
+            StringComparer.Ordinal);
+        execution.MutationStarted = true;
+        bool debugGateTouched = false;
+        Exception? primaryFailure = null;
+        try
+        {
+            await _adb.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Debug.Enabled,
+                    "true",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            debugGateTouched = true;
+            string debugValue = await _adb.GetPropertyAsync(
+                    serial,
+                    PropertyConstants.Debug.Enabled,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!string.Equals(debugValue.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The persisted property debug gate could not be enabled and verified.");
+
+            var handled = new HashSet<string>(StringComparer.Ordinal);
+            if (statuses.ContainsKey(PropertyConstants.Spoof.SimEnabled))
+            {
+                await ApplyPropertyStatusAsync(
+                        serial,
+                        PropertyConstants.Spoof.SimEnabled,
+                        values,
+                        statuses,
+                        cancellationToken,
+                        forceValue: "0")
+                    .ConfigureAwait(false);
+                handled.Add(PropertyConstants.Spoof.SimEnabled);
+            }
+
+            if (statuses.ContainsKey(PropertyConstants.Integrity.Enabled))
+            {
+                await ApplyPropertyStatusAsync(
+                        serial,
+                        PropertyConstants.Integrity.Enabled,
+                        values,
+                        statuses,
+                        cancellationToken,
+                        forceValue: "false")
+                    .ConfigureAwait(false);
+                handled.Add(PropertyConstants.Integrity.Enabled);
+            }
+
+            if (statuses.ContainsKey(PropertyConstants.Integrity.DroidGuardSdk))
+            {
+                await ApplyPropertyStatusAsync(
+                        serial,
+                        PropertyConstants.Integrity.DroidGuardSdk,
+                        values,
+                        statuses,
+                        cancellationToken,
+                        forceValue: "false")
+                    .ConfigureAwait(false);
+                handled.Add(PropertyConstants.Integrity.DroidGuardSdk);
+            }
+
+            foreach (string propertyName in ManagedDevicePropertyCatalog.Properties)
+            {
+                if (handled.Contains(propertyName)
+                    || string.Equals(propertyName, PropertyConstants.Keybox.Enabled, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!statuses.ContainsKey(propertyName))
+                    continue;
+
+                await ApplyPropertyStatusAsync(
+                        serial,
+                        propertyName,
+                        values,
+                        statuses,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                handled.Add(propertyName);
+            }
+
+        }
+        catch (Exception exception)
+        {
+            primaryFailure = exception;
+            throw;
+        }
+        finally
+        {
+            if (debugGateTouched)
+            {
+                try
+                {
+                    using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+                    await _adb.SetPropertyAsync(
+                            serial,
+                            PropertyConstants.Debug.Enabled,
+                            "false",
+                            cleanupCancellation.Token)
+                        .ConfigureAwait(false);
+                    string debugValue = await _adb.GetPropertyAsync(
+                            serial,
+                            PropertyConstants.Debug.Enabled,
+                            cleanupCancellation.Token)
+                        .ConfigureAwait(false);
+                    if (string.Equals(debugValue.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("The persisted property debug gate remained enabled after restore cleanup.");
+                }
+                catch (Exception cleanupException)
+                {
+                    execution.Warnings.Add("property_debug_cleanup_failed");
+                    _logger.LogError(
+                        cleanupException,
+                        "Property debug cleanup failed for {Serial}.",
+                        serial);
+                    if (primaryFailure is null)
+                        throw;
+                }
+            }
+        }
+    }
+
+    private async Task ApplyPropertyStatusAsync(
+        string serial,
+        string propertyName,
+        IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, BackupPropertyStatus> statuses,
+        CancellationToken cancellationToken,
+        string? forceValue = null)
+    {
+        BackupPropertyStatus status = statuses[propertyName];
+        if (status.State is "excluded" or "read_failed")
+            return;
+
+        string value;
+        if (forceValue is not null)
+        {
+            value = forceValue;
+        }
+        else if (string.Equals(status.State, "backed_up", StringComparison.Ordinal))
+        {
+            if (!values.TryGetValue(propertyName, out value!))
+            {
+                throw new InvalidDataException(
+                    $"The backup property {propertyName} is marked backed_up but has no value.");
+            }
+        }
+        else if (status.State is "skipped_missing" or "skipped_empty" or "empty")
+        {
+            value = string.Empty;
+        }
+        else
+        {
+            return;
+        }
+
+        await _adb.SetPropertyAsync(serial, propertyName, value, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task FinalizePropertyStatesAsync(
+        string serial,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        bool hasPendingPropertyStates = execution.PendingPropertyValues is not null
+            && execution.PendingPropertyStatuses is not null;
+        bool debugGateTouched = false;
+        Exception? primaryFailure = null;
+
+        try
+        {
+            if (hasPendingPropertyStates || execution.PendingKeyboxEnabledValue is not null)
+            {
+                await _adb.SetPropertyAsync(
+                        serial,
+                        PropertyConstants.Debug.Enabled,
+                        "true",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                debugGateTouched = true;
+                string debugValue = await _adb.GetPropertyAsync(
+                        serial,
+                        PropertyConstants.Debug.Enabled,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (!string.Equals(debugValue.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        "The persisted property debug gate could not be enabled for final state restoration.");
+                }
+            }
+
+            if (hasPendingPropertyStates)
+            {
+                IReadOnlyDictionary<string, string> values = execution.PendingPropertyValues!;
+                IReadOnlyDictionary<string, BackupPropertyStatus> statuses = execution.PendingPropertyStatuses!;
+
+                // These gates are deliberately restored after all payloads.
+                if (statuses.ContainsKey(PropertyConstants.Spoof.SimEnabled))
+                {
+                    await ApplyPropertyStatusAsync(
+                            serial,
+                            PropertyConstants.Spoof.SimEnabled,
+                            values,
+                            statuses,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                if (statuses.ContainsKey(PropertyConstants.Integrity.DroidGuardSdk))
+                {
+                    await ApplyPropertyStatusAsync(
+                            serial,
+                            PropertyConstants.Integrity.DroidGuardSdk,
+                            values,
+                            statuses,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                if (statuses.ContainsKey(PropertyConstants.Integrity.Enabled))
+                {
+                    await ApplyPropertyStatusAsync(
+                            serial,
+                            PropertyConstants.Integrity.Enabled,
+                            values,
+                            statuses,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            if (execution.PendingKeyboxEnabledValue is not null)
+            {
+                string finalKeyboxValue = execution.PendingKeyboxPayloadInstalled
+                    || !IsEnabledPropertyValue(execution.PendingKeyboxEnabledValue)
+                    ? execution.PendingKeyboxEnabledValue
+                    : "false";
+                await _adb.SetPropertyAsync(
+                        serial,
+                        PropertyConstants.Keybox.Enabled,
+                        finalKeyboxValue,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            await RunRequiredShellAsync(
+                    serial,
+                    "sync",
+                    "flush restored device state",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            primaryFailure = exception;
+            throw;
+        }
+        finally
+        {
+            if (debugGateTouched)
+            {
+                try
+                {
+                    using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+                    await _adb.SetPropertyAsync(
+                            serial,
+                            PropertyConstants.Debug.Enabled,
+                            "false",
+                            cleanupCancellation.Token)
+                        .ConfigureAwait(false);
+                    string debugValue = await _adb.GetPropertyAsync(
+                            serial,
+                            PropertyConstants.Debug.Enabled,
+                            cleanupCancellation.Token)
+                        .ConfigureAwait(false);
+                    if (string.Equals(debugValue.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            "The persisted property debug gate remained enabled after finalization.");
+                    }
+                }
+                catch (Exception cleanupException)
+                {
+                    execution.Warnings.Add("property_debug_cleanup_failed");
+                    _logger.LogError(
+                        cleanupException,
+                        "Final property debug cleanup failed for {Serial}.",
+                        serial);
+                    if (primaryFailure is null)
+                        throw;
+                }
+            }
+        }
+    }
+
+    private async Task RestoreSettingsAsync(
+        string serial,
+        ZipArchive archive,
+        BackupArchiveManifest manifest,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        if (!manifest.SelectedComponents.ManagedSystemSettings
+            || string.Equals(manifest.SettingsStatus, "not_selected", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Managed system settings are not available in this backup.");
+        }
+
+        BackupSettingsPayload payload = await ReadJsonEntryAsync<BackupSettingsPayload>(
+                archive,
+                "settings.json",
+                cancellationToken)
+            .ConfigureAwait(false);
+        Dictionary<string, string> values = payload.Values
+            .GroupBy(item => item.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Single().Value, StringComparer.Ordinal);
+        Dictionary<string, BackupSettingStatus> statuses = CreateUniqueStatusMap(
+            manifest.SettingsStatuses,
+            item => item.Name,
+            "setting status");
+        HashSet<string> knownSettings = ManagedSettings
+            .Select(descriptor => $"{descriptor.Namespace}.{descriptor.Key}")
+            .Append(PropertyConstants.Timezone)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (string settingName in statuses.Keys)
+        {
+            if (!knownSettings.Contains(settingName))
+                execution.Warnings.Add($"setting_not_whitelisted:{settingName}");
+        }
+
+        execution.MutationStarted = true;
+        foreach (SettingDescriptor descriptor in ManagedSettings.Where(
+                     descriptor => !IsTimezoneControl(descriptor)))
+        {
+            await RestoreManagedSettingAsync(
+                    serial,
+                    descriptor,
+                    values,
+                    statuses,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (statuses.TryGetValue(PropertyConstants.Timezone, out BackupSettingStatus? timezoneStatus))
+        {
+            if (string.Equals(timezoneStatus.State, "backed_up", StringComparison.Ordinal))
+            {
+                if (!values.TryGetValue(PropertyConstants.Timezone, out string? timezone))
+                    throw new InvalidDataException("The backup timezone is marked backed_up but has no value.");
+
+                await _adb.SetPropertyAsync(
+                        serial,
+                        PropertyConstants.Timezone,
+                        timezone,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else if (timezoneStatus.State is "skipped_missing" or "skipped_empty" or "empty")
+            {
+                await _adb.SetPropertyAsync(
+                        serial,
+                        PropertyConstants.Timezone,
+                        string.Empty,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            await _adb.BroadcastAsync(
+                    serial,
+                    "android.intent.action.TIMEZONE_CHANGED",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _adb.BroadcastAsync(
+                    serial,
+                    "android.intent.action.TIME_SET",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        foreach (SettingDescriptor descriptor in ManagedSettings.Where(IsTimezoneControl))
+        {
+            await RestoreManagedSettingAsync(
+                    serial,
+                    descriptor,
+                    values,
+                    statuses,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task RestoreManagedSettingAsync(
+        string serial,
+        SettingDescriptor descriptor,
+        IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, BackupSettingStatus> statuses,
+        CancellationToken cancellationToken)
+    {
+        string name = $"{descriptor.Namespace}.{descriptor.Key}";
+        if (!statuses.TryGetValue(name, out BackupSettingStatus? status))
+            return;
+
+        if (string.Equals(status.State, "backed_up", StringComparison.Ordinal))
+        {
+            if (!values.TryGetValue(name, out string? value))
+                throw new InvalidDataException($"The backup setting {name} is marked backed_up but has no value.");
+
+            await _adb.PutSettingAsync(
+                    serial,
+                    descriptor.Namespace,
+                    descriptor.Key,
+                    value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else if (status.State is "skipped_missing" or "skipped_empty" or "empty")
+        {
+            await _adb.DeleteSettingAsync(
+                    serial,
+                    descriptor.Namespace,
+                    descriptor.Key,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task RestorePackagesAsync(
+        string serial,
+        ZipArchive archive,
+        RestorePlan plan,
+        string localSessionDirectory,
+        string remoteSessionPath,
+        DeviceRestoreOptions options,
+        IProgress<DeviceRestoreProgress>? progress,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        foreach (PackagePlan packagePlan in plan.Packages)
+        {
+            bool selected = packagePlan.Manifest.Group switch
+            {
+                "apps" => options.RestoreUserAppData,
+                "google" => options.RestoreGoogleAppData,
+                _ => false
+            };
+            if (!selected)
+                continue;
+
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new(
+                DeviceRestoreStage.RestoringApps,
+                packagePlan.Manifest.PackageName,
+                packagePlan.Manifest.Group));
+
+            if (packagePlan.Compatibility.Outcome != DeviceRestoreOutcome.Succeeded)
+            {
+                execution.AddPackage(new(
+                    packagePlan.Manifest.PackageName,
+                    packagePlan.Manifest.Group,
+                    packagePlan.Compatibility.Outcome,
+                    packagePlan.Compatibility.Reason,
+                    Warning: packagePlan.Compatibility.Warning));
+                continue;
+            }
+
+            try
+            {
+                DeviceRestorePackageResult result = await RestorePackageAsync(
+                        serial,
+                        archive,
+                        packagePlan.Manifest,
+                        packagePlan.Compatibility.TargetUid!.Value,
+                        localSessionDirectory,
+                        remoteSessionPath,
+                        execution,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                execution.AddPackage(result with { Warning = packagePlan.Compatibility.Warning });
+                if (result.Outcome is DeviceRestoreOutcome.Failed or DeviceRestoreOutcome.Partial)
+                    execution.Warnings.Add($"package_restore_failed:{packagePlan.Manifest.PackageName}");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                execution.AddPackage(new(
+                    packagePlan.Manifest.PackageName,
+                    packagePlan.Manifest.Group,
+                    DeviceRestoreOutcome.Failed,
+                    exception.Message));
+                execution.Warnings.Add($"package_restore_failed:{packagePlan.Manifest.PackageName}");
+            }
+        }
+
+        if (options.RestoreUserAppData)
+        {
+            int appCount = plan.Packages.Count(item =>
+                string.Equals(item.Manifest.Group, "apps", StringComparison.Ordinal));
+            if (appCount > 0)
+            {
+                int restored = execution.Packages.Count(item =>
+                    string.Equals(item.Group, "apps", StringComparison.Ordinal)
+                    && (item.Outcome == DeviceRestoreOutcome.Succeeded
+                        || item.Outcome == DeviceRestoreOutcome.Partial && item.RestoredPayloadCount > 0));
+                int skipped = execution.Packages.Count(item =>
+                    string.Equals(item.Group, "apps", StringComparison.Ordinal)
+                    && item.Outcome == DeviceRestoreOutcome.Skipped);
+                int failed = execution.Packages.Count(item =>
+                    string.Equals(item.Group, "apps", StringComparison.Ordinal)
+                    && item.Outcome is DeviceRestoreOutcome.Failed or DeviceRestoreOutcome.Partial);
+                execution.AddComponent(new(
+                    "userAppData",
+                    failed > 0 && restored == 0
+                        ? DeviceRestoreOutcome.Failed
+                        : failed > 0 || skipped > 0
+                            ? DeviceRestoreOutcome.Partial
+                            : DeviceRestoreOutcome.Succeeded,
+                    null,
+                    restored,
+                    skipped,
+                    failed));
+            }
+            else
+            {
+                execution.AddComponent(new(
+                    "userAppData",
+                    DeviceRestoreOutcome.Skipped,
+                    "no_payload"));
+            }
+        }
+
+        if (options.RestoreGoogleAppData)
+        {
+            int googleCount = plan.Packages.Count(item =>
+                string.Equals(item.Manifest.Group, "google", StringComparison.Ordinal));
+            int googleRestored = execution.Packages.Count(item =>
+                string.Equals(item.Group, "google", StringComparison.Ordinal)
+                && (item.Outcome == DeviceRestoreOutcome.Succeeded
+                    || item.Outcome == DeviceRestoreOutcome.Partial && item.RestoredPayloadCount > 0));
+            int googleSkipped = execution.Packages.Count(item =>
+                string.Equals(item.Group, "google", StringComparison.Ordinal)
+                && item.Outcome == DeviceRestoreOutcome.Skipped);
+            int googleFailed = execution.Packages.Count(item =>
+                string.Equals(item.Group, "google", StringComparison.Ordinal)
+                && item.Outcome is DeviceRestoreOutcome.Failed or DeviceRestoreOutcome.Partial);
+            execution.AddComponent(new(
+                "googleAppData",
+                googleCount == 0
+                    ? DeviceRestoreOutcome.Skipped
+                    : googleFailed > 0 && googleRestored == 0
+                        ? DeviceRestoreOutcome.Failed
+                        : googleFailed > 0 || googleSkipped > 0
+                            ? DeviceRestoreOutcome.Partial
+                            : DeviceRestoreOutcome.Succeeded,
+                googleCount == 0 ? "no_payload" : "experimental_google_state",
+                googleRestored,
+                googleSkipped,
+                googleFailed,
+                Experimental: true));
+        }
+    }
+
+    private async Task<DeviceRestorePackageResult> RestorePackageAsync(
+        string serial,
+        ZipArchive archive,
+        PackageBackupManifest package,
+        int targetUid,
+        string localSessionDirectory,
+        string remoteSessionPath,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        BackupDataPathStatus[] payloadPaths = package.Paths
+            .Where(path => path.State is "backed_up" or "present_alias"
+                && !string.IsNullOrWhiteSpace(path.Payload))
+            .GroupBy(path => path.Payload!, StringComparer.Ordinal)
+            .Select(group => group.FirstOrDefault(path => path.State == "backed_up") ?? group.First())
+            .ToArray();
+        var staged = new List<StagedPackagePayload>();
+        var resolvedPaths = new HashSet<string>(StringComparer.Ordinal);
+        int restoredPayloads = 0;
+        int attemptedPayloads = 0;
+        try
+        {
+            // Stage every payload and capture target metadata before touching
+            // live app data. Paths without a payload are never cleared.
+            foreach (BackupDataPathStatus pathStatus in payloadPaths)
+            {
+                string destinationPath = GetPackageRestorePath(package.PackageName, pathStatus);
+                string resolvedPath = await RunShellOutputAsync(
+                        serial,
+                        $"readlink -f {QuoteShellValue(destinationPath)}",
+                        $"resolve {package.PackageName} data path",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(resolvedPath))
+                    throw new InvalidOperationException("target_package_path_unavailable");
+                GetPackageRestorePath(package.PackageName, pathStatus with { DevicePath = resolvedPath });
+                if (!resolvedPaths.Add(resolvedPath))
+                    throw new InvalidOperationException("target_package_paths_overlap");
+
+                string metadata = await ReadFileMetadataAsync(serial, destinationPath, cancellationToken)
+                    .ConfigureAwait(false);
+                bool internalData = !destinationPath.StartsWith("/data/media/", StringComparison.Ordinal);
+                if (internalData)
+                {
+                    string targetGroup = await ReadTargetGroupAsync(
+                            serial,
+                            destinationPath,
+                            targetUid,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    Match metadataMatch = FileMetadataPattern.Match(metadata);
+                    string mode = metadataMatch.Success ? metadataMatch.Groups["mode"].Value : "700";
+                    metadata = $"{targetUid}:{targetGroup}:{mode}";
+                }
+                else if (string.IsNullOrWhiteSpace(metadata))
+                {
+                    metadata = await BuildFallbackMetadataAsync(
+                            serial,
+                            GetUnixDirectoryName(destinationPath),
+                            fallbackOwner: "1023:1023",
+                            defaultMode: "770",
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                ZipArchiveEntry entry = GetRequiredEntry(
+                    archive,
+                    $"{package.Group}/{package.PackageName}/{pathStatus.Payload}");
+                string remoteTarPath = $"{remoteSessionPath}/package-{staged.Count:D5}.tar";
+                await PushZipEntryAsync(
+                        serial,
+                        entry,
+                        localSessionDirectory,
+                        remoteTarPath,
+                        $"stage {package.PackageName} payload",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                staged.Add(new(destinationPath, remoteTarPath, metadata));
+            }
+
+            if (staged.Count == 0)
+                return new(package.PackageName, package.Group, DeviceRestoreOutcome.Skipped, "payload_missing");
+
+            execution.MutationStarted = true;
+            await _adb.ForceStopPackageAsync(serial, package.PackageName, cancellationToken)
+                .ConfigureAwait(false);
+            foreach (StagedPackagePayload payload in staged)
+            {
+                attemptedPayloads++;
+                string parentPath = GetUnixDirectoryName(payload.DestinationPath);
+                await RunRequiredShellAsync(
+                        serial,
+                        $"rm -rf {QuoteShellValue(payload.DestinationPath)} && mkdir -p {QuoteShellValue(parentPath)} && tar -xpf {QuoteShellValue(payload.RemoteTarPath)} -C {QuoteShellValue(parentPath)} && test -d {QuoteShellValue(payload.DestinationPath)}",
+                        $"replace {package.PackageName} data payload",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                await ApplyFileMetadataAsync(
+                        serial,
+                        payload.DestinationPath,
+                        payload.Metadata,
+                        defaultMode: "700",
+                        cancellationToken,
+                        recursive: true)
+                    .ConfigureAwait(false);
+                await RunRequiredShellAsync(
+                        serial,
+                        $"restorecon -RF {QuoteShellValue(payload.DestinationPath)} && rm -f {QuoteShellValue(payload.RemoteTarPath)}",
+                        $"finalize {package.PackageName} data payload",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                restoredPayloads++;
+            }
+
+            return new(
+                package.PackageName,
+                package.Group,
+                DeviceRestoreOutcome.Succeeded,
+                null,
+                RestoredPayloadCount: restoredPayloads);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return new(
+                package.PackageName,
+                package.Group,
+                restoredPayloads > 0 ? DeviceRestoreOutcome.Partial : DeviceRestoreOutcome.Failed,
+                exception.Message,
+                RestoredPayloadCount: restoredPayloads,
+                SkippedPayloadCount: payloadPaths.Length - attemptedPayloads);
+        }
+    }
+
+    private async Task RestoreKeyboxAsync(
+        string serial,
+        ZipArchive archive,
+        BackupArchiveManifest manifest,
+        string? keyboxEnabledValue,
+        string remoteSessionPath,
+        string localSessionDirectory,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        BackupComponentStatus status = FindRequiredOptionalStatus(manifest, "keybox");
+        bool hasPayload = status.State == "backed_up";
+        if (!hasPayload && IsEnabledPropertyValue(keyboxEnabledValue))
+            throw new InvalidOperationException("keybox_payload_missing_for_enabled_state");
+
+        if (!hasPayload)
+        {
+            execution.PendingKeyboxEnabledValue = keyboxEnabledValue;
+            execution.MutationStarted |= keyboxEnabledValue is not null;
+            return;
+        }
+
+        ZipArchiveEntry entry = GetRequiredEntry(archive, "optional/keybox.xml");
+        await ValidateXmlEntryAsync(entry, "Keybox", cancellationToken).ConfigureAwait(false);
+
+        const string targetPath = "/data/system/keybox.xml";
+        string metadata = await ReadFileMetadataAsync(serial, targetPath, cancellationToken)
+            .ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(metadata))
+        {
+            metadata = await BuildFallbackMetadataAsync(
+                    serial,
+                    "/data/system",
+                    fallbackOwner: "0:0",
+                    defaultMode: "600",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        string remotePayloadPath = $"{remoteSessionPath}/keybox.xml";
+        await PushZipEntryAsync(
+                serial,
+                entry,
+                localSessionDirectory,
+                remotePayloadPath,
+                "restore Keybox payload",
+                cancellationToken)
+            .ConfigureAwait(false);
+        execution.PendingKeyboxEnabledValue = keyboxEnabledValue;
+        execution.PendingKeyboxPayloadInstalled = false;
+        execution.MutationStarted = true;
+        if (keyboxEnabledValue is not null)
+        {
+            await _adb.SetPropertyAsync(
+                    serial,
+                    PropertyConstants.Keybox.Enabled,
+                    "false",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        await RunRequiredShellAsync(
+                serial,
+                $"mkdir -p /data/system && cp {QuoteShellValue(remotePayloadPath)} {QuoteShellValue(targetPath)}",
+                "install Keybox payload",
+                cancellationToken)
+            .ConfigureAwait(false);
+        await ApplyFileMetadataAsync(serial, targetPath, metadata, defaultMode: "600", cancellationToken)
+            .ConfigureAwait(false);
+        await RunRequiredShellAsync(
+                serial,
+                $"restorecon {QuoteShellValue(targetPath)}",
+                "restore Keybox SELinux context",
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        execution.PendingKeyboxPayloadInstalled = true;
+    }
+
+    private async Task RestoreSsaidAsync(
+        string serial,
+        ZipArchive archive,
+        string remoteSessionPath,
+        string localSessionDirectory,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        ZipArchiveEntry entry = GetRequiredEntry(archive, "experimental/settings_ssaid.xml");
+        await ValidateXmlEntryAsync(entry, "SSAID", cancellationToken).ConfigureAwait(false);
+
+        string remotePayloadPath = $"{remoteSessionPath}/settings_ssaid.xml";
+        await PushZipEntryAsync(
+                serial,
+                entry,
+                localSessionDirectory,
+                remotePayloadPath,
+                "stage SSAID payload",
+                cancellationToken)
+            .ConfigureAwait(false);
+        await StopFrameworkForRestoreAsync(serial, execution, cancellationToken).ConfigureAwait(false);
+
+        const string targetPath = "/data/system/users/0/settings_ssaid.xml";
+        string targetMetadata = await ReadFileMetadataAsync(serial, targetPath, cancellationToken)
+            .ConfigureAwait(false);
+        string metadata = targetMetadata;
+        if (string.IsNullOrWhiteSpace(metadata))
+        {
+            metadata = await BuildFallbackMetadataAsync(
+                    serial,
+                    "/data/system/users/0",
+                    fallbackOwner: "1000:1000",
+                    defaultMode: "600",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        string remoteRollbackPath = $"{remoteSessionPath}/rollback-settings_ssaid.tar";
+        bool targetOriginallyExisted = !string.IsNullOrWhiteSpace(targetMetadata);
+        string parentPath = GetUnixDirectoryName(targetPath);
+        string[] stateFileNames = ["settings_ssaid.xml", "settings_ssaid.xml.bak", "settings_ssaid.xml.new"];
+        IReadOnlyList<string> existingFileNames = await ReadExistingRestoreFilesAsync(
+                serial,
+                parentPath,
+                stateFileNames,
+                "SSAID",
+                cancellationToken)
+            .ConfigureAwait(false);
+        bool liveReplacementStarted = false;
+        string stateFiles = string.Join(
+            " ",
+            stateFileNames.Select(fileName => QuoteShellValue($"{parentPath}/{fileName}")));
+        try
+        {
+            if (existingFileNames.Count > 0)
+            {
+                string rollbackFiles = string.Join(" ", existingFileNames.Select(QuoteShellValue));
+                await RunRequiredShellAsync(
+                        serial,
+                        $"tar -cpf {QuoteShellValue(remoteRollbackPath)} -C {QuoteShellValue(parentPath)} {rollbackFiles}",
+                        "save the current SSAID state",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            liveReplacementStarted = true;
+            await RunRequiredShellAsync(
+                    serial,
+                    $"mkdir -p {QuoteShellValue(parentPath)} && rm -f {stateFiles} && cp {QuoteShellValue(remotePayloadPath)} {QuoteShellValue(targetPath)}",
+                    "install SSAID state",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await ApplyFileMetadataAsync(serial, targetPath, metadata, defaultMode: "600", cancellationToken)
+                .ConfigureAwait(false);
+            await RunRequiredShellAsync(
+                    serial,
+                    $"restorecon {QuoteShellValue(targetPath)} && sync",
+                    "restore SSAID SELinux context",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch when (liveReplacementStarted)
+        {
+            try
+            {
+                using var rollbackCancellation = new CancellationTokenSource(CleanupTimeout);
+                string rollbackCommand = $"rm -f {stateFiles}";
+                if (existingFileNames.Count > 0)
+                    rollbackCommand += $" && tar -xpf {QuoteShellValue(remoteRollbackPath)} -C {QuoteShellValue(parentPath)}";
+                await RunRequiredShellAsync(
+                        serial,
+                        rollbackCommand,
+                        "rollback SSAID state",
+                        rollbackCancellation.Token)
+                    .ConfigureAwait(false);
+
+                if (targetOriginallyExisted)
+                {
+                    await ApplyFileMetadataAsync(
+                            serial,
+                            targetPath,
+                            targetMetadata,
+                            defaultMode: "600",
+                            rollbackCancellation.Token)
+                        .ConfigureAwait(false);
+                }
+                if (existingFileNames.Count > 0)
+                {
+                    string rollbackFiles = string.Join(
+                        " ",
+                        existingFileNames.Select(fileName => QuoteShellValue($"{parentPath}/{fileName}")));
+                    await RunRequiredShellAsync(
+                            serial,
+                            $"restorecon {rollbackFiles}",
+                            "restore SSAID rollback contexts",
+                            rollbackCancellation.Token)
+                        .ConfigureAwait(false);
+                }
+                await RunRequiredShellAsync(
+                        serial,
+                        "sync",
+                        "flush SSAID rollback state",
+                        rollbackCancellation.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception rollbackException)
+            {
+                execution.Warnings.Add("ssaid_rollback_failed");
+                execution.ForceFailed = true;
+                _logger.LogError(
+                    rollbackException,
+                    "SSAID restore rollback failed for {Serial}.",
+                    serial);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task StopFrameworkForRestoreAsync(
+        string serial,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        if (!execution.FrameworkStopped)
+        {
+            string systemServerPid = await RunShellOutputAsync(
+                    serial,
+                    "pidof system_server 2>/dev/null || true",
+                    "verify Android framework is running before state replacement",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(systemServerPid))
+                throw new InvalidOperationException("android_framework_not_running_before_restore");
+
+            execution.FrameworkStopRequested = true;
+            execution.MutationStarted = true;
+            await RunRequiredShellAsync(
+                    serial,
+                    "if [ \"$(getprop init.svc.zygote_secondary)\" = \"running\" ]; then stop zygote_secondary || exit 1; fi; stop zygote",
+                    "stop Android framework for state replacement",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await RunRequiredShellAsync(
+                    serial,
+                    "for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do if ! pidof system_server >/dev/null 2>&1; then exit 0; fi; sleep 1; done; exit 1",
+                    "wait for Android framework shutdown",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        string remainingSystemServerPid = await RunShellOutputAsync(
+                serial,
+                "pidof system_server 2>/dev/null || true",
+                "verify Android framework shutdown",
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(remainingSystemServerPid))
+            throw new InvalidOperationException("android_framework_stop_timeout");
+        execution.FrameworkStopped = true;
+    }
+
+    private async Task RestoreGoogleAccountStateAsync(
+        string serial,
+        ZipArchive archive,
+        BackupArchiveManifest manifest,
+        string remoteSessionPath,
+        string localSessionDirectory,
+        RestoreExecution execution,
+        CancellationToken cancellationToken)
+    {
+        var staged = new List<StagedAccountPayload>();
+        int index = 0;
+        foreach (AccountRestoreDescriptor descriptor in AccountPaths)
+        {
+            BackupComponentStatus? status = FindOptionalStatus(manifest, descriptor.Component);
+            if (status is null || status.State != "backed_up")
+                continue;
+
+            ZipArchiveEntry entry = GetRequiredEntry(archive, descriptor.ArchivePath);
+            string remoteTarPath = $"{remoteSessionPath}/account-{index:D5}.tar";
+            string stageDirectory = $"{remoteSessionPath}/account-stage/{SanitizeShellPart(descriptor.Component)}";
+            index++;
+            await PushZipEntryAsync(
+                    serial,
+                    entry,
+                    localSessionDirectory,
+                    remoteTarPath,
+                    $"stage {descriptor.Component}",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await RunRequiredShellAsync(
+                    serial,
+                    $"mkdir -p {QuoteShellValue(stageDirectory)} && tar -xpf {QuoteShellValue(remoteTarPath)} -C {QuoteShellValue(stageDirectory)}",
+                    $"stage {descriptor.Component} payload",
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            string stagedPath = $"{stageDirectory}/{descriptor.FileName}";
+            if (descriptor.IsDatabase)
+            {
+                string quickCheck = await RunShellOutputAsync(
+                        serial,
+                        $"if command -v sqlite3 >/dev/null 2>&1; then if [ \"$(sqlite3 {QuoteShellValue(stagedPath)} 'PRAGMA quick_check;' 2>/dev/null)\" = \"ok\" ]; then printf '%s\\n' __DDC_SQLITE_OK__; else printf '%s\\n' __DDC_SQLITE_INVALID__; fi; elif [ \"$(dd if={QuoteShellValue(stagedPath)} bs=1 count=16 2>/dev/null | od -An -tx1 | tr -d ' \\n')\" = \"53514c69746520666f726d6174203300\" ]; then printf '%s\\n' __DDC_SQLITE_HEADER_OK__; else printf '%s\\n' __DDC_SQLITE_INVALID__; fi",
+                        $"validate {descriptor.Component} SQLite snapshot",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (quickCheck is not ("__DDC_SQLITE_OK__" or "__DDC_SQLITE_HEADER_OK__"))
+                {
+                    throw new InvalidDataException(
+                        $"The {descriptor.Component} SQLite snapshot could not be validated ({quickCheck}).");
+                }
+            }
+
+            string livePath = $"{descriptor.Directory}/{descriptor.FileName}";
+            string liveMetadata = await ReadFileMetadataAsync(serial, livePath, cancellationToken)
+                .ConfigureAwait(false);
+            string metadata = liveMetadata;
+            if (string.IsNullOrWhiteSpace(metadata))
+            {
+                metadata = await BuildFallbackMetadataAsync(
+                        serial,
+                        descriptor.Directory,
+                        fallbackOwner: "1000:1000",
+                        defaultMode: descriptor.IsDirectory ? "700" : "660",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            staged.Add(new StagedAccountPayload(
+                descriptor,
+                stagedPath,
+                livePath,
+                liveMetadata,
+                metadata,
+                remoteTarPath,
+                RollbackTarPath: null,
+                OriginallyExisted: !string.IsNullOrWhiteSpace(liveMetadata),
+                RollbackFileNames: []));
+        }
+
+        if (staged.Count == 0)
+            throw new InvalidOperationException("No restorable Google Account State payload is available.");
+
+        bool rollbackPrepared = false;
+        bool liveReplacementStarted = false;
+        var replacementTargets = new List<StagedAccountPayload>();
+        try
+        {
+            await StopFrameworkForRestoreAsync(serial, execution, cancellationToken).ConfigureAwait(false);
+
+            for (int payloadIndex = 0; payloadIndex < staged.Count; payloadIndex++)
+            {
+                StagedAccountPayload payload = staged[payloadIndex];
+                IReadOnlyList<string> rollbackFileNames = await ReadExistingRestoreFilesAsync(
+                        serial,
+                        payload.Descriptor.Directory,
+                        GetAccountComponentFileNames(payload.Descriptor),
+                        payload.Descriptor.Component,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                string targetMetadata = await ReadFileMetadataAsync(
+                        serial,
+                        payload.LivePath,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                string installMetadata = string.IsNullOrWhiteSpace(targetMetadata)
+                    ? payload.InstallMetadata
+                    : targetMetadata;
+
+                string? rollbackTarPath = null;
+                if (rollbackFileNames.Count > 0)
+                {
+                    rollbackTarPath = $"{remoteSessionPath}/account-rollback-{payloadIndex:D5}.tar";
+                    string rollbackFiles = string.Join(
+                        " ",
+                        rollbackFileNames.Select(QuoteShellValue));
+                    await RunRequiredShellAsync(
+                            serial,
+                            $"tar -cpf {QuoteShellValue(rollbackTarPath)} -C {QuoteShellValue(payload.Descriptor.Directory)} {rollbackFiles}",
+                            $"save the current {payload.Descriptor.Component} state",
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                staged[payloadIndex] = payload with
+                {
+                    TargetMetadata = targetMetadata,
+                    InstallMetadata = installMetadata,
+                    RollbackTarPath = rollbackTarPath,
+                    OriginallyExisted = rollbackFileNames.Count > 0,
+                    RollbackFileNames = rollbackFileNames
+                };
+            }
+
+            rollbackPrepared = true;
+
+            foreach (StagedAccountPayload payload in staged)
+            {
+                string parent = GetUnixDirectoryName(payload.LivePath);
+                string replacementCommand = BuildInstallAccountPayloadCommand(payload, parent);
+                liveReplacementStarted = true;
+                replacementTargets.Add(payload);
+                await RunRequiredShellAsync(
+                        serial,
+                        replacementCommand,
+                        $"replace {payload.Descriptor.Component} state",
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                await ApplyAccountMetadataAsync(
+                        serial,
+                        payload.LivePath,
+                        payload.InstallMetadata,
+                        payload.Descriptor.IsDirectory,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (payload.Descriptor.IsDatabase)
+                {
+                    await ValidateLiveAccountDatabaseAsync(
+                            serial,
+                            payload,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            await RunRequiredShellAsync(serial, "sync", "flush restored account state", cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            string failureReason = exception.Message;
+            if (liveReplacementStarted)
+            {
+                if (rollbackPrepared)
+                {
+                    try
+                    {
+                        await RollbackAccountStateAsync(serial, replacementTargets).ConfigureAwait(false);
+                        failureReason = "restore_failed_rolled_back";
+                    }
+                    catch (Exception rollbackException)
+                    {
+                        failureReason = "restore_failed_rollback_failed";
+                        execution.Warnings.Add("google_account_state_rollback_failed");
+                        _logger.LogError(
+                            rollbackException,
+                            "Google Account State rollback failed for {Serial}.",
+                            serial);
+                    }
+                }
+                else
+                {
+                    _logger.LogError(
+                        exception,
+                        "Google Account State mutation started before all rollback snapshots were ready for {Serial}.",
+                        serial);
+                    failureReason = "restore_failed_rollback_failed";
+                    execution.Warnings.Add("google_account_state_rollback_failed");
+                }
+            }
+
+            if (execution.FrameworkStopRequested)
+            {
+                _logger.LogWarning(
+                    "Android framework stop was requested during account restore on {Serial}; the outer restore recovery will reboot the device.",
+                    serial);
+            }
+
+            if (exception is OperationCanceledException)
+                throw;
+
+            if (liveReplacementStarted)
+            {
+                _logger.LogError(
+                    exception,
+                    "Google Account State restore failed for {Serial}: {FailureReason}.",
+                    serial,
+                    failureReason);
+                throw new AccountStateRestoreException(failureReason, exception);
+            }
+
+            _logger.LogError(
+                exception,
+                "Google Account State restore failed before live replacement for {Serial}.",
+                serial);
+
+            throw;
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ReadExistingRestoreFilesAsync(
+        string serial,
+        string directory,
+        IReadOnlyList<string> candidateFileNames,
+        string component,
+        CancellationToken cancellationToken)
+    {
+        string candidates = string.Join(" ", candidateFileNames.Select(QuoteShellValue));
+        string output = await RunShellOutputAsync(
+                serial,
+                $"if [ -d {QuoteShellValue(directory)} ]; then cd {QuoteShellValue(directory)} && for file in {candidates}; do if [ -e \"$file\" ]; then printf '%s\\n' \"$file\"; fi; done; fi",
+                $"inspect the current {component} files",
+                cancellationToken)
+            .ConfigureAwait(false);
+        string[] existingFileNames = output.Split(
+            ['\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        HashSet<string> candidateSet = candidateFileNames.ToHashSet(StringComparer.Ordinal);
+        if (existingFileNames.Any(fileName => !candidateSet.Contains(fileName)))
+        {
+            throw new InvalidOperationException(
+                $"The existing {component} file list could not be validated.");
+        }
+
+        return existingFileNames;
+    }
+
+    private async Task ValidateLiveAccountDatabaseAsync(
+        string serial,
+        StagedAccountPayload payload,
+        CancellationToken cancellationToken)
+    {
+        const string valid = "__DDC_SQLITE_OK__";
+        const string unavailable = "__DDC_SQLITE_UNAVAILABLE__";
+        string result = await RunShellOutputAsync(
+                serial,
+                $"if command -v sqlite3 >/dev/null 2>&1; then if [ \"$(sqlite3 {QuoteShellValue(payload.LivePath)} 'PRAGMA quick_check;' 2>/dev/null)\" = \"ok\" ]; then printf '%s\\n' {valid}; else printf '%s\\n' __DDC_SQLITE_INVALID__; fi; else printf '%s\\n' {unavailable}; fi",
+                $"validate restored {payload.Descriptor.Component} SQLite database",
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (result is not (valid or unavailable))
+        {
+            throw new InvalidDataException(
+                $"The restored {payload.Descriptor.Component} SQLite database failed quick_check ({result}).");
+        }
+    }
+
+    private async Task RollbackAccountStateAsync(
+        string serial,
+        IReadOnlyList<StagedAccountPayload> staged)
+    {
+        using var rollbackCancellation = new CancellationTokenSource(CleanupTimeout);
+        Exception? rollbackFailure = null;
+        foreach (StagedAccountPayload payload in staged.Reverse())
+        {
+            try
+            {
+                string parent = GetUnixDirectoryName(payload.LivePath);
+                string removeCommand = BuildRemoveAccountTargetCommand(payload);
+                string restoreCommand = !payload.OriginallyExisted || payload.RollbackTarPath is null
+                    ? removeCommand
+                    : $"{removeCommand} && mkdir -p {QuoteShellValue(parent)} && tar -xpf {QuoteShellValue(payload.RollbackTarPath)} -C {QuoteShellValue(parent)}";
+                await RunRequiredShellAsync(
+                        serial,
+                        restoreCommand,
+                        $"rollback {payload.Descriptor.Component} state",
+                        rollbackCancellation.Token)
+                    .ConfigureAwait(false);
+
+                if (payload.RollbackTarPath is not null)
+                {
+                    if (payload.Descriptor.IsDatabase)
+                    {
+                        if (payload.RollbackFileNames.Contains(
+                                payload.Descriptor.FileName,
+                                StringComparer.Ordinal))
+                        {
+                            string metadata = string.IsNullOrWhiteSpace(payload.TargetMetadata)
+                                ? payload.InstallMetadata
+                                : payload.TargetMetadata;
+                            await ApplyFileMetadataAsync(
+                                    serial,
+                                    payload.LivePath,
+                                    metadata,
+                                    defaultMode: "660",
+                                    rollbackCancellation.Token)
+                                .ConfigureAwait(false);
+                        }
+
+                        string restoredDatabaseFiles = string.Join(
+                            " ",
+                            payload.RollbackFileNames.Select(fileName =>
+                                QuoteShellValue($"{payload.Descriptor.Directory}/{fileName}")));
+                        await RunRequiredShellAsync(
+                                serial,
+                                $"restorecon {restoredDatabaseFiles}",
+                                $"restore {payload.Descriptor.Component} SELinux contexts",
+                                rollbackCancellation.Token)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        string metadata = string.IsNullOrWhiteSpace(payload.TargetMetadata)
+                            ? payload.InstallMetadata
+                            : payload.TargetMetadata;
+                        await ApplyAccountMetadataAsync(
+                                serial,
+                                payload.LivePath,
+                                metadata,
+                                payload.Descriptor.IsDirectory,
+                                rollbackCancellation.Token)
+                            .ConfigureAwait(false);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                rollbackFailure ??= exception;
+                _logger.LogError(
+                    exception,
+                    "Could not rollback Google Account State component {Component} on {Serial}.",
+                    payload.Descriptor.Component,
+                    serial);
+            }
+        }
+
+        try
+        {
+            await RunRequiredShellAsync(
+                    serial,
+                    "sync",
+                    "flush rolled back account state",
+                    rollbackCancellation.Token)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            rollbackFailure ??= exception;
+        }
+
+        if (rollbackFailure is not null)
+            throw rollbackFailure;
+    }
+
+    private static string[] GetAccountComponentFileNames(AccountRestoreDescriptor descriptor)
+    {
+        if (!descriptor.IsDatabase)
+            return [descriptor.FileName];
+
+        return
+        [
+            descriptor.FileName,
+            descriptor.FileName + "-wal",
+            descriptor.FileName + "-shm",
+            descriptor.FileName + "-journal"
+        ];
+    }
+
+    private static string BuildInstallAccountPayloadCommand(
+        StagedAccountPayload payload,
+        string parent)
+    {
+        if (!payload.Descriptor.IsDatabase)
+        {
+            return $"rm -rf {QuoteShellValue(payload.LivePath)} && mkdir -p {QuoteShellValue(parent)} && tar -xpf {QuoteShellValue(payload.RemoteTarPath)} -C {QuoteShellValue(parent)}";
+        }
+
+        string removeCommand = BuildRemoveAccountTargetCommand(payload);
+        return $"{removeCommand} && mkdir -p {QuoteShellValue(parent)} && cp {QuoteShellValue(payload.StagedPath)} {QuoteShellValue(payload.LivePath)}";
+    }
+
+    private static string BuildRemoveAccountTargetCommand(StagedAccountPayload payload)
+    {
+        if (!payload.Descriptor.IsDatabase)
+            return $"rm -rf {QuoteShellValue(payload.LivePath)}";
+
+        return string.Join(
+            " && ",
+            GetAccountComponentFileNames(payload.Descriptor).Select(fileName =>
+                $"rm -f {QuoteShellValue($"{payload.Descriptor.Directory}/{fileName}")}"));
+    }
+
+    private async Task ApplyAccountMetadataAsync(
+        string serial,
+        string path,
+        string metadata,
+        bool isDirectory,
+        CancellationToken cancellationToken)
+    {
+        await ApplyFileMetadataAsync(
+                serial,
+                path,
+                metadata,
+                defaultMode: isDirectory ? "700" : "660",
+                cancellationToken,
+                recursive: isDirectory)
+            .ConfigureAwait(false);
+        await RunRequiredShellAsync(
+                serial,
+                isDirectory
+                    ? $"restorecon -RF {QuoteShellValue(path)}"
+                    : $"restorecon {QuoteShellValue(path)}",
+                $"restore {GetUnixFileName(path)} SELinux context",
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<RestorePlan> BuildRestorePlanAsync(
+        string serial,
+        DeviceRestoreOptions options,
+        BackupArchiveManifest manifest,
+        string archivePath,
+        CancellationToken cancellationToken)
+    {
+        ValidateSelectedComponents(options, manifest);
+        string? keyboxEnabledValue = null;
+        if (options.RestoreKeybox)
+        {
+            keyboxEnabledValue = await ReadKeyboxEnabledValueAsync(
+                    archivePath,
+                    manifest,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (IsEnabledPropertyValue(keyboxEnabledValue)
+                && FindOptionalStatus(manifest, "keybox")?.State != "backed_up")
+            {
+                throw new InvalidOperationException(
+                    "keybox_payload_missing_for_enabled_state");
+            }
+        }
+        string? targetRole = await TryReadPropertyAsync(
+                serial,
+                PropertyConstants.DeepDroidDevice,
+                cancellationToken)
+            .ConfigureAwait(false);
+        int? targetSdk = ParsePositiveInt(await TryReadPropertyAsync(
+                serial,
+                PropertyConstants.Runtime.AndroidSdkVersion,
+                cancellationToken).ConfigureAwait(false));
+
+        var warnings = new List<string>(manifest.Warnings ?? []);
+        if (!string.Equals(manifest.SourceSerial, serial, StringComparison.OrdinalIgnoreCase))
+            warnings.Add("source_serial_differs_from_target");
+        if (!string.IsNullOrWhiteSpace(manifest.SourceDeviceRole)
+            && !string.Equals(manifest.SourceDeviceRole, targetRole, StringComparison.OrdinalIgnoreCase))
+        {
+            warnings.Add("source_device_role_differs_from_target");
+        }
+        if (options.RestoreKeybox)
+            warnings.Add("keybox_sensitive_restore");
+        if (options.RestoreSsaid
+            && !string.Equals(manifest.SourceSerial, serial, StringComparison.OrdinalIgnoreCase))
+        {
+            warnings.Add("ssaId_source_serial_differs");
+        }
+        if (options.RestoreGoogleAppData
+            && (!string.Equals(manifest.SourceSerial, serial, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(manifest.SourceDeviceRole, targetRole, StringComparison.OrdinalIgnoreCase)))
+        {
+            warnings.Add("google_app_data_source_differs");
+        }
+
+        bool accountStateAllowed = true;
+        bool accountStatePartial = string.Equals(
+            FindOptionalStatus(manifest, "googleAccountState")?.State,
+            "partial",
+            StringComparison.Ordinal);
+        if (options.RestoreGoogleAccountState)
+        {
+            accountStateAllowed = string.Equals(
+                    manifest.SourceSerial,
+                    serial,
+                    StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(manifest.SourceDeviceRole)
+                && string.Equals(
+                    manifest.SourceDeviceRole,
+                    targetRole,
+                    StringComparison.OrdinalIgnoreCase)
+                && manifest.AndroidSdkVersion.HasValue
+                && targetSdk.HasValue
+                && manifest.AndroidSdkVersion.Value == targetSdk.Value;
+            if (!accountStateAllowed)
+                warnings.Add("google_account_state_incompatible");
+            if (accountStatePartial)
+                warnings.Add("google_account_state_partial");
+        }
+
+        var packagePlans = new List<PackagePlan>();
+        foreach (PackageBackupManifest package in manifest.Packages ?? [])
+        {
+            if (package.Group is not ("apps" or "google"))
+                continue;
+            if ((package.Group == "apps" && !options.RestoreUserAppData)
+                || (package.Group == "google" && !options.RestoreGoogleAppData))
+            {
+                continue;
+            }
+            if (!IsValidPackageName(package.PackageName))
+                throw new InvalidDataException("The archive contains an invalid package name.");
+
+            DeviceRestorePackageCompatibility compatibility =
+                await CheckPackageCompatibilityAsync(serial, package, cancellationToken)
+                    .ConfigureAwait(false);
+            packagePlans.Add(new PackagePlan(package, compatibility));
+        }
+
+        return new RestorePlan(
+            manifest,
+            packagePlans,
+            warnings,
+            accountStateAllowed,
+            accountStatePartial,
+            targetRole,
+            targetSdk,
+            keyboxEnabledValue);
+    }
+
+    private static DeviceRestoreCompatibility CreateCompatibility(
+        RestorePlan plan,
+        DeviceRestoreOptions options)
+    {
+        bool isCompatible = !options.RestoreGoogleAccountState || plan.AccountStateAllowed;
+        return new(
+            isCompatible,
+            plan.Warnings,
+            plan.Packages.Select(item => item.Compatibility).ToArray());
+    }
+
+    private async Task<DeviceRestorePackageCompatibility> CheckPackageCompatibilityAsync(
+        string serial,
+        PackageBackupManifest package,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(package.Status, "backed_up", StringComparison.Ordinal))
+        {
+            return new(
+                package.PackageName,
+                DeviceRestoreOutcome.Skipped,
+                package.Reason ?? "source_package_unavailable",
+                package.VersionCode,
+                null,
+                null);
+        }
+
+        bool installed = await _devicePackageService
+            .IsPackageInstalledAsync(serial, package.PackageName, cancellationToken)
+            .ConfigureAwait(false);
+        if (!installed)
+        {
+            return new(
+                package.PackageName,
+                DeviceRestoreOutcome.Skipped,
+                "package_not_installed",
+                package.VersionCode,
+                null,
+                null);
+        }
+
+        CommandResult metadataResult = await _adb.RunAdbShellAsync(
+                serial,
+                $"dumpsys package {QuoteShellValue(package.PackageName)}",
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (metadataResult.ExitCode != 0)
+        {
+            return new(
+                package.PackageName,
+                DeviceRestoreOutcome.Skipped,
+                "package_metadata_unavailable",
+                package.VersionCode,
+                null,
+                null);
+        }
+
+        string output = metadataResult.StandardOutput;
+        long? targetVersion = ParseLong(VersionCodePattern, output);
+        long? targetSdkLong = ParseLong(TargetSdkPattern, output);
+        int? targetSdk = targetSdkLong is > 0 and <= int.MaxValue
+            ? (int)targetSdkLong.Value
+            : null;
+        long? targetUidLong = ParseLong(SourceUidPattern, output);
+        int? targetUid = targetUidLong is >= 0 and <= int.MaxValue
+            ? (int)targetUidLong.Value
+            : null;
+        if (!targetUid.HasValue)
+        {
+            return new(
+                package.PackageName,
+                DeviceRestoreOutcome.Skipped,
+                "target_uid_unavailable",
+                package.VersionCode,
+                targetVersion,
+                null);
+        }
+
+        bool hasPayload = package.Paths.Any(path =>
+            path.State is "backed_up" or "present_alias"
+            && !string.IsNullOrWhiteSpace(path.Payload));
+        if (!hasPayload)
+        {
+            return new(
+                package.PackageName,
+                DeviceRestoreOutcome.Skipped,
+                "payload_missing",
+                package.VersionCode,
+                targetVersion,
+                targetUid);
+        }
+
+        return new(
+            package.PackageName,
+            DeviceRestoreOutcome.Succeeded,
+            null,
+            package.VersionCode,
+            targetVersion,
+            targetUid,
+            targetVersion > package.VersionCode
+                ? "newer_target_version"
+                : package.TargetSdk.HasValue
+                    && targetSdk.HasValue
+                    && package.TargetSdk.Value != targetSdk.Value
+                    ? "target_sdk_differs"
+                    : null);
+    }
+
+    private async Task<BackupArchiveManifest> LoadAndValidateArchiveAsync(
+        string plaintextPath,
+        CancellationToken cancellationToken)
+    {
+        using ZipArchive archive = ZipFile.OpenRead(plaintextPath);
+        var normalizedEntries = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            string normalized = NormalizeArchivePath(entry.FullName);
+            if (!normalizedEntries.TryAdd(normalized, entry))
+                throw new InvalidDataException($"The backup ZIP contains a duplicate entry: {normalized}.");
+        }
+
+        ZipArchiveEntry manifestEntry = GetRequiredEntry(normalizedEntries, "manifest.json");
+        byte[] manifestBytes;
+        await using (Stream manifestStream = manifestEntry.Open())
+        await using (var buffer = new MemoryStream())
+        {
+            await manifestStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            manifestBytes = buffer.ToArray();
+        }
+
+        using JsonDocument manifestDocument = JsonDocument.Parse(manifestBytes);
+        if (manifestDocument.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("The backup manifest is not a JSON object.");
+        JsonElement checksumsElement = manifestDocument.RootElement.TryGetProperty(
+                "checksums",
+                out JsonElement checksumProperty)
+            ? checksumProperty
+            : throw new InvalidDataException("The backup manifest did not contain checksums.");
+        if (checksumsElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("The backup manifest checksums were invalid.");
+
+        var checksumNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonProperty checksum in checksumsElement.EnumerateObject())
+        {
+            string path = NormalizeArchivePath(checksum.Name);
+            if (!checksumNames.Add(path))
+                throw new InvalidDataException("The backup manifest contains duplicate checksum entries.");
+            if (checksum.Value.ValueKind != JsonValueKind.String
+                || !IsSha256(checksum.Value.GetString()))
+            {
+                throw new InvalidDataException($"The backup checksum for {path} was invalid.");
+            }
+        }
+
+        BackupArchiveManifest manifest = JsonSerializer.Deserialize<BackupArchiveManifest>(
+                manifestBytes,
+                JsonOptions)
+            ?? throw new InvalidDataException("The backup manifest could not be parsed.");
+        ValidateManifestShape(manifest);
+
+        if (manifest.Checksums.Count != checksumNames.Count)
+            throw new InvalidDataException("The backup manifest checksum table was inconsistent.");
+
+        var allowedUnchecksummedEntries = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "manifest.json"
+        };
+        foreach (PackageBackupManifest package in manifest.Packages)
+        {
+            allowedUnchecksummedEntries.Add(
+                NormalizeArchivePath($"{package.Group}/{package.PackageName}/manifest.json"));
+        }
+
+        foreach (string entryPath in normalizedEntries.Keys)
+        {
+            if (!checksumNames.Contains(entryPath)
+                && !allowedUnchecksummedEntries.Contains(entryPath))
+            {
+                throw new InvalidDataException(
+                    $"The backup ZIP contains an unlisted payload entry: {entryPath}.");
+            }
+        }
+
+        foreach ((string path, string expectedHash) in manifest.Checksums)
+        {
+            string normalized = NormalizeArchivePath(path);
+            if (!normalizedEntries.TryGetValue(normalized, out ZipArchiveEntry? entry))
+                throw new InvalidDataException($"The backup payload {normalized} is missing.");
+
+            await using Stream payloadStream = entry.Open();
+            byte[] actualHash = await SHA256.HashDataAsync(payloadStream, cancellationToken)
+                .ConfigureAwait(false);
+            if (!CryptographicOperations.FixedTimeEquals(
+                    actualHash,
+                    Convert.FromHexString(expectedHash)))
+            {
+                throw new InvalidDataException($"The backup payload checksum did not match for {normalized}.");
+            }
+        }
+
+        var requiredEntries = new HashSet<string>(StringComparer.Ordinal) { "manifest.json" };
+        if (manifest.PropertiesStatus != "not_selected")
+            requiredEntries.Add("properties.json");
+        if (manifest.SettingsStatus != "not_selected")
+            requiredEntries.Add("settings.json");
+
+        var tarRoots = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (PackageBackupManifest package in manifest.Packages)
+        {
+            string packageManifest = $"{package.Group}/{package.PackageName}/manifest.json";
+            requiredEntries.Add(NormalizeArchivePath(packageManifest));
+            foreach (BackupDataPathStatus path in package.Paths)
+            {
+                if (path.State is not ("backed_up" or "present_alias")
+                    || string.IsNullOrWhiteSpace(path.Payload))
+                {
+                    continue;
+                }
+
+                string payloadPath = NormalizeArchivePath(
+                    $"{package.Group}/{package.PackageName}/{path.Payload}");
+                requiredEntries.Add(payloadPath);
+                tarRoots.TryAdd(
+                    payloadPath,
+                    GetUnixFileName(GetPackageRestorePath(package.PackageName, path)));
+            }
+        }
+
+        foreach (BackupComponentStatus component in manifest.OptionalComponents)
+        {
+            if (component.State != "backed_up")
+                continue;
+
+            string? payloadPath = component.Component switch
+            {
+                "keybox" => "optional/keybox.xml",
+                "ssaId" => "experimental/settings_ssaid.xml",
+                _ => AccountPaths.FirstOrDefault(item =>
+                        string.Equals(item.Component, component.Component, StringComparison.Ordinal))
+                    ?.ArchivePath
+            };
+            if (payloadPath is null)
+                continue;
+
+            string normalizedPayloadPath = NormalizeArchivePath(payloadPath);
+            requiredEntries.Add(normalizedPayloadPath);
+            if (normalizedPayloadPath.EndsWith(".tar", StringComparison.OrdinalIgnoreCase))
+            {
+                AccountRestoreDescriptor descriptor = AccountPaths.First(item =>
+                    string.Equals(item.ArchivePath, normalizedPayloadPath, StringComparison.Ordinal));
+                tarRoots.TryAdd(normalizedPayloadPath, descriptor.FileName);
+            }
+        }
+
+        foreach (string requiredEntry in requiredEntries)
+        {
+            if (!normalizedEntries.ContainsKey(requiredEntry))
+                throw new InvalidDataException($"The required backup entry {requiredEntry} is missing.");
+        }
+
+        foreach ((string tarPath, string expectedRoot) in tarRoots)
+        {
+            await ValidateTarEntryAsync(
+                    normalizedEntries[tarPath],
+                    expectedRoot,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (FindOptionalStatus(manifest, "keybox")?.State == "backed_up")
+        {
+            await ValidateXmlEntryAsync(
+                    normalizedEntries["optional/keybox.xml"],
+                    "Keybox",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (FindOptionalStatus(manifest, "ssaId")?.State == "backed_up")
+        {
+            await ValidateXmlEntryAsync(
+                    normalizedEntries["experimental/settings_ssaid.xml"],
+                    "SSAID",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (manifest.PropertiesStatus != "not_selected")
+        {
+            await ValidatePropertiesEntryAsync(
+                    normalizedEntries["properties.json"],
+                    manifest.PropertyStatuses,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (manifest.SettingsStatus != "not_selected")
+        {
+            await ValidateSettingsEntryAsync(
+                    normalizedEntries["settings.json"],
+                    manifest.SettingsStatuses,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        foreach (PackageBackupManifest package in manifest.Packages)
+        {
+            await ValidatePackageManifestEntryAsync(
+                    normalizedEntries[$"{package.Group}/{package.PackageName}/manifest.json"],
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return manifest;
+    }
+
+    private static void ValidateManifestShape(BackupArchiveManifest manifest)
+    {
+        if (manifest.FormatVersion != 3
+            || manifest.Encrypted
+            || manifest.EncryptionFormatVersion != 0)
+        {
+            throw new InvalidDataException("The backup manifest format is not supported.");
+        }
+
+        if (string.IsNullOrWhiteSpace(manifest.SourceSerial))
+            throw new InvalidDataException("The backup manifest did not contain a source serial.");
+        if (manifest.SelectedComponents is null)
+            throw new InvalidDataException("The backup manifest component selection was missing.");
+        if (manifest.Checksums is null)
+            throw new InvalidDataException("The backup manifest checksums were missing.");
+        if (manifest.PropertyStatuses is null
+            || manifest.SettingsStatuses is null
+            || manifest.Packages is null
+            || manifest.OptionalComponents is null)
+        {
+            throw new InvalidDataException("The backup manifest contained a missing status collection.");
+        }
+        if (manifest.Warnings is null)
+            throw new InvalidDataException("The backup manifest warnings were missing.");
+
+        if (manifest.PropertiesStatus is not ("not_selected" or "backed_up" or "keybox_property_only")
+            || manifest.SettingsStatus is not ("not_selected" or "backed_up"))
+        {
+            throw new InvalidDataException("The backup manifest summary status was invalid.");
+        }
+
+        CreateUniqueStatusMap(
+            manifest.PropertyStatuses,
+            item => item.PropertyName,
+            "property status");
+        foreach (BackupPropertyStatus status in manifest.PropertyStatuses)
+        {
+            if (!ValidPropertyStates.Contains(status.State))
+                throw new InvalidDataException($"The property status {status.PropertyName} was invalid.");
+        }
+
+        CreateUniqueStatusMap(
+            manifest.SettingsStatuses,
+            item => item.Name,
+            "setting status");
+        foreach (BackupSettingStatus status in manifest.SettingsStatuses)
+        {
+            if (!ValidSettingStates.Contains(status.State))
+                throw new InvalidDataException($"The setting status {status.Name} was invalid.");
+        }
+
+        CreateUniqueStatusMap(
+            manifest.OptionalComponents,
+            item => item.Component,
+            "optional component");
+        foreach (BackupComponentStatus status in manifest.OptionalComponents)
+        {
+            if (!ValidOptionalComponentStates.Contains(status.State))
+                throw new InvalidDataException($"The optional component status {status.Component} was invalid.");
+        }
+
+        var packageNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (PackageBackupManifest package in manifest.Packages)
+        {
+            if (!IsValidPackageName(package.PackageName)
+                || package.Group is not ("apps" or "google"))
+            {
+                throw new InvalidDataException("The backup manifest contains an invalid package entry.");
+            }
+
+            if (!packageNames.Add($"{package.Group}:{package.PackageName}"))
+                throw new InvalidDataException("The backup manifest contains a duplicate package entry.");
+
+            if (!ValidPackageStates.Contains(package.Status)
+                || package.VersionCode is < 0
+                || package.SourceUid is < 0
+                || package.TargetSdk is <= 0
+                || package.CeLogicalAliases is null
+                || package.Paths is null)
+            {
+                throw new InvalidDataException(
+                    $"The backup manifest metadata was invalid for {package.PackageName}.");
+            }
+
+            if (package.SigningCertificateSha256 is not null
+                && NormalizeDigest(package.SigningCertificateSha256).Length == 0)
+            {
+                throw new InvalidDataException(
+                    $"The signing certificate digest was invalid for {package.PackageName}.");
+            }
+
+            CreateUniqueStatusMap(
+                package.Paths,
+                item => item.DevicePath,
+                $"package data path for {package.PackageName}");
+            foreach (BackupDataPathStatus path in package.Paths)
+            {
+                if (!ValidPackagePathStates.Contains(path.State)
+                    || string.IsNullOrWhiteSpace(path.DevicePath))
+                {
+                    throw new InvalidDataException(
+                        $"The package data path status was invalid for {package.PackageName}.");
+                }
+
+                bool hasPayload = path.State is "backed_up" or "present_alias";
+                if (hasPayload != !string.IsNullOrWhiteSpace(path.Payload))
+                {
+                    throw new InvalidDataException(
+                        $"The package data payload mapping was invalid for {package.PackageName}.");
+                }
+            }
+            foreach (IGrouping<string, BackupDataPathStatus> payloadGroup in package.Paths
+                         .Where(path => path.State is "backed_up" or "present_alias")
+                         .GroupBy(path => path.Payload!, StringComparer.Ordinal))
+            {
+                if (payloadGroup.Count() <= 1)
+                    continue;
+                bool isCeAlias = package.SameUnderlyingCeData == true
+                    && payloadGroup.Key == "ce.tar"
+                    && payloadGroup.Count() == 2
+                    && payloadGroup.Any(path => path.DevicePath == $"/data/data/{package.PackageName}"
+                        && path.State == "present_alias")
+                    && payloadGroup.Any(path => path.DevicePath == $"/data/user/0/{package.PackageName}"
+                        && path.State == "backed_up");
+                if (!isCeAlias)
+                {
+                    throw new InvalidDataException(
+                        $"The backup payload maps to independent paths for {package.PackageName}.");
+                }
+            }
+        }
+    }
+
+    private static async Task ValidateTarEntryAsync(
+        ZipArchiveEntry zipEntry,
+        string expectedRoot,
+        CancellationToken cancellationToken)
+    {
+        await using Stream tarStream = zipEntry.Open();
+        using var reader = new TarReader(tarStream, leaveOpen: false);
+        bool sawEntry = false;
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        TarEntry? entry;
+        while ((entry = reader.GetNextEntry(copyData: false)) is not null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            sawEntry = true;
+            string name = NormalizeTarPath(entry.Name);
+            if (!paths.Add(name))
+                throw new InvalidDataException($"The tar payload contains a duplicate entry: {name}.");
+            if (name.Length == 0 || name == ".")
+                throw new InvalidDataException("A tar payload contained an empty path.");
+            if (name != expectedRoot
+                && !name.StartsWith(expectedRoot + "/", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"A tar payload contained an entry outside its expected subtree: {name}.");
+            }
+
+            if (entry.EntryType is not (TarEntryType.V7RegularFile
+                or TarEntryType.RegularFile
+                or TarEntryType.ContiguousFile
+                or TarEntryType.Directory))
+            {
+                throw new InvalidDataException($"The tar payload contains an unsafe entry type for {name}.");
+            }
+
+            if (entry.DataStream is not null)
+                await entry.DataStream.CopyToAsync(Stream.Null, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!sawEntry)
+            throw new InvalidDataException("A tar payload was empty.");
+    }
+
+    private static async Task ValidateXmlEntryAsync(
+        ZipArchiveEntry entry,
+        string componentName,
+        CancellationToken cancellationToken)
+    {
+        await using Stream stream = entry.Open();
+        var settings = new XmlReaderSettings
+        {
+            Async = true,
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = 4 * 1024 * 1024,
+            MaxCharactersFromEntities = 0
+        };
+        using XmlReader reader = XmlReader.Create(stream, settings);
+        bool hasRoot = false;
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (reader.NodeType == XmlNodeType.Element && reader.Depth == 0)
+                hasRoot = true;
+        }
+
+        if (!hasRoot)
+            throw new InvalidDataException($"The {componentName} XML payload has no root element.");
+    }
+
+    private static async Task ValidatePropertiesEntryAsync(
+        ZipArchiveEntry entry,
+        IReadOnlyList<BackupPropertyStatus> statuses,
+        CancellationToken cancellationToken)
+    {
+        await using Stream stream = entry.Open();
+        using JsonDocument document = await JsonDocument.ParseAsync(
+                stream,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        JsonElement root = RequireJsonObject(document.RootElement, "properties.json");
+        JsonElement values = RequireJsonProperty(root, "values", "properties.json");
+        if (values.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException("The properties payload values were invalid.");
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonProperty property in values.EnumerateObject())
+        {
+            if (!names.Add(property.Name))
+                throw new InvalidDataException(
+                    $"The properties payload contains a duplicate property: {property.Name}.");
+            if (property.Value.ValueKind != JsonValueKind.String)
+                throw new InvalidDataException(
+                    $"The property payload value for {property.Name} was not a string.");
+        }
+
+        foreach (BackupPropertyStatus status in statuses)
+        {
+            if (status.State == "backed_up" && !names.Contains(status.PropertyName))
+            {
+                throw new InvalidDataException(
+                    $"The properties payload was missing {status.PropertyName} marked backed_up.");
+            }
+        }
+    }
+
+    private static async Task ValidateSettingsEntryAsync(
+        ZipArchiveEntry entry,
+        IReadOnlyList<BackupSettingStatus> statuses,
+        CancellationToken cancellationToken)
+    {
+        await using Stream stream = entry.Open();
+        using JsonDocument document = await JsonDocument.ParseAsync(
+                stream,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        JsonElement root = RequireJsonObject(document.RootElement, "settings.json");
+        JsonElement values = RequireJsonProperty(root, "values", "settings.json");
+        if (values.ValueKind != JsonValueKind.Array)
+            throw new InvalidDataException("The settings payload values were invalid.");
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement value in values.EnumerateArray())
+        {
+            JsonElement item = RequireJsonObject(value, "settings.json value");
+            JsonElement name = RequireJsonProperty(item, "name", "settings.json value name");
+            JsonElement settingValue = RequireJsonProperty(item, "value", "settings.json value");
+            if (name.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(name.GetString()))
+            {
+                throw new InvalidDataException("A settings payload name was invalid.");
+            }
+
+            string settingName = name.GetString()!;
+            if (!names.Add(settingName))
+                throw new InvalidDataException(
+                    $"The settings payload contains a duplicate setting: {settingName}.");
+            if (settingValue.ValueKind != JsonValueKind.String)
+                throw new InvalidDataException(
+                    $"The settings payload value for {settingName} was not a string.");
+        }
+
+        foreach (BackupSettingStatus status in statuses)
+        {
+            if (status.State == "backed_up" && !names.Contains(status.Name))
+            {
+                throw new InvalidDataException(
+                    $"The settings payload was missing {status.Name} marked backed_up.");
+            }
+        }
+    }
+
+    private static async Task ValidatePackageManifestEntryAsync(
+        ZipArchiveEntry entry,
+        CancellationToken cancellationToken)
+    {
+        await using Stream stream = entry.Open();
+        using JsonDocument document = await JsonDocument.ParseAsync(
+                stream,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        JsonElement root = RequireJsonObject(document.RootElement, entry.FullName);
+        JsonElement paths = RequireJsonProperty(root, "paths", entry.FullName);
+        if (paths.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException(
+                $"The package manifest paths were invalid: {entry.FullName}.");
+        }
+
+        foreach (JsonElement value in paths.EnumerateArray())
+        {
+            JsonElement item = RequireJsonObject(value, $"{entry.FullName} path");
+            JsonElement devicePath = RequireJsonProperty(
+                item,
+                "devicePath",
+                $"{entry.FullName} path devicePath");
+            JsonElement state = RequireJsonProperty(
+                item,
+                "state",
+                $"{entry.FullName} path state");
+            if (devicePath.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(devicePath.GetString())
+                || state.ValueKind != JsonValueKind.String
+                || string.IsNullOrWhiteSpace(state.GetString()))
+            {
+                throw new InvalidDataException(
+                    $"A package manifest path was invalid: {entry.FullName}.");
+            }
+        }
+    }
+
+    private static JsonElement RequireJsonObject(JsonElement element, string path)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new InvalidDataException($"The JSON payload was not an object: {path}.");
+        return element;
+    }
+
+    private static JsonElement RequireJsonProperty(
+        JsonElement objectElement,
+        string propertyName,
+        string path)
+    {
+        if (!objectElement.TryGetProperty(propertyName, out JsonElement property))
+            throw new InvalidDataException($"The JSON payload was missing {propertyName}: {path}.");
+        return property;
+    }
+
+    private static async Task<T> ReadJsonEntryAsync<T>(
+        ZipArchive archive,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        ZipArchiveEntry entry = GetRequiredEntry(archive, path);
+        await using Stream stream = entry.Open();
+        return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidDataException($"The backup JSON entry {path} was empty.");
+    }
+
+    private static DeviceRestoreInspection CreateInspection(
+        string archivePath,
+        BackupArchiveManifest manifest)
+    {
+        return new DeviceRestoreInspection(
+            archivePath,
+            manifest.CreatedAtUtc,
+            manifest.SourceSerial,
+            manifest.SourceDeviceRole,
+            manifest.AndroidSdkVersion,
+            manifest.FormatVersion,
+            manifest.EncryptionFormatVersion,
+            manifest.SelectedComponents,
+            manifest.Keybox,
+            manifest.OptionalComponents,
+            manifest.Packages,
+            manifest.Warnings,
+            [])
+        {
+            PropertiesStatus = manifest.PropertiesStatus,
+            PropertyStatuses = manifest.PropertyStatuses,
+            SettingsStatus = manifest.SettingsStatus,
+            SettingsStatuses = manifest.SettingsStatuses
+        };
+    }
+
+    private static void ValidateSelectedComponents(
+        DeviceRestoreOptions options,
+        BackupArchiveManifest manifest)
+    {
+        if (options.RestoreDeviceProperties
+            && (!manifest.SelectedComponents.DeviceProperties
+                || manifest.PropertiesStatus == "not_selected"))
+        {
+            throw new InvalidOperationException("Device properties are not available in this backup.");
+        }
+
+        if (options.RestoreManagedSystemSettings
+            && (!manifest.SelectedComponents.ManagedSystemSettings
+                || manifest.SettingsStatus == "not_selected"))
+        {
+            throw new InvalidOperationException("Managed system settings are not available in this backup.");
+        }
+
+        if (options.RestoreUserAppData && !manifest.SelectedComponents.UserAppData)
+            throw new InvalidOperationException("User app data is not available in this backup.");
+
+        ValidateOptionalSelection(options.RestoreKeybox, manifest, "keybox");
+        ValidateOptionalSelection(options.RestoreSsaid, manifest, "ssaId");
+        ValidateOptionalSelection(options.RestoreGoogleAppData, manifest, "googleAppData");
+        ValidateOptionalSelection(options.RestoreGoogleAccountState, manifest, "googleAccountState");
+    }
+
+    private static void ValidateOptionalSelection(
+        bool selected,
+        BackupArchiveManifest manifest,
+        string component)
+    {
+        if (!selected)
+            return;
+
+        bool selectedInManifest = component switch
+        {
+            "keybox" => manifest.SelectedComponents.Keybox,
+            "ssaId" => manifest.SelectedComponents.Ssaid,
+            "googleAppData" => manifest.SelectedComponents.GoogleAppData,
+            "googleAccountState" => manifest.SelectedComponents.GoogleAccountState,
+            _ => false
+        };
+        BackupComponentStatus? status = FindOptionalStatus(manifest, component);
+        if (component == "keybox")
+        {
+            bool hasKeyboxPropertyState = manifest.PropertyStatuses.Any(item =>
+                string.Equals(item.PropertyName, PropertyConstants.Keybox.Enabled, StringComparison.Ordinal)
+                && item.State is "backed_up" or "skipped_missing" or "skipped_empty" or "empty");
+            if (!selectedInManifest
+                || status is null
+                || status.State is not ("backed_up" or "partial" or "skipped_missing")
+                || (status.State is ("partial" or "skipped_missing") && !hasKeyboxPropertyState))
+            {
+                throw new InvalidOperationException(
+                    "The selected restore component keybox is not available in this backup.");
+            }
+
+            return;
+        }
+
+        if (!selectedInManifest
+            || status is null
+            || status.State is not ("backed_up" or "partial")
+            || !HasRestorableOptionalPayload(manifest, component))
+        {
+            throw new InvalidOperationException(
+                $"The selected restore component {component} is not available in this backup.");
+        }
+    }
+
+    private async Task<string?> ReadKeyboxEnabledValueAsync(
+        string archivePath,
+        BackupArchiveManifest manifest,
+        CancellationToken cancellationToken)
+    {
+        BackupPropertyStatus? status = manifest.PropertyStatuses.FirstOrDefault(item =>
+            string.Equals(item.PropertyName, PropertyConstants.Keybox.Enabled, StringComparison.Ordinal));
+        if (status is null)
+            return null;
+
+        if (status.State is "skipped_missing" or "skipped_empty" or "empty")
+            return string.Empty;
+        if (status.State != "backed_up")
+            return null;
+
+        using ZipArchive archive = ZipFile.OpenRead(archivePath);
+        BackupPropertyPayload properties = await ReadJsonEntryAsync<BackupPropertyPayload>(
+                archive,
+                "properties.json",
+                cancellationToken)
+            .ConfigureAwait(false);
+        return properties.Values.TryGetValue(PropertyConstants.Keybox.Enabled, out string? value)
+            ? value
+            : throw new InvalidDataException(
+                "The Keybox enabled property is marked backed_up but has no value.");
+    }
+
+    private static bool IsEnabledPropertyValue(string? value)
+    {
+        return value is not null
+            && value.Trim() is "1" or "true" or "on";
+    }
+
+    private static bool HasRestorableOptionalPayload(
+        BackupArchiveManifest manifest,
+        string component)
+    {
+        return component switch
+        {
+            "keybox" => FindOptionalStatus(manifest, "keybox")?.State == "backed_up",
+            "ssaId" => FindOptionalStatus(manifest, "ssaId")?.State == "backed_up",
+            "googleAppData" => manifest.Packages.Any(package =>
+                string.Equals(package.Group, "google", StringComparison.Ordinal)
+                && string.Equals(package.Status, "backed_up", StringComparison.Ordinal)
+                && package.Paths.Any(path =>
+                    path.State is "backed_up" or "present_alias"
+                    && !string.IsNullOrWhiteSpace(path.Payload))),
+            "googleAccountState" => AccountPaths.Any(descriptor =>
+                FindOptionalStatus(manifest, descriptor.Component)?.State == "backed_up"),
+            _ => false
+        };
+    }
+
+    private static BackupComponentStatus FindRequiredOptionalStatus(
+        BackupArchiveManifest manifest,
+        string component)
+    {
+        return FindOptionalStatus(manifest, component)
+            ?? throw new InvalidDataException($"The backup component {component} was not described.");
+    }
+
+    private static BackupComponentStatus? FindOptionalStatus(
+        BackupArchiveManifest manifest,
+        string component)
+    {
+        return manifest.OptionalComponents.FirstOrDefault(item =>
+            string.Equals(item.Component, component, StringComparison.Ordinal));
+    }
+
+    private static Dictionary<string, T> CreateUniqueStatusMap<T>(
+        IEnumerable<T> statuses,
+        Func<T, string> keySelector,
+        string description)
+    {
+        var result = new Dictionary<string, T>(StringComparer.Ordinal);
+        foreach (T status in statuses)
+        {
+            string key = keySelector(status);
+            if (string.IsNullOrWhiteSpace(key) || !result.TryAdd(key, status))
+                throw new InvalidDataException($"The backup contains duplicate or empty {description} entries.");
+        }
+
+        return result;
+    }
+
+    private static string NormalizeArchivePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new InvalidDataException("The backup contains an empty archive path.");
+
+        string normalized = path.Replace('\\', '/');
+        if (normalized.StartsWith('/')
+            || normalized.StartsWith("//", StringComparison.Ordinal)
+            || Regex.IsMatch(normalized, @"^[A-Za-z]:/", RegexOptions.CultureInvariant))
+        {
+            throw new InvalidDataException($"The backup contains an unsafe absolute path: {path}.");
+        }
+
+        string[] segments = normalized.Split('/');
+        if (segments.Any(segment => segment.Length == 0 || segment is "." or ".."))
+            throw new InvalidDataException($"The backup contains an unsafe path: {path}.");
+        return string.Join('/', segments);
+    }
+
+    private static string NormalizeTarPath(string path)
+    {
+        return NormalizeArchivePath(path);
+    }
+
+    private static ZipArchiveEntry GetRequiredEntry(ZipArchive archive, string path)
+    {
+        return archive.GetEntry(NormalizeArchivePath(path))
+            ?? throw new InvalidDataException($"The backup entry {path} is missing.");
+    }
+
+    private static ZipArchiveEntry GetRequiredEntry(
+        IReadOnlyDictionary<string, ZipArchiveEntry> entries,
+        string path)
+    {
+        string normalized = NormalizeArchivePath(path);
+        return entries.TryGetValue(normalized, out ZipArchiveEntry? entry)
+            ? entry
+            : throw new InvalidDataException($"The backup entry {normalized} is missing.");
+    }
+
+    private async Task PushZipEntryAsync(
+        string serial,
+        ZipArchiveEntry entry,
+        string localSessionDirectory,
+        string remotePath,
+        string purpose,
+        CancellationToken cancellationToken)
+    {
+        string localPath = Path.Combine(
+            localSessionDirectory,
+            $"payload-{Guid.NewGuid():N}.tar");
+        try
+        {
+            await using (Stream source = entry.Open())
+            await using (FileStream destination = new(
+                               localPath,
+                               FileMode.CreateNew,
+                               FileAccess.Write,
+                               FileShare.None,
+                               bufferSize: 81920,
+                               useAsync: true))
+            {
+                await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+                await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            CommandResult result = await _adb.PushFileAsync(
+                    serial,
+                    localPath,
+                    remotePath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            EnsureCommandSuccess(result, purpose);
+        }
+        finally
+        {
+            TryDeleteFile(localPath);
+        }
+    }
+
+    private async Task<string> ReadTargetGroupAsync(
+        string serial,
+        string path,
+        int fallbackUid,
+        CancellationToken cancellationToken)
+    {
+        string packageName = GetUnixFileName(path);
+        string[] candidatePaths =
+        [
+            path,
+            $"/data/data/{packageName}",
+            $"/data/user_de/0/{packageName}",
+        ];
+        foreach (string candidatePath in candidatePaths.Distinct(StringComparer.Ordinal))
+        {
+            string metadata = await ReadFileMetadataAsync(
+                    serial,
+                    candidatePath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            Match match = FileMetadataPattern.Match(metadata);
+            if (match.Success)
+                return match.Groups["gid"].Value;
+        }
+
+        // Application data normally uses the package UID as its group. This
+        // fallback is still target-derived and never reads ownership from the
+        // source tar archive.
+        return fallbackUid.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private async Task<string> ReadFileMetadataAsync(
+        string serial,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        const string missing = "__DDC_FILE_MISSING__";
+        string output = await RunShellOutputAsync(
+                serial,
+                $"if [ -e {QuoteShellValue(path)} ]; then stat -c '%u:%g:%a' {QuoteShellValue(path)}; else printf '%s\\n' {missing}; fi",
+                $"inspect metadata for {path}",
+                cancellationToken)
+            .ConfigureAwait(false);
+        return output == missing ? string.Empty : output;
+    }
+
+    private async Task<string> BuildFallbackMetadataAsync(
+        string serial,
+        string parentPath,
+        string fallbackOwner,
+        string defaultMode,
+        CancellationToken cancellationToken)
+    {
+        string parentMetadata = await ReadFileMetadataAsync(
+                serial,
+                parentPath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        Match parentMatch = FileMetadataPattern.Match(parentMetadata);
+        string owner = parentMatch.Success
+            ? $"{parentMatch.Groups["uid"].Value}:{parentMatch.Groups["gid"].Value}"
+            : fallbackOwner;
+        return $"{owner}:{defaultMode}";
+    }
+
+    private async Task ApplyFileMetadataAsync(
+        string serial,
+        string path,
+        string metadata,
+        string defaultMode,
+        CancellationToken cancellationToken,
+        bool recursive = false)
+    {
+        Match match = FileMetadataPattern.Match(metadata);
+        string owner = match.Success
+            ? $"{match.Groups["uid"].Value}:{match.Groups["gid"].Value}"
+            : "0:0";
+        string mode = match.Success ? match.Groups["mode"].Value : defaultMode;
+        string chownCommand = recursive ? "chown -R" : "chown";
+        await RunRequiredShellAsync(
+                serial,
+                $"{chownCommand} {QuoteShellValue(owner)} {QuoteShellValue(path)} && chmod {QuoteShellValue(mode)} {QuoteShellValue(path)}",
+                $"apply metadata to {path}",
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<string> RunShellOutputAsync(
+        string serial,
+        string command,
+        string purpose,
+        CancellationToken cancellationToken)
+    {
+        CommandResult result = await _adb.RunAdbShellAsync(serial, command, cancellationToken)
+            .ConfigureAwait(false);
+        EnsureCommandSuccess(result, purpose);
+        return result.StandardOutput.Trim();
+    }
+
+    private async Task RunRequiredShellAsync(
+        string serial,
+        string command,
+        string purpose,
+        CancellationToken cancellationToken)
+    {
+        CommandResult result = await _adb.RunAdbShellAsync(serial, command, cancellationToken)
+            .ConfigureAwait(false);
+        EnsureCommandSuccess(result, purpose);
+    }
+
+    private async Task<string?> TryReadPropertyAsync(
+        string serial,
+        string propertyName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            string value = await _adb.GetPropertyAsync(serial, propertyName, cancellationToken)
+                .ConfigureAwait(false);
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Could not read target property {PropertyName} during restore preflight.",
+                propertyName);
+            return null;
+        }
+    }
+
+    private static string GetPackageRestorePath(
+        string packageName,
+        BackupDataPathStatus pathStatus)
+    {
+        string expectedCe = $"/data/user/0/{packageName}";
+        string legacyCe = $"/data/data/{packageName}";
+        if (pathStatus.DevicePath == legacyCe
+            && pathStatus.State == "present_alias"
+            && pathStatus.Payload == "ce.tar")
+            return expectedCe;
+        return pathStatus.DevicePath switch
+        {
+            var path when path == expectedCe => expectedCe,
+            var path when path == legacyCe && pathStatus.Payload is "ce.tar" or "data-data.tar" => legacyCe,
+            var path when path == $"/data/user_de/0/{packageName}" => path,
+            var path when path == $"/data/media/0/Android/data/{packageName}" => path,
+            var path when path == $"/data/media/0/Android/media/{packageName}" => path,
+            var path when path == $"/data/media/0/Android/obb/{packageName}" => path,
+            _ => throw new InvalidDataException($"The backup package path is not supported: {pathStatus.DevicePath}.")
+        };
+    }
+
+    private static bool IsTimezoneControl(SettingDescriptor descriptor)
+    {
+        return descriptor.Namespace == DeviceSettingsInfoConstants.GlobalNamespace
+            && descriptor.Key == "auto_time_zone"
+            || descriptor.Namespace == DeviceSettingsInfoConstants.SystemNamespace
+            && descriptor.Key == "time_12_24";
+    }
+
+    private static string GetUnixDirectoryName(string path)
+    {
+        int separator = path.LastIndexOf('/');
+        if (separator <= 0)
+            throw new InvalidDataException($"The device path has no safe parent: {path}.");
+        return path[..separator];
+    }
+
+    private static string GetUnixFileName(string path)
+    {
+        int separator = path.LastIndexOf('/');
+        return separator < 0 ? path : path[(separator + 1)..];
+    }
+
+    private static string QuoteShellValue(string value)
+    {
+        return $"'{value.Replace("'", "'\\''", StringComparison.Ordinal)}'";
+    }
+
+    private static string SanitizeShellPart(string value)
+    {
+        return string.Concat(value.Where(character =>
+            character is >= 'A' and <= 'Z'
+                or >= 'a' and <= 'z'
+                or >= '0' and <= '9'
+                or '_'
+                or '.'));
+    }
+
+    private static bool IsValidPackageName(string packageName)
+    {
+        return packageName.Length <= 255 && ValidPackageName.IsMatch(packageName);
+    }
+
+    private static bool IsSha256(string? value)
+    {
+        return value is { Length: 64 } && value.All(Uri.IsHexDigit);
+    }
+
+    private static long? ParseLong(Regex pattern, string output)
+    {
+        Match match = pattern.Match(output);
+        return match.Success && long.TryParse(match.Groups[1].Value, out long value)
+            ? value
+            : null;
+    }
+
+    private static int? ParsePositiveInt(string? value)
+    {
+        return int.TryParse(value, out int parsed) && parsed > 0 ? parsed : null;
+    }
+
+    private static string NormalizeDigest(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+        string trimmed = value.Trim().Trim('"', '\'');
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            trimmed = trimmed[2..];
+        string compactHex = string.Concat(trimmed.Where(character =>
+            character != ':' && !char.IsWhiteSpace(character)));
+        if (compactHex.Length == 64 && compactHex.All(Uri.IsHexDigit))
+            return compactHex.ToUpperInvariant();
+
+        string compactBase64 = string.Concat(trimmed.Where(character => !char.IsWhiteSpace(character)));
+        if (compactBase64.Length == 43)
+            compactBase64 += "=";
+        if (compactBase64.Length == 44)
+        {
+            try
+            {
+                byte[] decoded = Convert.FromBase64String(compactBase64);
+                if (decoded.Length == 32)
+                    return Convert.ToHexString(decoded);
+            }
+            catch (FormatException)
+            {
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static string CreateLocalSessionDirectory()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "DeepDroidChanger",
+            "Restore",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private static void ValidateArchiveArguments(string archivePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
+        if (!File.Exists(archivePath))
+            throw new FileNotFoundException("The selected backup archive was not found.", archivePath);
+
+        if (BackupEnvelopeCrypto.IsLegacyEnvelope(archivePath))
+        {
+            throw new InvalidDataException(
+                "legacy_encrypted_backup_not_supported_without_password");
+        }
+
+        using var stream = new FileStream(
+            archivePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4,
+            useAsync: false);
+        Span<byte> signature = stackalloc byte[4];
+        int read = stream.Read(signature);
+        bool isZip = read == signature.Length
+            && signature[0] == (byte)'P'
+            && signature[1] == (byte)'K'
+            && (signature[2], signature[3]) is ((byte)3, (byte)4)
+                or ((byte)5, (byte)6)
+                or ((byte)7, (byte)8);
+        if (!isZip)
+        {
+            throw new InvalidDataException(
+                "unsupported_backup_archive_format");
+        }
+    }
+
+    private async Task TryRecoverWithRebootAsync(string serial)
+    {
+        try
+        {
+            using var rebootCancellation = new CancellationTokenSource(CleanupTimeout);
+            await _adb.RebootAsync(serial, rebootCancellation.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Best-effort restore recovery reboot failed for {Serial}.",
+                serial);
+        }
+    }
+
+    private static void EnsureCommandSuccess(CommandResult result, string purpose)
+    {
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"ADB failed while attempting to {purpose} (exit code {result.ExitCode}).");
+        }
+    }
+
+    private static void MarkFinalizationFailure(
+        RestoreExecution execution,
+        string reason)
+    {
+        string[] affectedComponents =
+        [
+            execution.HasPendingPropertyStates ? "deviceProperties" : string.Empty,
+            execution.PendingKeyboxEnabledValue is not null ? "keybox" : string.Empty
+        ];
+
+        foreach (string component in affectedComponents.Where(item => item.Length > 0))
+        {
+            DeviceRestoreComponentResult? existing = execution.Components.FirstOrDefault(item =>
+                string.Equals(item.Component, component, StringComparison.Ordinal));
+            DeviceRestoreOutcome outcome = existing is null
+                ? DeviceRestoreOutcome.Failed
+                : existing.Outcome == DeviceRestoreOutcome.Succeeded
+                    ? DeviceRestoreOutcome.Partial
+                    : DeviceRestoreOutcome.Failed;
+            execution.AddComponent(existing is null
+                ? new(component, outcome, reason, FailedCount: 1, Experimental: component == "keybox")
+                : existing with
+                {
+                    Outcome = outcome,
+                    Reason = reason,
+                    FailedCount = Math.Max(1, existing.FailedCount)
+                });
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
+    private sealed record SettingDescriptor(string Namespace, string Key);
+
+    private sealed record AccountRestoreDescriptor(
+        string Component,
+        string Directory,
+        string FileName,
+        string ArchivePath,
+        bool IsDatabase)
+    {
+        public bool IsDirectory => !IsDatabase;
+    }
+
+    private sealed record PackagePlan(
+        PackageBackupManifest Manifest,
+        DeviceRestorePackageCompatibility Compatibility);
+
+    private sealed record StagedPackagePayload(
+        string DestinationPath,
+        string RemoteTarPath,
+        string Metadata);
+
+    private sealed record RestorePlan(
+        BackupArchiveManifest Manifest,
+        IReadOnlyList<PackagePlan> Packages,
+        IReadOnlyList<string> Warnings,
+        bool AccountStateAllowed,
+        bool AccountStatePartial,
+        string? TargetDeviceRole,
+        int? TargetSdk,
+        string? KeyboxEnabledValue);
+
+    private sealed record StagedAccountPayload(
+        AccountRestoreDescriptor Descriptor,
+        string StagedPath,
+        string LivePath,
+        string TargetMetadata,
+        string InstallMetadata,
+        string RemoteTarPath,
+        string? RollbackTarPath,
+        bool OriginallyExisted,
+        IReadOnlyList<string> RollbackFileNames);
+
+    private sealed class AccountStateRestoreException : Exception
+    {
+        public AccountStateRestoreException(string failureReason, Exception innerException)
+            : base(failureReason, innerException)
+        {
+        }
+    }
+
+    private sealed class RestoreExecution
+    {
+        public List<DeviceRestoreComponentResult> Components { get; } = [];
+        public List<DeviceRestorePackageResult> Packages { get; } = [];
+        public List<string> Warnings { get; } = [];
+        public bool MutationStarted { get; set; }
+        public bool FrameworkStopRequested { get; set; }
+        public bool FrameworkStopped { get; set; }
+        public bool ForceFailed { get; set; }
+        public bool Rebooted { get; set; }
+        public IReadOnlyDictionary<string, string>? PendingPropertyValues { get; set; }
+        public IReadOnlyDictionary<string, BackupPropertyStatus>? PendingPropertyStatuses { get; set; }
+        public string? PendingKeyboxEnabledValue { get; set; }
+        public bool PendingKeyboxPayloadInstalled { get; set; }
+        public string? FailureReason { get; set; }
+
+        public bool HasPendingPropertyStates =>
+            PendingPropertyValues is not null && PendingPropertyStatuses is not null;
+
+        public bool HasPendingFinalization =>
+            HasPendingPropertyStates || PendingKeyboxEnabledValue is not null;
+
+        public void AddComponent(DeviceRestoreComponentResult component)
+        {
+            Components.RemoveAll(item =>
+                string.Equals(item.Component, component.Component, StringComparison.Ordinal));
+            Components.Add(component);
+        }
+
+        public void AddPackage(DeviceRestorePackageResult package)
+        {
+            Packages.Add(package);
+        }
+
+        public DeviceRestoreResult CreateResult(bool forceFailed = false)
+        {
+            bool hasSuccessfulWork = Components.Any(component =>
+                    component.Outcome == DeviceRestoreOutcome.Succeeded
+                    || component.Outcome == DeviceRestoreOutcome.Partial && component.RestoredCount > 0)
+                || Packages.Any(package => package.Outcome == DeviceRestoreOutcome.Succeeded
+                    || package.Outcome == DeviceRestoreOutcome.Partial && package.RestoredPayloadCount > 0);
+            bool hasFailureReason = !string.IsNullOrWhiteSpace(FailureReason);
+            DeviceRestoreOutcome outcome = forceFailed
+                ? DeviceRestoreOutcome.Failed
+                : hasFailureReason
+                    ? hasSuccessfulWork
+                        ? DeviceRestoreOutcome.Partial
+                        : DeviceRestoreOutcome.Failed
+                : Components.Any(component => component.Outcome == DeviceRestoreOutcome.Failed)
+                    ? hasSuccessfulWork
+                        ? DeviceRestoreOutcome.Partial
+                        : DeviceRestoreOutcome.Failed
+                    : Components.Any(component => component.Outcome is DeviceRestoreOutcome.Partial
+                        or DeviceRestoreOutcome.Skipped)
+                        || Packages.Any(package => package.Outcome is DeviceRestoreOutcome.Failed
+                            or DeviceRestoreOutcome.Partial or DeviceRestoreOutcome.Skipped)
+                        ? DeviceRestoreOutcome.Partial
+                        : DeviceRestoreOutcome.Succeeded;
+
+            return new DeviceRestoreResult(
+                outcome,
+                Components,
+                Packages,
+                Warnings,
+                Rebooted,
+                FailureReason);
+        }
+    }
+}

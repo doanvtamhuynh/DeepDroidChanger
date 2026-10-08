@@ -1,6 +1,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
 
@@ -35,12 +36,6 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
     [ObservableProperty]
     private string _destinationDirectory = string.Empty;
 
-    [ObservableProperty]
-    private string _backupPassword = string.Empty;
-
-    [ObservableProperty]
-    private string _backupPasswordConfirmation = string.Empty;
-
     public BackupDeviceViewModel(
         IFilePickerDialogService filePickerDialogService,
         ILocalizationService localizationService)
@@ -59,19 +54,7 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
          || IncludeSsaid
          || IncludeGoogleAppData
          || IncludeGoogleAccountState)
-        && IsBackupPasswordValid
         && IsDestinationValid();
-
-    public bool IsBackupPasswordTooShort =>
-        !string.IsNullOrEmpty(BackupPassword)
-        && BackupPassword.Length < DeviceBackupOptions.MinimumBackupPasswordLength;
-
-    public bool IsBackupPasswordMismatch =>
-        !string.IsNullOrEmpty(BackupPasswordConfirmation)
-        && !string.Equals(
-            BackupPassword,
-            BackupPasswordConfirmation,
-            StringComparison.Ordinal);
 
     public bool IsDestinationInvalid =>
         !string.IsNullOrWhiteSpace(DestinationDirectory)
@@ -79,7 +62,7 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
 
     public string DefaultLocationHint => string.Format(
         _localizationService.GetString("BackupDevice_DefaultLocationHint"),
-        Path.Combine(AppContext.BaseDirectory, "Backup"));
+        BackupPathConstants.DefaultDirectory);
 
     public DeviceBackupOptions BuildOptions()
     {
@@ -96,16 +79,7 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
             IncludeGoogleAccountState,
             string.IsNullOrWhiteSpace(DestinationDirectory)
                 ? null
-                : DestinationDirectory.Trim())
-        {
-            BackupPassword = BackupPassword
-        };
-    }
-
-    public void ClearSensitiveInputs()
-    {
-        BackupPassword = string.Empty;
-        BackupPasswordConfirmation = string.Empty;
+                : DestinationDirectory.Trim());
     }
 
     [RelayCommand]
@@ -114,7 +88,7 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
         string? initialDirectory = IsDestinationValid()
             && !string.IsNullOrWhiteSpace(DestinationDirectory)
                 ? Path.GetFullPath(DestinationDirectory.Trim())
-                : Path.Combine(AppContext.BaseDirectory, "Backup");
+                : BackupPathConstants.EnsureDefaultDirectory();
         string? selectedDirectory = _filePickerDialogService.ShowOpenFolderDialog(
             _localizationService.GetString("BackupDevice_BrowseFolderTitle"),
             initialDirectory);
@@ -136,8 +110,6 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
     partial void OnIncludeSsaidChanged(bool value) => NotifyValidationChanged();
     partial void OnIncludeGoogleAppDataChanged(bool value) => NotifyValidationChanged();
     partial void OnIncludeGoogleAccountStateChanged(bool value) => NotifyValidationChanged();
-    partial void OnBackupPasswordChanged(string value) => NotifyValidationChanged();
-    partial void OnBackupPasswordConfirmationChanged(string value) => NotifyValidationChanged();
     partial void OnDestinationDirectoryChanged(string value)
     {
         NotifyValidationChanged();
@@ -146,19 +118,9 @@ public sealed partial class BackupDeviceViewModel : ObservableObject
     private void NotifyValidationChanged()
     {
         OnPropertyChanged(nameof(CanConfirm));
-        OnPropertyChanged(nameof(IsBackupPasswordTooShort));
-        OnPropertyChanged(nameof(IsBackupPasswordMismatch));
         OnPropertyChanged(nameof(IsDestinationInvalid));
         ConfirmCommand.NotifyCanExecuteChanged();
     }
-
-    private bool IsBackupPasswordValid =>
-        !string.IsNullOrWhiteSpace(BackupPassword)
-        && BackupPassword.Length >= DeviceBackupOptions.MinimumBackupPasswordLength
-        && string.Equals(
-            BackupPassword,
-            BackupPasswordConfirmation,
-            StringComparison.Ordinal);
 
     private bool IsDestinationValid()
     {

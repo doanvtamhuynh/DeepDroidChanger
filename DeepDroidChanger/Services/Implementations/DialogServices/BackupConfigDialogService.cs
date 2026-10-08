@@ -36,17 +36,9 @@ public sealed class BackupConfigDialogService : IBackupConfigDialogService
 
         using CancellationTokenRegistration registration =
             DialogCancellation.RegisterClose(window, cancellationToken);
-        try
-        {
-            bool accepted = window.ShowDialog() == true;
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult<DeviceBackupOptions?>(
-                accepted ? viewModel.BuildOptions() : null);
-        }
-        finally
-        {
-            window.ClearSensitiveInputs();
-            viewModel.ClearSensitiveInputs();
-        }
+        bool accepted = window.ShowDialog() == true;
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<DeviceBackupOptions?>(
+            accepted ? viewModel.BuildOptions() : null);
     }
 }
