@@ -600,7 +600,7 @@ public sealed class DeviceBackupService : IDeviceBackupService
 
             if (options.IncludeKeybox)
             {
-                const string keyboxPath = "/data/system/keybox.xml";
+                const string keyboxPath = "/data/local/tmp/keybox.xml";
                 string? identity = await ProbePathIdentityAsync(
                         serial,
                         keyboxPath,

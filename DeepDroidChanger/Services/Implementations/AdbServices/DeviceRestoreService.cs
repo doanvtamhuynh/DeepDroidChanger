@@ -1440,7 +1440,7 @@ public sealed class DeviceRestoreService : IDeviceRestoreService
         ZipArchiveEntry entry = GetRequiredEntry(archive, "optional/keybox.xml");
         await ValidateXmlEntryAsync(entry, "Keybox", cancellationToken).ConfigureAwait(false);
 
-        const string targetPath = "/data/system/keybox.xml";
+        const string targetPath = "/data/local/tmp/keybox.xml";
         string metadata = await ReadFileMetadataAsync(serial, targetPath, cancellationToken)
             .ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(metadata))

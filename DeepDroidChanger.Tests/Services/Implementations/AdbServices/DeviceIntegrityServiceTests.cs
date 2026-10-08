@@ -149,7 +149,7 @@ public sealed class DeviceIntegrityServiceTests
         IAdbCommandService adb = Substitute.For<IAdbCommandService>();
         ConfigureRootAccess(adb);
         string? pushedLocalPath = null;
-        adb.PushFileAsync("SERIAL", Arg.Any<string>(), "/data/system/keybox.xml", Arg.Any<CancellationToken>())
+        adb.PushFileAsync("SERIAL", Arg.Any<string>(), "/data/local/tmp/keybox.xml", Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 pushedLocalPath = callInfo.ArgAt<string>(1);
