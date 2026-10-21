@@ -21,8 +21,6 @@ public enum DeviceActionKind
     StopFakeProxy,
     StopChangeSim,
     ViewRandomDeviceInfo,
-    BackupDevice,
-    RestoreDevice,
     BatchRandomDevice,
     BatchRandomChangeAndWipe,
     BatchChangeDevice,
@@ -37,8 +35,6 @@ public enum DeviceActionKind
     BatchFakeProxy,
     BatchStopFakeProxy,
     BatchStopChangeSim,
-    BatchBackupDevice,
-    BatchRestoreDevice
 }
 
 public static class DeviceActionKindExtensions
@@ -58,9 +54,7 @@ public static class DeviceActionKindExtensions
             or DeviceActionKind.BatchUpdateIntegrity
             or DeviceActionKind.BatchFakeProxy
             or DeviceActionKind.BatchStopFakeProxy
-            or DeviceActionKind.BatchStopChangeSim
-            or DeviceActionKind.BatchBackupDevice
-            or DeviceActionKind.BatchRestoreDevice;
+            or DeviceActionKind.BatchStopChangeSim;
     }
 
     /// <summary>
@@ -85,8 +79,6 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.BatchFakeProxy => DeviceActionKind.FakeProxy,
             DeviceActionKind.BatchStopFakeProxy => DeviceActionKind.StopFakeProxy,
             DeviceActionKind.BatchStopChangeSim => DeviceActionKind.StopChangeSim,
-            DeviceActionKind.BatchBackupDevice => DeviceActionKind.BackupDevice,
-            DeviceActionKind.BatchRestoreDevice => DeviceActionKind.RestoreDevice,
             _ => kind
         };
     }
@@ -116,8 +108,6 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.FakeProxy => DeviceActionKind.BatchFakeProxy,
             DeviceActionKind.StopFakeProxy => DeviceActionKind.BatchStopFakeProxy,
             DeviceActionKind.StopChangeSim => DeviceActionKind.BatchStopChangeSim,
-            DeviceActionKind.BackupDevice => DeviceActionKind.BatchBackupDevice,
-            DeviceActionKind.RestoreDevice => DeviceActionKind.BatchRestoreDevice,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }
@@ -142,8 +132,6 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.StopFakeProxy => "DeviceAction_Name_StopFakeProxy",
             DeviceActionKind.StopChangeSim => "DeviceAction_Name_StopChangeSim",
             DeviceActionKind.ViewRandomDeviceInfo => "DeviceAction_Name_ViewRandomDeviceInfo",
-            DeviceActionKind.BackupDevice => "DeviceAction_Name_BackupDevice",
-            DeviceActionKind.RestoreDevice => "DeviceAction_Name_RestoreDevice",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }

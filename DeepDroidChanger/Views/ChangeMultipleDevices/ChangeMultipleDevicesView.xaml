@@ -968,7 +968,6 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <Button Grid.Row="0"
@@ -1127,28 +1126,6 @@
                                         <TextBlock Grid.Column="1"
                                                    Text="{DynamicResource ChangeMultipleDevices_ActionInstallApk}"
                                                    Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
-                                    </Grid>
-                                </Button>
-                                <Button Grid.Row="7"
-                                        Grid.Column="0"
-                                        Command="{Binding BackupMultipleDevicesCommand}"
-                                        ToolTip="{DynamicResource BackupDevice_ActionTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <materialDesign:PackIcon Kind="ArchiveArrowDown" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource BackupDevice_Action}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
-                                    </Grid>
-                                </Button>
-                                <Button Grid.Row="7"
-                                        Grid.Column="1"
-                                        Command="{Binding RestoreMultipleDevicesCommand}"
-                                        ToolTip="{DynamicResource RestoreDevice_ActionTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <materialDesign:PackIcon Kind="ArchiveArrowUp" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource RestoreDevice_Action}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>

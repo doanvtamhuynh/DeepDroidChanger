@@ -26,11 +26,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly IProxyService _adbProxyService;
         private readonly IProxyWorkflowService _proxyWorkflowService;
         private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
-        private readonly IBackupConfigDialogService _backupConfigDialogService;
-        private readonly IRestoreConfigDialogService? _restoreConfigDialogService;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
-        private readonly IDeviceBackupService _deviceBackupService;
-        private readonly IDeviceRestoreService? _deviceRestoreService;
         private readonly IFilePickerDialogService _filePickerDialogService;
         private readonly IPackageInstallService _packageInstallService;
         private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
@@ -114,9 +110,7 @@ namespace DeepDroidChanger.ViewModels
             IProxyService adbProxyService,
             IProxyWorkflowService proxyWorkflowService,
             IUpdateIntegrityDialogService updateIntegrityDialogService,
-            IBackupConfigDialogService backupConfigDialogService,
             IDeviceIntegrityService deviceIntegrityService,
-            IDeviceBackupService deviceBackupService,
             IFilePickerDialogService filePickerDialogService,
             IPackageInstallService packageInstallService,
             IDeviceActionConfirmationDialogService deviceActionConfirmationDialogService,
@@ -140,9 +134,7 @@ namespace DeepDroidChanger.ViewModels
             IDeviceActionFeedbackService deviceActionFeedbackService,
             IClipboardService clipboardService,
             IViewDeviceWindowService viewDeviceWindowService,
-            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null,
-            IRestoreConfigDialogService? restoreConfigDialogService = null,
-            IDeviceRestoreService? deviceRestoreService = null)
+            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
         {
             _addDevicesDialogService = addDevicesDialogService;
             _carrierDataService = carrierDataService;
@@ -154,11 +146,7 @@ namespace DeepDroidChanger.ViewModels
             _adbProxyService = adbProxyService;
             _proxyWorkflowService = proxyWorkflowService;
             _updateIntegrityDialogService = updateIntegrityDialogService;
-            _backupConfigDialogService = backupConfigDialogService;
-            _restoreConfigDialogService = restoreConfigDialogService;
             _deviceIntegrityService = deviceIntegrityService;
-            _deviceBackupService = deviceBackupService;
-            _deviceRestoreService = deviceRestoreService;
             _filePickerDialogService = filePickerDialogService;
             _packageInstallService = packageInstallService;
             _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
@@ -427,42 +415,6 @@ namespace DeepDroidChanger.ViewModels
         private void SetDeviceLog(DeviceRowViewModel device, string resourceKey, params object[] formatArguments)
         {
             _deviceActionFeedbackService.SetProcess(device.Serial, resourceKey, formatArguments);
-        }
-
-        private string? FormatRestorePackageIssues(DeviceRestoreResult result)
-        {
-            var issues = result.Packages
-                .Where(package => package.Outcome is DeviceRestoreOutcome.Skipped
-                    or DeviceRestoreOutcome.Failed or DeviceRestoreOutcome.Partial
-                    || !string.IsNullOrWhiteSpace(package.Warning))
-                .Select(package => string.Format(
-                    _localizationService.GetString("Log_RestoreDevicePackageIssueFormat"),
-                    package.PackageName,
-                    _localizationService.GetString(GetRestorePackageReasonResourceKey(
-                        package.Outcome == DeviceRestoreOutcome.Succeeded
-                            ? package.Warning
-                            : package.Reason ?? package.Warning))))
-                .ToArray();
-            return issues.Length == 0 ? null : string.Join("; ", issues);
-        }
-
-        private static string GetRestorePackageReasonResourceKey(string? reason)
-        {
-            return reason switch
-            {
-                "package_not_installed" => "Log_RestoreDevicePackageNotInstalled",
-                "package_metadata_unavailable" => "Log_RestoreDevicePackageMetadataUnavailable",
-                "signature_unavailable" => "Log_RestoreDevicePackageSignatureUnavailable",
-                "signature_mismatch" => "Log_RestoreDevicePackageSignatureMismatch",
-                "version_unavailable" => "Log_RestoreDevicePackageVersionUnavailable",
-                "target_version_older" => "Log_RestoreDevicePackageTargetVersionOlder",
-                "target_uid_unavailable" => "Log_RestoreDevicePackageTargetUidUnavailable",
-                "payload_missing" => "Log_RestoreDevicePackagePayloadMissing",
-                "source_package_unavailable" => "Log_RestoreDevicePackageSourceUnavailable",
-                "newer_target_version" => "Log_RestoreDevicePackageNewerTargetVersion",
-                "target_sdk_differs" => "Log_RestoreDevicePackageTargetSdkDiffers",
-                _ => "Log_RestoreDevicePackageRestoreFailed"
-            };
         }
 
         private void SetContextDeviceLog(
@@ -783,8 +735,6 @@ namespace DeepDroidChanger.ViewModels
             ChangeSingleDeviceLocationCommand.NotifyCanExecuteChanged();
             ChangeSingleDeviceTimezoneCommand.NotifyCanExecuteChanged();
             UpdateSingleDeviceIntegrityCommand.NotifyCanExecuteChanged();
-            BackupSingleDeviceCommand.NotifyCanExecuteChanged();
-            RestoreSingleDeviceCommand.NotifyCanExecuteChanged();
             InstallPackagesOnSingleDeviceCommand.NotifyCanExecuteChanged();
             StartSingleDeviceFakeProxyCommand.NotifyCanExecuteChanged();
             StopSingleDeviceFakeProxyCommand.NotifyCanExecuteChanged();
@@ -2215,266 +2165,6 @@ namespace DeepDroidChanger.ViewModels
             finally
             {
                 _deviceRefreshLock.Release();
-            }
-        }
-
-        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task BackupSingleDeviceAsync()
-        {
-            DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
-            try
-            {
-                if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
-                    return;
-            }
-            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
-            {
-                return;
-            }
-
-            DeviceRowViewModel device = selectedDevice!;
-            _deviceActionFeedbackService.SetNonOwningProcess(device.Serial, "Log_BackupDeviceOpening");
-
-            DeviceBackupOptions? options;
-            try
-            {
-                options = await _backupConfigDialogService
-                    .ShowBackupConfigAsync(_actionLifetimeCancellation.Token)
-                    .ConfigureAwait(true);
-            }
-            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to open Backup Device configuration for {Serial}.", device.Serial);
-                _deviceActionFeedbackService.SetNonOwningProcess(
-                    device.Serial,
-                    "Log_BackupDeviceFailedFormat",
-                    exception.Message);
-                return;
-            }
-
-            if (options == null)
-            {
-                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
-                return;
-            }
-
-            try
-            {
-                if (!await CheckInitialOnlineIdleEligibilityAsync(device).ConfigureAwait(true))
-                    return;
-
-                IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
-                    device,
-                    DeviceActionKind.BackupDevice);
-                if (operation == null)
-                    return;
-
-                using (operation)
-                {
-                    CancellationToken cancellationToken = operation.CancellationToken;
-                    try
-                    {
-                        var progress = new Progress<DeviceBackupProgress>(backupProgress =>
-                        {
-                            string? resourceKey = backupProgress.Stage switch
-                            {
-                                DeviceBackupStage.Preparing => "Log_BackupDevicePreparing",
-                                DeviceBackupStage.ReadingProperties => "Log_BackupDeviceReadingProperties",
-                                DeviceBackupStage.ReadingSettings => "Log_BackupDeviceReadingSettings",
-                                DeviceBackupStage.BackingUpApps => "Log_BackupDeviceBackingUpApps",
-                                DeviceBackupStage.BackingUpOptionalData => "Log_BackupDeviceBackingUpOptionalData",
-                                DeviceBackupStage.Finalizing => "Log_BackupDeviceFinalizing",
-                                _ => null
-                            };
-                            if (resourceKey != null)
-                                SetDeviceLog(device, resourceKey);
-                        });
-                        DeviceBackupResult result = await _deviceBackupService
-                            .BackupAsync(device.Serial, options, progress, cancellationToken)
-                            .ConfigureAwait(true);
-                        SetDeviceLog(
-                            device,
-                            "Log_BackupDeviceSuccessFormat",
-                            Path.GetFileName(result.ArchivePath));
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        await SetOperationCancellationLogAsync(
-                            device,
-                            operation,
-                            requiresOnline: true);
-                    }
-                    catch (Exception exception)
-                    {
-                        _logger.LogError(exception, "Backup failed for device {Serial}.", device.Serial);
-                        SetDeviceLog(device, "Log_BackupDeviceFailedFormat", exception.Message);
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
-            {
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Backup preparation failed for device {Serial}.", device.Serial);
-                _deviceActionFeedbackService.SetNonOwningProcess(
-                    device.Serial,
-                    "Log_BackupDeviceFailedFormat",
-                    exception.Message);
-            }
-        }
-
-        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
-        private async Task RestoreSingleDeviceAsync()
-        {
-            DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
-            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice).ConfigureAwait(true))
-                return;
-
-            if (_restoreConfigDialogService is null || _deviceRestoreService is null)
-            {
-                SetDeviceLog(
-                    selectedDevice!,
-                    "Log_RestoreDeviceFailedFormat",
-                    _localizationService.GetString("Log_RestoreDeviceServiceUnavailable"));
-                return;
-            }
-
-            DeviceRowViewModel device = selectedDevice!;
-            _deviceActionFeedbackService.SetNonOwningProcess(device.Serial, "Log_RestoreDeviceOpening");
-            DeviceRestoreOptions? options;
-            try
-            {
-                options = await _restoreConfigDialogService
-                    .ShowRestoreConfigAsync(
-                        device.Serial,
-                        _actionLifetimeCancellation.Token)
-                    .ConfigureAwait(true);
-            }
-            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Failed to open Restore Device configuration for {Serial}.", device.Serial);
-                _deviceActionFeedbackService.SetNonOwningProcess(
-                    device.Serial,
-                    "Log_RestoreDeviceFailedFormat",
-                    exception.Message);
-                return;
-            }
-
-            if (options is null)
-            {
-                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
-                return;
-            }
-
-            try
-            {
-                // The dialog is deliberately non-owning. Recheck before
-                // reserving the device so user interaction never leaves it
-                // busy while the archive is being selected or inspected.
-                if (!await CheckInitialOnlineIdleEligibilityAsync(device).ConfigureAwait(true))
-                    return;
-
-                IDeviceActionOperation? operation = TryStartEligibleDeviceAction(
-                    device,
-                    DeviceActionKind.RestoreDevice);
-                if (operation is null)
-                    return;
-
-                using (operation)
-                {
-                    CancellationToken cancellationToken = operation.CancellationToken;
-                    try
-                    {
-                        var progress = new Progress<DeviceRestoreProgress>(restoreProgress =>
-                        {
-                            string? resourceKey = restoreProgress.Stage switch
-                            {
-                                DeviceRestoreStage.Preparing => "Log_RestoreDevicePreparing",
-                                DeviceRestoreStage.ValidatingArchive => "Log_RestoreDeviceValidatingArchive",
-                                DeviceRestoreStage.CheckingCompatibility => "Log_RestoreDeviceCheckingCompatibility",
-                                DeviceRestoreStage.RestoringProperties => "Log_RestoreDeviceRestoringProperties",
-                                DeviceRestoreStage.RestoringSettings => "Log_RestoreDeviceRestoringSettings",
-                                DeviceRestoreStage.RestoringApps => "Log_RestoreDeviceRestoringApps",
-                                DeviceRestoreStage.RestoringOptionalData => "Log_RestoreDeviceRestoringOptionalData",
-                                DeviceRestoreStage.Finalizing => "Log_RestoreDeviceFinalizing",
-                                DeviceRestoreStage.Rebooting => "Log_RestoreDeviceRebooting",
-                                _ => null
-                            };
-                            if (resourceKey is not null)
-                                SetDeviceLog(device, resourceKey);
-                        });
-
-                        DeviceRestoreResult result = await _deviceRestoreService
-                            .RestoreAsync(device.Serial, options, progress, cancellationToken)
-                            .ConfigureAwait(true);
-                        string? packageIssues = FormatRestorePackageIssues(result);
-                        if (packageIssues is not null)
-                        {
-                            if (result.Outcome == DeviceRestoreOutcome.Failed)
-                            {
-                                SetDeviceLog(
-                                    device,
-                                    "Log_RestoreDevicePackageIssuesAndFailureFormat",
-                                    result.FailureReason ?? GetLogText("Log_RestoreDevicePackageRestoreFailed"),
-                                    packageIssues);
-                            }
-                            else
-                            {
-                                SetDeviceLog(
-                                    device,
-                                    "Log_RestoreDevicePackageIssuesFormat",
-                                    packageIssues);
-                            }
-                        }
-
-                        string resultKey = result.Outcome switch
-                        {
-                            DeviceRestoreOutcome.Succeeded => "Log_RestoreDeviceSuccess",
-                            DeviceRestoreOutcome.Partial => "Log_RestoreDevicePartial",
-                            _ => "Log_RestoreDeviceFailedFormat"
-                        };
-                        if (result.Outcome == DeviceRestoreOutcome.Failed && packageIssues is null)
-                        {
-                            SetDeviceLog(
-                                device,
-                                resultKey,
-                                result.FailureReason ?? GetLogText("Log_RestoreDevicePackageRestoreFailed"));
-                        }
-                        else if (packageIssues is null)
-                        {
-                            SetDeviceLog(device, resultKey);
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        await SetOperationCancellationLogAsync(device, operation, requiresOnline: true);
-                    }
-                    catch (Exception exception)
-                    {
-                        _logger.LogError(exception, "Restore failed for device {Serial}.", device.Serial);
-                        SetDeviceLog(device, "Log_RestoreDeviceFailedFormat", exception.Message);
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (_actionLifetimeCancellation.IsCancellationRequested)
-            {
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Restore preparation failed for device {Serial}.", device.Serial);
-                _deviceActionFeedbackService.SetNonOwningProcess(
-                    device.Serial,
-                    "Log_RestoreDeviceFailedFormat",
-                    exception.Message);
             }
         }
 

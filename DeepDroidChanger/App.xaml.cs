@@ -164,8 +164,6 @@ public sealed partial class App : Application
         services.AddSingleton<IDeviceIntegrityService, DeviceIntegrityService>();
         services.AddSingleton<IDevicePackageService, DevicePackageService>();
         services.AddSingleton<IDeviceDataCleanupService, DeviceDataCleanupService>();
-        services.AddSingleton<IDeviceBackupService, DeviceBackupService>();
-        services.AddSingleton<IDeviceRestoreService, DeviceRestoreService>();
         services.AddSingleton<IDeviceChangeService, DeviceChangeService>();
         services.AddSingleton<IXapkPackageService, XapkPackageService>();
         services.AddSingleton<IPackageInstallService, PackageInstallService>();
@@ -197,8 +195,6 @@ public sealed partial class App : Application
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
         services.AddTransient<IFakeProxyBatchDialogService, FakeProxyBatchDialogService>();
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
-        services.AddTransient<IBackupConfigDialogService, BackupConfigDialogService>();
-        services.AddTransient<IRestoreConfigDialogService, RestoreConfigDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ChangeSingleDeviceViewModel>();
         services.AddSingleton<ChangeMultipleDevicesViewModel>();
@@ -225,8 +221,6 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyViewModel>();
         services.AddTransient<FakeProxyBatchViewModel>();
         services.AddTransient<UpdateIntegrityViewModel>();
-        services.AddTransient<BackupDeviceViewModel>();
-        services.AddTransient<RestoreDeviceViewModel>();
 
         services.AddTransient<LoginDialog>();
         services.AddTransient<AddDevicesDialog>();
@@ -238,8 +232,6 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyDialog>();
         services.AddTransient<FakeProxyBatchDialog>();
         services.AddTransient<UpdateIntegrityDialog>();
-        services.AddTransient<BackupDeviceDialog>();
-        services.AddTransient<RestoreDeviceDialog>();
     }
 
     private static void CopySettings(AppSettings source, AppSettings target)
