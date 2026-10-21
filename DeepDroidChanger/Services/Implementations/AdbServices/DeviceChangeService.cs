@@ -147,10 +147,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
         await ExecuteWithDeviceLockAsync(serial, async () =>
         {
             progress?.Report(DeviceChangeStage.Preparing);
-            bool changeAndroidId = ShouldChangeAndroidId(options);
-            string? originalAndroidId = changeAndroidId
-                ? await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false)
-                : null;
+            string originalAndroidId = await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false);
             bool changeMacAddress = options.UseDefaultMode || options.ChangeMacAddress;
             if (changeMacAddress)
             {
@@ -164,8 +161,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             }
 
             await _cleanupService.DeleteSsaidAsync(serial, cancellationToken).ConfigureAwait(false);
-            if (changeAndroidId)
-                await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
+            await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             bool updateIntegrity = ShouldUpdateIntegrity(options);
             bool changeLocation = ShouldChangeLocation(options);
@@ -189,21 +185,17 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     profile,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (changeAndroidId)
-            {
-                await VerifyRegeneratedAndroidIdAsync(
-                        serial,
-                        originalAndroidId!,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
+            await VerifyRegeneratedAndroidIdAsync(
+                    serial,
+                    originalAndroidId,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             progress?.Report(DeviceChangeStage.Completed);
             _logger.LogInformation(
-                "Changed device identity without wiping package data on {Serial}. Default mode: {DefaultMode}; Android ID changed: {AndroidIdChanged}; SIM changed: {SimChanged}; MAC changed: {MacChanged}.",
+                "Changed device identity and regenerated Android ID without wiping package data on {Serial}. Default mode: {DefaultMode}; SIM changed: {SimChanged}; MAC changed: {MacChanged}.",
                 serial,
                 options.UseDefaultMode,
-                changeAndroidId,
                 changeSim,
                 changeMacAddress);
         }, cancellationToken).ConfigureAwait(false);
@@ -251,10 +243,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
             progress?.Report(DeviceChangeStage.Preparing);
             await _adb.SetWifiAsync(serial, false, cancellationToken).ConfigureAwait(false);
 
-            bool changeAndroidId = ShouldChangeAndroidId(options);
-            string? originalAndroidId = changeAndroidId
-                ? await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false)
-                : null;
+            string originalAndroidId = await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false);
             bool changeMacAddress = options.UseDefaultMode || options.ChangeMacAddress;
             if (changeMacAddress)
             {
@@ -283,8 +272,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
 
             progress?.Report(DeviceChangeStage.ClearingData);
             await _cleanupService.CleanAsync(serial, options, cancellationToken).ConfigureAwait(false);
-            if (changeAndroidId)
-                await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
+            await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
             await _cleanupService
@@ -297,21 +285,17 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     profile,
                     cancellationToken)
                 .ConfigureAwait(false);
-            if (changeAndroidId)
-            {
-                await VerifyRegeneratedAndroidIdAsync(
-                        serial,
-                        originalAndroidId!,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
+            await VerifyRegeneratedAndroidIdAsync(
+                    serial,
+                    originalAndroidId,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             progress?.Report(DeviceChangeStage.Completed);
             _logger.LogInformation(
-                "Changed device identity and rebooted device {Serial}. Default mode: {DefaultMode}; Android ID changed: {AndroidIdChanged}; package cleanup: {PackageCleanup}.",
+                "Changed device identity, regenerated Android ID, and rebooted device {Serial}. Default mode: {DefaultMode}; package cleanup: {PackageCleanup}.",
                 serial,
                 options.UseDefaultMode,
-                changeAndroidId,
                 DeviceChangeOptionsHelper.HasPackageCleanup(options));
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -614,11 +598,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
         }
 
         throw new TimeoutException($"Device {serial} did not finish booting after Change Device.");
-    }
-
-    private static bool ShouldChangeAndroidId(DeviceChangeOptions options)
-    {
-        return !options.UseDefaultMode && options.ChangeAndroidId;
     }
 
     private static bool ShouldUpdateIntegrity(DeviceChangeOptions options)

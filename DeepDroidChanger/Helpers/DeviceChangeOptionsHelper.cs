@@ -12,7 +12,6 @@ public static class DeviceChangeOptionsHelper
         return new DeviceChangeOptions
         {
             UseDefaultMode = useDefaultMode ?? source.UseDefaultMode,
-            ChangeAndroidId = source.ChangeAndroidId,
             ChangeMacAddress = source.ChangeMacAddress,
             UpdateIntegrity = source.UpdateIntegrity,
             ChangeTimezone = source.ChangeTimezone,

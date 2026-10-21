@@ -19,9 +19,6 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
     private bool _initialUseDefaultMode;
 
     [ObservableProperty]
-    private bool _changeAndroidId;
-
-    [ObservableProperty]
     private bool _changeMacAddress = true;
 
     [ObservableProperty]
@@ -129,7 +126,6 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         _deviceSerial = _deviceSerials[0];
         _initialUseDefaultMode = options.UseDefaultMode;
         _ = isMultiple;
-        ChangeAndroidId = options.ChangeAndroidId;
         ChangeMacAddress = options.ChangeMacAddress;
         UpdateIntegrity = options.UpdateIntegrity;
         ChangeTimezone = options.ChangeTimezone;
@@ -340,7 +336,6 @@ public sealed partial class AdvancedChangeConfigViewModel : ObservableObject
         var options = new DeviceChangeOptions
         {
             UseDefaultMode = _initialUseDefaultMode,
-            ChangeAndroidId = ChangeAndroidId,
             ChangeMacAddress = ChangeMacAddress,
             UpdateIntegrity = UpdateIntegrity,
             ChangeTimezone = ChangeTimezone,

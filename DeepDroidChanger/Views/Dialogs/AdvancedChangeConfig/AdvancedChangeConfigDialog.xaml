@@ -96,11 +96,6 @@
                            Style="{StaticResource SubtitleTextStyle}"/>
                 <UniformGrid Columns="3"
                              Margin="0,8,0,0">
-                    <CheckBox x:Name="ChangeAndroidIdCheckBox"
-                              Content="{DynamicResource AdvancedChangeConfig_ChangeAndroidId}"
-                              ToolTip="{DynamicResource Shared_TooltipOption}"
-                              IsChecked="{Binding ChangeAndroidId, Mode=TwoWay}"
-                              Margin="0,4"/>
                     <CheckBox x:Name="ChangeMacAddressCheckBox"
                               Content="{DynamicResource AdvancedChangeConfig_ChangeMac}"
                               ToolTip="{DynamicResource Shared_TooltipOption}"

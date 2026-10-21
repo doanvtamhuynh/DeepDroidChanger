@@ -1,8 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace DeepDroidChanger.Models;
 
 public sealed class DeviceChangeOptions
 {
     public bool UseDefaultMode { get; set; } = true;
+    // Retained for source compatibility; Change always regenerates Android ID.
+    [JsonIgnore]
     public bool ChangeAndroidId { get; set; }
     public bool ChangeMacAddress { get; set; } = true;
     public bool UpdateIntegrity { get; set; }

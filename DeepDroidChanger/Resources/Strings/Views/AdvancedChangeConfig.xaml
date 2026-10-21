@@ -4,7 +4,6 @@
     <sys:String x:Key="AdvancedChangeConfig_WindowTitle">Advanced Change Device Configuration</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_Title">Advanced Change Device</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeSectionTitle">Change configuration</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Change Android ID</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Change Wi-Fi/Bluetooth MAC</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatch">Use Integrity security patch</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatchDescription">Applies when the next Random profile is generated; an existing prepared profile is unchanged.</sys:String>

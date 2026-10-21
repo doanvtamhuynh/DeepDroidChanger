@@ -4,7 +4,6 @@
     <sys:String x:Key="AdvancedChangeConfig_WindowTitle">Cấu hình đổi thiết bị nâng cao</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_Title">Đổi thiết bị nâng cao</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeSectionTitle">Cấu hình Change</sys:String>
-    <sys:String x:Key="AdvancedChangeConfig_ChangeAndroidId">Đổi Android ID</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_ChangeMac">Đổi MAC</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatch">Sử dụng bản vá Integrity</sys:String>
     <sys:String x:Key="AdvancedChangeConfig_UseIntegritySecurityPatchDescription">Áp dụng khi tạo profile Random tiếp theo; profile đã random sẵn sẽ không bị thay đổi.</sys:String>
