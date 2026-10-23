@@ -1,0 +1,96 @@
+<UserControl x:Class="DeepDroidChanger.Views.TwrpOptionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" PreviewKeyDown="OnPreviewKeyDown">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <Style x:Key="BackupOnly" TargetType="StackPanel">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRestoreMode}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RestoreOnly" TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRestoreMode}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Grid Style="{StaticResource DialogRootGridStyle}">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Border Style="{StaticResource DialogHeaderBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <materialDesign:PackIcon Kind="CellphoneCog" Style="{StaticResource DialogHeaderIconStyle}"/>
+                <TextBlock Grid.Column="1" Text="{Binding DeviceHeading}" Style="{StaticResource DialogHeaderTextStyle}"/>
+            </Grid>
+        </Border>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel IsEnabled="{Binding CanEdit}">
+                <StackPanel Style="{StaticResource BackupOnly}">
+                    <GroupBox Header="{DynamicResource Twrp_Config}" Style="{StaticResource DialogOptionGroupBoxStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="{DynamicResource Twrp_BackupName}" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                            <TextBox Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding BackupName, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding OutputPreview}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,0,8"/>
+                            <TextBlock Grid.Row="1" Text="{DynamicResource Twrp_PcDirectory}" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BackupDirectory, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding OutputPreview}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,0,8"/>
+                            <Button Grid.Row="1" Grid.Column="3" Command="{Binding BrowseBackupCommand}" ToolTip="{DynamicResource Twrp_Browse}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
+                            </Button>
+                            <TextBlock Grid.Row="2" Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
+                            <Button Grid.Row="2" Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
+                            </Button>
+                        </Grid>
+                    </GroupBox>
+                </StackPanel>
+                <StackPanel Style="{StaticResource RestoreOnly}">
+                    <GroupBox Header="{DynamicResource Twrp_Config}" Style="{StaticResource DialogOptionGroupBoxStyle}">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="{DynamicResource Twrp_ChooseArchive}" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                            <TextBox Grid.Column="1" Text="{Binding ArchiveSource, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding ArchiveSource}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,0,8"/>
+                            <Button Grid.Column="3" Command="{Binding BrowseArchiveCommand}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
+                            </Button>
+                            <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding BackupSummary}" TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource Spacing.ControlPadding}"/>
+                            <TextBlock Grid.Row="2" Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
+                            <Button Grid.Row="2" Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
+                            </Button>
+                        </Grid>
+                    </GroupBox>
+                </StackPanel>
+                <StackPanel Visibility="{Binding HasExportSessions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ComboBox ItemsSource="{Binding ExportSessions}" SelectedItem="{Binding SelectedExport}" DisplayMemberPath="Label" Style="{StaticResource DialogFormComboBoxStyle}"/>
+                    <Button Content="{DynamicResource Twrp_RetryExport}" Command="{Binding RetryExportCommand}" Style="{StaticResource DialogPrimaryButtonStyle}"/>
+                </StackPanel>
+                <StackPanel Visibility="{Binding HasRecoverySessions, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ComboBox ItemsSource="{Binding RecoverySessions}" SelectedItem="{Binding SelectedRecovery}" DisplayMemberPath="Label" Style="{StaticResource DialogFormComboBoxStyle}"/>
+                    <Button Content="{DynamicResource Twrp_Recover}" Command="{Binding RecoverCommand}" Style="{StaticResource DialogPrimaryButtonStyle}"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2">
+            <TextBlock Text="{Binding Error}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+            <Grid Style="{StaticResource DialogActionGridStyle}">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Button Grid.Column="5" Command="{Binding SubmitCommand}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                    <TextBlock Foreground="{DynamicResource Brush.AccentForeground}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="{DynamicResource Twrp_BackupAction}"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding IsRestoreMode}" Value="True"><Setter Property="Text" Value="{DynamicResource Twrp_RestoreAction}"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</UserControl>

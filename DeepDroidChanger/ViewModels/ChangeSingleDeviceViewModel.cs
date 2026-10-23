@@ -26,6 +26,11 @@ namespace DeepDroidChanger.ViewModels
         private readonly IProxyService _adbProxyService;
         private readonly IProxyWorkflowService _proxyWorkflowService;
         private readonly IUpdateIntegrityDialogService _updateIntegrityDialogService;
+        private readonly ITwrpWorkspaceDialogService _twrpWorkspace;
+        private readonly ITwrpRecoveryService _twrpRecovery;
+        private readonly IConfirmationDialogService _twrpConfirmation;
+        [ObservableProperty]
+        private string _twrpPendingMessage = string.Empty;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IFilePickerDialogService _filePickerDialogService;
         private readonly IPackageInstallService _packageInstallService;
@@ -110,6 +115,9 @@ namespace DeepDroidChanger.ViewModels
             IProxyService adbProxyService,
             IProxyWorkflowService proxyWorkflowService,
             IUpdateIntegrityDialogService updateIntegrityDialogService,
+            ITwrpWorkspaceDialogService twrpWorkspace,
+            ITwrpRecoveryService twrpRecovery,
+            IConfirmationDialogService twrpConfirmation,
             IDeviceIntegrityService deviceIntegrityService,
             IFilePickerDialogService filePickerDialogService,
             IPackageInstallService packageInstallService,
@@ -146,6 +154,9 @@ namespace DeepDroidChanger.ViewModels
             _adbProxyService = adbProxyService;
             _proxyWorkflowService = proxyWorkflowService;
             _updateIntegrityDialogService = updateIntegrityDialogService;
+            _twrpWorkspace = twrpWorkspace;
+            _twrpRecovery = twrpRecovery;
+            _twrpConfirmation = twrpConfirmation;
             _deviceIntegrityService = deviceIntegrityService;
             _filePickerDialogService = filePickerDialogService;
             _packageInstallService = packageInstallService;
@@ -227,6 +238,7 @@ namespace DeepDroidChanger.ViewModels
 
                 await LoadCarrierProfilesAsync(cancellationToken).ConfigureAwait(false);
                 await LoadSavedDevicesAsync(cancellationToken).ConfigureAwait(false);
+                await RefreshTwrpPendingAsync(cancellationToken).ConfigureAwait(false);
                 await RefreshNewDeviceCountAsync(cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -632,6 +644,17 @@ namespace DeepDroidChanger.ViewModels
             if (_isDisposed)
                 return;
 
+            if (snapshot.Kind == DeviceActionKind.TwrpRecovery && snapshot.Source == DeviceActionSource.SingleDevice
+                && snapshot.State != DeviceActionRuntimeState.Idle)
+            {
+                lock (_activeActionOperationsLock)
+                {
+                    if (_activeActionOperationIds.Count == 0)
+                        _activeActionOperationsCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _activeActionOperationIds.Add(snapshot.OperationId);
+                }
+            }
+
             if (snapshot.State == DeviceActionRuntimeState.Idle)
             {
                 TaskCompletionSource? completion = null;
@@ -735,6 +758,8 @@ namespace DeepDroidChanger.ViewModels
             ChangeSingleDeviceLocationCommand.NotifyCanExecuteChanged();
             ChangeSingleDeviceTimezoneCommand.NotifyCanExecuteChanged();
             UpdateSingleDeviceIntegrityCommand.NotifyCanExecuteChanged();
+            OpenTwrpBackupCommand.NotifyCanExecuteChanged();
+            OpenTwrpRestoreCommand.NotifyCanExecuteChanged();
             InstallPackagesOnSingleDeviceCommand.NotifyCanExecuteChanged();
             StartSingleDeviceFakeProxyCommand.NotifyCanExecuteChanged();
             StopSingleDeviceFakeProxyCommand.NotifyCanExecuteChanged();
@@ -748,12 +773,26 @@ namespace DeepDroidChanger.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanStopDeviceActionCommandCanExecute))]
-        private void StopDeviceAction(DeviceRowViewModel? device)
+        private async Task StopDeviceActionAsync(DeviceRowViewModel? device)
         {
             if (device == null || !device.CanStopAction)
                 return;
 
-            _deviceActionCoordinatorService.TryRequestCancellation(device.Serial);
+            var snapshot = _deviceActionCoordinatorService.GetOperation(device.Serial);
+            if (snapshot?.Kind == DeviceActionKind.TwrpRecovery)
+            {
+                bool confirmed = await _twrpConfirmation.ShowConfirmationAsync(new()
+                {
+                    Caption = GetLogText("Twrp_StopTitle"), Message = GetLogText("Twrp_StopMessage"),
+                    WarningMessage = GetLogText("Twrp_StopWarning"), Icon = ConfirmationDialogIcon.Warning,
+                    ConfirmButtonText = GetLogText("Twrp_StopAnyway"), CancelButtonText = GetLogText("Twrp_Continue")
+                });
+                if (confirmed && await _twrpRecovery.RequestStopAsync(device.Serial, snapshot.OperationId, CancellationToken.None))
+                    SetDeviceLog(device, "Twrp_Stopping");
+                return;
+            }
+            if (snapshot is not null && _deviceActionCoordinatorService.GetOperation(device.Serial)?.OperationId == snapshot.OperationId)
+                _deviceActionCoordinatorService.TryRequestCancellation(device.Serial);
         }
 
         private static bool CanStopDeviceActionCommandCanExecute(DeviceRowViewModel? device)
@@ -2166,6 +2205,78 @@ namespace DeepDroidChanger.ViewModels
             {
                 _deviceRefreshLock.Release();
             }
+        }
+
+        private bool CanOpenTwrpWorkspace() => SelectedDevice is not null && !IsDeviceBusy(SelectedDevice);
+
+        [RelayCommand(CanExecute = nameof(CanOpenTwrpWorkspace))]
+        private Task OpenTwrpBackupAsync() => RunTwrpDialogAsync(restore: false);
+
+        [RelayCommand(CanExecute = nameof(CanOpenTwrpWorkspace))]
+        private Task OpenTwrpRestoreAsync() => RunTwrpDialogAsync(restore: true);
+
+        private async Task RunTwrpDialogAsync(bool restore)
+        {
+            DeviceRowViewModel? device = SelectedDevice;
+            if (device is null) return;
+            try
+            {
+                SetDeviceLog(device, "Twrp_Inspect");
+                var result = restore ? await _twrpWorkspace.ShowRestoreAsync(device.Serial, device.Name, _actionLifetimeCancellation.Token)
+                    : await _twrpWorkspace.ShowBackupAsync(device.Serial, device.Name, _actionLifetimeCancellation.Token);
+                if (result is null) { SetDeviceLog(device, "Log_Ready"); return; }
+                var progress = new TwrpMainProgress(value => _uiDispatcher.InvokeAsync(() =>
+                {
+                    if (value.State == TwrpSessionState.ImagePrepared && value.RescuePath is not null)
+                        _deviceActionFeedbackService.SetProcess(device.Serial, "Twrp_ImagePreparedRescue", value.RescuePath);
+                    else if (value.Detail is not null)
+                        _deviceActionFeedbackService.SetProcess(device.Serial, value.MessageKey, value.Detail);
+                    else _deviceActionFeedbackService.SetProcess(device.Serial, value.MessageKey);
+                }, CancellationToken.None).GetAwaiter().GetResult());
+                TwrpSession session = result.RecoverSessionId is Guid recover
+                    ? await _twrpRecovery.RecoverAsync(recover, progress, _actionLifetimeCancellation.Token)
+                    : result.RetryExportSessionId is Guid retry
+                        ? await _twrpRecovery.RetryExportAsync(retry, progress, _actionLifetimeCancellation.Token)
+                        : await _twrpRecovery.RunAsync(result.Request!, progress, _actionLifetimeCancellation.Token);
+                if (session.State == TwrpSessionState.NeedsRecovery) SetDeviceLog(device, "Log_TwrpRecoveryFailed");
+                else if (result.RecoverSessionId is not null && session.BootRestored) SetDeviceLog(device, "Log_TwrpBootRecoverySuccess");
+                else if (session.ExportState is TwrpExportState.Failed or TwrpExportState.Canceled)
+                    SetDeviceLog(device, session.ExportState == TwrpExportState.Canceled ? "Log_TwrpExportCanceled" : "Log_TwrpExportFailed");
+                else if (session.StopRequested) SetDeviceLog(device, "Log_TwrpCanceled");
+                else if (session.State != TwrpSessionState.Completed) SetDeviceLog(device, "Log_TwrpFailed");
+                else if (session.Kind == TwrpOperationKind.Backup && session.ArchivePath is not null)
+                    SetDeviceLog(device, "Log_TwrpBackupSuccess", session.ArchivePath);
+                else SetDeviceLog(device, "Log_TwrpRestoreSuccess");
+            }
+            catch (OperationCanceledException) { SetDeviceLog(device, "Log_TwrpCanceled"); }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "TWRP action failed for {Serial}.", device.Serial);
+                if (ex is TwrpWorkflowException known) SetDeviceLog(device, "Log_TwrpDetailFailed", GetLogText(known.MessageKey));
+                else SetDeviceLog(device, "Log_TwrpFailed");
+            }
+            finally { await RefreshTwrpPendingAsync(CancellationToken.None); }
+        }
+
+        private sealed class TwrpMainProgress(Action<TwrpProgress> report) : IProgress<TwrpProgress>
+        {
+            public void Report(TwrpProgress value) => report(value);
+        }
+
+        private async Task RefreshTwrpPendingAsync(CancellationToken token)
+        {
+            string? message = null;
+            try
+            {
+                var sessions = await _twrpRecovery.ListAsync(string.Empty, token).ConfigureAwait(false);
+                if (sessions.Any(item => !item.IsTerminal)) message = "Twrp_PendingSession";
+            }
+            catch (Exception exception) when (exception is TwrpWorkflowException or IOException or System.Text.Json.JsonException)
+            {
+                _logger.LogError(exception, "Unable to read the TWRP recovery journal.");
+                message = "Twrp_InvalidJournal";
+            }
+            await _uiDispatcher.InvokeAsync(() => TwrpPendingMessage = message is null ? string.Empty : _localizationService.GetString(message), token);
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]

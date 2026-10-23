@@ -35,6 +35,7 @@ public enum DeviceActionKind
     BatchFakeProxy,
     BatchStopFakeProxy,
     BatchStopChangeSim,
+    TwrpRecovery,
 }
 
 public static class DeviceActionKindExtensions
@@ -132,6 +133,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.StopFakeProxy => "DeviceAction_Name_StopFakeProxy",
             DeviceActionKind.StopChangeSim => "DeviceAction_Name_StopChangeSim",
             DeviceActionKind.ViewRandomDeviceInfo => "DeviceAction_Name_ViewRandomDeviceInfo",
+            DeviceActionKind.TwrpRecovery => "Twrp_Title",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }
@@ -247,6 +249,9 @@ public interface IDeviceActionCoordinatorService
         DeviceActionSource source = DeviceActionSource.Unknown);
 
     bool TryRequestCancellation(string serial);
+
+    /// <summary>Cancel only the operation the user actually confirmed.</summary>
+    bool TryRequestCancellation(string serial, Guid operationId) => false;
 
     /// <summary>
     /// Requests cancellation for every cancellable operation in a session.

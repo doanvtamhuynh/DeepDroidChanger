@@ -31,10 +31,14 @@
     <None Remove="Assets\Data\**\*.*" />
     <None Remove="Assets\Icons\**\*.*" />
     <None Remove="Assets\Tools\**\*.*" />
+    <None Remove="Assets\TWRP\**\*.*" />
 
     <EmbeddedResource Include="Assets\Data\**\*.*" />
     <Resource Include="Assets\Icons\**\*.*" />
     <Content Include="Assets\Tools\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\TWRP\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

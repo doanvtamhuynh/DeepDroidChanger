@@ -20,5 +20,6 @@
         <ResourceDictionary Source="Views/RandomDeviceInfo.vi.xaml" />
         <ResourceDictionary Source="Views/Login.vi.xaml" />
         <ResourceDictionary Source="Views/RuntimeMessages.vi.xaml" />
+        <ResourceDictionary Source="Views/TwrpRecovery.vi.xaml" />
     </ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

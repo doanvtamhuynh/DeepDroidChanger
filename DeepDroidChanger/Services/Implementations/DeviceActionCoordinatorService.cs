@@ -130,6 +130,19 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
             honorCanCancel: true);
     }
 
+    public bool TryRequestCancellation(string serial, Guid operationId)
+    {
+        if (string.IsNullOrWhiteSpace(serial) || operationId == Guid.Empty) return false;
+        ActiveDeviceAction? operation;
+        lock (_syncRoot)
+        {
+            if (!_activeOperations.TryGetValue(NormalizeSerial(serial), out operation)
+                || operation.OperationId != operationId || !operation.CanCancel) return false;
+        }
+        // RequestCancellation operates on this handle and rechecks ownership.
+        return RequestCancellation(operation, DeviceActionCancellationReason.UserStop, honorCanCancel: true);
+    }
+
     public bool TryRequestSessionCancellation(Guid sessionId)
     {
         if (sessionId == Guid.Empty)

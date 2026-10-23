@@ -165,6 +165,10 @@ public sealed partial class App : Application
         services.AddSingleton<IDevicePackageService, DevicePackageService>();
         services.AddSingleton<IDeviceDataCleanupService, DeviceDataCleanupService>();
         services.AddSingleton<IDeviceChangeService, DeviceChangeService>();
+        services.AddSingleton<TwrpSessionStore>();
+        services.AddSingleton<TwrpImageService>();
+        services.AddSingleton<TwrpArchiveService>();
+        services.AddSingleton<ITwrpRecoveryService, TwrpRecoveryService>();
         services.AddSingleton<IXapkPackageService, XapkPackageService>();
         services.AddSingleton<IPackageInstallService, PackageInstallService>();
         services.AddSingleton<IDeviceRandomProfileService, DeviceRandomProfileService>();
@@ -195,6 +199,7 @@ public sealed partial class App : Application
         services.AddTransient<IFakeProxyDialogService, FakeProxyDialogService>();
         services.AddTransient<IFakeProxyBatchDialogService, FakeProxyBatchDialogService>();
         services.AddTransient<IUpdateIntegrityDialogService, UpdateIntegrityDialogService>();
+        services.AddTransient<ITwrpWorkspaceDialogService, TwrpWorkspaceDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ChangeSingleDeviceViewModel>();
         services.AddSingleton<ChangeMultipleDevicesViewModel>();
@@ -221,6 +226,7 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyViewModel>();
         services.AddTransient<FakeProxyBatchViewModel>();
         services.AddTransient<UpdateIntegrityViewModel>();
+        services.AddTransient<TwrpWorkspaceViewModel>();
 
         services.AddTransient<LoginDialog>();
         services.AddTransient<AddDevicesDialog>();
@@ -232,6 +238,8 @@ public sealed partial class App : Application
         services.AddTransient<FakeProxyDialog>();
         services.AddTransient<FakeProxyBatchDialog>();
         services.AddTransient<UpdateIntegrityDialog>();
+        services.AddTransient<TwrpBackupDialog>();
+        services.AddTransient<TwrpRestoreDialog>();
     }
 
     private static void CopySettings(AppSettings source, AppSettings target)
