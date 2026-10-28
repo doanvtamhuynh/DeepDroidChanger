@@ -5,7 +5,8 @@ public enum DeviceActionRequirement
 {
     None = 0,
     Online = 1,
-    Idle = 2
+    Idle = 2,
+    OnlineOrRecovery = 4
 }
 
 public enum DeviceActionEligibilityFailure

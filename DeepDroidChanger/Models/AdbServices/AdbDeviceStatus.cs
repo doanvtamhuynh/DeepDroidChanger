@@ -4,6 +4,8 @@ namespace DeepDroidChanger.Models
     {
         Online,
         Offline,
-        Unauthorized
+        Unauthorized,
+        Recovery,
+        Bootloader
     }
 }

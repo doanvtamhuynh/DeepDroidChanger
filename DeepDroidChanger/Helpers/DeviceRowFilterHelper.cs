@@ -15,7 +15,9 @@ public static class DeviceRowFilterHelper
         bool matchesFilter = selectedFilter switch
         {
             "Online" => device.ConnectionStatus == AdbDeviceStatus.Online,
-            "Offline" => device.ConnectionStatus != AdbDeviceStatus.Online,
+            "Offline" => device.ConnectionStatus is AdbDeviceStatus.Offline or AdbDeviceStatus.Unauthorized,
+            "Recovery" => device.ConnectionStatus == AdbDeviceStatus.Recovery,
+            "Bootloader" => device.ConnectionStatus == AdbDeviceStatus.Bootloader,
             "Active" => string.Equals(device.Active, "Active", StringComparison.OrdinalIgnoreCase),
             "Inactive" => string.Equals(device.Active, "Inactive", StringComparison.OrdinalIgnoreCase),
             _ => true

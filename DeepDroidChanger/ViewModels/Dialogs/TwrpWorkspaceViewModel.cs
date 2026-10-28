@@ -21,6 +21,12 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
     private CancellationToken _configurationToken;
     private TwrpBackupManifest? _manifest;
     private string _serial = "";
+    private string _marker = "";
+    private string? _bundledRecoveryImagePath;
+    public bool UsesInstalledRecovery => _marker == "starlte";
+    public bool UsesBundledRecoveryImage => !UsesInstalledRecovery && _bundledRecoveryImagePath is not null;
+    public bool RequiresRecoveryImageSelection => !UsesInstalledRecovery && !UsesBundledRecoveryImage;
+    public bool CanBrowseRecoveryImage => CanEdit && RequiresRecoveryImageSelection;
     private bool _settingAll;
     public event Action<TwrpDialogResult>? Submitted;
     [ObservableProperty] private bool _isBusy;
@@ -47,14 +53,11 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
     public string DeviceSerial => _serial;
     public string DeviceHeading => DeviceInfoTextHelper.Create(_localization, DeviceName, _serial);
     public string RescueDirectory => _service.DefaultRescueDirectory;
-    public string RescueHint => Path.Combine(RescueDirectory,
-        (IsRestoreMode ? Path.GetFileNameWithoutExtension(ArchiveSource) : Path.GetFileNameWithoutExtension(BackupName)) is { Length: > 0 } name
-            ? name + (IsRestoreMode ? "_restore_<operation-id>" : "") : "<backup-name>", "original.img");
     public string OutputPreview => string.IsNullOrWhiteSpace(BackupName) ? "" : Path.Combine(BackupDirectory, BackupName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? BackupName : BackupName + ".zip");
     public bool HasRecoverySessions => RecoverySessions.Count > 0;
     public bool HasExportSessions => ExportSessions.Count > 0;
-    public bool CanSubmit => !IsBusy && RecoverySessions.Count == 0 && !string.IsNullOrWhiteSpace(RecoveryImagePath)
-        && (IsRestoreMode ? _manifest is { Version: 3 or 4 or 5 } : !string.IsNullOrWhiteSpace(BackupName));
+    public bool CanSubmit => !IsBusy && RecoverySessions.Count == 0 && !ExportSessions.Any(row => !row.Session.IsTerminal)
+        && (IsRestoreMode ? _manifest is { Version: 3 or 4 or 5 or 6 } : !string.IsNullOrWhiteSpace(BackupName));
     public bool CanRecover => !IsBusy && SelectedRecovery is not null;
     public bool CanRetry => !IsBusy && SelectedExport is not null;
     public bool AllSelected
@@ -91,21 +94,35 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
         StagingRoot = "/data/local/tmp";
         try
         {
-            // The header uses the existing row name/serial. The marker only
-            // prefills the ZIP name and image path, and may be unavailable.
+            // Resolve the marker and bundled image before exposing manual selection.
             string marker = "";
             try { marker = await _service.GetDeviceMarkerAsync(serial, token) ?? ""; }
             catch (Exception ex) when (ex is not OperationCanceledException)
             { _logger.LogDebug(ex, "Could not prefill the TWRP image for {Serial}.", serial); }
-            RecoveryImagePath = _service.GetDefaultImagePath(marker) ?? "";
+            _marker = marker;
+            _bundledRecoveryImagePath = null;
+            if (!UsesInstalledRecovery)
+            {
+                try
+                {
+                    string? image = _service.GetDefaultImagePath(marker);
+                    if (!string.IsNullOrWhiteSpace(image)) _bundledRecoveryImagePath = image;
+                }
+                catch (Exception ex)
+                { _logger.LogDebug(ex, "Could not locate the bundled TWRP image for {Serial}.", serial); }
+            }
+            OnPropertyChanged(nameof(UsesInstalledRecovery));
+            OnPropertyChanged(nameof(UsesBundledRecoveryImage));
+            OnPropertyChanged(nameof(RequiresRecoveryImageSelection));
+            RecoveryImagePath = _bundledRecoveryImagePath ?? "";
             if (!string.IsNullOrWhiteSpace(marker))
             {
                 string nameMarker = string.Concat(marker.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
                 BackupName = _archives.DefaultName(nameMarker, serial);
             }
             var history = await _service.ListAsync(serial, token);
-            foreach (var s in history.Where(s => !s.IsTerminal || s.CliRestore && s.State == TwrpSessionState.Completed && !s.CleanupCompleted)) RecoverySessions.Add(new(s, _localization));
-            foreach (var s in history.Where(s => s.Kind == TwrpOperationKind.Backup && (s.State == TwrpSessionState.Completed || s.State == TwrpSessionState.Failed && s.CliBackup && s.NativeBackupCompleted && s.BootRestored && !s.StopRequested) && s.ArchivePath is not null && s.ExportState != TwrpExportState.Completed && !s.Partitions.Contains("media"))) ExportSessions.Add(new(s, _localization));
+            foreach (var s in history.Where(s => (!s.IsTerminal && !(s.ExecutionMode == TwrpExecutionMode.ExternalRecovery && s.CliBackup && s.NativeCompleted && !s.CleanupCompleted)) || s.CliRestore && s.State == TwrpSessionState.Completed && !s.CleanupCompleted)) RecoverySessions.Add(new(s, _localization));
+            foreach (var s in history.Where(s => s.ExecutionMode == TwrpExecutionMode.ExternalRecovery ? s.CliBackup && s.NativeCompleted && !s.CleanupCompleted : s.Kind == TwrpOperationKind.Backup && (s.State == TwrpSessionState.Completed || s.State == TwrpSessionState.Failed && s.CliBackup && s.NativeBackupCompleted && s.BootRestored && !s.StopRequested) && s.ArchivePath is not null && s.ExportState != TwrpExportState.Completed && !s.Partitions.Contains("media"))) ExportSessions.Add(new(s, _localization));
             SelectedRecovery = RecoverySessions.FirstOrDefault(); SelectedExport = ExportSessions.FirstOrDefault();
             OnPropertyChanged(nameof(HasRecoverySessions)); OnPropertyChanged(nameof(HasExportSessions));
         }
@@ -117,7 +134,7 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
         foreach (var p in Partitions) p.PropertyChanged -= PartitionChanged;
         Partitions.Clear();
         var supplied = partitions.ToDictionary(p => p.Id);
-        foreach (var known in TwrpPartitionCatalog.All)
+        foreach (var known in TwrpPartitionCatalog.All.Where(p => p.Id == "data"))
         {
             var p = supplied.GetValueOrDefault(known.Id) ?? known;
             var item = new TwrpPartitionOption(p, _localization, IsRestoreMode && p.Id == "boot" ? "Twrp_BootRescueOnly" : null)
@@ -145,16 +162,16 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
     partial void OnDeviceNameChanged(string value) => OnPropertyChanged(nameof(DeviceHeading));
     partial void OnSelectedRecoveryChanged(TwrpSessionRow? value) => UpdateCommands();
     partial void OnSelectedExportChanged(TwrpSessionRow? value) => UpdateCommands();
-    partial void OnBackupNameChanged(string value) { OnPropertyChanged(nameof(OutputPreview)); OnPropertyChanged(nameof(RescueHint)); UpdateCommands(); }
-    partial void OnArchiveSourceChanged(string value) => OnPropertyChanged(nameof(RescueHint));
+    partial void OnBackupNameChanged(string value) { OnPropertyChanged(nameof(OutputPreview)); UpdateCommands(); }
     partial void OnBackupDirectoryChanged(string value) => OnPropertyChanged(nameof(OutputPreview));
     private void UpdateCommands()
     {
         OnPropertyChanged(nameof(CanSubmit)); OnPropertyChanged(nameof(CanRecover)); OnPropertyChanged(nameof(CanRetry));
+        OnPropertyChanged(nameof(CanBrowseRecoveryImage));
         SubmitCommand.NotifyCanExecuteChanged(); RecoverCommand.NotifyCanExecuteChanged(); RetryExportCommand.NotifyCanExecuteChanged();
         BrowseBackupCommand.NotifyCanExecuteChanged(); BrowseArchiveCommand.NotifyCanExecuteChanged(); BrowseRecoveryImageCommand.NotifyCanExecuteChanged();
     }
-    [RelayCommand(CanExecute = nameof(CanEdit))]
+    [RelayCommand(CanExecute = nameof(CanBrowseRecoveryImage))]
     private void BrowseRecoveryImage()
     {
         try
@@ -181,7 +198,7 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
             if (path is null) return;
             _manifest = null; SetPartitions(TwrpPartitionCatalog.All); BackupSummary = ""; ArchiveSource = "";
             var manifest = await _archives.ReadAsync(path, CancellationToken.None);
-            if (manifest.Version is not 3 and not 4 and not 5) throw new TwrpWorkflowException("Twrp_RestoreFormatRequired");
+            if (manifest.Version is not 3 and not 4 and not 5 and not 6) throw new TwrpWorkflowException("Twrp_RestoreFormatRequired");
             TwrpSafety.CliBackupName(path);
             string marker = await _service.GetDeviceMarkerAsync(_serial, CancellationToken.None);
             if (manifest.Device.Codename != marker || manifest.Device.Serial != _serial) throw new TwrpWorkflowException("Twrp_BackupTypeMismatch");
@@ -198,24 +215,25 @@ public sealed partial class TwrpWorkspaceViewModel : ObservableObject, IDisposab
         try
         {
             Error = ""; TwrpSafety.Storage(StorageRoot);
-            string imagePath = Path.GetFullPath(RecoveryImagePath);
-            if (!string.Equals(Path.GetExtension(imagePath), ".img", StringComparison.OrdinalIgnoreCase)) throw new TwrpWorkflowException("Twrp_InvalidImage");
+            string? selectedImage = UsesBundledRecoveryImage ? _bundledRecoveryImagePath : RecoveryImagePath;
+            string? imagePath = UsesInstalledRecovery || string.IsNullOrWhiteSpace(selectedImage) ? null : Path.GetFullPath(selectedImage);
+            if (imagePath is not null && !string.Equals(Path.GetExtension(imagePath), ".img", StringComparison.OrdinalIgnoreCase)) throw new TwrpWorkflowException("Twrp_InvalidImage");
             if (IsRestoreMode)
             {
-                if (_manifest is not { Version: 3 or 4 or 5 }) throw new TwrpWorkflowException("Twrp_RestoreFormatRequired");
+                if (_manifest is not { Version: 3 or 4 or 5 or 6 }) throw new TwrpWorkflowException("Twrp_RestoreFormatRequired");
             }
             else TwrpSafety.CliBackupName(_archives.OutputPath(BackupDirectory, BackupName));
             var request = new TwrpRequest(_serial, new[] { "data" }, StorageRoot, RescueDirectory, TwrpSafety.Confirmation, StagingRoot: StagingRoot,
                 Options: new(false, true, VerifyDigest: IsRestoreMode), BackupName: IsRestoreMode ? null : BackupName,
                 BackupDirectory: IsRestoreMode ? null : BackupDirectory, SourceArchivePath: IsRestoreMode ? ArchiveSource : null,
-                RecoveryDevice: TwrpRecoveryImage.Available.FirstOrDefault(p => string.Equals(p.FileName, Path.GetFileName(imagePath), StringComparison.OrdinalIgnoreCase))?.Device,
+                RecoveryDevice: string.IsNullOrEmpty(_marker) ? null : _marker,
                 SourceImagePath: imagePath);
             string actionKey = IsRestoreMode ? "Twrp_RestoreAction" : "Twrp_BackupAction";
             bool confirmed = await _confirmation.ShowConfirmationAsync(new()
             {
                 Caption = _localization.GetString(IsRestoreMode ? "Twrp_RestoreTitle" : "Twrp_BackupTitle"),
                 Message = DeviceHeading + Environment.NewLine + _localization.GetString("Twrp_StartConfirm")
-                    + Environment.NewLine + "TWRP: " + imagePath,
+                    + Environment.NewLine + (UsesInstalledRecovery ? _localization.GetString("Twrp_InstalledRecovery") : "TWRP: " + imagePath),
                 WarningMessage = _localization.GetString("Twrp_StartWarning"),
                 ConfirmButtonText = _localization.GetString(actionKey), CancelButtonText = _localization.GetString("Twrp_Cancel"),
                 Icon = ConfirmationDialogIcon.Warning
@@ -282,5 +300,5 @@ public sealed partial class TwrpPartitionOption(TwrpPartition partition, ILocali
 public sealed class TwrpSessionRow(TwrpSession session, ILocalizationService localization)
 {
     public TwrpSession Session { get; } = session;
-    public string Label => $"{Session.CreatedAt.ToLocalTime():g} · {Session.Id.ToString("N")[..8]} · {localization.GetString(Session.ExportError ?? ("Twrp_State_" + Session.State))}";
+    public string Label => (Session.ExecutionMode == TwrpExecutionMode.LegacyFlashedBoot ? localization.GetString("Twrp_LegacySession") + " · " : "") + $"{Session.CreatedAt.ToLocalTime():g} · {Session.Id.ToString("N")[..8]} · {localization.GetString(Session.ExportError ?? ("Twrp_State_" + Session.State))}";
 }

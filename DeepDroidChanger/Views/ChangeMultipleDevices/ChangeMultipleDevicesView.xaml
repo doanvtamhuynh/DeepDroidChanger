@@ -471,6 +471,12 @@
                         <ComboBoxItem Tag="Online"
                                       Content="{DynamicResource ChangeMultipleDevices_FilterOnline}"
                                       Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                        <ComboBoxItem Tag="Recovery"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterRecovery}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
+                        <ComboBoxItem Tag="Bootloader"
+                                      Content="{DynamicResource ChangeMultipleDevices_FilterBootloader}"
+                                      Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
                         <ComboBoxItem Tag="Offline"
                                       Content="{DynamicResource ChangeMultipleDevices_FilterOffline}"
                                       Style="{StaticResource MultipleDeviceComboBoxItemStyle}"/>

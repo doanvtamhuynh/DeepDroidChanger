@@ -12,6 +12,8 @@
     <sys:String x:Key="ChangeMultipleDevices_DeviceSearchName">Tìm kiếm thiết bị</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterAll">Tất cả</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterOnline">Online</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_FilterRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_FilterBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterActive">Đã kích hoạt</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterInactive">Chưa kích hoạt</sys:String>
@@ -72,6 +74,8 @@
     <sys:String x:Key="ChangeMultipleDevices_AdvancedConfig">Cấu hình nâng cao</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_AdvancedConfigTooltip">Cấu hình nâng cao cho các thiết bị được chọn.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOnline">Online</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StatusRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StatusBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusUnauthorized">Chưa cấp quyền</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocation">Đổi Location</sys:String>

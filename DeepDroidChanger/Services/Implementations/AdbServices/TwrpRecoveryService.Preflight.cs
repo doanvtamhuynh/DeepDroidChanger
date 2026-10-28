@@ -1,10 +1,8 @@
 using System.IO;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Constants;
-using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.Services;
 
@@ -13,20 +11,31 @@ public sealed partial class TwrpRecoveryService
     public async Task<string> GetDeviceMarkerAsync(string serial, CancellationToken cancellationToken)
     {
         TwrpSafety.ValidateSerial(serial);
-        return (await adb.GetPropertyAsync(serial, PropertyConstants.DeepDroidDevice, cancellationToken).ConfigureAwait(false)).Trim();
+        string marker = (await adb.GetPropertyAsync(serial, PropertyConstants.DeepDroidDevice, cancellationToken).ConfigureAwait(false)).Trim();
+        if (IsDataDevice(marker)) return marker;
+        var receipt = await store.ReadEntryAsync(serial, cancellationToken).ConfigureAwait(false);
+        if (receipt is null) return marker;
+        var result = await ShellAsync(serial, "getprop ro.twrp.boot; cat /proc/sys/kernel/random/boot_id", cancellationToken).ConfigureAwait(false);
+        string[] lines = result.StandardOutput.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return lines.Length == 2 && lines[0] == "1" && lines[1] == receipt.RecoveryBootId ? receipt.DeviceMarker : "";
     }
 
     public async Task<TwrpPreflight> InspectAsync(string serial, CancellationToken cancellationToken)
     {
         TwrpSafety.ValidateSerial(serial);
         using var ownership = Start(serial, cancellationToken);
-        return await InspectCoreAsync(serial, cancellationToken).ConfigureAwait(false);
+        // Before entering recovery only identity is needed. New sessions run
+        // the native CLI directly, without root/Data/CLI readiness probes.
+        string marker = await GetDeviceMarkerAsync(serial, cancellationToken).ConfigureAwait(false);
+        return IsDataDevice(marker) ? new(DataDevice(serial, marker), [], ["data"])
+            : new(null, ["Twrp_UnsupportedDevice"]);
     }
     private IDeviceActionOperation Start(string serial, CancellationToken token, bool canCancel = false) =>
         coordinator.TryStart(serial, DeviceActionKind.TwrpRecovery, canCancel, token, source: DeviceActionSource.SingleDevice)
         ?? throw new TwrpWorkflowException("Twrp_DeviceBusy");
 
-    private async Task<TwrpPreflight> InspectCoreAsync(string serial, CancellationToken token, string? sourceImagePath = null)
+    // Only unfinished legacy export/recovery paths use the historical inventory.
+    private async Task<TwrpPreflight> InspectLegacyCoreAsync(string serial, CancellationToken token, string? sourceImagePath = null)
     {
         // This marker is the device identity supplied by DeepDroid. Product,
         // build, hardware and bootloader properties may intentionally be spoofed.

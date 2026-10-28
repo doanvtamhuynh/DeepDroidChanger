@@ -1,6 +1,4 @@
 using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Text.Json;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Constants;
@@ -13,6 +11,8 @@ public sealed partial class TwrpRecoveryService
     public async Task<TwrpSession> RecoverAsync(Guid sessionId, IProgress<TwrpProgress>? progress, CancellationToken cancellationToken)
     {
         var session = await store.LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (session.ExecutionMode == TwrpExecutionMode.ExternalRecovery)
+            return await RecoverDataAsync(session, progress, cancellationToken).ConfigureAwait(false);
         using var operation = Start(session.Device.Serial, cancellationToken);
         if (session.IsTerminal)
         {
@@ -42,7 +42,7 @@ public sealed partial class TwrpRecoveryService
             return session;
         }
         string? result = await ReadResultAsync(session).ConfigureAwait(false);
-                if (result is not null && GetField(ParseFields(result), "state") is "COMPLETED" or "FAILED" or "NEEDS_RECOVERY")
+        if (result is not null && GetField(ParseFields(result), "state") is "COMPLETED" or "FAILED" or "NEEDS_RECOVERY")
         {
             await CollectResultAsync(session, progress).ConfigureAwait(false);
             if (session.CliRestore && session.State == TwrpSessionState.Completed && !session.StopRequested)
@@ -108,6 +108,13 @@ public sealed partial class TwrpRecoveryService
         using var operation = Start(serial, cancellationToken);
         var session = await store.LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
         var history = await store.ListAsync(serial, cancellationToken).ConfigureAwait(false);
+        if (session.ExecutionMode == TwrpExecutionMode.ExternalRecovery)
+        {
+            if (session.Device.Serial != serial || !session.IsTerminal || !session.CleanupCompleted || history.Any(s => !s.IsTerminal))
+                throw new TwrpWorkflowException("Twrp_PendingSession");
+            store.DeleteLocal(sessionId);
+            return;
+        }
         if (session.Device.Serial != serial || !session.IsTerminal || !session.BootRestored || history.Any(item => !item.IsTerminal)) throw new TwrpWorkflowException("Twrp_PendingSession");
         if ((session.CliBackup || session.CliRestore) && !session.CleanupCompleted) throw new TwrpWorkflowException("Twrp_PendingSession");
         if (session.Kind == TwrpOperationKind.Backup && !session.CliBackup)

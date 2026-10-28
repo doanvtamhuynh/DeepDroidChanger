@@ -36,6 +36,7 @@ public enum DeviceActionKind
     BatchStopFakeProxy,
     BatchStopChangeSim,
     TwrpRecovery,
+    EnterTwrp,
 }
 
 public static class DeviceActionKindExtensions
@@ -134,6 +135,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.StopChangeSim => "DeviceAction_Name_StopChangeSim",
             DeviceActionKind.ViewRandomDeviceInfo => "DeviceAction_Name_ViewRandomDeviceInfo",
             DeviceActionKind.TwrpRecovery => "Twrp_Title",
+            DeviceActionKind.EnterTwrp => "Twrp_EntryTitle",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }

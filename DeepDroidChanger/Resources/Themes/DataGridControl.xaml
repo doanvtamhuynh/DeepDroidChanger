@@ -299,6 +299,14 @@
                 <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusWarningBackground}" />
                 <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusWarningForeground}" />
             </DataTrigger>
+            <DataTrigger Binding="{Binding ConnectionStatus}" Value="{x:Static models:AdbDeviceStatus.Recovery}">
+                <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusWarningBackground}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusWarningForeground}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding ConnectionStatus}" Value="{x:Static models:AdbDeviceStatus.Bootloader}">
+                <Setter Property="Background" Value="{DynamicResource Brush.DeviceStatusWarningBackground}" />
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.DeviceStatusWarningForeground}" />
+            </DataTrigger>
         </Style.Triggers>
     </Style>
     <Style x:Key="DataGridColumnHeaderTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">

@@ -5,6 +5,19 @@ namespace DeepDroidChanger.Helpers;
 
 public static class DeviceRowFactory
 {
+    public static string GetConnectionStatusResourceKey(string prefix, AdbDeviceStatus status)
+    {
+        string suffix = status switch
+        {
+            AdbDeviceStatus.Online => "Online",
+            AdbDeviceStatus.Unauthorized => "Unauthorized",
+            AdbDeviceStatus.Recovery => "Recovery",
+            AdbDeviceStatus.Bootloader => "Bootloader",
+            _ => "Offline"
+        };
+        return prefix + "_Status" + suffix;
+    }
+
     public static void MergeSelectedDevices(
         List<StoredDeviceConfig> storedDevices,
         IEnumerable<StoredDeviceConfig> selectedDevices)

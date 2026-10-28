@@ -7,21 +7,58 @@ namespace DeepDroidChanger.Services
     {
         private const string GmsPackageName = "com.google.android.gms";
         private const string PlayStorePackageName = "com.android.vending";
+        private static readonly TimeSpan RebootTimeout = TimeSpan.FromSeconds(30);
 
         private readonly IAdbCommandService _commandService;
         private readonly IDevicePackageService _packageService;
+        private readonly IAdbDeviceService _deviceService;
 
         public DeviceActionService(
             IAdbCommandService commandService,
-            IDevicePackageService packageService)
+            IDevicePackageService packageService,
+            IAdbDeviceService? deviceService = null)
         {
             _commandService = commandService;
             _packageService = packageService;
+            _deviceService = deviceService ?? new AdbDeviceService(commandService);
         }
 
-        public Task RebootAsync(string serial, CancellationToken cancellationToken)
+        public async Task RebootAsync(string serial, CancellationToken cancellationToken)
         {
-            return _commandService.RebootAsync(serial, cancellationToken);
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            cancellationToken.ThrowIfCancellationRequested();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(RebootTimeout);
+            try
+            {
+                var devices = await _deviceService.GetConnectedDevicesAsync(timeout.Token).ConfigureAwait(false);
+                AdbDevice? device = devices.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Serial, serial, StringComparison.OrdinalIgnoreCase));
+                switch (device?.Status)
+                {
+                    case AdbDeviceStatus.Online:
+                    case AdbDeviceStatus.Recovery:
+                        await _commandService.RebootAsync(serial, timeout.Token).ConfigureAwait(false);
+                        break;
+                    case AdbDeviceStatus.Bootloader:
+                        await RebootFastbootAsync(serial, timeout.Token).ConfigureAwait(false);
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Device {serial} is not connected through ADB or fastboot.");
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Reboot timed out for device {serial}.");
+            }
+        }
+
+        private async Task RebootFastbootAsync(string serial, CancellationToken cancellationToken)
+        {
+            var result = await _commandService.RunFastbootAsync(
+                $"-s {AdbCommandService.QuoteProcessArgument(serial)} reboot", cancellationToken).ConfigureAwait(false);
+            if (result.ExitCode != 0)
+                throw new InvalidOperationException($"Failed to reboot device {serial} with fastboot (exit code {result.ExitCode}).");
         }
 
         public async Task<GooglePackageState> GetGooglePackageStateAsync(

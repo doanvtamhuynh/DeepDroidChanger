@@ -45,6 +45,7 @@ public sealed partial class TwrpRecoveryService
 
     private async Task PayloadTransferAsync(string serial, string from, string to, bool push, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         // Payloads can be several GB; the boot image's two-minute limit does not apply.
         var result = push ? await adb.PushFileAsync(serial, from, to, token).ConfigureAwait(false)
             : await adb.PullFileAsync(serial, from, to, token).ConfigureAwait(false);
@@ -137,6 +138,11 @@ public sealed partial class TwrpRecoveryService
     public async Task<TwrpSession> RetryExportAsync(Guid sessionId, IProgress<TwrpProgress>? progress, CancellationToken cancellationToken)
     {
         var session = await store.LoadAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        if (session.ExecutionMode == TwrpExecutionMode.ExternalRecovery)
+        {
+            if (!session.CliBackup || !session.NativeCompleted) throw new TwrpWorkflowException("Twrp_InvalidArchive");
+            return await RecoverDataAsync(session, progress, cancellationToken).ConfigureAwait(false);
+        }
         if (session.CliBackup) return await RetryCliExportAsync(session, progress, cancellationToken).ConfigureAwait(false);
         if (session.Partitions.Contains("media")) throw new TwrpWorkflowException("Twrp_MediaUnsupported");
         if (session.Kind != TwrpOperationKind.Backup || session.State != TwrpSessionState.Completed || !session.BootRestored
@@ -162,7 +168,7 @@ public sealed partial class TwrpRecoveryService
         }
         if (!HasCompletePcPayload(session))
         {
-            var actual = await InspectCoreAsync(session.Device.Serial, lifetime.Token).ConfigureAwait(false);
+            var actual = await InspectLegacyCoreAsync(session.Device.Serial, lifetime.Token).ConfigureAwait(false);
             if (actual.Device is null || !actual.CanStart || !TwrpSafety.Compatible(session.Device, actual.Device)) throw new TwrpWorkflowException("Twrp_IncompatibleBackup");
         }
         string expected = TwrpSafety.Storage(session.StorageRoot) + "/DeepDroidChanger/TWRP/" + session.Id.ToString("N");

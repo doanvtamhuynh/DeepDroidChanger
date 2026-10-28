@@ -9,7 +9,7 @@ using DeepDroidChanger.Models;
 
 namespace DeepDroidChanger.Services;
 
-/// <summary>Deliberately supports only the pinned sargo v2/gzip/unsigned-AVB image.</summary>
+/// <summary>Verifies bundled boot sources; guarded image rebuilding remains pinned to sargo.</summary>
 public sealed class TwrpImageService
 {
     private readonly string _assets;
@@ -23,6 +23,30 @@ public sealed class TwrpImageService
         return File.Exists(path) ? path : null;
     }
     private string SourcePath(string? path) => string.IsNullOrWhiteSpace(path) ? Path.Combine(_assets, "twrp_sargo.img") : Path.GetFullPath(path);
+    // Keep the verified source open until fastboot exits so it cannot be replaced
+    // between verification and boot. This does not use the guarded image builder.
+    internal async Task<FileStream> OpenBootSourceAsync(string deviceMarker, CancellationToken token, string? sourceImagePath = null)
+    {
+        string expectedHash = deviceMarker switch
+        {
+            "sargo" => TwrpSafety.SourceHash,
+            "tissot" => "0aeb095960e6f1c6e2ed350ab8cbb8fa289204a8e473708ce32b5e35812f8d73",
+            _ => throw new TwrpWorkflowException("Twrp_EntryUnsupportedDevice")
+        };
+        string path = sourceImagePath is null ? GetDefaultImagePath(deviceMarker) ?? throw new TwrpWorkflowException("Twrp_EntryInvalidImage") : Path.GetFullPath(sourceImagePath);
+        var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, useAsync: true);
+        try
+        {
+            if (Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, token).ConfigureAwait(false)) != expectedHash)
+                throw new TwrpWorkflowException("Twrp_EntryInvalidImage");
+            return stream;
+        }
+        catch
+        {
+            await stream.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
     public long SourceImageBytes => GetSourceImageBytes(null);
     public long GetSourceImageBytes(string? path) => new FileInfo(SourcePath(path)).Length;
     public async Task VerifySourceAsync(CancellationToken token, string? sourceImagePath = null)

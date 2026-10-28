@@ -4,6 +4,8 @@
 
     <!-- Resource ownership: Change Single Device. -->
     <sys:String x:Key="ChangeSingleDevice_StatusOnline">Online</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StatusRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StatusBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeSingleDevice_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeSingleDevice_StatusUnauthorized">Chưa cấp quyền</sys:String>
     <sys:String x:Key="ChangeSingleDevice_AddNewDevices">Thêm thiết bị</sys:String>
@@ -100,6 +102,8 @@
     <sys:String x:Key="ChangeSingleDevice_DeviceSearchName">Tìm kiếm thiết bị</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterAll">Tất cả</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterOnline">Online</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_FilterRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_FilterBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterOffline">Offline</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterActive">Đã kích hoạt</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterInactive">Chưa kích hoạt</sys:String>

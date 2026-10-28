@@ -10,63 +10,6 @@ namespace DeepDroidChanger.Services;
 
 public sealed partial class TwrpRecoveryService
 {
-    private async Task SaveOriginalAsync(TwrpSession session, CancellationToken token)
-    {
-        string remote = TwrpScripts.Remote(session), boot = TwrpSafety.Boot(session.Device.Slot);
-        await root.ExecuteAsRootAsync(session.Device.Serial, async ct =>
-        {
-            await ShellAsync(session.Device.Serial, $$"""
-                set -eu
-                test "$(getprop ro.boot.slot_suffix)" = {{TwrpSafety.Quote(session.Device.Slot)}}
-                test "$(readlink -f {{TwrpSafety.Quote(boot)}})" = {{TwrpSafety.Quote(session.Device.BootDevice)}}
-                test ! -e {{TwrpSafety.Quote(remote)}}
-                mkdir -p {{TwrpSafety.Quote(remote)}}
-                chmod 700 {{TwrpSafety.Quote(remote)}}
-                test "$(readlink -f {{TwrpSafety.Quote(remote)}})" = {{TwrpSafety.Quote(remote)}}
-                dd if={{TwrpSafety.Quote(boot)}} of={{TwrpSafety.Quote(remote + "/original.img")}} bs=4194304 conv=fsync
-                """, ct, TimeSpan.FromMinutes(2)).ConfigureAwait(false);
-            await TransferAsync(session.Device.Serial, remote + "/original.img", store.FileFor(session.Id, "original.img"), false, ct).ConfigureAwait(false);
-        }, token).ConfigureAwait(false);
-    }
-    private async Task SaveRescueAsync(TwrpSession session, CancellationToken token)
-    {
-        string script = TwrpScripts.RescuePowerShell(session);
-        await File.WriteAllTextAsync(store.FileFor(session.Id, "restore-boot.ps1"), script, new UTF8Encoding(false), token).ConfigureAwait(false);
-        if (session.CacheLayoutVersion == 1) return; // Journal and rescue already share the owned cache.
-        string destination = Path.Combine(session.RescueDirectory, "DeepDroidTwrp-" + session.Id.ToString("N"));
-        Directory.CreateDirectory(destination);
-        foreach (string name in new[] { "original.img", "restore-boot.ps1" })
-            File.Copy(store.FileFor(session.Id, name), Path.Combine(destination, name), overwrite: false);
-        await File.WriteAllTextAsync(Path.Combine(destination, "device.json"), JsonSerializer.Serialize(session, TwrpSessionStore.JsonOptions), token).ConfigureAwait(false);
-    }
-    private async Task FlashAsync(TwrpSession session)
-    {
-        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        string script = store.FileFor(session.Id, "flash.sh");
-        await File.WriteAllTextAsync(script, TwrpScripts.Flash(session), deadline.Token).ConfigureAwait(false);
-        await root.ExecuteAsRootAsync(session.Device.Serial, async ct =>
-        {
-            string path = TwrpScripts.Remote(session);
-            await TransferAsync(session.Device.Serial, script, path + "/flash.sh", true, ct).ConfigureAwait(false);
-            await WriteRemoteJournalAsync(session, ct).ConfigureAwait(false);
-            await ShellAsync(session.Device.Serial, $$"""
-                set -eu
-                cat /proc/sys/kernel/random/boot_id > {{TwrpSafety.Quote(path + "/flash.bootid")}}
-                touch {{TwrpSafety.Quote(path + "/flash-owned")}}
-                sync
-                nohup sh {{TwrpSafety.Quote(path + "/flash.sh")}} >{{TwrpSafety.Quote(path + "/flash.log")}} 2>&1 </dev/null &
-                """, ct).ConfigureAwait(false);
-            DateTimeOffset limit = DateTimeOffset.UtcNow.AddMinutes(2);
-            while (DateTimeOffset.UtcNow < limit)
-            {
-                string state = (await ShellAsync(session.Device.Serial, $"cat {TwrpSafety.Quote(path + "/flash-state")} 2>/dev/null || true", ct).ConfigureAwait(false)).StandardOutput.Trim();
-                if (state == "TWRP_FLASHED") return;
-                if (state == "BOOT_RESTORED") throw new TwrpWorkflowException("Twrp_FlashFailed");
-                await Task.Delay(PollInterval, ct).ConfigureAwait(false);
-            }
-            throw new TwrpWorkflowException("Twrp_FlashFailed");
-        }, deadline.Token).ConfigureAwait(false);
-    }
     private async Task CollectResultAsync(TwrpSession session, IProgress<TwrpProgress>? progress, Func<bool>? stopRequested = null, CancellationToken exportToken = default)
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + RecoveryTimeout;

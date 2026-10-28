@@ -240,7 +240,7 @@ namespace DeepDroidChanger.Services
             return result.StandardOutput?.Trim() ?? string.Empty;
         }
 
-        private static string QuoteProcessArgument(string value)
+        internal static string QuoteProcessArgument(string value)
         {
             return $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
         }

@@ -4,6 +4,8 @@
 
     <!-- Resource ownership: Change Single Device. -->
     <sys:String x:Key="ChangeSingleDevice_StatusOnline">Online</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StatusRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_StatusBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeSingleDevice_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeSingleDevice_StatusUnauthorized">Unauthorized</sys:String>
     <sys:String x:Key="ChangeSingleDevice_AddNewDevices">Add Devices</sys:String>
@@ -100,6 +102,8 @@
     <sys:String x:Key="ChangeSingleDevice_DeviceSearchName">Search devices</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterAll">All</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterOnline">Online</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_FilterRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeSingleDevice_FilterBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterOffline">Offline</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterActive">Active</sys:String>
     <sys:String x:Key="ChangeSingleDevice_FilterInactive">Inactive</sys:String>

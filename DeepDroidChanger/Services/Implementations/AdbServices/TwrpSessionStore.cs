@@ -19,6 +19,26 @@ public sealed class TwrpSessionStore
         Root = Path.GetFullPath(root);
         CacheRoot = Path.GetFullPath(cacheRoot);
     }
+    private string EntryPath(string serial)
+    {
+        TwrpSafety.ValidateSerial(serial);
+        TwrpSafety.ValidateLocalDirectory(Root);
+        string path = Path.Combine(Root, "entry-" + serial + ".json");
+        if (File.Exists(path) && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint))
+            throw new TwrpWorkflowException("Twrp_InvalidJournal");
+        return path;
+    }
+    internal Task SaveEntryAsync(TwrpEntryIdentity identity, CancellationToken token) =>
+        AtomicFileWriter.WriteAllTextAsync(EntryPath(identity.Serial), JsonSerializer.Serialize(identity, JsonOptions), token);
+    internal async Task<TwrpEntryIdentity?> ReadEntryAsync(string serial, CancellationToken token)
+    {
+        string path = EntryPath(serial);
+        if (!File.Exists(path)) return null;
+        var value = JsonSerializer.Deserialize<TwrpEntryIdentity>(await File.ReadAllTextAsync(path, token).ConfigureAwait(false), JsonOptions);
+        if (value is null || value.Serial != serial || !TwrpRecoveryImage.Available.Any(i => i.Device == value.DeviceMarker)
+            || !Guid.TryParse(value.RecoveryBootId, out _)) throw new TwrpWorkflowException("Twrp_InvalidJournal");
+        return value;
+    }
     private string? CacheOwner(string directory)
     {
         TwrpSafety.ValidateLocalDirectory(directory);
@@ -71,13 +91,22 @@ public sealed class TwrpSessionStore
     {
         var session = JsonSerializer.Deserialize<TwrpSession>(await File.ReadAllTextAsync(FileFor(id, "session.json"), token).ConfigureAwait(false), JsonOptions)
             ?? throw new TwrpWorkflowException("Twrp_InvalidJournal");
-        if (session.Id != id || session.FormatVersion != 1 || session.Device is null || session.Device.Codename != "sargo"
-            || !Enum.IsDefined(session.State) || !Enum.IsDefined(session.Kind))
+        if (session.Id != id || session.FormatVersion != 1 || session.Device is null
+            || !Enum.IsDefined(session.ExecutionMode) || !Enum.IsDefined(session.State) || !Enum.IsDefined(session.Kind))
             throw new TwrpWorkflowException("Twrp_InvalidJournal");
         TwrpSafety.ValidateSerial(session.Device.Serial);
-        TwrpSafety.Staging(session.StagingRoot);
         TwrpSafety.Storage(session.StorageRoot);
-        TwrpSafety.Boot(session.Device.Slot);
+        if (session.ExecutionMode == TwrpExecutionMode.LegacyFlashedBoot)
+        {
+            if (session.Device.Codename != "sargo") throw new TwrpWorkflowException("Twrp_InvalidJournal");
+            TwrpSafety.Staging(session.StagingRoot);
+            TwrpSafety.Boot(session.Device.Slot);
+        }
+        else if (!TwrpRecoveryImage.Available.Any(i => i.Device == session.Device.Codename)
+            || !session.Partitions.SequenceEqual(new[] { "data" }) || session.StorageRoot != "/data/media/0"
+            || session.RecoveryDevice != session.Device.Codename || session.CacheLayoutVersion != 1
+            || session.RunnerStarted && !Guid.TryParse(session.RecoveryBootId, out _))
+            throw new TwrpWorkflowException("Twrp_InvalidJournal");
         if (session.CacheLayoutVersion is < 0 or > 1 || session.CacheLayoutVersion == 1
             && !string.Equals(DirectoryFor(id), session.CacheDirectory, StringComparison.OrdinalIgnoreCase))
             throw new TwrpWorkflowException("Twrp_InvalidJournal");

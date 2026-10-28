@@ -59,6 +59,21 @@ public sealed class DeviceRowViewModel : ObservableObject
         set => SetProperty(ref _connectionStatus, value);
     }
 
+    internal void ApplyLiveConnectionState(bool isOnline, Func<AdbDeviceStatus, string> getStatusText)
+    {
+        // Android action eligibility cannot distinguish a disconnected device
+        // from another transport mode already observed by device discovery.
+        if (!isOnline && ConnectionStatus is AdbDeviceStatus.Recovery or AdbDeviceStatus.Bootloader)
+            return;
+
+        AdbDeviceStatus status = isOnline ? AdbDeviceStatus.Online : AdbDeviceStatus.Offline;
+        if (ConnectionStatus == status)
+            return;
+
+        ConnectionStatus = status;
+        Status = getStatusText(status);
+    }
+
     public string Name
     {
         get => _name;

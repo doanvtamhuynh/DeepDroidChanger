@@ -12,6 +12,8 @@
     <sys:String x:Key="ChangeMultipleDevices_DeviceSearchName">Search devices</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterAll">All</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterOnline">Online</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_FilterRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_FilterBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterActive">Active</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_FilterInactive">Inactive</sys:String>
@@ -72,6 +74,8 @@
     <sys:String x:Key="ChangeMultipleDevices_AdvancedConfig">Advanced Config</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_AdvancedConfigTooltip">Configure advanced options for the selected devices.</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOnline">Online</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StatusRecovery">Recovery</sys:String>
+    <sys:String x:Key="ChangeMultipleDevices_StatusBootloader">Bootloader</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusOffline">Offline</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_StatusUnauthorized">Unauthorized</sys:String>
     <sys:String x:Key="ChangeMultipleDevices_ActionChangeLocation">Change Location</sys:String>

@@ -100,7 +100,7 @@ public sealed partial class TwrpArchiveService
         if (json is null || json.Length > 32 * 1024 * 1024) throw Invalid();
         await using var stream = json.Open();
         var m = await ReadManifestAsync(stream, token).ConfigureAwait(false);
-        if (m?.Version is 3 or 4 or 5) return await ReadCliRestoreCoreAsync(zip, m, token).ConfigureAwait(false);
+        if (m?.Version is 3 or 4 or 5 or 6) return await ReadCliRestoreCoreAsync(zip, m, token).ConfigureAwait(false);
         if (m is null || m.Version is not 1 and not 2 || m.BackupId == Guid.Empty || string.IsNullOrWhiteSpace(m.Name) || m.Device is null || m.Options is null
             || m.Device.Codename != "sargo" || m.Device.Partitions is null || m.Partitions is null || m.Payload is null || m.Payload.Length == 0) throw Invalid();
         if (m.Payload.Any(p => p is null || p.Path is null) || m.Device.Partitions.Any(p => p is null || p.Id is null) || m.Partitions.Any(p => p is null)) throw Invalid();

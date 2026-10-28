@@ -1,3 +1,4 @@
+using DeepDroidChanger.Models;
 using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.Services;
@@ -35,16 +36,26 @@ public sealed class DeviceActionEligibilityService : IDeviceActionEligibilitySer
             return DeviceActionEligibilityFailure.Busy;
         }
 
-        if (!requirements.HasFlag(DeviceActionRequirement.Online))
+        bool allowRecovery = requirements.HasFlag(DeviceActionRequirement.OnlineOrRecovery);
+        if (!requirements.HasFlag(DeviceActionRequirement.Online) && !allowRecovery)
             return DeviceActionEligibilityFailure.None;
 
         await _liveCheckLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            bool isOnline = await _deviceListService
-                .IsDeviceOnlineAsync(serial, cancellationToken)
-                .ConfigureAwait(false);
-            return isOnline
+            bool isConnected;
+            if (allowRecovery)
+            {
+                var devices = await _deviceListService.LoadDetectedDevicesAsync(cancellationToken).ConfigureAwait(false);
+                isConnected = devices.Any(device =>
+                    string.Equals(device.Serial, serial, StringComparison.OrdinalIgnoreCase)
+                    && device.Status is AdbDeviceStatus.Online or AdbDeviceStatus.Recovery);
+            }
+            else
+            {
+                isConnected = await _deviceListService.IsDeviceOnlineAsync(serial, cancellationToken).ConfigureAwait(false);
+            }
+            return isConnected
                 ? DeviceActionEligibilityFailure.None
                 : DeviceActionEligibilityFailure.Offline;
         }

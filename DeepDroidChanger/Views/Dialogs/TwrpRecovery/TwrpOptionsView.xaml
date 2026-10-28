@@ -15,6 +15,18 @@
                 <DataTrigger Binding="{Binding IsRestoreMode}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="RecoveryImageControls" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers><DataTrigger Binding="{Binding RequiresRecoveryImageSelection}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="BundledRecoveryHint" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers><DataTrigger Binding="{Binding UsesBundledRecoveryImage}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="InstalledRecoveryHint" TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers><DataTrigger Binding="{Binding UsesInstalledRecovery}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid Style="{StaticResource DialogRootGridStyle}">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -39,11 +51,16 @@
                             <Button Grid.Row="1" Grid.Column="3" Command="{Binding BrowseBackupCommand}" ToolTip="{DynamicResource Twrp_Browse}" Style="{StaticResource DialogPrimaryButtonStyle}">
                                 <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
                             </Button>
-                            <TextBlock Grid.Row="2" Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
-                            <Button Grid.Row="2" Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
-                                <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
-                            </Button>
+                            <Grid Grid.Row="2" Grid.ColumnSpan="4" Style="{StaticResource RecoveryImageControls}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                                <TextBox Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
+                                <Button Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                    <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
+                                </Button>
+                            </Grid>
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Text="{DynamicResource Twrp_InstalledRecovery}" TextWrapping="Wrap" Style="{StaticResource InstalledRecoveryHint}"/>
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Text="{DynamicResource Twrp_BundledRecovery}" ToolTip="{Binding RecoveryImagePath}" TextWrapping="Wrap" Style="{StaticResource BundledRecoveryHint}"/>
                         </Grid>
                     </GroupBox>
                 </StackPanel>
@@ -58,11 +75,16 @@
                                 <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
                             </Button>
                             <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding BackupSummary}" TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource Spacing.ControlPadding}"/>
-                            <TextBlock Grid.Row="2" Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
-                            <Button Grid.Row="2" Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
-                                <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
-                            </Button>
+                            <Grid Grid.Row="2" Grid.ColumnSpan="4" Style="{StaticResource RecoveryImageControls}">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
+                                <TextBox Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
+                                <Button Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                    <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{DynamicResource Brush.AccentForeground}"/>
+                                </Button>
+                            </Grid>
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Text="{DynamicResource Twrp_InstalledRecovery}" TextWrapping="Wrap" Style="{StaticResource InstalledRecoveryHint}"/>
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Text="{DynamicResource Twrp_BundledRecovery}" ToolTip="{Binding RecoveryImagePath}" TextWrapping="Wrap" Style="{StaticResource BundledRecoveryHint}"/>
                         </Grid>
                     </GroupBox>
                 </StackPanel>

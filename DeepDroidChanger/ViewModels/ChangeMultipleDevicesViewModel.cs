@@ -23,6 +23,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly ICarrierDataService _carrierDataService;
     private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
     private readonly IDeviceActionService _deviceActionService;
+    private readonly ITwrpRecoveryService _twrpRecovery;
     private readonly IDeviceChangeService _deviceChangeService;
     private readonly IDeviceIntegrityService _deviceIntegrityService;
     private readonly IDeviceConfigService _deviceConfigService;
@@ -164,13 +165,15 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceActionEligibilityService deviceActionEligibilityService,
         IDeviceActionFeedbackService deviceActionFeedbackService,
         IClipboardService clipboardService,
-        IViewDeviceWindowService viewDeviceWindowService)
+        IViewDeviceWindowService viewDeviceWindowService,
+        ITwrpRecoveryService twrpRecovery)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
         _carrierDataService = carrierDataService;
         _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
         _deviceActionService = deviceActionService;
+        _twrpRecovery = twrpRecovery;
         _deviceChangeService = deviceChangeService;
         _deviceIntegrityService = deviceIntegrityService;
         _deviceConfigService = deviceConfigService;
@@ -2225,8 +2228,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RebootDeviceAsync(DeviceRowViewModel? device)
     {
-        device = await GetContextOnlineDeviceAsync(device).ConfigureAwait(true);
-        if (device == null)
+        if (device == null || string.IsNullOrWhiteSpace(device.Serial))
             return;
 
         try
@@ -2242,7 +2244,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             await _deviceActionFeedbackService.ReportOperationCanceledAsync(
                     device.Serial,
                     DeviceActionCancellationReason.External,
-                    requiresOnline: true,
+                    requiresOnline: false,
                     CancellationToken.None)
                 .ConfigureAwait(true);
         }
@@ -3560,17 +3562,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         DeviceRowViewModel device,
         DeviceActionEligibilityFailure result)
     {
-        if (result is not (DeviceActionEligibilityFailure.None or DeviceActionEligibilityFailure.Offline))
-            return;
-
-        AdbDeviceStatus status = result == DeviceActionEligibilityFailure.None
-            ? AdbDeviceStatus.Online
-            : AdbDeviceStatus.Offline;
-        if (device.ConnectionStatus == status)
-            return;
-
-        device.ConnectionStatus = status;
-        device.Status = GetConnectionStatusText(status);
+        if (result is DeviceActionEligibilityFailure.None or DeviceActionEligibilityFailure.Offline)
+            device.ApplyLiveConnectionState(result == DeviceActionEligibilityFailure.None, GetConnectionStatusText);
     }
 
     private string GetLogText(string resourceKey)
@@ -3929,13 +3922,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private string GetConnectionStatusText(AdbDeviceStatus status)
     {
-        string resourceKey = status switch
-        {
-            AdbDeviceStatus.Online => "ChangeMultipleDevices_StatusOnline",
-            AdbDeviceStatus.Unauthorized => "ChangeMultipleDevices_StatusUnauthorized",
-            _ => "ChangeMultipleDevices_StatusOffline"
-        };
-        return _localizationService.GetString(resourceKey);
+        return _localizationService.GetString(
+            DeviceRowFactory.GetConnectionStatusResourceKey("ChangeMultipleDevices", status));
     }
 
     private void ApplyConfiguration(

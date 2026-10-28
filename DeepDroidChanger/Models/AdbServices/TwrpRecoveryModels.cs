@@ -4,8 +4,10 @@ public enum TwrpOperationKind { LegacyProbe = 0, Backup = 1, Restore = 2, Recove
 public enum TwrpSessionState
 {
     Preparing, OriginalSaved, ImagePrepared, FlashIntent, TwrpFlashed, Rebooted,
-    RecoveryRunning, RestoreBootIntent, BootRestored, Completed, Failed, NeedsRecovery
+    RecoveryRunning, RestoreBootIntent, BootRestored, Completed, Failed, NeedsRecovery,
+    EnteringRecovery, RecoveryReady, NativeCompleted, ReturningAndroid
 }
+public enum TwrpExecutionMode { LegacyFlashedBoot, ExternalRecovery }
 
 public sealed record TwrpPartition(string Id, string MountPoint, string BlockName, long Bytes, bool Sensitive = false);
 public sealed record TwrpRecoveryImage(string Device, string FileName)
@@ -54,6 +56,9 @@ public sealed record TwrpBackupManifest(int Version, Guid BackupId, string Name,
 internal sealed record TwrpCliBackupManifest(int Version, Guid BackupId, string Name, DateTimeOffset CreatedAt,
     string DeviceMarker, string Serial, string Slot, string LayoutHash, string RecoveryDevice,
     string[] Partitions, TwrpArchivePayload[] Payload);
+internal sealed record TwrpDataBackupManifest(int Version, Guid BackupId, string Name, DateTimeOffset CreatedAt,
+    string DeviceMarker, string Serial, string RecoveryDevice, string[] Partitions, TwrpArchivePayload[] Payload);
+internal sealed record TwrpEntryIdentity(string Serial, string DeviceMarker, string RecoveryBootId);
 // DeviceMarker is the captured ro.deepdroid.device value, never a product/build property.
 public sealed record TwrpBackupType(int Version, Guid BackupId, string Name, DateTimeOffset CreatedAt,
     string DeviceMarker, string Serial, string Slot, string RecoveryDevice, string[] Partitions);
@@ -64,6 +69,16 @@ public sealed record TwrpProgress(Guid OperationId, TwrpSessionState State, stri
 public sealed class TwrpSession
 {
     public int FormatVersion { get; set; } = 1;
+    public TwrpExecutionMode ExecutionMode { get; set; }
+    public bool DirectCommands { get; set; }
+    public bool RebootRequested { get; set; }
+    public string RecoveryBootId { get; set; } = "";
+    public bool RunnerStarted { get; set; }
+    public bool NativeStarted { get; set; }
+    public bool NativeCompleted { get; set; }
+    public bool NativeResultVerified { get; set; }
+    public int? RecoveryScreenTimeout { get; set; }
+    public bool AndroidReturned { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public TwrpOperationKind Kind { get; set; }
     public TwrpSessionState State { get; set; } = TwrpSessionState.Preparing;

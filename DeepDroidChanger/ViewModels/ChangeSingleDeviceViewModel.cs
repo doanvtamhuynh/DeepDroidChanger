@@ -471,6 +471,12 @@ namespace DeepDroidChanger.ViewModels
             return SelectedDevices.Count == 1 ? SelectedDevices[0] : null;
         }
 
+        private bool IsCurrentSingleDevice(DeviceRowViewModel device)
+        {
+            return SelectedDevice is not null && SerialEquals(SelectedDevice.Serial, device.Serial)
+                && SerialEquals(GetSingleSelectedDeviceSnapshot()?.Serial ?? string.Empty, device.Serial);
+        }
+
         private async Task<bool> IsOperationTargetOnlineAsync(
             DeviceRowViewModel device,
             CancellationToken cancellationToken)
@@ -494,7 +500,8 @@ namespace DeepDroidChanger.ViewModels
             return _deviceActionCoordinatorService.IsBusy(device.Serial);
         }
 
-        private async Task<bool> CheckInitialOnlineIdleEligibilityAsync(DeviceRowViewModel? device)
+        private async Task<bool> CheckInitialOnlineIdleEligibilityAsync(DeviceRowViewModel? device,
+            DeviceActionRequirement connectionRequirement = DeviceActionRequirement.Online)
         {
             if (device == null)
             {
@@ -509,10 +516,11 @@ namespace DeepDroidChanger.ViewModels
             DeviceActionEligibilityFailure eligibility = await _deviceActionEligibilityService
                 .CheckAsync(
                     device.Serial,
-                    DeviceActionRequirement.Online | DeviceActionRequirement.Idle,
+                    connectionRequirement | DeviceActionRequirement.Idle,
                     _actionLifetimeCancellation.Token)
                 .ConfigureAwait(true);
-            ApplyLiveConnectionState(device, eligibility);
+            if (connectionRequirement == DeviceActionRequirement.Online)
+                ApplyLiveConnectionState(device, eligibility);
             if (eligibility == DeviceActionEligibilityFailure.None)
                 return true;
 
@@ -951,8 +959,7 @@ namespace DeepDroidChanger.ViewModels
         private async Task RebootDeviceAsync(DeviceRowViewModel? device)
         {
             CancellationToken cancellationToken = CancellationToken.None;
-            device = await GetContextOnlineDeviceAsync(device, cancellationToken).ConfigureAwait(true);
-            if (device == null)
+            if (device == null || string.IsNullOrWhiteSpace(device.Serial))
                 return;
 
             SetContextDeviceLog(device, "Log_RebootingDevice");
@@ -967,7 +974,7 @@ namespace DeepDroidChanger.ViewModels
                 await _deviceActionFeedbackService.ReportOperationCanceledAsync(
                         device.Serial,
                         DeviceActionCancellationReason.External,
-                        requiresOnline: true,
+                        requiresOnline: false,
                         CancellationToken.None)
                     .ConfigureAwait(true);
             }
@@ -1740,17 +1747,8 @@ namespace DeepDroidChanger.ViewModels
             DeviceRowViewModel device,
             DeviceActionEligibilityFailure result)
         {
-            if (result is not (DeviceActionEligibilityFailure.None or DeviceActionEligibilityFailure.Offline))
-                return;
-
-            AdbDeviceStatus status = result == DeviceActionEligibilityFailure.None
-                ? AdbDeviceStatus.Online
-                : AdbDeviceStatus.Offline;
-            if (device.ConnectionStatus == status)
-                return;
-
-            device.ConnectionStatus = status;
-            device.Status = GetConnectionStatusText(status);
+            if (result is DeviceActionEligibilityFailure.None or DeviceActionEligibilityFailure.Offline)
+                device.ApplyLiveConnectionState(result == DeviceActionEligibilityFailure.None, GetConnectionStatusText);
         }
 
         private DeviceInfoApiDevice? CreateRandomDeviceProfileSnapshot(DeviceRowViewModel? device)
@@ -2207,24 +2205,34 @@ namespace DeepDroidChanger.ViewModels
             }
         }
 
-        private bool CanOpenTwrpWorkspace() => SelectedDevice is not null && !IsDeviceBusy(SelectedDevice);
-
-        [RelayCommand(CanExecute = nameof(CanOpenTwrpWorkspace))]
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private Task OpenTwrpBackupAsync() => RunTwrpDialogAsync(restore: false);
 
-        [RelayCommand(CanExecute = nameof(CanOpenTwrpWorkspace))]
+        [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]
         private Task OpenTwrpRestoreAsync() => RunTwrpDialogAsync(restore: true);
 
         private async Task RunTwrpDialogAsync(bool restore)
         {
-            DeviceRowViewModel? device = SelectedDevice;
-            if (device is null) return;
+            DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
+            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice, DeviceActionRequirement.OnlineOrRecovery).ConfigureAwait(true))
+                return;
+            DeviceRowViewModel device = selectedDevice!;
+            if (!IsCurrentSingleDevice(device))
+                return;
             try
             {
-                SetDeviceLog(device, "Twrp_Inspect");
+                SetContextDeviceLog(device, "Twrp_Inspect");
                 var result = restore ? await _twrpWorkspace.ShowRestoreAsync(device.Serial, device.Name, _actionLifetimeCancellation.Token)
                     : await _twrpWorkspace.ShowBackupAsync(device.Serial, device.Name, _actionLifetimeCancellation.Token);
-                if (result is null) { SetDeviceLog(device, "Log_Ready"); return; }
+                if (result is null)
+                {
+                    _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+                    return;
+                }
+                if (!await CheckInitialOnlineIdleEligibilityAsync(device, DeviceActionRequirement.OnlineOrRecovery).ConfigureAwait(true))
+                    return;
+                if (!IsCurrentSingleDevice(device))
+                    return;
                 var progress = new TwrpMainProgress(value => _uiDispatcher.InvokeAsync(() =>
                 {
                     if (value.State == TwrpSessionState.ImagePrepared && value.RescuePath is not null)
@@ -2249,6 +2257,10 @@ namespace DeepDroidChanger.ViewModels
                 else SetDeviceLog(device, "Log_TwrpRestoreSuccess");
             }
             catch (OperationCanceledException) { SetDeviceLog(device, "Log_TwrpCanceled"); }
+            catch (TwrpWorkflowException exception) when (exception.MessageKey == "Twrp_DeviceBusy")
+            {
+                ShowBusyActionLog(device);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "TWRP action failed for {Serial}.", device.Serial);
@@ -3370,13 +3382,8 @@ namespace DeepDroidChanger.ViewModels
 
         private string GetConnectionStatusText(AdbDeviceStatus status)
         {
-            string resourceKey = status switch
-            {
-                AdbDeviceStatus.Online => "ChangeSingleDevice_StatusOnline",
-                AdbDeviceStatus.Unauthorized => "ChangeSingleDevice_StatusUnauthorized",
-                _ => "ChangeSingleDevice_StatusOffline"
-            };
-            return _localizationService.GetString(resourceKey);
+            return _localizationService.GetString(
+                DeviceRowFactory.GetConnectionStatusResourceKey("ChangeSingleDevice", status));
         }
 
         private static bool SerialEquals(string left, string right)
