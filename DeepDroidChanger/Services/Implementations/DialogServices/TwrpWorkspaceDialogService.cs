@@ -15,15 +15,15 @@ public sealed class TwrpWorkspaceDialogService(IServiceScopeFactory scopeFactory
     public Task<TwrpDialogResult?> ShowRestoreAsync(string serial, string deviceName, CancellationToken cancellationToken) => ShowAsync(serial, deviceName, true, cancellationToken);
     private async Task<TwrpDialogResult?> ShowAsync(string serial, string deviceName, bool restore, CancellationToken token)
     {
-        using var scope = scopeFactory.CreateScope();
-        var vm = scope.ServiceProvider.GetRequiredService<TwrpWorkspaceViewModel>();
-        await vm.InitializeAsync(serial, restore, token, deviceName);
-        token.ThrowIfCancellationRequested();
-        // Initialization performs its own short recovery inspection. Reserve
-        // the device afterward so the modal configuration cannot overlap work.
+        // Own the device before initialization performs configuration reads,
+        // and keep that ownership until the modal dialog has closed.
         using var operation = coordinator.TryStart(serial, DeviceActionKind.TwrpRecovery, canCancel: false,
             token, source: DeviceActionSource.SingleDevice) ?? throw new TwrpWorkflowException("Twrp_DeviceBusy");
         CancellationToken dialogToken = operation.CancellationToken;
+        dialogToken.ThrowIfCancellationRequested();
+        using var scope = scopeFactory.CreateScope();
+        var vm = scope.ServiceProvider.GetRequiredService<TwrpWorkspaceViewModel>();
+        await vm.InitializeAsync(serial, restore, dialogToken, deviceName);
         dialogToken.ThrowIfCancellationRequested();
         Window window = restore ? scope.ServiceProvider.GetRequiredService<TwrpRestoreDialog>() : scope.ServiceProvider.GetRequiredService<TwrpBackupDialog>();
         window.Owner = Application.Current?.MainWindow; window.DataContext = vm;

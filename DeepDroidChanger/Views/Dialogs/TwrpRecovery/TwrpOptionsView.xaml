@@ -88,14 +88,6 @@
                         </Grid>
                     </GroupBox>
                 </StackPanel>
-                <StackPanel Visibility="{Binding HasExportSessions, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <ComboBox ItemsSource="{Binding ExportSessions}" SelectedItem="{Binding SelectedExport}" DisplayMemberPath="Label" Style="{StaticResource DialogFormComboBoxStyle}"/>
-                    <Button Content="{DynamicResource Twrp_RetryExport}" Command="{Binding RetryExportCommand}" Style="{StaticResource DialogPrimaryButtonStyle}"/>
-                </StackPanel>
-                <StackPanel Visibility="{Binding HasRecoverySessions, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <ComboBox ItemsSource="{Binding RecoverySessions}" SelectedItem="{Binding SelectedRecovery}" DisplayMemberPath="Label" Style="{StaticResource DialogFormComboBoxStyle}"/>
-                    <Button Content="{DynamicResource Twrp_Recover}" Command="{Binding RecoverCommand}" Style="{StaticResource DialogPrimaryButtonStyle}"/>
-                </StackPanel>
             </StackPanel>
         </ScrollViewer>
         <StackPanel Grid.Row="2">

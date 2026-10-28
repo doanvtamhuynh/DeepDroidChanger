@@ -53,6 +53,14 @@ namespace DeepDroidChanger.Services
             return RunAdbAsync(serial, $"shell {shellCommand}", cancellationToken);
         }
 
+        public Task<CommandResult> RunAdbShellStreamingAsync(string serial, string shellCommand,
+            Action<ProcessUpdate> output, CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(serial);
+            return _commandRunner.RunStreamingAsync(_toolPathResolver.GetAdbPath(),
+                $"-s {QuoteProcessArgument(serial)} shell {shellCommand}", output, cancellationToken);
+        }
+
         public async Task<CommandResult> RunAdbShellScriptAsync(
             string serial,
             string shellScript,

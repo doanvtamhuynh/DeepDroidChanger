@@ -1021,7 +1021,6 @@
                                 <Button.ToolTip>
                                     <StackPanel>
                                         <TextBlock Text="{DynamicResource Twrp_BackupButton}"/>
-                                        <TextBlock Text="{Binding TwrpPendingMessage}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Button.ToolTip>
                                 <Grid>

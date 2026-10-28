@@ -8,8 +8,8 @@ namespace DeepDroidChanger.Services;
 /// <summary>Portable ZIP64 container for native TWRP payload.</summary>
 public sealed partial class TwrpArchiveService
 {
+    internal static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
     public string DefaultDirectory => Path.Combine(AppContext.BaseDirectory, "Backup");
-    public string DefaultCacheDirectory => Path.Combine(DefaultDirectory, "cache");
     public string EnsureDefaultDirectory()
     {
         CheckDirectory(DefaultDirectory);
@@ -50,7 +50,7 @@ public sealed partial class TwrpArchiveService
         }
         if (entry.Length is <= 0 or > 65536 || ((entry.ExternalAttributes >> 16) & 0xf000) == 0xa000) throw Invalid();
         await using var stream = entry.Open();
-        var metadata = await JsonSerializer.DeserializeAsync<TwrpBackupType>(stream, TwrpSessionStore.JsonOptions, token).ConfigureAwait(false);
+        var metadata = await JsonSerializer.DeserializeAsync<TwrpBackupType>(stream, TwrpArchiveService.JsonOptions, token).ConfigureAwait(false);
         if (metadata is null || metadata.Version != 1 || metadata.BackupId != manifest.BackupId || metadata.Name != manifest.Name
             || metadata.CreatedAt != manifest.CreatedAt || metadata.DeviceMarker != manifest.Device.Codename
             || metadata.Serial != manifest.Device.Serial || metadata.Slot != manifest.Device.Slot
@@ -60,11 +60,6 @@ public sealed partial class TwrpArchiveService
     }
     private static bool SafeFile(string name) => name.Length is > 0 and <= 255 && name is not "." and not ".." && TwrpSafety.SafeName().IsMatch(name);
     private static bool IsData(string name) => System.Text.RegularExpressions.Regex.IsMatch(name, @"\.win(?:[0-9]{3})?\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-    internal static TwrpArchivePayload[] Payloads(TwrpSession session)
-    {
-        TwrpSafety.ValidateRequestedSelection(session.Partitions);
-        return [.. session.Artifacts.Select(f => new TwrpArchivePayload("payload/" + f.Name, f.Bytes, PartitionFor(session.Device, session.Partitions, f.Name)))];
-    }
     internal static string? PartitionFor(TwrpDeviceInfo device, IEnumerable<string> partitions, string name) =>
         partitions.FirstOrDefault(id => name.StartsWith(device.Partitions.Single(p => p.Id == id).MountPoint.TrimStart('/') + ".", StringComparison.Ordinal));
     private static bool DigestFor(TwrpBackupManifest manifest, TwrpArchivePayload file) =>
@@ -152,7 +147,7 @@ public sealed partial class TwrpArchiveService
         await using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, true);
         using var zip = new ZipArchive(input, ZipArchiveMode.Read);
         var m = await ReadCoreAsync(zip, token).ConfigureAwait(false);
-        if (m.Version is 3 or 4 or 5) throw Invalid(); // Data archives use their owned-cache restore workflow.
+        if (m.Version is 3 or 4 or 5 or 6) throw Invalid(); // Data archives use their owned-cache restore workflow.
         ValidateSelection(m, selection, verifyDigest);
         foreach (var file in m.Payload.Where(p => p.PartitionId is not null && selection.Contains(p.PartitionId)))
         {
@@ -167,40 +162,5 @@ public sealed partial class TwrpArchiveService
             if (output.Length != file.Bytes) throw Invalid();
         }
         return m;
-    }
-    public async Task WriteAsync(TwrpSession session, string payloadDirectory, CancellationToken token)
-    {
-        string path = session.ArchivePath ?? throw Invalid();
-        OutputPath(Path.GetDirectoryName(path)!, Path.GetFileName(path));
-        var files = Payloads(session);
-        var m = new TwrpBackupManifest(session.NativeBoot ? 2 : 1, session.Id, Path.GetFileNameWithoutExtension(path), session.CreatedAt, session.Device, session.Options, session.Partitions, files, session.NativeBoot);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        if (session.RecoveryDevice is not null && session.RecoveryDevice != session.Device.Codename) throw Invalid();
-        string partial = path + "." + session.Id.ToString("N") + ".partial";
-        if (File.Exists(partial) && File.GetAttributes(partial).HasFlag(FileAttributes.ReparsePoint)) throw Invalid();
-        await using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
-        {
-            using (var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
-            {
-                await using (var json = zip.CreateEntry("backup.json").Open())
-                    await JsonSerializer.SerializeAsync(json, m, TwrpSessionStore.JsonOptions, token).ConfigureAwait(false);
-                foreach (var file in files)
-                {
-                    token.ThrowIfCancellationRequested();
-                    string local = Path.Combine(payloadDirectory, file.Path[8..]);
-                    CheckDirectory(Path.GetDirectoryName(local)!);
-                    if (File.GetAttributes(local).HasFlag(FileAttributes.ReparsePoint)) throw Invalid();
-                    await using var source = new FileStream(local, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, true);
-                    if (source.Length != file.Bytes) throw Invalid();
-                    await using var entry = zip.CreateEntry(file.Path, CompressionLevel.Fastest).Open();
-                    await source.CopyToAsync(entry, token).ConfigureAwait(false);
-                }
-            }
-            await output.FlushAsync(token).ConfigureAwait(false);
-            output.Flush(flushToDisk: true);
-        }
-        await ReadAsync(partial, token).ConfigureAwait(false);
-        token.ThrowIfCancellationRequested();
-        File.Move(partial, path, overwrite: false);
     }
 }

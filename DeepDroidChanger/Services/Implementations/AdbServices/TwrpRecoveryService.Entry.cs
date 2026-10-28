@@ -1,5 +1,4 @@
 using System.IO;
-using DeepDroidChanger.Constants;
 using DeepDroidChanger.Models;
 using Microsoft.Extensions.Logging;
 
@@ -7,7 +6,6 @@ namespace DeepDroidChanger.Services;
 
 public sealed partial class TwrpRecoveryService
 {
-    internal TimeSpan EntryFastbootTimeout { get; set; } = TimeSpan.FromSeconds(60);
     internal TimeSpan EntryRecoveryTimeout { get; set; } = TimeSpan.FromSeconds(120);
 
     public async Task EnterRecoveryAsync(string serial, IProgress<string>? progress, CancellationToken cancellationToken,
@@ -19,32 +17,21 @@ public sealed partial class TwrpRecoveryService
             cancellationToken, source: source) ?? throw new TwrpWorkflowException("Twrp_DeviceBusy");
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, operation.CancellationToken);
         CancellationToken token = lifetime.Token;
-        await EnterRecoveryCoreAsync(serial, null, null, progress, token).ConfigureAwait(false);
+        if (await IsEntryRecoveryAsync(serial, token).ConfigureAwait(false)) return;
+        string marker = await GetDeviceMarkerAsync(serial, token).ConfigureAwait(false);
+        await EnterRecoveryCoreAsync(serial, marker, null, progress, token).ConfigureAwait(false);
     }
 
     private async Task EnterRecoveryCoreAsync(string serial, string? expectedMarker, string? sourceImagePath,
-        IProgress<string>? progress, CancellationToken token, bool rememberIdentity = true)
+        IProgress<string>? progress, CancellationToken token)
     {
         string failureKey = "Twrp_EntryInspectFailed";
         try
         {
             progress?.Report("Twrp_EntryInspect");
-            if (await IsEntryRecoveryAsync(serial, token).ConfigureAwait(false))
-            {
-                if (rememberIdentity)
-                {
-                    string current = await GetDeviceMarkerAsync(serial, token).ConfigureAwait(false);
-                    if (!IsDataDevice(current) || expectedMarker is not null && current != expectedMarker)
-                        throw new TwrpWorkflowException("Twrp_DataIdentityRequired");
-                    await SaveEntryIdentityAsync(serial, current, token).ConfigureAwait(false);
-                }
-                return;
-            }
-            var identity = await EntryCommandAsync(ct => adb.RunAdbShellAsync(serial,
-                $"getprop {PropertyConstants.DeepDroidDevice}", ct), TimeSpan.FromSeconds(10), token).ConfigureAwait(false);
-            string marker = identity.StandardOutput.Trim();
-            if (!IsDataDevice(marker) || expectedMarker is not null && marker != expectedMarker)
-                throw new TwrpWorkflowException("Twrp_EntryUnsupportedDevice");
+            if (await IsEntryRecoveryAsync(serial, token).ConfigureAwait(false)) return;
+            string marker = expectedMarker ?? "";
+            if (!IsDataDevice(marker)) throw new TwrpWorkflowException("Twrp_EntryUnsupportedDevice");
 
             failureKey = "Twrp_EntryInvalidImage";
             using FileStream? image = marker == "starlte" ? null : await images.OpenBootSourceAsync(marker, token, sourceImagePath).ConfigureAwait(false);
@@ -56,19 +43,6 @@ public sealed partial class TwrpRecoveryService
 
             if (image is not null)
             {
-                failureKey = "Twrp_EntryFastbootWaitFailed";
-                progress?.Report("Twrp_EntryWaitFastboot");
-                await WaitForEntryAsync(async ct =>
-                {
-                    var result = await EntryCommandAsync(commandToken => adb.RunFastbootAsync("devices", commandToken),
-                        TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
-                    return result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries).Any(line =>
-                    {
-                        string[] fields = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-                        return fields.Length == 2 && fields[0] == serial && fields[1] == "fastboot";
-                    });
-                }, EntryFastbootTimeout, token).ConfigureAwait(false);
-
                 failureKey = "Twrp_EntryBootFailed";
                 progress?.Report("Twrp_EntryBoot");
                 // Both arguments are validated: serial is a safe token and Name is
@@ -80,7 +54,6 @@ public sealed partial class TwrpRecoveryService
             failureKey = "Twrp_EntryRecoveryWaitFailed";
             progress?.Report("Twrp_EntryWaitRecovery");
             await WaitForEntryAsync(ct => IsEntryRecoveryAsync(serial, ct), EntryRecoveryTimeout, token).ConfigureAwait(false);
-            if (rememberIdentity) await SaveEntryIdentityAsync(serial, marker, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (TwrpWorkflowException) { throw; }
@@ -91,18 +64,11 @@ public sealed partial class TwrpRecoveryService
         }
     }
 
-    private async Task SaveEntryIdentityAsync(string serial, string marker, CancellationToken token)
-    {
-        string bootId = (await ShellAsync(serial, "cat /proc/sys/kernel/random/boot_id", token).ConfigureAwait(false)).StandardOutput.Trim();
-        if (!Guid.TryParse(bootId, out _)) throw new TwrpWorkflowException("Twrp_DataIdentityRequired");
-        await store.SaveEntryAsync(new(serial, marker, bootId), token).ConfigureAwait(false);
-    }
-
     private async Task<bool> IsEntryRecoveryAsync(string serial, CancellationToken token)
     {
-        var result = await EntryCommandAsync(ct => adb.RunAdbShellAsync(serial, "getprop ro.twrp.boot", ct),
+        var result = await EntryCommandAsync(ct => adb.RunAdbAsync(serial, "get-state", ct),
             TimeSpan.FromSeconds(10), token).ConfigureAwait(false);
-        return result.StandardOutput.Trim() == "1";
+        return result.StandardOutput.Trim() == "recovery";
     }
 
     private static async Task<CommandResult> EntryCommandAsync(Func<CancellationToken, Task<CommandResult>> command,

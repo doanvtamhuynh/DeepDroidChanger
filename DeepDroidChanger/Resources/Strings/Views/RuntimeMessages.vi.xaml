@@ -14,6 +14,11 @@
     <sys:String x:Key="Log_RebootingDevice">Đang khởi động lại thiết bị...</sys:String>
     <sys:String x:Key="Log_RebootDeviceSuccess">Đã gửi lệnh khởi động lại thiết bị</sys:String>
     <sys:String x:Key="Log_RebootDeviceFailed">Khởi động lại thiết bị thất bại</sys:String>
+    <sys:String x:Key="Log_TwrpBackupSuccess">Backup TWRP hoàn tất: {0}</sys:String>
+    <sys:String x:Key="Log_TwrpRestoreSuccess">Restore Data bằng TWRP hoàn tất</sys:String>
+    <sys:String x:Key="Log_TwrpDetailFailed">TWRP: {0}</sys:String>
+    <sys:String x:Key="Log_TwrpFailed">Backup/Restore TWRP thất bại. Xem log của thao tác.</sys:String>
+    <sys:String x:Key="Log_TwrpCanceled">Đã hủy thao tác TWRP</sys:String>
     <sys:String x:Key="Log_SelectDeviceFirst">Vui lòng chọn thiết bị trước</sys:String>
     <sys:String x:Key="Log_RandomDevice">Tạo thiết bị ngẫu nhiên</sys:String>
     <sys:String x:Key="Log_RandomDeviceSuccess">Đã tạo thông tin thiết bị ngẫu nhiên</sys:String>

@@ -4,6 +4,9 @@ namespace DeepDroidChanger.Services
 {
     public interface IAdbCommandService
     {
+        Task<CommandResult> RunAdbShellStreamingAsync(string serial, string shellCommand,
+            Action<ProcessUpdate> output, CancellationToken cancellationToken);
+
         Task<CommandResult> RunAdbAsync(string arguments, CancellationToken cancellationToken);
         Task<CommandResult> RunAdbAsync(string serial, string arguments, CancellationToken cancellationToken);
         Task<CommandResult> RunAdbShellAsync(string serial, string shellCommand, CancellationToken cancellationToken);

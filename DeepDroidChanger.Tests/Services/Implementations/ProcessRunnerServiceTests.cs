@@ -10,6 +10,51 @@ namespace DeepDroidChanger.Tests.Services.Implementations;
 public sealed class ProcessRunnerServiceTests
 {
     [TestMethod]
+    public async Task Streaming_DeliversBothStreamsBeforeExit_AndDrainsOnCancellation()
+    {
+        var service = new ProcessRunnerService(new TestLogger<ProcessRunnerService>());
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var stdout = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stderr = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var updates = new List<ProcessUpdate>();
+        Task running = service.RunStreamingAsync("powershell.exe",
+            "-NoProfile -NonInteractive -Command \"[Console]::Out.Write('out-now'); [Console]::Out.Flush(); [Console]::Error.Write('err-now'); [Console]::Error.Flush(); Start-Sleep -Seconds 30\"",
+            update =>
+            {
+                updates.Add(update);
+                if (update.Kind == ProcessUpdateKind.StandardOutput) stdout.TrySetResult();
+                if (update.Kind == ProcessUpdateKind.StandardError) stderr.TrySetResult();
+            }, cancellation.Token);
+        try
+        {
+            await Task.WhenAll(stdout.Task, stderr.Task).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.IsFalse(running.IsCompleted, "Output must arrive before the process exits, including output without newlines.");
+        }
+        finally
+        {
+            cancellation.Cancel();
+            await Assert.ThrowsAsync<OperationCanceledException>(() => running);
+        }
+        Assert.AreEqual(ProcessUpdateKind.Started, updates[0].Kind);
+        Assert.AreEqual(ProcessUpdateKind.Exited, updates[^1].Kind);
+        Assert.IsTrue(IsProcessStopped(updates[0].ProcessId));
+    }
+
+    [TestMethod]
+    public async Task Streaming_ReturnsExitCodeAndCompleteOutput()
+    {
+        var service = new ProcessRunnerService(new TestLogger<ProcessRunnerService>());
+        var updates = new List<ProcessUpdate>();
+        var result = await service.RunStreamingAsync("powershell.exe",
+            "-NoProfile -NonInteractive -Command \"[Console]::Out.Write('stdout'); [Console]::Error.Write('stderr'); exit 7\"",
+            updates.Add, CancellationToken.None);
+        Assert.AreEqual(7, result.ExitCode);
+        Assert.AreEqual("stdout", result.StandardOutput);
+        Assert.AreEqual("stderr", result.StandardError);
+        Assert.AreEqual(7, updates[^1].ExitCode);
+    }
+
+    [TestMethod]
     public async Task RunAsync_SensitiveArguments_AreNotWrittenToLogs()
     {
         const string secret = "process-secret-should-not-be-logged";

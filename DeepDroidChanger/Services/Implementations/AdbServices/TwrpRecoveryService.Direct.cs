@@ -1,207 +1,237 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using DeepDroidChanger.Models;
-using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.Services;
 
 public sealed partial class TwrpRecoveryService
 {
-    private async Task UploadDirectDataAsync(TwrpSession session, TwrpBackupManifest manifest,
+    private async Task RunDirectDataCommandAsync(TwrpOperation operation, string name,
         IProgress<TwrpProgress>? progress, CancellationToken token)
     {
-        ReportData(session, progress, "Twrp_Uploading");
-        await OwnDirectDataPayloadAsync(session, create: true, token).ConfigureAwait(false);
-        foreach (var artifact in session.Artifacts)
-        {
-            string local = Path.Combine(CliPayloadDirectory(session), manifest.Name, artifact.Name);
-            await PayloadTransferAsync(session.Device.Serial, local, session.NativeFolder + "/" + artifact.Name, true, token).ConfigureAwait(false);
-        }
-    }
-
-    private async Task RunDirectDataCommandAsync(TwrpSession session, string name,
-        IProgress<TwrpProgress>? progress, CancellationToken token)
-    {
-        string command = session.CliRestore
-            ? "twrp restore " + TwrpSafety.Quote(session.NativeFolder) + " D"
+        // A previous CLI crash can leave an ORS command behind. TWRP appends
+        // the next CLI command to that file and would otherwise replay both.
+        await EnsureNativeCommandQueueEmptyAsync(operation, token).ConfigureAwait(false);
+        string command = operation.CliRestore
+            ? "twrp restore " + TwrpSafety.Quote(operation.NativeFolder) + " D"
             : "twrp backup D " + TwrpSafety.Quote(name);
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
         limit.CancelAfter(RecoveryTimeout);
-        string completion = await DirectCompletionPatternAsync(session, token).ConfigureAwait(false);
-        // Keep the native command direct; its FIFO exit code alone does not
-        // prove success (including when recovery crashes and closes the FIFO).
-        var result = await adb.RunAdbShellAsync(session.Device.Serial, command, limit.Token).ConfigureAwait(false);
-        session.RecoveryLog = result.StandardOutput + Environment.NewLine + result.StandardError;
-        await File.WriteAllTextAsync(Path.Combine(session.CacheDirectory!, "recovery.log"), session.RecoveryLog, CancellationToken.None).ConfigureAwait(false);
-        if (result.ExitCode != 0)
+        using var timerCancellation = new CancellationTokenSource();
+        var elapsed = Stopwatch.StartNew();
+        string lastOutput = "";
+        var outputTails = new Dictionary<ProcessUpdateKind, string>();
+        double? percent = null;
+        string processState = "Starting";
+        void ReportStatus()
         {
-            session.State = TwrpSessionState.Failed;
-            throw new TwrpWorkflowException("Twrp_DataNativeFailed");
+            lock (operation)
+                progress?.Report(new(operation.Id, operation.State, "Twrp_NativeStatus",
+                    Detail: lastOutput, Percent: percent, Elapsed: elapsed.Elapsed, ProcessStatus: processState));
         }
-        if (!Regex.IsMatch(result.StandardOutput, completion, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
-            throw new TwrpWorkflowException("Twrp_DirectResultUnknown");
-        session.NativeResultVerified = true;
-        session.NativeCompleted = true;
-        session.NativeBackupCompleted = session.CliBackup;
-        await DataStateAsync(session, TwrpSessionState.NativeCompleted, progress, CancellationToken.None).ConfigureAwait(false);
-    }
-
-    private async Task<string> DirectCompletionPatternAsync(TwrpSession session, CancellationToken token)
-    {
-        string key = session.CliRestore ? "restore_completed" : "backup_completed";
-        string template = session.CliRestore ? "[RESTORE COMPLETED IN {1} SECONDS]" : "[BACKUP COMPLETED IN {1} SECONDS]";
+        async Task TickAsync()
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            try { while (await timer.WaitForNextTickAsync(timerCancellation.Token).ConfigureAwait(false)) ReportStatus(); }
+            catch (OperationCanceledException) when (timerCancellation.IsCancellationRequested) { }
+        }
+        SetDataState(operation, operation.CliRestore ? TwrpOperationState.NativeRestoreRunning : TwrpOperationState.NativeBackupRunning, progress);
+        Log(operation, "process.log", $"{DateTimeOffset.UtcNow:O} adb -s {operation.Device.Serial} shell {command}{Environment.NewLine}");
+        Task timerTask = TickAsync();
         try
         {
-            string language = await ReadTwrpVariableAsync(session.Device.Serial, "tw_language", token).ConfigureAwait(false);
-            if (language != "en" && Regex.IsMatch(language, "^[A-Za-z0-9_-]{1,32}$", RegexOptions.CultureInvariant))
+            limit.Token.ThrowIfCancellationRequested();
+            // Mark intent before starting: even failure to receive the start event may mean a lost transport.
+            operation.NativeStarted = true;
+            var result = await adb.RunAdbShellStreamingAsync(operation.Device.Serial, command, update =>
             {
-                var xml = await ShellAsync(session.Device.Serial, "cat " + TwrpSafety.Quote("/twres/languages/" + language + ".xml"), token).ConfigureAwait(false);
-                using var reader = XmlReader.Create(new StringReader(xml.StandardOutput), new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
-                string? translated = XDocument.Load(reader).Descendants("string").FirstOrDefault(e => (string?)e.Attribute("name") == key)?.Value;
-                if (!string.IsNullOrWhiteSpace(translated) && translated.Contains("{1}", StringComparison.Ordinal)) template = translated;
+                lock (operation)
+                {
+                    processState = update.Kind == ProcessUpdateKind.Exited ? "Exited" : "Running";
+                    string label = update.Kind.ToString();
+                    Log(operation, "process.log", $"{DateTimeOffset.UtcNow:O} PID={update.ProcessId} {label} {update.ExitCode} {update.Text}{Environment.NewLine}");
+                    if (update.Kind is ProcessUpdateKind.StandardOutput or ProcessUpdateKind.StandardError)
+                    {
+                        Log(operation, "recovery.log", update.Text);
+                        lastOutput = update.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim() ?? lastOutput;
+                        if (lastOutput.Length > 600) lastOutput = lastOutput[^600..];
+                        outputTails.TryGetValue(update.Kind, out string? tail);
+                        string recent = tail + update.Text;
+                        var matches = Regex.Matches(recent, @"(?<![\d.])(100|[0-9]{1,2}(?:\.[0-9]+)?)\s*%", RegexOptions.CultureInvariant);
+                        if (matches.Count > 0) percent = double.Parse(matches[^1].Groups[1].Value, CultureInfo.InvariantCulture);
+                        outputTails[update.Kind] = recent.Length > 128 ? recent[^128..] : recent;
+                    }
+                    ReportStatus();
+                }
+            }, limit.Token).ConfigureAwait(false);
+            processState = "Exited";
+            LogOperation(operation, "ADB exit code: " + result.ExitCode);
+            string output = result.StandardOutput + "\n" + result.StandardError;
+            bool complete = HasNativeCompletion(output, operation.CliRestore);
+            if (!complete && result.ExitCode == 0)
+                complete = await HasTranslatedCompletionAsync(operation, output, token).ConfigureAwait(false);
+            bool failed = HasNativeError(output);
+            // A terminal native failure also proves writing ended; a bare adb exit does not.
+            operation.NativeCompleted = complete || Regex.IsMatch(output,
+                @"\[" + (operation.CliRestore ? "RESTORE" : "BACKUP") + @" FAILED[^\]\r\n]*\]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (result.ExitCode != 0 || failed) throw new TwrpWorkflowException("Twrp_DataNativeFailed");
+            if (!complete) throw new TwrpWorkflowException("Twrp_DirectResultUnknown");
+            operation.NativeResultVerified = true;
+            SetDataState(operation, TwrpOperationState.NativeCompleted, progress);
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            LogOperation(operation, "Native ADB timeout after " + RecoveryTimeout);
+            throw new TwrpWorkflowException("Twrp_NativeTimeout");
+        }
+        finally
+        {
+            timerCancellation.Cancel();
+            await timerTask.ConfigureAwait(false);
+        }
+    }
+
+    internal static bool HasNativeCompletion(string output, bool restore) => Regex.IsMatch(output,
+        @"\[\s*" + (restore ? "RESTORE" : "BACKUP") + @"\s+COMPLETED(?:\s+IN\s+[0-9]+(?:[.,][0-9]+)?\s+SECONDS?)?\s*\]",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    internal static bool HasNativeError(string output)
+    {
+        // Some recoveries prefix a missing UI translation with E:, even when
+        // native restore succeeds. Keep it in the raw logs, but do not classify
+        // this exact diagnostic as a backup/restore error.
+        string nativeOutput = Regex.Replace(output,
+            @"^[\t ]*E:[\t ]*String resource '[^'\r\n]+' not found\. No default value\.[\t ]*\r?$",
+            "", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        return Regex.IsMatch(nativeOutput,
+            @"(?:^|[\r\n])\s*(?:E:|ERROR\b|(?:Backup|Restore)\s+(?:failed|aborted)\b)|\[(?:BACKUP|RESTORE)\s+FAILED\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    }
+
+    private async Task<bool> HasTranslatedCompletionAsync(TwrpOperation operation, string output, CancellationToken token)
+    {
+        try
+        {
+            // Optional completion evidence, after process exit. No property or native CLI probe.
+            var result = await ShellAsync(operation.Device.Serial, "cat /twres/languages/*.xml 2>/dev/null", token).ConfigureAwait(false);
+            string xml = "<languages>" + Regex.Replace(result.StandardOutput, @"<\?xml[^?]*\?>", "") + "</languages>";
+            using var reader = XmlReader.Create(new StringReader(xml), new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+            string key = operation.CliRestore ? "restore_completed" : "backup_completed";
+            foreach (var text in XDocument.Load(reader).Descendants("string").Where(e => (string?)e.Attribute("name") == key))
+            {
+                if (!text.Value.Contains("{1}", StringComparison.Ordinal)) continue;
+                string pattern = Regex.Escape(text.Value).Replace(Regex.Escape("{1}"), "[0-9]+(?:[.,][0-9]+)?", StringComparison.Ordinal);
+                if (Regex.IsMatch(output, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))) return true;
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-        catch (Exception exception) { logger.LogDebug(exception, "Using the default native completion message for {Operation}.", session.Id); }
-        return Regex.Escape(template).Replace(Regex.Escape("{1}"), "[0-9]+", StringComparison.Ordinal);
+        catch (Exception exception) { LogOperation(operation, "Localized completion evidence unavailable: " + exception.Message); }
+        return false;
     }
 
-    private async Task RebootDirectDataAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token)
+    private async Task ReserveDirectDataPayloadAsync(TwrpOperation operation, CancellationToken token)
     {
-        if (session.RebootRequested) return;
-        ReportData(session, progress, "Twrp_State_ReturningAndroid");
-        await AdbAsync(session.Device.Serial, "reboot", token).ConfigureAwait(false);
-        session.RebootRequested = true;
-        // Record command acceptance without polling Android properties.
-        await store.SaveAsync(session, CancellationToken.None).ConfigureAwait(false);
+        ValidateDirectDataFolder(operation);
+        // TWRP backup rejects an already existing destination. Reserve the path
+        // under the exclusive interlock; only restore creates a directory here.
+        await ShellAsync(operation.Device.Serial, $$"""
+            set -eu
+            path={{TwrpSafety.Quote(operation.NativeFolder)}}
+            test ! -e "$path"
+            test ! -L "$path"
+            test "$(cat /tmp/deepdroid-native-active/owner)" = {{TwrpSafety.Quote(operation.Id.ToString("N"))}}
+            printf '%s' "$path" > /tmp/deepdroid-native-active/payload
+            """, token).ConfigureAwait(false);
+        operation.RemotePayloadOwned = true;
+        if (operation.CliRestore)
+            await ShellAsync(operation.Device.Serial, $$"""
+                set -eu
+                path={{TwrpSafety.Quote(operation.NativeFolder)}}
+                mkdir -p "$path"
+                test "$(readlink -f "$path")" = "$path"
+                printf '%s' {{TwrpSafety.Quote(operation.Id.ToString("N"))}} > "$path/.deepdroid-operation"
+                """, token).ConfigureAwait(false);
     }
 
-    private async Task DownloadDirectDataAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token)
+    private async Task UploadDirectDataAsync(TwrpOperation operation, TwrpBackupManifest manifest,
+        IProgress<TwrpProgress>? progress, CancellationToken token)
     {
-        await OwnDirectDataPayloadAsync(session, create: false, token).ConfigureAwait(false);
-        ReportData(session, progress, "Twrp_Downloading");
-        session.ExportState = TwrpExportState.Downloading;
-        string payload = CliPayloadDirectory(session);
+        ReportData(operation, progress, "Twrp_Uploading");
+        foreach (var artifact in operation.Artifacts)
+        {
+            string local = Path.Combine(CliPayloadDirectory(operation), manifest.Name, artifact.Name);
+            await PayloadTransferAsync(operation.Device.Serial, local, operation.NativeFolder + "/" + artifact.Name, true, token).ConfigureAwait(false);
+        }
+    }
+
+    private async Task DownloadDirectDataAsync(TwrpOperation operation, IProgress<TwrpProgress>? progress, CancellationToken token)
+    {
+        SetDataState(operation, TwrpOperationState.Downloading, progress);
+        string payload = CliPayloadDirectory(operation);
         TwrpArchiveService.CheckDirectory(payload);
         Directory.CreateDirectory(payload);
-        string folder = Path.Combine(payload, TwrpSafety.CliBackupName(session.ArchivePath!));
-        TwrpArchiveService.CheckDirectory(folder);
-        if (Directory.Exists(folder)) DeleteCheckedDirectory(folder);
-        await store.SaveAsync(session, token).ConfigureAwait(false);
-        // adb pull copies the named native folder into payload. All
-        // payload validation happens locally, with no device queries.
-        await PayloadTransferAsync(session.Device.Serial, session.NativeFolder, payload, false, token).ConfigureAwait(false);
+        await PayloadTransferAsync(operation.Device.Serial, operation.NativeFolder, payload, false, token).ConfigureAwait(false);
+        string folder = Path.Combine(payload, TwrpSafety.CliBackupName(operation.ArchivePath!));
         TwrpArchiveService.CheckDirectory(folder);
         if (Directory.EnumerateDirectories(folder).Any()) throw new TwrpWorkflowException("Twrp_InvalidManifest");
-        session.Artifacts = Directory.EnumerateFiles(folder)
-            .Where(path => Path.GetFileName(path) != ".deepdroid-operation").Select(path =>
+        operation.Artifacts = Directory.EnumerateFiles(folder).Where(path => Path.GetFileName(path) != ".deepdroid-operation").Select(path =>
         {
             if (File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint)) throw new TwrpWorkflowException("Twrp_UnsafePath");
             return new TwrpArtifact(Path.GetFileName(path), new FileInfo(path).Length);
         }).OrderBy(file => file.Name, StringComparer.Ordinal).ToArray();
-        TwrpArchiveService.ValidateDataArtifacts(session.Artifacts);
-        session.PayloadDownloaded = true;
-        await store.SaveAsync(session, token).ConfigureAwait(false);
+        TwrpArchiveService.ValidateDataArtifacts(operation.Artifacts);
+        // Compare a post-completion remote inventory with the downloaded files, catching truncated pulls.
+        var inventory = await ShellAsync(operation.Device.Serial, $$"""
+            set -eu
+            for file in {{TwrpSafety.Quote(operation.NativeFolder)}}/*; do
+                test -f "$file"
+                test ! -L "$file"
+                printf '%s|' "${file##*/}"
+                wc -c < "$file"
+            done
+            """, token).ConfigureAwait(false);
+        string[] actual = operation.Artifacts.Select(f => f.Name + "|" + f.Bytes.ToString(CultureInfo.InvariantCulture)).Order(StringComparer.Ordinal).ToArray();
+        string[] expected = inventory.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line => string.Join("|", line.Split('|').Select(field => field.Trim()))).Order(StringComparer.Ordinal).ToArray();
+        if (!actual.SequenceEqual(expected)) throw new TwrpWorkflowException("Twrp_TransferFailed");
+        LogOperation(operation, "Payload inventory and lengths verified.");
     }
 
-    private async Task FinishDirectDataAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token)
+    private static void ValidateDirectDataFolder(TwrpOperation operation)
     {
-        if (!session.NativeCompleted || !session.NativeResultVerified) throw new TwrpWorkflowException("Twrp_DirectResultUnknown");
-        CheckCliCache(session);
-        if (session.CliBackup && !session.PayloadDownloaded)
-            await DownloadDirectDataAsync(session, progress, token).ConfigureAwait(false);
-        if (session.CliBackup && !session.CleanupCompleted)
-        {
-            await PackageDataBackupAsync(session, progress, token).ConfigureAwait(false);
-            session.ExportState = TwrpExportState.Completed;
-        }
-        if (!session.CleanupCompleted)
-        {
-            ReportData(session, progress, session.CliBackup ? "Twrp_CleaningBackup" : "Twrp_CleaningRestore");
-            ValidateDirectDataFolder(session);
-            await CleanupDataPayloadAsync(session, token).ConfigureAwait(false);
-            session.CleanupCompleted = true;
-            await store.SaveAsync(session, token).ConfigureAwait(false);
-        }
-        string localPayload = CliPayloadDirectory(session);
-        if (Directory.Exists(localPayload)) DeleteCheckedDirectory(localPayload);
-        await RestoreDirectScreenAsync(session, token).ConfigureAwait(false);
-        await RebootDirectDataAsync(session, progress, token).ConfigureAwait(false);
-        session.WorkflowError = null;
-        session.ExportError = null;
-        session.ExportState = session.CliBackup ? TwrpExportState.Completed : TwrpExportState.None;
-        await DataStateAsync(session, TwrpSessionState.Completed, progress, token).ConfigureAwait(false);
-        CheckCliCache(session);
-        DeleteCheckedDirectory(session.CacheDirectory!);
-    }
-
-    private static void ValidateDirectDataFolder(TwrpSession session)
-    {
-        TwrpSafety.ValidateSerial(session.Device.Serial);
-        string leaf = session.CliRestore ? "restore_" + session.Id.ToString("N") : TwrpSafety.CliBackupName(session.ArchivePath!);
-        string expected = "/data/media/0/TWRP/BACKUPS/" + session.Device.Serial + "/" + leaf;
-        if (!session.DirectCommands || session.StorageRoot != "/data/media/0" || session.NativeFolder != expected)
+        TwrpSafety.RemoteRoot(operation.NativeFolder);
+        string leaf = operation.CliRestore ? "restore_" + operation.Id.ToString("N") : TwrpSafety.CliBackupName(operation.ArchivePath!);
+        if (operation.NativeFolder != "/data/media/0/TWRP/BACKUPS/" + operation.Device.Serial + "/" + leaf)
             throw new TwrpWorkflowException("Twrp_UnsafePath");
     }
 
-    private async Task OwnDirectDataPayloadAsync(TwrpSession session, bool create, CancellationToken token)
+    private async Task CleanupDataPayloadAsync(TwrpOperation operation, CancellationToken token)
     {
-        ValidateDirectDataFolder(session);
-        // Ownership metadata is used only for payload handling/cleanup, never
-        // as a CLI, root, mount, encryption or space preflight.
-        string createFolder = create ? "test ! -e \"$path\"\ntest ! -L \"$path\"\nmkdir -p \"$path\"" : "";
-        await ShellAsync(session.Device.Serial, $$"""
+        if (!operation.RemotePayloadOwned) return;
+        if (operation.NativeStarted && !operation.NativeCompleted) throw new TwrpWorkflowException("Twrp_DataNativeActive");
+        ValidateDirectDataFolder(operation);
+        string restoreOwnership = operation.CliRestore ? $$"""
+                test ! -L "$path/.deepdroid-operation"
+                test "$(cat "$path/.deepdroid-operation")" = {{TwrpSafety.Quote(operation.Id.ToString("N"))}}
+            """ : "";
+        await ShellAsync(operation.Device.Serial, $$"""
             set -eu
-            path={{TwrpSafety.Quote(session.NativeFolder)}}
-            {{createFolder}}
-            test "$(readlink -f "$path")" = "$path"
-            test ! -L "$path/.deepdroid-operation"
-            if [ -e "$path/.deepdroid-operation" ]; then
-                test "$(cat "$path/.deepdroid-operation")" = {{TwrpSafety.Quote(session.Id.ToString("N"))}}
-            else
-                printf '%s' {{TwrpSafety.Quote(session.Id.ToString("N"))}} > "$path/.deepdroid-operation"
+            path={{TwrpSafety.Quote(operation.NativeFolder)}}
+            test ! -L /tmp/deepdroid-native-active
+            test ! -L /tmp/deepdroid-native-active/owner
+            test ! -L /tmp/deepdroid-native-active/payload
+            test "$(cat /tmp/deepdroid-native-active/owner)" = {{TwrpSafety.Quote(operation.Id.ToString("N"))}}
+            test "$(cat /tmp/deepdroid-native-active/payload)" = "$path"
+            if [ -e "$path" ] || [ -L "$path" ]; then
+                test "$(readlink -f "$path")" = "$path"
+                {{restoreOwnership}}
+                rm -rf -- "$path"
             fi
             """, token).ConfigureAwait(false);
-    }
-
-    private async Task<TwrpSession> RecoverDirectDataAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token)
-    {
-        using var operation = Start(session.Device.Serial, token, canCancel: true);
-        using var stopCleanup = new StopRegistration(_confirmedStops, operation.OperationId);
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(token, operation.CancellationToken);
-        if (session.State == TwrpSessionState.Completed) return session;
-        try
-        {
-            if (!session.NativeCompleted || !session.NativeResultVerified) throw new TwrpWorkflowException("Twrp_DirectResultUnknown");
-            session.StopRequested = false;
-            if (!session.CleanupCompleted && session.RebootRequested)
-            {
-                // Re-enter only to finish export/cleanup, never to replay the
-                // native backup/restore command after an interrupted export.
-                await EnterRecoveryCoreAsync(session.Device.Serial, session.Device.Codename, session.SourceImagePath,
-                    new DataEntryProgress(key => ReportData(session, progress, key)), lifetime.Token, rememberIdentity: false).ConfigureAwait(false);
-                session.RebootRequested = false;
-                await store.SaveAsync(session, lifetime.Token).ConfigureAwait(false);
-            }
-            if (!session.CleanupCompleted) await PrepareDirectScreenAsync(session, progress, lifetime.Token).ConfigureAwait(false);
-            await FinishDirectDataAsync(session, progress, lifetime.Token).ConfigureAwait(false);
-            return session;
-        }
-        catch (Exception exception)
-        {
-            session.StopRequested = _confirmedStops.ContainsKey(operation.OperationId);
-            session.State = session.NativeCompleted ? TwrpSessionState.NativeCompleted : TwrpSessionState.NeedsRecovery;
-            session.WorkflowError = exception is TwrpWorkflowException known ? known.MessageKey : "Twrp_DirectResultUnknown";
-            if (session.CliBackup && session.NativeCompleted)
-            {
-                session.ExportState = lifetime.IsCancellationRequested ? TwrpExportState.Canceled : TwrpExportState.Failed;
-                session.ExportError = session.WorkflowError;
-            }
-            logger.LogWarning(exception, "Direct Data session {Operation} retained without replay.", session.Id);
-            await store.SaveAsync(session, CancellationToken.None).ConfigureAwait(false);
-            return session;
-        }
+        operation.RemotePayloadOwned = false;
     }
 }

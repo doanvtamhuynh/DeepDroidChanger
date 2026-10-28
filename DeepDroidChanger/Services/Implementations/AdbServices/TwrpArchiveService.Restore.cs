@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using DeepDroidChanger.Models;
 
 namespace DeepDroidChanger.Services;
@@ -33,13 +34,14 @@ public sealed partial class TwrpArchiveService
         if (TwrpSafety.CliBackupName(m.Name + ".zip") != m.Name) throw Invalid();
         TwrpSafety.ValidateSerial(m.Device.Serial);
         if (m.Version != 6) TwrpSafety.Slot(m.Device.Slot);
-        if (!TwrpRecoveryImage.Available.Any(i => i.Device == m.Device.Codename)
+        if ((m.Version != 6 && !TwrpRecoveryImage.Available.Any(i => i.Device == m.Device.Codename))
             || m.Device.Partitions.Any(p => p is null || p.Id is null)
             || m.Device.Partitions.Select(p => p.Id).Distinct().Count() != m.Device.Partitions.Count
             || !m.Device.Partitions.Any(p => p.Id == "data" && p.MountPoint == "/data")) throw Invalid();
         if (m.Version == 3) await ValidateTypeAsync(zip, m, required: true, token).ConfigureAwait(false);
         else if (zip.GetEntry("type.json") is not null) throw Invalid();
-        if (m.Payload.Any(p => p is null || p.Path is null || p.Bytes < 0)
+        if (m.Payload.Any(p => p is null || p.Path is null || p.Bytes < 0
+            || p.Sha256 is not null && !System.Text.RegularExpressions.Regex.IsMatch(p.Sha256, "^[a-f0-9]{64}$"))
             || m.Payload.Select(p => p.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count() != m.Payload.Length) throw Invalid();
         if (m.Version is 3 or 4 && (m.Payload[0].Path != "original.img" || m.Payload[0].PartitionId is not null || m.Payload[0].Bytes == 0)) throw Invalid();
         foreach (var file in NativePayloads(m))
@@ -68,30 +70,21 @@ public sealed partial class TwrpArchiveService
         return m;
     }
 
-    // The caller owns a newly created, operation-marked cache. Native .win files
+    // The caller owns a newly created cache owned in memory. Native .win files
     // are copied out of the outer ZIP byte for byte, never unpacked themselves.
-    public async Task<TwrpBackupManifest> ExtractCliRestoreAsync(string path, string destination, CancellationToken token, bool payloadSubdirectory = false)
-        => await ExtractCliRestoreCoreAsync(path, destination, token, payloadSubdirectory, false, null).ConfigureAwait(false);
-
-    internal Task<TwrpBackupManifest> ExtractDataRestoreAsync(string path, string destination,
-        Func<TwrpBackupManifest, Task> validate, CancellationToken token) =>
-        ExtractCliRestoreCoreAsync(path, destination, token, true, true, validate);
-
-    private static async Task<TwrpBackupManifest> ExtractCliRestoreCoreAsync(string path, string destination, CancellationToken token,
-        bool payloadSubdirectory, bool dataOnly, Func<TwrpBackupManifest, Task>? validate)
+    internal async Task<TwrpBackupManifest> ExtractDataRestoreAsync(string path, string destination, CancellationToken token)
     {
         CheckDirectory(destination);
         await using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, true);
         using var zip = new ZipArchive(input, ZipArchiveMode.Read);
         var m = await ReadCoreAsync(zip, token).ConfigureAwait(false);
         if (m.Version is not 3 and not 4 and not 5 and not 6) throw Invalid();
-        if (validate is not null) await validate(m).ConfigureAwait(false);
         // Version 3's type.json is validated on read; restore uses the normalized
-        // backup manifest for both versions and never needs a second metadata file.
-        foreach (var name in new[] { "backup.json" }.Concat((dataOnly ? NativePayloads(m) : m.Payload).Select(p => p.Path)))
+        // backup manifest for all supported Data versions and never needs a second metadata file.
+        foreach (var name in new[] { "backup.json" }.Concat(NativePayloads(m).Select(p => p.Path)))
         {
             token.ThrowIfCancellationRequested();
-            string root = payloadSubdirectory && name != "backup.json" ? Path.Combine(destination, "payload") : destination;
+            string root = name != "backup.json" ? Path.Combine(destination, "payload") : destination;
             string target = Path.Combine(root, name.Replace('/', Path.DirectorySeparatorChar));
             CheckDirectory(Path.GetDirectoryName(target)!);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -99,6 +92,14 @@ public sealed partial class TwrpArchiveService
             await using var entry = zip.GetEntry(name)!.Open();
             await entry.CopyToAsync(output, token).ConfigureAwait(false);
             if (output.Length != zip.GetEntry(name)!.Length) throw Invalid();
+            await output.FlushAsync(token).ConfigureAwait(false);
+            var payloadFile = m.Payload.FirstOrDefault(file => file.Path == name);
+            if (payloadFile?.Sha256 is string expectedHash)
+            {
+                await using var check = zip.GetEntry(name)!.Open();
+                string actualHash = Convert.ToHexStringLower(await SHA256.HashDataAsync(check, token).ConfigureAwait(false));
+                if (expectedHash != actualHash) throw Invalid();
+            }
         }
         return m;
     }

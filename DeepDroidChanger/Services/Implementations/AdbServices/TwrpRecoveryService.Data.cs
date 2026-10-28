@@ -10,154 +10,172 @@ public sealed partial class TwrpRecoveryService
     private static TwrpDeviceInfo DataDevice(string serial, string marker) =>
         new(serial, marker, "", "", 0, "", "", 0, "", "", 0, [new("data", "/data", "", 0)], []);
 
-    private Task<TwrpSession> RecoverDataAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token) =>
-        session.DirectCommands
-            ? RecoverDirectDataAsync(session, progress, token)
-            : RecoverRunnerDataAsync(session, progress, token);
-
-    private async Task<TwrpSession> RunDataAsync(TwrpRequest request, IProgress<TwrpProgress>? progress, CancellationToken externalToken)
+    private async Task<TwrpOperation> RunDataAsync(TwrpRequest request, IProgress<TwrpProgress>? progress, CancellationToken externalToken)
     {
-        TwrpSafety.ValidateSerial(request.Serial);
+        // Validate argument syntax, never query or compare the UI's serial again.
+        string serial = request.Serial;
+        TwrpSafety.ValidateSerial(serial);
         if (request.Confirmation != TwrpSafety.Confirmation) throw new TwrpWorkflowException("Twrp_ConfirmationRequired");
-        using var operation = Start(request.Serial, externalToken, canCancel: true);
-        using var stopCleanup = new StopRegistration(_confirmedStops, operation.OperationId);
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(externalToken, operation.CancellationToken);
+        using var ownership = Start(serial, externalToken);
+        using var stopCleanup = new StopRegistration(_confirmedStops, ownership.OperationId);
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(externalToken, ownership.CancellationToken);
         CancellationToken token = lifetime.Token;
-        if ((await store.ListAsync(request.Serial, token).ConfigureAwait(false)).Any(s => !s.IsTerminal))
-            throw new TwrpWorkflowException("Twrp_PendingSession");
-        string marker = await GetDeviceMarkerAsync(request.Serial, token).ConfigureAwait(false);
-        if (!IsDataDevice(marker)) throw new TwrpWorkflowException("Twrp_DataIdentityRequired");
-        if (request.RecoveryDevice is not null && request.RecoveryDevice != marker)
-            throw new TwrpWorkflowException("Twrp_BackupTypeMismatch");
+        if (_unsafeDevices.ContainsKey(serial)) throw new TwrpWorkflowException("Twrp_DataNativeActive");
         bool restore = request.SourceArchivePath is not null;
+        string marker = request.RecoveryDevice ?? "recovery"; // configuration snapshot, not a live identity check
         string archivePath = restore ? Path.GetFullPath(request.SourceArchivePath!)
             : _archives.OutputPath(request.BackupDirectory ?? _archives.DefaultDirectory,
-                request.BackupName ?? _archives.DefaultName(marker, request.Serial));
+                request.BackupName ?? _archives.DefaultName(marker, serial));
         if (!restore) _archives.PrepareOutput(archivePath);
-        TwrpSafety.CliBackupName(archivePath);
-        var session = new TwrpSession
+        string name = TwrpSafety.CliBackupName(archivePath);
+        var operation = new TwrpOperation
         {
-            ExecutionMode = TwrpExecutionMode.ExternalRecovery, DirectCommands = true, Device = DataDevice(request.Serial, marker),
-            Kind = restore ? TwrpOperationKind.Restore : TwrpOperationKind.Backup,
-            RecoveryDevice = marker, SourceImagePath = request.SourceImagePath,
-            SourceImageHash = "", GuardVersion = "data-direct-1", Partitions = ["data"], RequestedPartitions = ["data"],
-            StorageRoot = "/data/media/0", ArchivePath = archivePath, CliBackup = !restore, CliRestore = restore,
-            Options = new(false, true), RescueDirectory = store.CacheRoot
+            Device = DataDevice(serial, marker), Kind = restore ? TwrpOperationKind.Restore : TwrpOperationKind.Backup,
+            RecoveryDevice = marker, ArchivePath = archivePath,
+            Options = new(false, true)
         };
-        PrepareCliCache(session);
-        await store.SaveAsync(session, token).ConfigureAwait(false);
         try
         {
-            TwrpBackupManifest? manifest = null;
-            string name = TwrpSafety.CliBackupName(archivePath);
-            if (restore)
+            if (restore) cache.Create(operation);
+            SetDataState(operation, TwrpOperationState.Preparing, progress);
+            TwrpBackupManifest? manifest = restore
+                ? await PrepareDataRestoreAsync(operation, progress, token).ConfigureAwait(false)
+                : null;
+            operation.NativeFolder = "/data/media/0/TWRP/BACKUPS/" + serial + "/"
+                + (restore ? "restore_" + operation.Id.ToString("N") : name);
+            SetDataState(operation, TwrpOperationState.EnteringRecovery, progress);
+            await EnterRecoveryCoreAsync(serial, request.RecoveryDevice, request.SourceImagePath,
+                new DataEntryProgress(key => ReportData(operation, progress, key)), token).ConfigureAwait(false);
+            if (!restore) cache.Create(operation);
+            SetDataState(operation, TwrpOperationState.RecoveryReady, progress);
+            await AcquireNativeOwnershipAsync(operation, token).ConfigureAwait(false);
+            await ReserveDirectDataPayloadAsync(operation, token).ConfigureAwait(false);
+            await PrepareDirectScreenAsync(operation, progress, token).ConfigureAwait(false);
+            if (restore) await UploadDirectDataAsync(operation, manifest!, progress, token).ConfigureAwait(false);
+            await RunDirectDataCommandAsync(operation, name, progress, token).ConfigureAwait(false);
+            if (!restore) await CreateDataBackupArchiveAsync(operation, progress, token).ConfigureAwait(false);
+            SetDataState(operation, TwrpOperationState.Cleaning, progress);
+            await CleanupDataRecoveryAsync(operation, token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            await AdbAsync(serial, "reboot", token).ConfigureAwait(false);
+            LogOperation(operation, "Removing PC temporary files.");
+            cache.Clean(operation, success: true);
+            operation.State = TwrpOperationState.Completed;
+            logger.LogInformation("TWRP operation {Operation} completed; PC cleanup completed.", operation.Id);
+            try { progress?.Report(new(operation.Id, operation.State, "Twrp_State_Completed")); }
+            catch (Exception notificationError)
             {
-                manifest = await PrepareDataRestoreAsync(session, progress, token).ConfigureAwait(false);
-                name = manifest.Name;
+                logger.LogWarning(notificationError, "Cannot display completion for {Operation}.", operation.Id);
             }
-            session.NativeFolder = session.StorageRoot + "/TWRP/BACKUPS/" + request.Serial + "/"
-                + (restore ? "restore_" + session.Id.ToString("N") : name);
-            TwrpSafety.RemoteRoot(session.NativeFolder);
-            await DataStateAsync(session, TwrpSessionState.EnteringRecovery, progress, token).ConfigureAwait(false);
-            await EnterRecoveryCoreAsync(request.Serial, marker, request.SourceImagePath,
-                new DataEntryProgress(key => ReportData(session, progress, key)), token, rememberIdentity: false).ConfigureAwait(false);
-            await PrepareDirectScreenAsync(session, progress, token).ConfigureAwait(false);
-            if (restore) await UploadDirectDataAsync(session, manifest!, progress, token).ConfigureAwait(false);
-            session.NativeStarted = true; // Persist intent; reconnect must never replay a direct command.
-            await DataStateAsync(session, TwrpSessionState.RecoveryRunning, progress, token).ConfigureAwait(false);
-            await RunDirectDataCommandAsync(session, name, progress, token).ConfigureAwait(false);
-            await FinishDirectDataAsync(session, progress, token).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
-            session.StopRequested = _confirmedStops.ContainsKey(operation.OperationId);
-            if (session.NativeStarted) await CaptureDataLogsAsync(session, CancellationToken.None).ConfigureAwait(false);
-            session.WorkflowError = session.StopRequested ? "Twrp_Stopped"
-                : exception is TwrpWorkflowException known ? known.MessageKey
-                : exception is OperationCanceledException ? "Twrp_DirectResultUnknown" : "Twrp_WorkflowFailed";
-            if (session.NativeCompleted && session.CliBackup)
-            {
-                session.ExportState = exception is OperationCanceledException ? TwrpExportState.Canceled : TwrpExportState.Failed;
-                session.ExportError = session.WorkflowError;
-            }
-            if (session.State != TwrpSessionState.Failed)
-                session.State = session.NativeStarted && !session.NativeCompleted ? TwrpSessionState.NeedsRecovery
-                    : session.NativeCompleted ? TwrpSessionState.NativeCompleted : TwrpSessionState.Failed;
-            await store.SaveAsync(session, CancellationToken.None).ConfigureAwait(false);
-            logger.LogWarning(exception, "Data workflow {Operation} retained at {State}.", session.Id, session.State);
+            await HandleDataFailureAsync(operation, exception, ownership.OperationId, progress, token).ConfigureAwait(false);
         }
-        return session;
+        return operation;
     }
 
-    private async Task<TwrpBackupManifest> PrepareDataRestoreAsync(TwrpSession session,
+    private async Task<TwrpBackupManifest> PrepareDataRestoreAsync(TwrpOperation operation,
         IProgress<TwrpProgress>? progress, CancellationToken token)
     {
-        ReportData(session, progress, "Twrp_Extracting");
-        var manifest = await _archives.ExtractDataRestoreAsync(session.ArchivePath!, session.CacheDirectory!, m =>
-        {
-            if (m.Device.Serial != session.Device.Serial || m.Device.Codename != session.Device.Codename)
-                throw new TwrpWorkflowException("Twrp_BackupTypeMismatch");
-            return Task.CompletedTask;
-        }, token).ConfigureAwait(false);
-        session.SourceBackupId = manifest.BackupId;
-        session.Artifacts = TwrpArchiveService.NativePayloads(manifest)
+        ReportData(operation, progress, "Twrp_Extracting");
+        // The dialog checks device compatibility; extraction validates archive contents.
+        var manifest = await _archives.ExtractDataRestoreAsync(operation.ArchivePath!, operation.CacheDirectory!, token).ConfigureAwait(false);
+        operation.Artifacts = TwrpArchiveService.NativePayloads(manifest)
             .Select(p => new TwrpArtifact(p.Path[(manifest.Name.Length + 1)..], p.Bytes)).ToArray();
-        session.Options = new(false, true, VerifyDigest: _archives.HasDigests(manifest, ["data"]));
         return manifest;
     }
 
-    private async Task PackageDataBackupAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token)
+    private async Task CreateDataBackupArchiveAsync(TwrpOperation operation,
+        IProgress<TwrpProgress>? progress, CancellationToken token)
     {
-        session.ExportState = TwrpExportState.Packaging;
-        ReportData(session, progress, "Twrp_Packaging");
-        if (File.Exists(session.ArchivePath))
-            await _archives.VerifyCliAsync(session, session.ArchivePath!, token).ConfigureAwait(false);
-        else
-            await _archives.WriteCliAsync(session, token).ConfigureAwait(false);
+        await DownloadDirectDataAsync(operation, progress, token).ConfigureAwait(false);
+        SetDataState(operation, TwrpOperationState.Packaging, progress);
+        await _archives.WriteCliAsync(operation, token,
+            () => SetDataState(operation, TwrpOperationState.Verifying, progress)).ConfigureAwait(false);
+        LogOperation(operation, "ZIP verified and published: " + operation.ArchivePath);
     }
 
-    private async Task CleanupDataPayloadAsync(TwrpSession session, CancellationToken token)
+    private async Task CleanupDataRecoveryAsync(TwrpOperation operation, CancellationToken token)
     {
-        string path = session.NativeFolder;
-        TwrpSafety.RemoteRoot(path);
-        string prefix = session.StorageRoot + "/TWRP/BACKUPS/" + session.Device.Serial + "/";
-        if (!path.StartsWith(prefix, StringComparison.Ordinal) || !TwrpSafety.SafeName().IsMatch(path[prefix.Length..])) throw new TwrpWorkflowException("Twrp_UnsafePath");
-        string recoveryIdentity = session.DirectCommands ? "" : "test \"$(cat /proc/sys/kernel/random/boot_id)\" = " + TwrpSafety.Quote(session.RecoveryBootId);
-        await ShellAsync(session.Device.Serial, $$"""
-            set -eu
-            {{recoveryIdentity}}
-            path={{TwrpSafety.Quote(path)}}
-            if [ -e "$path" ] || [ -L "$path" ]; then
-                test "$(readlink -f "$path")" = "$path"
-                test ! -L "$path/.deepdroid-operation"
-                test "$(cat "$path/.deepdroid-operation")" = {{TwrpSafety.Quote(session.Id.ToString("N"))}}
-                rm -rf -- "$path"
-            fi
-            """, token).ConfigureAwait(false);
+        await RestoreDirectScreenAsync(operation, token).ConfigureAwait(false);
+        await CleanupDataPayloadAsync(operation, token).ConfigureAwait(false);
+        await ReleaseNativeOwnershipAsync(operation, token).ConfigureAwait(false);
     }
 
-    private async Task CaptureDataLogsAsync(TwrpSession session, CancellationToken token)
+    private async Task HandleDataFailureAsync(TwrpOperation operation, Exception exception, Guid ownershipId,
+        IProgress<TwrpProgress>? progress, CancellationToken token)
+    {
+        // Entry errors still receive a fresh log-only attempt; no workflow is loaded.
+        if (operation.CacheDirectory is null) cache.Create(operation);
+        operation.StopRequested = token.IsCancellationRequested || _confirmedStops.ContainsKey(ownershipId);
+        operation.NativeStateUnknown = operation.NativeStarted && !operation.NativeCompleted;
+        if (operation.NativeStateUnknown) _unsafeDevices.TryAdd(operation.Device.Serial, 0);
+        operation.WorkflowError = exception switch
+        {
+            TwrpWorkflowException { MessageKey: "Twrp_NativeTimeout" } => "Twrp_NativeTimeout",
+            _ when operation.NativeStateUnknown => "Twrp_DirectResultUnknown",
+            _ when operation.StopRequested => "Twrp_Stopped",
+            TwrpWorkflowException known => known.MessageKey,
+            _ => "Twrp_WorkflowFailed"
+        };
+        if (operation.StopRequested) SetDataState(operation, TwrpOperationState.Stopping, progress);
+        LogOperation(operation, $"{(operation.StopRequested ? "Stop" : "Failure")}: {exception}. Native state unknown: {operation.NativeStateUnknown}");
+        await CaptureDataLogsAsync(operation).ConfigureAwait(false);
+        // Killing adb does not imply TWRP stopped. Preserve its interlock and remote data if uncertain.
+        if (!operation.NativeStateUnknown)
+        {
+            using var cleanupLimit = new CancellationTokenSource(CommandTimeout);
+            try
+            {
+                await CleanupDataRecoveryAsync(operation, cleanupLimit.Token).ConfigureAwait(false);
+                LogOperation(operation, "Remote cleanup completed.");
+            }
+            catch (Exception cleanupError)
+            {
+                LogOperation(operation, "Remote cleanup failed: " + cleanupError.Message);
+                logger.LogWarning(cleanupError, "Remote cleanup failed for {Operation}.", operation.Id);
+            }
+        }
+        try
+        {
+            string partial = operation.ArchivePath + "." + operation.Id.ToString("N") + ".partial";
+            if (operation.CliBackup && File.Exists(partial)) TwrpOperationCache.DeleteChecked(partial);
+            cache.Clean(operation, success: false);
+            LogOperation(operation, "PC cleanup completed; only logs retained.");
+        }
+        catch (Exception cleanupError)
+        {
+            LogOperation(operation, "PC cleanup FAILED; temporary files may remain: " + cleanupError.Message);
+            operation.WorkflowError = "Twrp_CleanupFailed";
+        }
+        SetDataState(operation, operation.StopRequested ? TwrpOperationState.Stopped : TwrpOperationState.Failed, progress);
+        ReportData(operation, progress, operation.WorkflowError);
+        logger.LogWarning(exception, "TWRP operation {Operation} failed. Native state unknown: {Unknown}.", operation.Id, operation.NativeStateUnknown);
+    }
+
+    private async Task CaptureDataLogsAsync(TwrpOperation operation)
     {
         try
         {
-            string text = (await ShellAsync(session.Device.Serial,
-                $"cat {TwrpSafety.Quote(TwrpScripts.Work(session) + "/runner.log")} {TwrpSafety.Quote(TwrpScripts.Work(session) + "/native.log")} /tmp/recovery.log 2>/dev/null || true", token).ConfigureAwait(false)).StandardOutput;
-            session.RecoveryLog += "\n" + text;
-            await File.WriteAllTextAsync(Path.Combine(session.CacheDirectory!, "recovery.log"), session.RecoveryLog, token).ConfigureAwait(false);
+            using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            string text = (await ShellAsync(operation.Device.Serial, "cat /tmp/recovery.log 2>/dev/null || true", limit.Token).ConfigureAwait(false)).StandardOutput;
+            Log(operation, "recovery.log", text);
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-        catch (Exception e) { logger.LogDebug(e, "Unable to collect Data logs for {Operation}.", session.Id); }
+        catch (Exception exception) { LogOperation(operation, "Recovery log unavailable: " + exception.Message); }
     }
 
-    private async Task DataStateAsync(TwrpSession session, TwrpSessionState state, IProgress<TwrpProgress>? progress, CancellationToken token)
+    private void SetDataState(TwrpOperation operation, TwrpOperationState state, IProgress<TwrpProgress>? progress)
     {
-        session.State = state;
-        await store.SaveAsync(session, token).ConfigureAwait(false);
-        ReportData(session, progress, "Twrp_State_" + state);
+        operation.State = state;
+        ReportData(operation, progress, "Twrp_State_" + state);
     }
 
-    private static void ReportData(TwrpSession session, IProgress<TwrpProgress>? progress, string key) =>
-        progress?.Report(new(session.Id, session.State, key, Detail: session.CacheDirectory));
+    private void ReportData(TwrpOperation operation, IProgress<TwrpProgress>? progress, string key)
+    {
+        LogOperation(operation, key);
+        progress?.Report(new(operation.Id, operation.State, key));
+    }
 
     private sealed class DataEntryProgress(Action<string> report) : IProgress<string>
     {

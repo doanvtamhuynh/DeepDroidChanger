@@ -165,7 +165,7 @@ public sealed partial class App : Application
         services.AddSingleton<IDevicePackageService, DevicePackageService>();
         services.AddSingleton<IDeviceDataCleanupService, DeviceDataCleanupService>();
         services.AddSingleton<IDeviceChangeService, DeviceChangeService>();
-        services.AddSingleton<TwrpSessionStore>();
+        services.AddSingleton<TwrpOperationCache>();
         services.AddSingleton<TwrpImageService>();
         services.AddSingleton<TwrpArchiveService>();
         services.AddSingleton<ITwrpRecoveryService, TwrpRecoveryService>();

@@ -29,8 +29,6 @@ namespace DeepDroidChanger.ViewModels
         private readonly ITwrpWorkspaceDialogService _twrpWorkspace;
         private readonly ITwrpRecoveryService _twrpRecovery;
         private readonly IConfirmationDialogService _twrpConfirmation;
-        [ObservableProperty]
-        private string _twrpPendingMessage = string.Empty;
         private readonly IDeviceIntegrityService _deviceIntegrityService;
         private readonly IFilePickerDialogService _filePickerDialogService;
         private readonly IPackageInstallService _packageInstallService;
@@ -238,7 +236,6 @@ namespace DeepDroidChanger.ViewModels
 
                 await LoadCarrierProfilesAsync(cancellationToken).ConfigureAwait(false);
                 await LoadSavedDevicesAsync(cancellationToken).ConfigureAwait(false);
-                await RefreshTwrpPendingAsync(cancellationToken).ConfigureAwait(false);
                 await RefreshNewDeviceCountAsync(cancellationToken).ConfigureAwait(false);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -2214,44 +2211,44 @@ namespace DeepDroidChanger.ViewModels
         private async Task RunTwrpDialogAsync(bool restore)
         {
             DeviceRowViewModel? selectedDevice = GetSingleSelectedDeviceSnapshot();
-            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice, DeviceActionRequirement.OnlineOrRecovery).ConfigureAwait(true))
+            if (!await CheckInitialOnlineIdleEligibilityAsync(selectedDevice,
+                    DeviceActionRequirement.OnlineOrRecovery).ConfigureAwait(true))
                 return;
             DeviceRowViewModel device = selectedDevice!;
+            string serial = device.Serial;
             if (!IsCurrentSingleDevice(device))
                 return;
             try
             {
                 SetContextDeviceLog(device, "Twrp_Inspect");
-                var result = restore ? await _twrpWorkspace.ShowRestoreAsync(device.Serial, device.Name, _actionLifetimeCancellation.Token)
-                    : await _twrpWorkspace.ShowBackupAsync(device.Serial, device.Name, _actionLifetimeCancellation.Token);
+                var result = restore ? await _twrpWorkspace.ShowRestoreAsync(serial, device.Name, _actionLifetimeCancellation.Token)
+                    : await _twrpWorkspace.ShowBackupAsync(serial, device.Name, _actionLifetimeCancellation.Token);
                 if (result is null)
                 {
-                    _deviceActionFeedbackService.ReportNonOwningDialogDismissed(device.Serial);
+                    _deviceActionFeedbackService.ReportNonOwningDialogDismissed(serial);
                     return;
                 }
-                if (!await CheckInitialOnlineIdleEligibilityAsync(device, DeviceActionRequirement.OnlineOrRecovery).ConfigureAwait(true))
+                if (!IsCurrentSingleDevice(device))
+                    return;
+                if (!await CheckInitialOnlineIdleEligibilityAsync(device,
+                        DeviceActionRequirement.OnlineOrRecovery).ConfigureAwait(true))
                     return;
                 if (!IsCurrentSingleDevice(device))
                     return;
                 var progress = new TwrpMainProgress(value => _uiDispatcher.InvokeAsync(() =>
                 {
-                    if (value.State == TwrpSessionState.ImagePrepared && value.RescuePath is not null)
-                        _deviceActionFeedbackService.SetProcess(device.Serial, "Twrp_ImagePreparedRescue", value.RescuePath);
+                    if (value.Elapsed is TimeSpan elapsed)
+                        _deviceActionFeedbackService.SetProcess(serial, value.MessageKey,
+                            GetLogText("Twrp_State_" + value.State), GetLogText("Twrp_Adb_" + value.ProcessStatus),
+                            elapsed.ToString(@"hh\:mm\:ss"), value.Detail ?? "",
+                            value.Percent is double percent ? percent.ToString("0.#") + "%" : "");
                     else if (value.Detail is not null)
-                        _deviceActionFeedbackService.SetProcess(device.Serial, value.MessageKey, value.Detail);
-                    else _deviceActionFeedbackService.SetProcess(device.Serial, value.MessageKey);
+                        _deviceActionFeedbackService.SetProcess(serial, value.MessageKey, value.Detail);
+                    else _deviceActionFeedbackService.SetProcess(serial, value.MessageKey);
                 }, CancellationToken.None).GetAwaiter().GetResult());
-                TwrpSession session = result.RecoverSessionId is Guid recover
-                    ? await _twrpRecovery.RecoverAsync(recover, progress, _actionLifetimeCancellation.Token)
-                    : result.RetryExportSessionId is Guid retry
-                        ? await _twrpRecovery.RetryExportAsync(retry, progress, _actionLifetimeCancellation.Token)
-                        : await _twrpRecovery.RunAsync(result.Request!, progress, _actionLifetimeCancellation.Token);
-                if (session.State == TwrpSessionState.NeedsRecovery) SetDeviceLog(device, "Log_TwrpRecoveryFailed");
-                else if (result.RecoverSessionId is not null && session.BootRestored) SetDeviceLog(device, "Log_TwrpBootRecoverySuccess");
-                else if (session.ExportState is TwrpExportState.Failed or TwrpExportState.Canceled)
-                    SetDeviceLog(device, session.ExportState == TwrpExportState.Canceled ? "Log_TwrpExportCanceled" : "Log_TwrpExportFailed");
-                else if (session.StopRequested) SetDeviceLog(device, "Log_TwrpCanceled");
-                else if (session.State != TwrpSessionState.Completed) SetDeviceLog(device, "Log_TwrpFailed");
+                var session = await _twrpRecovery.RunAsync(result.Request, progress, _actionLifetimeCancellation.Token);
+                if (session.State != TwrpOperationState.Completed)
+                    SetDeviceLog(device, "Log_TwrpDetailFailed", GetLogText(session.WorkflowError ?? "Twrp_WorkflowFailed"));
                 else if (session.Kind == TwrpOperationKind.Backup && session.ArchivePath is not null)
                     SetDeviceLog(device, "Log_TwrpBackupSuccess", session.ArchivePath);
                 else SetDeviceLog(device, "Log_TwrpRestoreSuccess");
@@ -2263,32 +2260,15 @@ namespace DeepDroidChanger.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "TWRP action failed for {Serial}.", device.Serial);
+                _logger.LogError(ex, "TWRP action failed for {Serial}.", serial);
                 if (ex is TwrpWorkflowException known) SetDeviceLog(device, "Log_TwrpDetailFailed", GetLogText(known.MessageKey));
                 else SetDeviceLog(device, "Log_TwrpFailed");
             }
-            finally { await RefreshTwrpPendingAsync(CancellationToken.None); }
         }
 
         private sealed class TwrpMainProgress(Action<TwrpProgress> report) : IProgress<TwrpProgress>
         {
             public void Report(TwrpProgress value) => report(value);
-        }
-
-        private async Task RefreshTwrpPendingAsync(CancellationToken token)
-        {
-            string? message = null;
-            try
-            {
-                var sessions = await _twrpRecovery.ListAsync(string.Empty, token).ConfigureAwait(false);
-                if (sessions.Any(item => !item.IsTerminal)) message = "Twrp_PendingSession";
-            }
-            catch (Exception exception) when (exception is TwrpWorkflowException or IOException or System.Text.Json.JsonException)
-            {
-                _logger.LogError(exception, "Unable to read the TWRP recovery journal.");
-                message = "Twrp_InvalidJournal";
-            }
-            await _uiDispatcher.InvokeAsync(() => TwrpPendingMessage = message is null ? string.Empty : _localizationService.GetString(message), token);
         }
 
         [RelayCommand(CanExecute = nameof(CanExecuteSelectedDeviceAction), AllowConcurrentExecutions = true)]

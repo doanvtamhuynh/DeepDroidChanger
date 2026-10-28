@@ -10,6 +10,19 @@ namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
 public sealed class AdbCommandServiceTests
 {
     [TestMethod]
+    public async Task Streaming_KeepsSelectedSerialInAdbArguments()
+    {
+        var runner = Substitute.For<IProcessRunnerService>();
+        runner.RunStreamingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Action<ProcessUpdate>>(), Arg.Any<CancellationToken>())
+            .Returns(new CommandResult(0, "native", ""));
+        var service = new AdbCommandService(runner, new TestLogger<AdbCommandService>());
+        Action<ProcessUpdate> output = _ => { };
+        await service.RunAdbShellStreamingAsync("UI123", "twrp backup D 'name'", output, default);
+        await runner.Received(1).RunStreamingAsync(Arg.Any<string>(), "-s \"UI123\" shell twrp backup D 'name'", output, default);
+        await runner.DidNotReceiveWithAnyArgs().RunAsync(default!, default!, default);
+    }
+
+    [TestMethod]
     public async Task RunAdbAsync_SensitiveArguments_AreNotWrittenToLogs()
     {
         const string secret = "proxy-password-should-not-be-logged";

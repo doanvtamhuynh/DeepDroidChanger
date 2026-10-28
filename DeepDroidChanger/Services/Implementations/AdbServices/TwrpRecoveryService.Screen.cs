@@ -1,18 +1,22 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using DeepDroidChanger.Models;
 
 namespace DeepDroidChanger.Services;
 
 public sealed partial class TwrpRecoveryService
 {
-    private async Task PrepareDirectScreenAsync(TwrpSession session, IProgress<TwrpProgress>? progress, CancellationToken token)
+    private async Task PrepareDirectScreenAsync(TwrpOperation operation, IProgress<TwrpProgress>? progress, CancellationToken token)
     {
-        if (session.Device.Codename != "sargo") return;
-        ReportData(session, progress, "Twrp_KeepingScreenAwake");
+        // This is a recovery UI workaround using the configuration snapshot,
+        // not another device identity, Data, mount or storage preflight.
+        if (operation.RecoveryDevice != "sargo") return;
+        ReportData(operation, progress, "Twrp_KeepingScreenAwake");
         try
         {
-            // A backlight write alone cannot enable a blanked DRM CRTC. Wake
-            // through the actual power-key device before sending any TWRP CLI.
-            await ShellAsync(session.Device.Serial, """
+            // Writing brightness alone cannot re-enable a blanked DRM display.
+            // Reuse the recovery's power-key input before sending any TWRP CLI.
+            await ShellAsync(operation.Device.Serial, """
                 set -eu
                 brightness=/sys/class/backlight/panel0-backlight/brightness
                 value=$(cat "$brightness")
@@ -36,27 +40,43 @@ public sealed partial class TwrpRecoveryService
                 done
                 exit 1
                 """, token).ConfigureAwait(false);
-            if (session.RecoveryScreenTimeout is null)
+            await EnsureNativeCommandQueueEmptyAsync(operation, token).ConfigureAwait(false);
+            var current = await EntryCommandAsync(ct => adb.RunAdbShellAsync(operation.Device.Serial,
+                "twrp get tw_screen_timeout_secs", ct), CommandTimeout, token).ConfigureAwait(false);
+            var match = Regex.Match(current.StandardOutput,
+                @"(?m)^\s*tw_screen_timeout_secs\s*[:=]\s*([0-9]+)\s*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+            if (!match.Success || !int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int seconds))
             {
-                string value = await ReadTwrpVariableAsync(session.Device.Serial, "tw_screen_timeout_secs", token).ConfigureAwait(false);
-                if (!int.TryParse(value, out int seconds) || seconds < 0)
-                    throw new TwrpWorkflowException("Twrp_ScreenAwakeFailed");
-                session.RecoveryScreenTimeout = seconds;
-                await store.SaveAsync(session, token).ConfigureAwait(false);
+                LogOperation(operation, "Screen timeout unavailable; screen wake attempted without changing its timeout.");
+                return;
             }
-            var result = await ShellAsync(session.Device.Serial, "twrp set tw_screen_timeout_secs 0\ntwrp get tw_screen_timeout_secs", token).ConfigureAwait(false);
-            if (GetField(ParseFields(result.StandardOutput), "tw_screen_timeout_secs") != "0")
-                throw new TwrpWorkflowException("Twrp_ScreenAwakeFailed");
+            operation.RecoveryScreenTimeout = seconds;
+            await EnsureNativeCommandQueueEmptyAsync(operation, token).ConfigureAwait(false);
+            await EntryCommandAsync(ct => adb.RunAdbShellAsync(operation.Device.Serial,
+                "twrp set tw_screen_timeout_secs 0", ct), CommandTimeout, token).ConfigureAwait(false);
+            LogOperation(operation, "Recovery screen awakened; screen timeout temporarily disabled.");
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-        catch (Exception) { throw new TwrpWorkflowException("Twrp_ScreenAwakeFailed"); }
+        catch (TwrpWorkflowException exception) when (exception.MessageKey == "Twrp_NativeCommandPending") { throw; }
+        catch (Exception exception)
+        {
+            // Screen control is best effort; the device preflight remains get-state only.
+            LogOperation(operation, "Recovery screen workaround unavailable: " + exception.Message);
+        }
     }
 
-    private async Task RestoreDirectScreenAsync(TwrpSession session, CancellationToken token)
+    private async Task RestoreDirectScreenAsync(TwrpOperation operation, CancellationToken token)
     {
-        if (session.RecoveryScreenTimeout is not int seconds) return;
-        await EntryCommandAsync(ct => adb.RunAdbShellAsync(session.Device.Serial, "twrp set tw_screen_timeout_secs " + seconds.ToString(System.Globalization.CultureInfo.InvariantCulture), ct), CommandTimeout, token).ConfigureAwait(false);
-        session.RecoveryScreenTimeout = null;
-        await store.SaveAsync(session, token).ConfigureAwait(false);
+        if (operation.RecoveryScreenTimeout is not int seconds || operation.NativeStarted && !operation.NativeCompleted) return;
+        await EnsureNativeCommandQueueEmptyAsync(operation, token).ConfigureAwait(false);
+        try
+        {
+            await EntryCommandAsync(ct => adb.RunAdbShellAsync(operation.Device.Serial,
+                "twrp set tw_screen_timeout_secs " + seconds.ToString(CultureInfo.InvariantCulture), ct), CommandTimeout, token).ConfigureAwait(false);
+            operation.RecoveryScreenTimeout = null;
+            LogOperation(operation, "Recovery screen timeout restored.");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (Exception exception) { LogOperation(operation, "Unable to restore recovery screen timeout: " + exception.Message); }
     }
 }
