@@ -4,6 +4,8 @@ namespace DeepDroidChanger.Services;
 
 public interface IDeviceActionConfirmationDialogService
 {
+    Task<bool> ConfirmFactoryResetAsync(string deviceName, string deviceSerial, CancellationToken cancellationToken);
+
     Task<bool> ConfirmDeleteDeviceAsync(
         string deviceName,
         string deviceSerial,

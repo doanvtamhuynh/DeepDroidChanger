@@ -30,6 +30,13 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
             cancellationToken);
     }
 
+    public Task<bool> ConfirmFactoryResetAsync(string deviceName, string deviceSerial, CancellationToken cancellationToken)
+    {
+        return ShowConfirmationAsync("FactoryReset_ConfirmCaption", "FactoryReset_ConfirmMessage",
+            "FactoryReset_ConfirmWarning", ConfirmationDialogIcon.Delete, deviceName, deviceSerial, cancellationToken,
+            isDestructive: true);
+    }
+
     public Task<bool> ConfirmChangeAndWipeAsync(
         string deviceName,
         string deviceSerial,
@@ -166,7 +173,8 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
         ConfirmationDialogIcon icon,
         string deviceName,
         string deviceSerial,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isDestructive = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         bool confirmed = await _confirmationDialogService
@@ -179,7 +187,9 @@ public sealed class DeviceActionConfirmationDialogService : IDeviceActionConfirm
                         deviceSerial),
                     Message = _localizationService.GetString(messageKey),
                     WarningMessage = _localizationService.GetString(warningKey),
-                    Icon = icon
+                    Icon = icon,
+                    IsDestructive = isDestructive,
+                    ConfirmButtonText = isDestructive ? _localizationService.GetString("FactoryReset_ConfirmButton") : null
                 },
                 cancellationToken)
             .ConfigureAwait(true);

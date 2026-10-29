@@ -33,6 +33,43 @@
         <Thickness x:Key="Spacing.ConfirmationDialog.ButtonGap">0,0,12,0</Thickness>
         <Thickness x:Key="Metric.ConfirmationDialog.FooterBorderThickness">0,1,0,0</Thickness>
 
+        <ControlTemplate x:Key="ConfirmationDialogDangerButtonTemplate" TargetType="{x:Type Button}">
+            <Border x:Name="ButtonBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="{StaticResource Radius.Medium}">
+                <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="ButtonBorder"
+                            Property="Background"
+                            Value="{DynamicResource Brush.DangerHover}"/>
+                    <Setter TargetName="ButtonBorder"
+                            Property="BorderBrush"
+                            Value="{DynamicResource Brush.DangerHover}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter TargetName="ButtonBorder"
+                            Property="Background"
+                            Value="{DynamicResource Brush.DangerPressed}"/>
+                    <Setter TargetName="ButtonBorder"
+                            Property="BorderBrush"
+                            Value="{DynamicResource Brush.DangerPressed}"/>
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter TargetName="ButtonBorder"
+                            Property="BorderBrush"
+                            Value="{DynamicResource Brush.Focus}"/>
+                    <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="2"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
         <Style x:Key="ConfirmationDialogCloseButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Width" Value="{StaticResource Metric.ConfirmationDialog.CloseButtonSize}"/>
             <Setter Property="Height" Value="{StaticResource Metric.ConfirmationDialog.CloseButtonSize}"/>
@@ -47,43 +84,7 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="{StaticResource Radius.Medium}">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder"
-                                        Property="Background"
-                                        Value="{DynamicResource Brush.DangerHover}"/>
-                                <Setter TargetName="ButtonBorder"
-                                        Property="BorderBrush"
-                                        Value="{DynamicResource Brush.DangerHover}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder"
-                                        Property="Background"
-                                        Value="{DynamicResource Brush.DangerPressed}"/>
-                                <Setter TargetName="ButtonBorder"
-                                        Property="BorderBrush"
-                                        Value="{DynamicResource Brush.DangerPressed}"/>
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="ButtonBorder"
-                                        Property="BorderBrush"
-                                        Value="{DynamicResource Brush.Focus}"/>
-                                <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="2"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
+                    <StaticResource ResourceKey="ConfirmationDialogDangerButtonTemplate"/>
                 </Setter.Value>
             </Setter>
         </Style>
@@ -139,9 +140,19 @@
                                Text="{Binding Caption}"
                                FontSize="{StaticResource Metric.FontSize.Title}"
                                FontWeight="Bold"
-                               Foreground="{DynamicResource Brush.TextPrimary}"
                                TextWrapping="Wrap"
-                               Margin="{StaticResource Spacing.ConfirmationDialog.TitleMargin}"/>
+                               Margin="{StaticResource Spacing.ConfirmationDialog.TitleMargin}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDestructive}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
 
                     <TextBlock x:Name="ConfirmationMessage"
                                Text="{Binding Message}"
@@ -208,8 +219,18 @@
                     <Button x:Name="YesButton"
                             MinWidth="{StaticResource Metric.ConfirmationDialog.ButtonWidth}"
                             Command="{Binding ConfirmCommand}"
-                            ToolTip="{DynamicResource Shared_TooltipConfirm}"
-                            Style="{StaticResource PrimaryButtonStyle}">
+                            ToolTip="{DynamicResource Shared_TooltipConfirm}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsDestructive}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
+                                        <Setter Property="Template" Value="{StaticResource ConfirmationDialogDangerButtonTemplate}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
                         <TextBlock x:Name="YesButtonText"
                                    Text="{Binding ConfirmButtonText}"
                                    Foreground="{DynamicResource Brush.AccentForeground}"/>

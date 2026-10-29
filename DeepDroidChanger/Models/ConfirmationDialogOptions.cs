@@ -8,4 +8,5 @@ public sealed class ConfirmationDialogOptions
     public string? ConfirmButtonText { get; set; }
     public string? CancelButtonText { get; set; }
     public ConfirmationDialogIcon Icon { get; set; } = ConfirmationDialogIcon.Question;
+    public bool IsDestructive { get; set; }
 }

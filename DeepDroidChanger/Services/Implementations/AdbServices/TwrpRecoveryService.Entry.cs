@@ -60,7 +60,7 @@ public sealed partial class TwrpRecoveryService
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Entering TWRP for {Serial} failed at {Stage}.", serial, failureKey);
-            throw new TwrpWorkflowException(failureKey);
+            throw new TwrpWorkflowException(failureKey, exception);
         }
     }
 
@@ -79,7 +79,8 @@ public sealed partial class TwrpRecoveryService
         limit.Token.ThrowIfCancellationRequested();
         var result = await command(limit.Token).ConfigureAwait(false);
         limit.Token.ThrowIfCancellationRequested();
-        if (result.ExitCode != 0) throw new IOException("TWRP entry command failed: " + result.StandardError);
+        if (result.ExitCode != 0)
+            throw new IOException($"Device command failed with exit code {result.ExitCode}: {result.StandardOutput.Trim()} {result.StandardError.Trim()}");
         return result;
     }
 

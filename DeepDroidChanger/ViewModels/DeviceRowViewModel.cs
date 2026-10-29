@@ -56,7 +56,10 @@ public sealed class DeviceRowViewModel : ObservableObject
     public AdbDeviceStatus ConnectionStatus
     {
         get => _connectionStatus;
-        set => SetProperty(ref _connectionStatus, value);
+        set
+        {
+            if (SetProperty(ref _connectionStatus, value)) OnPropertyChanged(nameof(CanFactoryReset));
+        }
     }
 
     internal void ApplyLiveConnectionState(bool isOnline, Func<AdbDeviceStatus, string> getStatusText)
@@ -83,7 +86,10 @@ public sealed class DeviceRowViewModel : ObservableObject
     public string Type
     {
         get => _type;
-        set => SetProperty(ref _type, value);
+        set
+        {
+            if (SetProperty(ref _type, value)) OnPropertyChanged(nameof(CanFactoryReset));
+        }
     }
 
     public bool IsSelected
@@ -125,11 +131,16 @@ public sealed class DeviceRowViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _isActionBusy, value))
+            {
                 OnPropertyChanged(nameof(CanEdit));
+                OnPropertyChanged(nameof(CanFactoryReset));
+            }
         }
     }
 
     public bool CanEdit => !IsActionBusy;
+    public bool CanFactoryReset => !IsActionBusy && (Type is "sargo" or "starlte" or "tissot")
+        && (ConnectionStatus is AdbDeviceStatus.Online or AdbDeviceStatus.Recovery);
 
     public bool HasActionStopButton
     {

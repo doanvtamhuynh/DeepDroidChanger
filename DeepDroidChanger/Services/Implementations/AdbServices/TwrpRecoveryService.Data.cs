@@ -34,6 +34,7 @@ public sealed partial class TwrpRecoveryService
             RecoveryDevice = marker, ArchivePath = archivePath,
             Options = new(false, true)
         };
+        LogOperation(operation, $"{operation.Kind} started: operation={operation.Id}; serial={serial}; configured type={marker}.");
         try
         {
             if (restore) cache.Create(operation);
@@ -57,16 +58,15 @@ public sealed partial class TwrpRecoveryService
             SetDataState(operation, TwrpOperationState.Cleaning, progress);
             await CleanupDataRecoveryAsync(operation, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
-            await AdbAsync(serial, "reboot", token).ConfigureAwait(false);
+            SetDataState(operation, TwrpOperationState.Rebooting, progress);
+            await AdbAsync(operation, "reboot", token).ConfigureAwait(false);
+            LogOperation(operation, "Reboot command sent; Android startup was not checked.");
+            SetDataState(operation, TwrpOperationState.Cleaning, progress);
             LogOperation(operation, "Removing PC temporary files.");
             cache.Clean(operation, success: true);
             operation.State = TwrpOperationState.Completed;
             logger.LogInformation("TWRP operation {Operation} completed; PC cleanup completed.", operation.Id);
-            try { progress?.Report(new(operation.Id, operation.State, "Twrp_State_Completed")); }
-            catch (Exception notificationError)
-            {
-                logger.LogWarning(notificationError, "Cannot display completion for {Operation}.", operation.Id);
-            }
+            NotifyTwrpProgress(operation, progress, new(operation.Id, operation.State, "Twrp_State_Completed"));
         }
         catch (Exception exception)
         {
@@ -108,6 +108,7 @@ public sealed partial class TwrpRecoveryService
     {
         // Entry errors still receive a fresh log-only attempt; no workflow is loaded.
         if (operation.CacheDirectory is null) cache.Create(operation);
+        TwrpOperationState stage = operation.State;
         operation.StopRequested = token.IsCancellationRequested || _confirmedStops.ContainsKey(ownershipId);
         operation.NativeStateUnknown = operation.NativeStarted && !operation.NativeCompleted;
         if (operation.NativeStateUnknown) _unsafeDevices.TryAdd(operation.Device.Serial, 0);
@@ -116,11 +117,14 @@ public sealed partial class TwrpRecoveryService
             TwrpWorkflowException { MessageKey: "Twrp_NativeTimeout" } => "Twrp_NativeTimeout",
             _ when operation.NativeStateUnknown => "Twrp_DirectResultUnknown",
             _ when operation.StopRequested => "Twrp_Stopped",
+            _ when operation.State == TwrpOperationState.Rebooting => "Twrp_RebootFailed",
+            _ when operation.State == TwrpOperationState.Cleaning => "Twrp_CleanupFailed",
             TwrpWorkflowException known => known.MessageKey,
             _ => "Twrp_WorkflowFailed"
         };
         if (operation.StopRequested) SetDataState(operation, TwrpOperationState.Stopping, progress);
-        LogOperation(operation, $"{(operation.StopRequested ? "Stop" : "Failure")}: {exception}. Native state unknown: {operation.NativeStateUnknown}");
+        LogOperation(operation, $"Outcome={(operation.StopRequested ? "Stopped" : "Failed")}; stage={stage}; error={operation.WorkflowError}; native state unknown={operation.NativeStateUnknown}.");
+        if (!operation.StopRequested) LogOperation(operation, exception.ToString());
         await CaptureDataLogsAsync(operation).ConfigureAwait(false);
         // Killing adb does not imply TWRP stopped. Preserve its interlock and remote data if uncertain.
         if (!operation.NativeStateUnknown)
@@ -151,7 +155,12 @@ public sealed partial class TwrpRecoveryService
         }
         SetDataState(operation, operation.StopRequested ? TwrpOperationState.Stopped : TwrpOperationState.Failed, progress);
         ReportData(operation, progress, operation.WorkflowError);
-        logger.LogWarning(exception, "TWRP operation {Operation} failed. Native state unknown: {Unknown}.", operation.Id, operation.NativeStateUnknown);
+        if (operation.StopRequested)
+            logger.LogInformation("TWRP operation {Operation} on {Serial} stopped. Native state unknown: {Unknown}.",
+                operation.Id, operation.Device.Serial, operation.NativeStateUnknown);
+        else
+            logger.LogWarning(exception, "TWRP operation {Operation} on {Serial} failed. Native state unknown: {Unknown}.",
+                operation.Id, operation.Device.Serial, operation.NativeStateUnknown);
     }
 
     private async Task CaptureDataLogsAsync(TwrpOperation operation)
@@ -160,7 +169,7 @@ public sealed partial class TwrpRecoveryService
         {
             using var limit = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             string text = (await ShellAsync(operation.Device.Serial, "cat /tmp/recovery.log 2>/dev/null || true", limit.Token).ConfigureAwait(false)).StandardOutput;
-            Log(operation, "recovery.log", text);
+            Log(operation, "recovery.log", $"{Environment.NewLine}=== Recovery log snapshot at {DateTimeOffset.UtcNow:O} ==={Environment.NewLine}" + text);
         }
         catch (Exception exception) { LogOperation(operation, "Recovery log unavailable: " + exception.Message); }
     }
@@ -174,7 +183,7 @@ public sealed partial class TwrpRecoveryService
     private void ReportData(TwrpOperation operation, IProgress<TwrpProgress>? progress, string key)
     {
         LogOperation(operation, key);
-        progress?.Report(new(operation.Id, operation.State, key));
+        NotifyTwrpProgress(operation, progress, new(operation.Id, operation.State, key));
     }
 
     private sealed class DataEntryProgress(Action<string> report) : IProgress<string>

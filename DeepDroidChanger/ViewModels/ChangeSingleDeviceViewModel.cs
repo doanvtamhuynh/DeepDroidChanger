@@ -649,7 +649,7 @@ namespace DeepDroidChanger.ViewModels
             if (_isDisposed)
                 return;
 
-            if (snapshot.Kind == DeviceActionKind.TwrpRecovery && snapshot.Source == DeviceActionSource.SingleDevice
+            if (snapshot.Kind is DeviceActionKind.TwrpRecovery or DeviceActionKind.FactoryReset && snapshot.Source == DeviceActionSource.SingleDevice
                 && snapshot.State != DeviceActionRuntimeState.Idle)
             {
                 lock (_activeActionOperationsLock)
@@ -949,6 +949,57 @@ namespace DeepDroidChanger.ViewModels
                     _logger.LogError(exception, "Failed to delete device {Serial}.", serial);
                     SetDeviceLog(device, "Log_DeleteDeviceFailed");
                 }
+            }
+        }
+
+        [RelayCommand(AllowConcurrentExecutions = true)]
+        private async Task FactoryResetAsync(DeviceRowViewModel? device)
+        {
+            if (device?.CanFactoryReset != true) return;
+            string serial = device.Serial, expectedMarker = device.Type, name = device.Name;
+            CancellationToken token = _actionLifetimeCancellation.Token;
+            try
+            {
+                var eligibility = await _deviceActionEligibilityService.CheckAsync(serial,
+                    DeviceActionRequirement.OnlineOrRecovery | DeviceActionRequirement.Idle, token).ConfigureAwait(true);
+                if (eligibility != DeviceActionEligibilityFailure.None)
+                {
+                    _deviceActionFeedbackService.ReportEligibilityFailure(serial, eligibility);
+                    return;
+                }
+                if (!await _deviceActionConfirmationDialogService.ConfirmFactoryResetAsync(name, serial, token).ConfigureAwait(true))
+                {
+                    _deviceActionFeedbackService.ReportNonOwningDialogDismissed(serial);
+                    return;
+                }
+                bool receivingProgress = true;
+                var progress = new Progress<TwrpProgress>(value =>
+                {
+                    if (receivingProgress && value.State is not (TwrpOperationState.Completed or TwrpOperationState.Failed or TwrpOperationState.Stopped))
+                        _deviceActionFeedbackService.SetProcess(serial, value.MessageKey);
+                });
+                TwrpOperation result;
+                try
+                {
+                    result = await _twrpRecovery.FactoryResetAsync(serial, expectedMarker, progress, token,
+                        DeviceActionSource.SingleDevice).ConfigureAwait(true);
+                }
+                finally
+                {
+                    receivingProgress = false;
+                }
+                _deviceActionFeedbackService.ReportTwrpResult(serial, result);
+            }
+            catch (OperationCanceledException) { }
+            catch (TwrpWorkflowException exception) when (exception.MessageKey == "Twrp_DeviceBusy")
+            {
+                _deviceActionFeedbackService.ReportEligibilityFailure(serial, DeviceActionEligibilityFailure.Busy);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Factory Reset failed for {Serial}.", serial);
+                _deviceActionFeedbackService.SetNonOwningProcess(serial, exception is TwrpWorkflowException known
+                    ? known.MessageKey : "FactoryReset_PreflightFailed");
             }
         }
 
@@ -2247,11 +2298,7 @@ namespace DeepDroidChanger.ViewModels
                     else _deviceActionFeedbackService.SetProcess(serial, value.MessageKey);
                 }, CancellationToken.None).GetAwaiter().GetResult());
                 var session = await _twrpRecovery.RunAsync(result.Request, progress, _actionLifetimeCancellation.Token);
-                if (session.State != TwrpOperationState.Completed)
-                    SetDeviceLog(device, "Log_TwrpDetailFailed", GetLogText(session.WorkflowError ?? "Twrp_WorkflowFailed"));
-                else if (session.Kind == TwrpOperationKind.Backup && session.ArchivePath is not null)
-                    SetDeviceLog(device, "Log_TwrpBackupSuccess", session.ArchivePath);
-                else SetDeviceLog(device, "Log_TwrpRestoreSuccess");
+                _deviceActionFeedbackService.ReportTwrpResult(serial, session);
             }
             catch (OperationCanceledException) { SetDeviceLog(device, "Log_TwrpCanceled"); }
             catch (TwrpWorkflowException exception) when (exception.MessageKey == "Twrp_DeviceBusy")

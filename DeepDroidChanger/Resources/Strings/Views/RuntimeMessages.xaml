@@ -14,8 +14,8 @@
     <sys:String x:Key="Log_RebootingDevice">Rebooting device...</sys:String>
     <sys:String x:Key="Log_RebootDeviceSuccess">Device reboot command sent</sys:String>
     <sys:String x:Key="Log_RebootDeviceFailed">Failed to reboot device</sys:String>
-    <sys:String x:Key="Log_TwrpBackupSuccess">TWRP backup completed: {0}</sys:String>
-    <sys:String x:Key="Log_TwrpRestoreSuccess">TWRP Data restore completed</sys:String>
+    <sys:String x:Key="Log_TwrpBackupSuccess">TWRP backup created: {0}. Reboot to Android requested; PC cache removed.</sys:String>
+    <sys:String x:Key="Log_TwrpRestoreSuccess">TWRP Data restore completed. Reboot to Android requested; PC cache removed.</sys:String>
     <sys:String x:Key="Log_TwrpDetailFailed">TWRP: {0}</sys:String>
     <sys:String x:Key="Log_TwrpFailed">TWRP backup/restore failed. See the operation logs.</sys:String>
     <sys:String x:Key="Log_TwrpCanceled">TWRP operation canceled</sys:String>

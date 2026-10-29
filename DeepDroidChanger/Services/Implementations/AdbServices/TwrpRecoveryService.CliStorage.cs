@@ -8,6 +8,34 @@ public sealed partial class TwrpRecoveryService
 {
     private static string CliPayloadDirectory(TwrpOperation operation) => Path.Combine(operation.CacheDirectory!, "payload");
 
+    private void NotifyTwrpProgress(TwrpOperation operation, IProgress<TwrpProgress>? progress, TwrpProgress value)
+    {
+        try { progress?.Report(value); }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Cannot display {MessageKey} for TWRP operation {Operation} on {Serial}.",
+                value.MessageKey, operation.Id, operation.Device.Serial);
+        }
+    }
+
+    private static void LogProcessUpdate(TwrpOperation operation, ProcessUpdate update)
+    {
+        lock (operation)
+        {
+            Log(operation, "process.log", $"{DateTimeOffset.UtcNow:O} PID={update.ProcessId} {update.Kind} {update.ExitCode} {update.Text}{Environment.NewLine}");
+            if (update.Kind is ProcessUpdateKind.StandardOutput or ProcessUpdateKind.StandardError)
+                Log(operation, "recovery.log", update.Text);
+        }
+    }
+
+    private void LogCommandResult(TwrpOperation operation, string command, CommandResult result, bool includeOutput = false)
+    {
+        LogOperation(operation, $"Command '{command}' exited with code {result.ExitCode}.");
+        // Streaming commands already record both streams as chunks arrive.
+        if (includeOutput)
+            Log(operation, "process.log", $"{DateTimeOffset.UtcNow:O} {command}; Exit={result.ExitCode}{Environment.NewLine}STDOUT:{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}STDERR:{Environment.NewLine}{result.StandardError}{Environment.NewLine}");
+    }
+
     private static void Log(TwrpOperation operation, string file, string text)
     {
         // Both native streams and the elapsed timer share these writers.
@@ -77,7 +105,7 @@ public sealed partial class TwrpRecoveryService
             set -eu
             for cmdline in /proc/[0-9]*/cmdline; do
                 command=$(tr '\000' ' ' < "$cmdline" 2>/dev/null || true)
-                case "$command" in twrp\ backup*|*/twrp\ backup*|twrp\ restore*|*/twrp\ restore*)
+                case "$command" in twrp\ backup*|*/twrp\ backup*|twrp\ restore*|*/twrp\ restore*|twrp\ format*|*/twrp\ format*)
                     printf '%s\n' DDC_NATIVE_PROCESS_ACTIVE
                     exit 74
                     ;;

@@ -54,7 +54,8 @@ public sealed class ConfirmationDialogService : IConfirmationDialogService
             warningMessage,
             confirmText,
             cancelText,
-            options.Icon);
+            options.Icon,
+            options.IsDestructive);
 
         ConfirmationDialog window = scope.ServiceProvider.GetRequiredService<ConfirmationDialog>();
 

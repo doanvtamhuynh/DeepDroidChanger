@@ -1,8 +1,12 @@
+using DeepDroidChanger.Models;
+
 namespace DeepDroidChanger.Services;
 
 public interface IDeviceActionFeedbackService
 {
     void SetProcess(string serial, string resourceKey, params object[] arguments);
+
+    void ReportTwrpResult(string serial, TwrpOperation operation);
 
     void ReportEligibilityFailure(
         string serial,

@@ -26,6 +26,7 @@ public sealed partial class ConfirmationDialogViewModel : ObservableObject
     private PackIconKind _iconKind = PackIconKind.HelpCircleOutline;
 
     public bool HasWarning => !string.IsNullOrWhiteSpace(WarningMessage);
+    public bool IsDestructive { get; private set; }
 
     public event EventHandler<bool>? CloseRequested;
 
@@ -35,7 +36,8 @@ public sealed partial class ConfirmationDialogViewModel : ObservableObject
         string? warningMessage,
         string confirmButtonText,
         string cancelButtonText,
-        ConfirmationDialogIcon icon = ConfirmationDialogIcon.Question)
+        ConfirmationDialogIcon icon = ConfirmationDialogIcon.Question,
+        bool isDestructive = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(caption);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
@@ -43,6 +45,8 @@ public sealed partial class ConfirmationDialogViewModel : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(cancelButtonText);
 
         Caption = caption;
+        IsDestructive = isDestructive;
+        OnPropertyChanged(nameof(IsDestructive));
         Message = message;
         WarningMessage = warningMessage;
         ConfirmButtonText = confirmButtonText;

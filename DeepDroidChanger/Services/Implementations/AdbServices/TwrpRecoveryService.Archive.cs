@@ -16,7 +16,8 @@ public sealed partial class TwrpRecoveryService
     {
         token.ThrowIfCancellationRequested();
         var current = coordinator.GetOperation(serial);
-        if (current is not { Kind: DeviceActionKind.TwrpRecovery, CanCancel: true } || current.OperationId != operationId)
+        if (current is not { CanCancel: true } || current.OperationId != operationId
+            || current.Kind is not (DeviceActionKind.TwrpRecovery or DeviceActionKind.FactoryReset))
             return Task.FromResult(false);
         _confirmedStops.TryAdd(operationId, 0);
         bool requested = coordinator.TryRequestCancellation(serial, operationId);

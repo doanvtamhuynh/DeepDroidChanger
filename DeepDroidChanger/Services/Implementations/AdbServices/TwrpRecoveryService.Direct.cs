@@ -30,7 +30,7 @@ public sealed partial class TwrpRecoveryService
         void ReportStatus()
         {
             lock (operation)
-                progress?.Report(new(operation.Id, operation.State, "Twrp_NativeStatus",
+                NotifyTwrpProgress(operation, progress, new(operation.Id, operation.State, "Twrp_NativeStatus",
                     Detail: lastOutput, Percent: percent, Elapsed: elapsed.Elapsed, ProcessStatus: processState));
         }
         async Task TickAsync()
@@ -52,11 +52,9 @@ public sealed partial class TwrpRecoveryService
                 lock (operation)
                 {
                     processState = update.Kind == ProcessUpdateKind.Exited ? "Exited" : "Running";
-                    string label = update.Kind.ToString();
-                    Log(operation, "process.log", $"{DateTimeOffset.UtcNow:O} PID={update.ProcessId} {label} {update.ExitCode} {update.Text}{Environment.NewLine}");
+                    LogProcessUpdate(operation, update);
                     if (update.Kind is ProcessUpdateKind.StandardOutput or ProcessUpdateKind.StandardError)
                     {
-                        Log(operation, "recovery.log", update.Text);
                         lastOutput = update.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim() ?? lastOutput;
                         if (lastOutput.Length > 600) lastOutput = lastOutput[^600..];
                         outputTails.TryGetValue(update.Kind, out string? tail);
@@ -69,7 +67,7 @@ public sealed partial class TwrpRecoveryService
                 }
             }, limit.Token).ConfigureAwait(false);
             processState = "Exited";
-            LogOperation(operation, "ADB exit code: " + result.ExitCode);
+            LogCommandResult(operation, command, result);
             string output = result.StandardOutput + "\n" + result.StandardError;
             bool complete = HasNativeCompletion(output, operation.CliRestore);
             if (!complete && result.ExitCode == 0)

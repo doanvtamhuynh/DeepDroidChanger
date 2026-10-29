@@ -2226,6 +2226,57 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task FactoryResetAsync(DeviceRowViewModel? device)
+    {
+        if (device?.CanFactoryReset != true) return;
+        string serial = device.Serial, expectedMarker = device.Type, name = device.Name;
+        CancellationToken token = _actionLifetimeCancellation.Token;
+        try
+        {
+            var eligibility = await _deviceActionEligibilityService.CheckAsync(serial,
+                DeviceActionRequirement.OnlineOrRecovery | DeviceActionRequirement.Idle, token).ConfigureAwait(true);
+            if (eligibility != DeviceActionEligibilityFailure.None)
+            {
+                _deviceActionFeedbackService.ReportEligibilityFailure(serial, eligibility);
+                return;
+            }
+            if (!await _deviceActionConfirmationDialogService.ConfirmFactoryResetAsync(name, serial, token).ConfigureAwait(true))
+            {
+                _deviceActionFeedbackService.ReportNonOwningDialogDismissed(serial);
+                return;
+            }
+            bool receivingProgress = true;
+            var progress = new Progress<TwrpProgress>(value =>
+            {
+                if (receivingProgress && value.State is not (TwrpOperationState.Completed or TwrpOperationState.Failed or TwrpOperationState.Stopped))
+                    _deviceActionFeedbackService.SetProcess(serial, value.MessageKey);
+            });
+            TwrpOperation result;
+            try
+            {
+                result = await _twrpRecovery.FactoryResetAsync(serial, expectedMarker, progress, token,
+                    DeviceActionSource.MultipleDevices).ConfigureAwait(true);
+            }
+            finally
+            {
+                receivingProgress = false;
+            }
+            _deviceActionFeedbackService.ReportTwrpResult(serial, result);
+        }
+        catch (OperationCanceledException) { }
+        catch (TwrpWorkflowException exception) when (exception.MessageKey == "Twrp_DeviceBusy")
+        {
+            _deviceActionFeedbackService.ReportEligibilityFailure(serial, DeviceActionEligibilityFailure.Busy);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Factory Reset failed for {Serial}.", serial);
+            _deviceActionFeedbackService.SetNonOwningProcess(serial, exception is TwrpWorkflowException known
+                ? known.MessageKey : "FactoryReset_PreflightFailed");
+        }
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RebootDeviceAsync(DeviceRowViewModel? device)
     {
         if (device == null || string.IsNullOrWhiteSpace(device.Serial))
@@ -3388,6 +3439,16 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 
     private void OnDeviceActionStateChanged(DeviceActionOperationSnapshot snapshot)
     {
+        if (snapshot.Kind == DeviceActionKind.FactoryReset && snapshot.Source == DeviceActionSource.MultipleDevices
+            && snapshot.State != DeviceActionRuntimeState.Idle)
+        {
+            lock (_activeContextOperationsLock)
+            {
+                if (_activeContextOperationIds.Count == 0)
+                    _activeContextOperationsCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _activeContextOperationIds.Add(snapshot.OperationId);
+            }
+        }
         if (snapshot.State == DeviceActionRuntimeState.Idle)
         {
             TaskCompletionSource? completion = null;

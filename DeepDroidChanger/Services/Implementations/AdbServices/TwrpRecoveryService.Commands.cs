@@ -1,3 +1,4 @@
+using System.IO;
 using DeepDroidChanger.Models;
 
 namespace DeepDroidChanger.Services;
@@ -9,13 +10,20 @@ public sealed partial class TwrpRecoveryService
         token.ThrowIfCancellationRequested();
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(token); limit.CancelAfter(timeout ?? CommandTimeout);
         var result = await adb.RunAdbShellScriptAsync(serial, script, limit.Token).ConfigureAwait(false);
-        if (result.ExitCode != 0) throw new TwrpWorkflowException("Twrp_CommandFailed");
+        limit.Token.ThrowIfCancellationRequested();
+        if (result.ExitCode != 0)
+            throw new TwrpWorkflowException("Twrp_CommandFailed",
+                new IOException($"Shell command exited with code {result.ExitCode}: {result.StandardOutput.Trim()} {result.StandardError.Trim()}"));
         return result;
     }
-    private async Task AdbAsync(string serial, string args, CancellationToken token)
+
+    private async Task AdbAsync(TwrpOperation operation, string args, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(token); limit.CancelAfter(CommandTimeout);
-        if ((await adb.RunAdbAsync(serial, args, limit.Token).ConfigureAwait(false)).ExitCode != 0) throw new TwrpWorkflowException("Twrp_CommandFailed");
+        var result = await adb.RunAdbAsync(operation.Device.Serial, args, limit.Token).ConfigureAwait(false);
+        LogCommandResult(operation, args, result, includeOutput: true);
+        limit.Token.ThrowIfCancellationRequested();
+        if (result.ExitCode != 0) throw new TwrpWorkflowException("Twrp_CommandFailed");
     }
 }

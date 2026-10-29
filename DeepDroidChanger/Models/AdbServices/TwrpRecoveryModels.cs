@@ -1,10 +1,10 @@
 namespace DeepDroidChanger.Models;
 
-public enum TwrpOperationKind { Backup, Restore }
+public enum TwrpOperationKind { Backup, Restore, FactoryReset }
 public enum TwrpOperationState
 {
     Preparing, EnteringRecovery, RecoveryReady, NativeBackupRunning, NativeRestoreRunning,
-    NativeCompleted, Downloading, Packaging, Verifying, Cleaning, Completed, Failed, Stopping, Stopped
+    NativeCompleted, Downloading, Packaging, Verifying, Cleaning, Completed, Failed, Stopping, Stopped, NativeFormatRunning, Rebooting
 }
 
 public sealed record TwrpPartition(string Id, string MountPoint, string BlockName, long Bytes, bool Sensitive = false);
@@ -81,7 +81,7 @@ public sealed class TwrpOperation
     public bool StopRequested { get; set; }
 }
 
-public sealed class TwrpWorkflowException(string messageKey) : InvalidOperationException(messageKey)
+public sealed class TwrpWorkflowException(string messageKey, Exception? innerException = null) : InvalidOperationException(messageKey, innerException)
 {
     public string MessageKey { get; } = messageKey;
 }

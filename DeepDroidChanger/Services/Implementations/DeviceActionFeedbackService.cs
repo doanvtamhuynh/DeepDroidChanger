@@ -1,3 +1,4 @@
+using DeepDroidChanger.Models;
 using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.Services;
@@ -37,6 +38,38 @@ public sealed class DeviceActionFeedbackService : IDeviceActionFeedbackService
             : string.Format(template, arguments);
         _deviceProcessStateService.SetProcess(serial, message, resourceKey);
         _logger.LogInformation("Device {Serial} action: {Message}", serial, message);
+    }
+
+    public void ReportTwrpResult(string serial, TwrpOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        if (operation.State == TwrpOperationState.Completed)
+        {
+            switch (operation.Kind)
+            {
+                case TwrpOperationKind.FactoryReset:
+                    SetProcess(serial, "FactoryReset_ResultSuccess");
+                    break;
+                case TwrpOperationKind.Backup:
+                    SetProcess(serial, "Log_TwrpBackupSuccess", operation.ArchivePath ?? "");
+                    break;
+                case TwrpOperationKind.Restore:
+                    SetProcess(serial, "Log_TwrpRestoreSuccess");
+                    break;
+            }
+            return;
+        }
+
+        bool stopped = operation.State == TwrpOperationState.Stopped;
+        string fallback = (operation.Kind, stopped) switch
+        {
+            (TwrpOperationKind.FactoryReset, true) => "FactoryReset_Canceled",
+            (TwrpOperationKind.FactoryReset, false) => "FactoryReset_PreflightFailed",
+            (_, true) => "Twrp_Stopped",
+            _ => "Twrp_WorkflowFailed"
+        };
+        string detail = _localizationService.GetString(operation.WorkflowError ?? fallback);
+        SetProcess(serial, stopped ? "Twrp_ResultCanceled" : "Twrp_ResultFailed", detail, operation.CacheDirectory ?? "");
     }
 
     public void ReportEligibilityFailure(

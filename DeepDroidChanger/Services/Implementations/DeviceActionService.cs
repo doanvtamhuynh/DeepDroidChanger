@@ -12,15 +12,18 @@ namespace DeepDroidChanger.Services
         private readonly IAdbCommandService _commandService;
         private readonly IDevicePackageService _packageService;
         private readonly IAdbDeviceService _deviceService;
+        private readonly IDeviceActionCoordinatorService? _coordinator;
 
         public DeviceActionService(
             IAdbCommandService commandService,
             IDevicePackageService packageService,
-            IAdbDeviceService? deviceService = null)
+            IAdbDeviceService? deviceService = null,
+            IDeviceActionCoordinatorService? coordinator = null)
         {
             _commandService = commandService;
             _packageService = packageService;
             _deviceService = deviceService ?? new AdbDeviceService(commandService);
+            _coordinator = coordinator;
         }
 
         public async Task RebootAsync(string serial, CancellationToken cancellationToken)
@@ -34,6 +37,8 @@ namespace DeepDroidChanger.Services
                 var devices = await _deviceService.GetConnectedDevicesAsync(timeout.Token).ConfigureAwait(false);
                 AdbDevice? device = devices.FirstOrDefault(candidate =>
                     string.Equals(candidate.Serial, serial, StringComparison.OrdinalIgnoreCase));
+                if (_coordinator?.GetOperation(serial)?.Kind == DeviceActionKind.FactoryReset)
+                    throw new TwrpWorkflowException("Twrp_DeviceBusy");
                 switch (device?.Status)
                 {
                     case AdbDeviceStatus.Online:

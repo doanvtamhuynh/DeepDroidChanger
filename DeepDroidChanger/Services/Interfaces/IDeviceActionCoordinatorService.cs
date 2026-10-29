@@ -37,6 +37,7 @@ public enum DeviceActionKind
     BatchStopChangeSim,
     TwrpRecovery,
     EnterTwrp,
+    FactoryReset,
 }
 
 public static class DeviceActionKindExtensions
@@ -136,6 +137,7 @@ public static class DeviceActionKindExtensions
             DeviceActionKind.ViewRandomDeviceInfo => "DeviceAction_Name_ViewRandomDeviceInfo",
             DeviceActionKind.TwrpRecovery => "Twrp_Title",
             DeviceActionKind.EnterTwrp => "Twrp_EntryTitle",
+            DeviceActionKind.FactoryReset => "FactoryReset_Title",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }

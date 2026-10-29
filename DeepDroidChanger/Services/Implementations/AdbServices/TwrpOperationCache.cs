@@ -9,7 +9,7 @@ public sealed class TwrpOperationCache
     private static readonly object CreationGate = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, string> _owned = new();
     public string CacheRoot { get; }
-    public TwrpOperationCache() : this(Path.Combine(AppContext.BaseDirectory, "Backup", "cache")) { }
+    public TwrpOperationCache() : this(Path.Combine(AppContext.BaseDirectory, "cache")) { }
     internal TwrpOperationCache(string cacheRoot) => CacheRoot = Path.GetFullPath(cacheRoot);
 
     internal void Create(TwrpOperation operation)
@@ -19,7 +19,9 @@ public sealed class TwrpOperationCache
 
     private void CreateOwned(TwrpOperation operation)
     {
-        string name = TwrpSafety.CliBackupName(operation.ArchivePath!);
+        string name = operation.Kind == TwrpOperationKind.FactoryReset
+            ? "factory_reset_" + operation.Id.ToString("N")
+            : TwrpSafety.CliBackupName(operation.ArchivePath!);
         TwrpSafety.ValidateLocalDirectory(CacheRoot);
         Directory.CreateDirectory(CacheRoot);
         string directory = Path.Combine(CacheRoot, name);
