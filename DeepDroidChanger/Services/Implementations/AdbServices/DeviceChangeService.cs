@@ -12,6 +12,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
     private const string LegacySim2IccidProperty = PropertyConstants.LegacySim2.Iccid;
     private const string LegacySim2ImsiProperty = PropertyConstants.LegacySim2.Imsi;
     private const string LegacySim2PhoneNumberProperty = PropertyConstants.LegacySim2.PhoneNumber;
+    private static readonly TimeSpan AndroidIdPersistenceDelay = TimeSpan.FromSeconds(3);
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _deviceLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly IAdbCommandService _adb;
@@ -161,7 +162,6 @@ public sealed class DeviceChangeService : IDeviceChangeService
             }
 
             await _cleanupService.DeleteSsaidAsync(serial, cancellationToken).ConfigureAwait(false);
-            await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             bool updateIntegrity = ShouldUpdateIntegrity(options);
             bool changeLocation = ShouldChangeLocation(options);
@@ -178,6 +178,7 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            await DeleteAndroidIdSettingAsync(serial, originalAndroidId, cancellationToken).ConfigureAwait(false);
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
             progress?.Report(DeviceChangeStage.Verifying);
             await VerifyAppliedProfileAsync(
@@ -270,9 +271,10 @@ public sealed class DeviceChangeService : IDeviceChangeService
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            await DeleteAndroidIdSettingAsync(serial, originalAndroidId, cancellationToken).ConfigureAwait(false);
+
             progress?.Report(DeviceChangeStage.ClearingData);
             await _cleanupService.CleanAsync(serial, options, cancellationToken).ConfigureAwait(false);
-            await DeleteAndroidIdSettingAsync(serial, cancellationToken).ConfigureAwait(false);
 
             await RebootAndWaitAsync(serial, progress, cancellationToken).ConfigureAwait(false);
             await _cleanupService
@@ -772,26 +774,52 @@ public sealed class DeviceChangeService : IDeviceChangeService
         }
     }
 
-    private Task<string> ReadAndroidIdAsync(
+    private async Task<string> ReadAndroidIdAsync(
         string serial,
         CancellationToken cancellationToken)
     {
-        return _adb.GetSettingAsync(
-            serial,
-            DeviceSettingsInfoConstants.SecureNamespace,
-            DeviceSettingsInfoConstants.AndroidId,
-            cancellationToken);
+        string androidId = await _adb.GetSettingAsync(
+                serial,
+                DeviceSettingsInfoConstants.SecureNamespace,
+                DeviceSettingsInfoConstants.AndroidId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(androidId))
+            throw new InvalidOperationException($"Unable to read Android ID on device {serial}.");
+
+        return androidId;
     }
 
-    private Task DeleteAndroidIdSettingAsync(
+    private async Task DeleteAndroidIdSettingAsync(
         string serial,
+        string originalAndroidId,
         CancellationToken cancellationToken)
     {
-        return _adb.DeleteSettingAsync(
-            serial,
-            DeviceSettingsInfoConstants.SecureNamespace,
-            DeviceSettingsInfoConstants.AndroidId,
-            cancellationToken);
+        _logger.LogInformation("Deleting secure Android ID before reboot on {Serial}.", serial);
+        await _adb.DeleteSettingAsync(
+                serial,
+                DeviceSettingsInfoConstants.SecureNamespace,
+                DeviceSettingsInfoConstants.AndroidId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // SettingsProvider writes asynchronously, with a delay of up to two seconds.
+        // An immediate adb reboot can reload the old ID before that write completes.
+        await Task.Delay(AndroidIdPersistenceDelay, cancellationToken).ConfigureAwait(false);
+        string currentAndroidId = await ReadAndroidIdAsync(serial, cancellationToken).ConfigureAwait(false);
+        if (HasExistingAndroidId(currentAndroidId)
+            && string.Equals(currentAndroidId.Trim(), originalAndroidId.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Android ID was not deleted on device {serial}; reboot was canceled.");
+        }
+
+        await RunRequiredShellAsync(
+                serial,
+                "sync",
+                "sync deleted Android ID before reboot",
+                cancellationToken)
+            .ConfigureAwait(false);
+        _logger.LogInformation("Verified secure Android ID reset and synced before reboot on {Serial}.", serial);
     }
 
     private async Task VerifyRegeneratedAndroidIdAsync(
@@ -803,10 +831,12 @@ public sealed class DeviceChangeService : IDeviceChangeService
 
         if (!HasExistingAndroidId(currentAndroidId)
             || (HasExistingAndroidId(originalAndroidId)
-                && string.Equals(currentAndroidId.Trim(), originalAndroidId.Trim(), StringComparison.Ordinal)))
+                && string.Equals(currentAndroidId.Trim(), originalAndroidId.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException($"Android ID was not regenerated on device {serial}.");
         }
+
+        _logger.LogInformation("Verified regenerated Android ID after reboot on {Serial}.", serial);
     }
 
     private async Task VerifyAppliedProfileAsync(
