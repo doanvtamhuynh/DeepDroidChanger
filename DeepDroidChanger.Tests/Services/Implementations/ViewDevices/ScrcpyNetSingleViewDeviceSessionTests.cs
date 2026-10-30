@@ -1193,6 +1193,54 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
         Assert.AreNotEqual(firstPort, secondPort);
     }
 
+    [TestMethod]
+    public async Task ClipboardValidation_RejectsOversizeAndUnsafeTypingWithoutSending()
+    {
+        FakeClient client = new(CreateUninitializedScrcpy()) { Connected = true, Width = 720, Height = 1280 };
+        await using var session = CreateSession(new FakeDeviceResolver(), new FakeClientFactory(client));
+        await session.StartAsync(CancellationToken.None);
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() => session.PasteHostClipboardAsync(new string('a', SetClipboardControlMessage.MaxTextBytes + 1)));
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() => session.InjectTextAsync("Tiếng Việt 😀"));
+        await Assert.ThrowsExactlyAsync<ArgumentException>(() => session.InjectTextAsync(new string('a', 301)));
+        Assert.IsEmpty(client.Commands);
+        foreach (string text in new[] { "Tiếng Việt", "e\u0301", "日本語 中文 😀\n\t" }) await session.PasteHostClipboardAsync(text);
+        Assert.HasCount(3, client.Commands);
+    }
+
+    [TestMethod]
+    public async Task UhidStartupFailure_RetriesOnceWithSdkAndRetainsAudioOption()
+    {
+        FakeClient bad = new(CreateUninitializedScrcpy()) { StartException = new IOException("UHID failed") };
+        FakeClient good = new(CreateUninitializedScrcpy()) { Width = 720, Height = 1280 };
+        FakeClientFactory factory = new(bad, good);
+        await using var session = new ScrcpyNetSingleViewDeviceSession(
+            new ViewDeviceLaunchOptions(Serial) { KeyboardMode = ViewDeviceKeyboardMode.Uhid, NoAudio = false },
+            new FakeDeviceResolver(), factory, new TestLogger<ScrcpyNetSingleViewDeviceSession>());
+        await session.StartAsync(CancellationToken.None);
+        Assert.AreEqual(SingleViewDeviceSessionState.Running, session.State);
+        Assert.IsTrue(session.UhidFallback);
+        Assert.AreEqual(ViewDeviceKeyboardMode.Sdk, session.KeyboardMode);
+        Assert.HasCount(2, factory.Options);
+        Assert.AreEqual(ViewDeviceKeyboardMode.Uhid, factory.Options[0].KeyboardMode);
+        Assert.AreEqual(ViewDeviceKeyboardMode.Sdk, factory.Options[1].KeyboardMode);
+        Assert.IsFalse(factory.Options[1].NoAudio);
+        Assert.AreEqual(1, bad.DisposeCount);
+    }
+
+    [TestMethod]
+    public async Task UhidPreflightUnavailable_SkipsUhidAndDoesNotRetry()
+    {
+        FakeClient client = new(CreateUninitializedScrcpy()) { Width = 720, Height = 1280 };
+        FakeClientFactory factory = new(client) { UhidAvailable = false };
+        await using var session = new ScrcpyNetSingleViewDeviceSession(
+            new ViewDeviceLaunchOptions(Serial) { KeyboardMode = ViewDeviceKeyboardMode.Uhid },
+            new FakeDeviceResolver(), factory, new TestLogger<ScrcpyNetSingleViewDeviceSession>());
+        await session.StartAsync(CancellationToken.None);
+        Assert.AreEqual(1, factory.CreateCount);
+        Assert.AreEqual(ViewDeviceKeyboardMode.Sdk, factory.Options[0].KeyboardMode);
+        Assert.IsTrue(session.UhidFallback);
+    }
+
     private static ScrcpyNetSingleViewDeviceSession CreateSession(
         ISharpAdbDeviceResolver resolver,
         IScrcpyNetClientFactory factory,
@@ -1268,10 +1316,14 @@ public sealed class ScrcpyNetSingleViewDeviceSessionTests
         private readonly Queue<FakeClient> _clients = new(clients);
 
         public int CreateCount { get; private set; }
+        public List<ViewDeviceLaunchOptions> Options { get; } = [];
+        public bool UhidAvailable { get; init; } = true;
+        public Task<bool> CanUseUhidAsync(DeviceData device, CancellationToken cancellationToken) => Task.FromResult(UhidAvailable);
 
         public IScrcpyNetClient Create(DeviceData device, ViewDeviceLaunchOptions options)
         {
             CreateCount++;
+            Options.Add(options);
             Assert.AreEqual(Serial, options.Serial);
             if (_clients.Count == 0)
                 throw new InvalidOperationException("No fake client was configured.");

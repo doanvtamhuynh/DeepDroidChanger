@@ -10,6 +10,7 @@ public sealed partial class ViewMultipleDeviceTile : UserControl
 {
     private ViewMultipleDeviceItemViewModel? _viewModel;
     private bool _isLoaded;
+    private readonly ViewDeviceShortcutResolver _shortcutResolver = new();
 
     public ViewMultipleDeviceTile()
     {
@@ -17,6 +18,13 @@ public sealed partial class ViewMultipleDeviceTile : UserControl
         DataContextChanged += OnDataContextChanged;
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        ScrcpyDisplay.GotKeyboardFocus += (_, _) => _viewModel?.Controls.Activate();
+        ScrcpyDisplay.PreviewMouseDown += (_, _) => _viewModel?.Controls.Activate();
+        ScrcpyDisplay.LostKeyboardFocus += (_, _) => _shortcutResolver.Reset();
+        PreviewKeyUp += (_, args) =>
+        {
+            if (args.Key is Key.LeftAlt or Key.RightAlt || args.SystemKey is Key.LeftAlt or Key.RightAlt) _shortcutResolver.Reset();
+        };
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
@@ -61,22 +69,47 @@ public sealed partial class ViewMultipleDeviceTile : UserControl
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs eventArgs)
     {
+        if (!ScrcpyDisplay.IsKeyboardFocusWithin || _viewModel is null) return;
+        if (Keyboard.IsKeyDown(Key.RightAlt) && !Keyboard.IsKeyDown(Key.LeftAlt)) return;
         Key physicalKey = eventArgs.Key == Key.System
             ? eventArgs.SystemKey
             : eventArgs.Key;
-        if (!ViewMultipleDeviceShortcutPolicy.IsExactHostPaste(
-                physicalKey,
-                eventArgs.KeyboardDevice.Modifiers))
-        {
-            return;
-        }
-
+        ViewDeviceShortcutResolution resolution = _shortcutResolver.Resolve(physicalKey, eventArgs.KeyboardDevice.Modifiers, eventArgs.IsRepeat);
+        if (!resolution.Consume) return;
         eventArgs.Handled = true;
-        if (ViewMultipleDeviceShortcutPolicy.ShouldExecuteHostPaste(
-                physicalKey,
-                eventArgs.KeyboardDevice.Modifiers,
-                eventArgs.IsRepeat))
-            _viewModel?.PasteHostClipboardCommand.Execute(null);
+        if (!ViewDeviceShortcutPolicy.ShouldExecute(resolution, eventArgs.IsRepeat)) return;
+        ViewDeviceControlsViewModel controls = _viewModel.Controls;
+        switch (resolution.Action)
+        {
+            case ViewDeviceShortcutAction.Paste: controls.PasteCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.Back: controls.BackCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.ScreenOff: controls.ScreenOffCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.ScreenOn: controls.ScreenOnCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.ExpandNotifications: controls.NotificationsCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.ExpandSettings: controls.SettingsPanelCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.CollapsePanels: controls.CollapsePanelsCommand.Execute(null); break;
+            case ViewDeviceShortcutAction.Home: controls.SendKeyCommand.Execute(3); break;
+            case ViewDeviceShortcutAction.Recent: controls.SendKeyCommand.Execute(187); break;
+            case ViewDeviceShortcutAction.Power: controls.SendKeyCommand.Execute(26); break;
+            case ViewDeviceShortcutAction.VolumeUp: controls.SendKeyCommand.Execute(24); break;
+            case ViewDeviceShortcutAction.VolumeDown: controls.SendKeyCommand.Execute(25); break;
+            case ViewDeviceShortcutAction.Menu: controls.SendKeyCommand.Execute(82); break;
+        }
+    }
+
+
+    private void OnDragOver(object sender, DragEventArgs args)
+    {
+        string[]? files = ViewDeviceWindow.GetDroppedFiles(args.Data);
+        args.Effects = files is not null && _viewModel?.Controls.DropFilesCommand.CanExecute(files) == true ? DragDropEffects.Copy : DragDropEffects.None;
+        args.Handled = true;
+    }
+
+    private void OnDrop(object sender, DragEventArgs args)
+    {
+        string[]? files = ViewDeviceWindow.GetDroppedFiles(args.Data);
+        if (files is not null && _viewModel?.Controls.DropFilesCommand.CanExecute(files) == true) _viewModel.Controls.DropFilesCommand.Execute(files);
+        args.Handled = true;
     }
 
     private void UpdateStreamViewportLayout()

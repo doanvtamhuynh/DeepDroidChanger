@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using DeepDroidChanger.ViewDevices.Models;
 using WpfPoint = System.Windows.Point;
 
 namespace ScrcpyNet.Wpf
@@ -57,9 +58,10 @@ namespace ScrcpyNet.Wpf
         private int wheelRemainder;
         private int renderedFrameWidth;
         private int renderedFrameHeight;
+        private ModifierKeys gestureModifiers;
 
         internal const ulong PrimaryPointerId = ulong.MaxValue;
-        internal const ulong VirtualPointerId = ulong.MaxValue - 1;
+        internal const ulong VirtualPointerId = ulong.MaxValue - 2;
 
         static ScrcpyDisplay()
         {
@@ -87,7 +89,7 @@ namespace ScrcpyNet.Wpf
                 renderTarget.Source = bmp;
 
             Scrcpy? current = Volatile.Read(ref subscribedScrcpy);
-            if (current is not null && ReferenceEquals(current, Scrcpy))
+            if (current is not null && !current.IsVideoPaused && ReferenceEquals(current, Scrcpy))
                 RenderLatestFrame(current.VideoStreamDecoder);
         }
 
@@ -96,7 +98,7 @@ namespace ScrcpyNet.Wpf
             // For some reason WPF doesn't focus the control on click??
             Focus();
             Scrcpy? scrcpy = Scrcpy;
-            if (scrcpy is not null)
+            if (scrcpy is { ControlEnabled: true, IsVideoPaused: false })
             {
                 if (e.ChangedButton == MouseButton.Middle)
                 {
@@ -136,7 +138,8 @@ namespace ScrcpyNet.Wpf
                     Position? position = GetScrcpyMousePosition(e);
                     if (position is not null)
                     {
-                        bool pinchRequested = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+                        gestureModifiers = Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift);
+                        bool pinchRequested = gestureModifiers != ModifierKeys.None;
                         bool captureSucceeded = CaptureMouse();
                         if (pointerState.TryBeginPointerDown(captureSucceeded, pinchRequested))
                         {
@@ -151,7 +154,7 @@ namespace ScrcpyNet.Wpf
                             ];
                             if (pointerState.IsPinchActive)
                             {
-                                lastVirtualPointerPosition = GetVirtualFingerPosition(position);
+                                lastVirtualPointerPosition = GetGestureFingerPosition(position);
                                 messages.Add(
                                     CreateTouchCommand(
                                         AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN,
@@ -202,7 +205,7 @@ namespace ScrcpyNet.Wpf
                     ];
                     if (pinchActive)
                     {
-                        Position virtualPosition = GetVirtualFingerPosition(primaryPosition);
+                        Position virtualPosition = GetGestureFingerPosition(primaryPosition);
                         lastVirtualPointerPosition = virtualPosition;
                         messages.Add(
                             CreateTouchCommand(
@@ -225,7 +228,7 @@ namespace ScrcpyNet.Wpf
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            if (pointerState.CanMove)
+            if (pointerState.CanMove && Scrcpy is { ControlEnabled: true, IsVideoPaused: false })
             {
                 Position? position = GetScrcpyMousePosition(e);
                 Scrcpy? scrcpy = Scrcpy;
@@ -241,7 +244,7 @@ namespace ScrcpyNet.Wpf
                     ];
                     if (pointerState.IsPinchActive)
                     {
-                        lastVirtualPointerPosition = GetVirtualFingerPosition(position);
+                        lastVirtualPointerPosition = GetGestureFingerPosition(position);
                         messages.Add(
                             CreateTouchCommand(
                                 AndroidMotionEventAction.AMOTION_EVENT_ACTION_MOVE,
@@ -260,6 +263,19 @@ namespace ScrcpyNet.Wpf
         {
             Scrcpy? scrcpy = Scrcpy;
             Key physicalKey = NormalizePhysicalKey(e.Key, e.SystemKey);
+            if (scrcpy is not { ControlEnabled: true, IsVideoPaused: false }) { e.Handled = true; return; }
+            if (scrcpy.KeyboardMode == ViewDeviceKeyboardMode.Uhid)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat && TryGetHidUsage(physicalKey, out byte usage))
+                {
+                    byte leds = (byte)((Keyboard.IsKeyToggled(Key.NumLock) ? 1 : 0) | (Keyboard.IsKeyToggled(Key.CapsLock) ? 2 : 0));
+                    List<IControlMessage> messages = new(scrcpy.HidKeyboard.SynchronizeLocks(leds, usage));
+                    messages.Add(new UhidInputControlMessage { Data = scrcpy.HidKeyboard.SetKey(usage, true) });
+                    scrcpy.TrySendControlCommands(messages);
+                }
+                return;
+            }
             if (scrcpy != null && KeycodeHelper.TryConvertKey(physicalKey, out AndroidKeycode keyCode))
             {
                 e.Handled = true;
@@ -283,6 +299,13 @@ namespace ScrcpyNet.Wpf
         {
             Scrcpy? scrcpy = Scrcpy;
             Key physicalKey = NormalizePhysicalKey(e.Key, e.SystemKey);
+            if (scrcpy is { KeyboardMode: ViewDeviceKeyboardMode.Uhid })
+            {
+                e.Handled = true;
+                if (TryGetHidUsage(physicalKey, out byte usage))
+                    scrcpy.TrySendControlCommands([new UhidInputControlMessage { Data = scrcpy.HidKeyboard.SetKey(usage, false) }]);
+                return;
+            }
             if (KeycodeHelper.TryConvertKey(physicalKey, out _))
             {
                 e.Handled = true;
@@ -318,7 +341,7 @@ namespace ScrcpyNet.Wpf
         {
             Position? position = GetScrcpyMousePosition(e);
             Scrcpy? scrcpy = Scrcpy;
-            if (scrcpy != null && position != null && e.Delta != 0)
+            if (scrcpy is { ControlEnabled: true, IsVideoPaused: false } && position != null && e.Delta != 0)
             {
                 e.Handled = true;
 
@@ -360,6 +383,8 @@ namespace ScrcpyNet.Wpf
                 PointerId = pointerId,
                 Position = position,
                 Buttons = ScrcpyDisplayTouchPolicy.GetButtons(action, pointerId),
+                ActionButton = pointerId == PrimaryPointerId && action is AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN or AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP
+                    ? AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY : 0,
                 Pressure = ScrcpyDisplayTouchPolicy.GetPressure(action)
             };
         }
@@ -396,6 +421,40 @@ namespace ScrcpyNet.Wpf
                     Height = primaryPosition.ScreenSize.Height
                 }
             };
+        }
+
+        private Position GetGestureFingerPosition(Position primary)
+        {
+            Position reflected = GetVirtualFingerPosition(primary);
+            if (gestureModifiers == ModifierKeys.Shift) reflected.Point.Y = primary.Point.Y;
+            else if (gestureModifiers == (ModifierKeys.Control | ModifierKeys.Shift)) reflected.Point.X = primary.Point.X;
+            return reflected;
+        }
+
+        private static bool TryGetHidUsage(Key key, out byte usage)
+        {
+            if (key is >= Key.A and <= Key.Z) usage = (byte)(4 + key - Key.A);
+            else if (key is >= Key.D1 and <= Key.D9) usage = (byte)(0x1E + key - Key.D1);
+            else if (key is >= Key.F1 and <= Key.F12) usage = (byte)(0x3A + key - Key.F1);
+            else if (key is >= Key.NumPad1 and <= Key.NumPad9) usage = (byte)(0x59 + key - Key.NumPad1);
+            else usage = key switch
+            {
+                Key.D0 => 0x27, Key.Enter => 0x28, Key.Escape => 0x29, Key.Back => 0x2A,
+                Key.Tab => 0x2B, Key.Space => 0x2C, Key.OemMinus => 0x2D, Key.OemPlus => 0x2E,
+                Key.OemOpenBrackets => 0x2F, Key.OemCloseBrackets => 0x30, Key.OemPipe => 0x31,
+                Key.OemSemicolon => 0x33, Key.OemQuotes => 0x34, Key.OemTilde => 0x35,
+                Key.OemComma => 0x36, Key.OemPeriod => 0x37, Key.OemQuestion => 0x38,
+                Key.CapsLock => 0x39, Key.PrintScreen => 0x46, Key.Scroll => 0x47, Key.Pause => 0x48,
+                Key.Insert => 0x49, Key.Home => 0x4A, Key.PageUp => 0x4B, Key.Delete => 0x4C,
+                Key.End => 0x4D, Key.PageDown => 0x4E, Key.Right => 0x4F, Key.Left => 0x50,
+                Key.Down => 0x51, Key.Up => 0x52, Key.NumLock => 0x53, Key.Divide => 0x54,
+                Key.Multiply => 0x55, Key.Subtract => 0x56, Key.Add => 0x57, Key.NumPad0 => 0x62,
+                Key.Decimal => 0x63, Key.OemBackslash => 0x64, Key.Apps => 0x65,
+                Key.LeftCtrl => 0xE0, Key.LeftShift => 0xE1, Key.LeftAlt => 0xE2, Key.LWin => 0xE3,
+                Key.RightCtrl => 0xE4, Key.RightShift => 0xE5, Key.RightAlt => 0xE6, Key.RWin => 0xE7,
+                _ => 0
+            };
+            return usage != 0;
         }
 
         /// <summary>
@@ -462,7 +521,7 @@ namespace ScrcpyNet.Wpf
                 {
                     SendTouchBatch(
                         scrcpy,
-                        CreatePointerRecoveryMessages(primaryPosition, pinchActive));
+                        CreatePointerRecoveryMessages(primaryPosition, pinchActive, lastVirtualPointerPosition));
                 }
             }
             finally
@@ -474,6 +533,8 @@ namespace ScrcpyNet.Wpf
 
         private void ReleaseActiveKeys(Scrcpy? scrcpy)
         {
+            if (scrcpy is { KeyboardMode: ViewDeviceKeyboardMode.Uhid })
+                scrcpy.TrySendControlCommands([new UhidInputControlMessage { Data = scrcpy.HidKeyboard.ReleaseAll() }]);
             IReadOnlyList<ActiveAndroidKey> activeKeys = keyState.SnapshotAndClear();
             if (scrcpy is null || activeKeys.Count == 0)
                 return;
@@ -611,7 +672,8 @@ namespace ScrcpyNet.Wpf
         }
         internal static IReadOnlyList<TouchEventControlMessage> CreatePointerRecoveryMessages(
             Position primaryPosition,
-            bool pinchActive)
+            bool pinchActive,
+            Position? virtualPosition = null)
         {
             ArgumentNullException.ThrowIfNull(primaryPosition);
             List<TouchEventControlMessage> messages =
@@ -626,7 +688,7 @@ namespace ScrcpyNet.Wpf
                 messages.Add(
                     CreateTouchCommand(
                         AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP,
-                        GetVirtualFingerPosition(primaryPosition),
+                        virtualPosition ?? GetVirtualFingerPosition(primaryPosition),
                         VirtualPointerId));
             }
             return messages;
@@ -672,6 +734,7 @@ namespace ScrcpyNet.Wpf
 
         private void OnFrame(object? sender, FrameData frameData)
         {
+            if (Volatile.Read(ref subscribedScrcpy)?.IsVideoPaused == true) return;
             if (sender is not VideoStreamDecoder sourceDecoder ||
                 !IsCurrentFrameSource(sourceDecoder) ||
                 renderTarget == null)
@@ -733,7 +796,7 @@ namespace ScrcpyNet.Wpf
                 frameMailbox,
                 frame =>
                 {
-                    if (frame.SourceDecoder is not null &&
+                    if (Scrcpy?.IsVideoPaused != true && frame.SourceDecoder is not null &&
                         frame.Generation == Volatile.Read(ref renderGeneration) &&
                         IsCurrentFrameSource(frame.SourceDecoder) &&
                         frame.Buffer is not null)
@@ -958,6 +1021,7 @@ namespace ScrcpyNet.Wpf
                 try
                 {
                     old.VideoStreamDecoder.OnFrame -= display.OnFrame;
+                    old.FeaturesChanged -= display.OnFeaturesChanged;
                 }
                 catch (Exception exception)
                 {
@@ -984,6 +1048,7 @@ namespace ScrcpyNet.Wpf
                 // arriving during binding has no subscription gap.
                 Volatile.Write(ref display.subscribedScrcpy, current);
                 current.VideoStreamDecoder.OnFrame += display.OnFrame;
+                current.FeaturesChanged += display.OnFeaturesChanged;
                 display.frameMailbox.SetCurrentSource(current.VideoStreamDecoder, generation);
             }
 
@@ -995,6 +1060,18 @@ namespace ScrcpyNet.Wpf
                 display.RenderLatestFrame(current.VideoStreamDecoder);
             else
                 Volatile.Write(ref display.subscribedScrcpy, null);
+        }
+
+        private void OnFeaturesChanged(object? sender, EventArgs args)
+        {
+            Scrcpy? current = Volatile.Read(ref subscribedScrcpy);
+            if (Dispatcher.HasShutdownStarted) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (current is null || !ReferenceEquals(current, Scrcpy)) return;
+                if (current.IsVideoPaused) ReleaseActiveInput();
+                else RenderLatestFrame(current.VideoStreamDecoder);
+            }));
         }
 
         internal static Key NormalizePhysicalKey(Key key, Key systemKey)

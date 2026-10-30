@@ -106,11 +106,6 @@ internal sealed class ViewDeviceShortcutResolver
         return (modifiers, physicalKey) switch
         {
             (ModifierKeys.Control, Key.V) => new(ViewDeviceShortcutAction.Paste, true),
-            (ModifierKeys.Alt, Key.V) => new(ViewDeviceShortcutAction.PasteWithPasteKey, true),
-            (ModifierKeys.Alt | ModifierKeys.Shift, Key.V) =>
-                new(ViewDeviceShortcutAction.InjectClipboardText, true),
-            (ModifierKeys.Alt, Key.C) => new(ViewDeviceShortcutAction.Copy, true),
-            (ModifierKeys.Alt, Key.X) => new(ViewDeviceShortcutAction.Cut, true),
             _ => new(ViewDeviceShortcutAction.None, false)
         };
     }

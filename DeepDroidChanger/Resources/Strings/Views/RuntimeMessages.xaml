@@ -224,10 +224,22 @@
     <sys:String x:Key="ViewDevice_RuntimeToggleFailed">Unable to change device state</sys:String>
     <sys:String x:Key="ViewDevice_RuntimeToggleVerificationFailed">Device state did not reach the requested value</sys:String>
     <sys:String x:Key="ViewDevice_RuntimeToggleUnableToVerify">Unable to verify the device state</sys:String>
-    <sys:String x:Key="ViewDevice_DropPackageOverlay">Drop APK/XAPK to install</sys:String>
+    <sys:String x:Key="ViewDevice_DropPackageOverlay">Drop APK/XAPK to install, or files to copy to Downloads</sys:String>
     <sys:String x:Key="ViewDevice_RestartSent">Restart command sent</sys:String>
     <sys:String x:Key="ViewDevice_RestartFailed">Unable to restart the device</sys:String>
     <sys:String x:Key="ViewDevice_InstallFileInvalid">Choose one APK or XAPK file</sys:String>
     <sys:String x:Key="ViewDevice_InstallSucceeded">Package installation completed</sys:String>
     <sys:String x:Key="ViewDevice_InstallFailed">Package installation failed</sys:String>
+    <sys:String x:Key="ViewDevice_Audio">Toggle device audio (reconnects this viewer)</sys:String>
+    <sys:String x:Key="ViewDevice_FeaturesReady">Device controls ready</sys:String>
+    <sys:String x:Key="ViewDevice_AudioStarting">Starting device audio…</sys:String>
+    <sys:String x:Key="ViewDevice_AudioPlaying">Device audio is playing on this PC</sys:String>
+    <sys:String x:Key="ViewDevice_AudioUnavailable">Audio unavailable; video continues. Android 11+ is required; unlock Android 11 before connecting.</sys:String>
+    <sys:String x:Key="ViewDevice_UhidFallback">UHID unavailable. Using SDK keyboard; paste Unicode with Ctrl+V.</sys:String>
+    <sys:String x:Key="ViewDevice_ClipboardFailed">Could not synchronize the clipboard. Try Copy again.</sys:String>
+    <sys:String x:Key="ViewDevice_ClipboardTooLarge">Clipboard exceeds the 262130-byte UTF-8 limit; nothing was pasted.</sys:String>
+    <sys:String x:Key="ViewDevice_ClipboardUseNativePaste">Typing supports ASCII up to 300 bytes. Use Ctrl+V to preserve Unicode.</sys:String>
+    <sys:String x:Key="ViewDevice_ControlFailed">The device action failed. Check the connection and try again.</sys:String>
+    <sys:String x:Key="ViewDevice_FileTransferred">File transfer completed</sys:String>
+    <sys:String x:Key="ViewDevice_VideoPaused">Display paused; device input is locked. Alt+Shift+Z resumes.</sys:String>
 </ResourceDictionary>

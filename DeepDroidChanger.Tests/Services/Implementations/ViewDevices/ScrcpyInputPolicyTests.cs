@@ -507,9 +507,9 @@ public sealed class ScrcpyInputPolicyTests
     }
 
     [TestMethod]
-    public void VirtualPointerId_RemainsMinusTwo()
+    public void VirtualPointerId_UsesScrcpyV501VirtualFingerId()
     {
-        Assert.IsTrue(object.Equals(ulong.MaxValue - 1, ScrcpyDisplay.VirtualPointerId));
+        Assert.IsTrue(object.Equals(ulong.MaxValue - 2, ScrcpyDisplay.VirtualPointerId));
     }
 
     [TestMethod]
@@ -1555,13 +1555,13 @@ public sealed class ScrcpyInputPolicyTests
         Assert.AreEqual(2, batch.MessageCount);
         Assert.IsFalse(batch.IsDroppable);
         Assert.AreEqual((byte)AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, batch.Payload.Span[1]);
-        Assert.AreEqual((byte)AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, batch.Payload.Span[29]);
+        Assert.AreEqual((byte)AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, batch.Payload.Span[33]);
         Assert.AreEqual(oldPosition.Point.X, BinaryPrimitives.ReadInt32BigEndian(batch.Payload.Span[10..14]));
         Assert.AreEqual(oldPosition.Point.Y, BinaryPrimitives.ReadInt32BigEndian(batch.Payload.Span[14..18]));
-        Assert.AreEqual(960, BinaryPrimitives.ReadInt32BigEndian(batch.Payload.Span[38..42]));
-        Assert.AreEqual(1880, BinaryPrimitives.ReadInt32BigEndian(batch.Payload.Span[42..46]));
-        Assert.AreEqual(oldPosition.ScreenSize.Width, BinaryPrimitives.ReadUInt16BigEndian(batch.Payload.Span[46..48]));
-        Assert.AreEqual(oldPosition.ScreenSize.Height, BinaryPrimitives.ReadUInt16BigEndian(batch.Payload.Span[48..50]));
+        Assert.AreEqual(960, BinaryPrimitives.ReadInt32BigEndian(batch.Payload.Span[42..46]));
+        Assert.AreEqual(1880, BinaryPrimitives.ReadInt32BigEndian(batch.Payload.Span[46..50]));
+        Assert.AreEqual(oldPosition.ScreenSize.Width, BinaryPrimitives.ReadUInt16BigEndian(batch.Payload.Span[50..52]));
+        Assert.AreEqual(oldPosition.ScreenSize.Height, BinaryPrimitives.ReadUInt16BigEndian(batch.Payload.Span[52..54]));
     }
     [TestMethod]
     public void SizeChangeRelease_DoesNotDoubleSendOnLostCapture()

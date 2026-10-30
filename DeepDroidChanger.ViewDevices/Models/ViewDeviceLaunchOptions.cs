@@ -1,5 +1,7 @@
 namespace DeepDroidChanger.ViewDevices.Models;
 
+public enum ViewDeviceKeyboardMode { Sdk, Uhid }
+
 public sealed record ViewDeviceLaunchOptions(string Serial)
 {
     public const int BalancedMaxSize = 1280;
@@ -14,7 +16,8 @@ public sealed record ViewDeviceLaunchOptions(string Serial)
     public int MaxFps { get; init; } = BalancedMaxFps;
     public string VideoBitRate { get; init; } = BalancedVideoBitRate;
     public bool NoControl { get; init; }
-    public bool NoAudio { get; init; }
+    public bool NoAudio { get; init; } = true;
+    public ViewDeviceKeyboardMode KeyboardMode { get; init; }
 
     public static ViewDeviceLaunchOptions ForMultiView(string serial)
     {

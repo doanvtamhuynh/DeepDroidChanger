@@ -62,22 +62,20 @@ namespace ScrcpyNet
 
     internal sealed class ScrcpyNetServerLifecycle
     {
-        public const string RemoteEndpoint = "localabstract:scrcpy";
-        private const string RemoteServerPath = "/data/local/tmp/scrcpy-server.jar";
+        public int Scid { get; private set; }
+        public string SessionEndpoint => $"localabstract:scrcpy_{Scid:x8}";
+        public string RemoteServerPath { get; private set; } = string.Empty;
 
         private readonly DeviceData _device;
         private readonly IScrcpyNetAdbOperations _adb;
-        private readonly Action<Exception>? _logStaleReverseCleanupFailure;
         private bool _reverseCreated;
 
         public ScrcpyNetServerLifecycle(
             DeviceData device,
-            IScrcpyNetAdbOperations adb,
-            Action<Exception>? logStaleReverseCleanupFailure = null)
+            IScrcpyNetAdbOperations adb)
         {
             _device = device ?? throw new ArgumentNullException(nameof(device));
             _adb = adb ?? throw new ArgumentNullException(nameof(adb));
-            _logStaleReverseCleanupFailure = logStaleReverseCleanupFailure;
         }
 
         // SharpAdbClient 2.3.23 exposes reverse-forward operations only as
@@ -91,10 +89,11 @@ namespace ScrcpyNet
             if (string.IsNullOrWhiteSpace(serverFile))
                 throw new ArgumentException("A scrcpy server file is required.", nameof(serverFile));
 
-            _reverseCreated = false;
-            TryRemoveStaleReverseForward();
+            Cleanup();
+            Scid = System.Security.Cryptography.RandomNumberGenerator.GetInt32(1, int.MaxValue);
+            RemoteServerPath = $"/data/local/tmp/deepdroid-scrcpy-{Scid:x8}-{Guid.NewGuid():N}.jar";
             _adb.UploadMobileServer(_device, serverFile, RemoteServerPath, cancellationToken);
-            _adb.CreateReverseForward(_device, RemoteEndpoint, $"tcp:{hostPort}", rebind: true);
+            _adb.CreateReverseForward(_device, SessionEndpoint, $"tcp:{hostPort}", rebind: false);
             _reverseCreated = true;
         }
 
@@ -106,7 +105,7 @@ namespace ScrcpyNet
             // SharpAdbClient exposes reverse removal only synchronously. Keep
             // ownership until this call returns; never abandon it behind a
             // timeout because it mutates the shared reverse-forward mapping.
-            _adb.RemoveReverseForward(_device, RemoteEndpoint);
+            _adb.RemoveReverseForward(_device, SessionEndpoint);
             _reverseCreated = false;
         }
 
@@ -118,16 +117,13 @@ namespace ScrcpyNet
             return _adb.ExecuteRemoteCommandAsync(command, _device, receiver, cancellationToken);
         }
 
-        private void TryRemoveStaleReverseForward()
+        public async Task CleanupServerFileAsync(CancellationToken cancellationToken)
         {
-            try
-            {
-                _adb.RemoveReverseForward(_device, RemoteEndpoint);
-            }
-            catch (Exception exception)
-            {
-                _logStaleReverseCleanupFailure?.Invoke(exception);
-            }
+            // This path is generated here, contains only hex and separators, and belongs to this lifecycle.
+            string ownedPath = RemoteServerPath;
+            if (string.IsNullOrEmpty(ownedPath)) return;
+            await _adb.ExecuteRemoteCommandAsync($"rm -f {ownedPath}", _device, new SerilogOutputReceiver(), cancellationToken).ConfigureAwait(false);
+            if (RemoteServerPath == ownedPath) RemoteServerPath = string.Empty;
         }
     }
 }

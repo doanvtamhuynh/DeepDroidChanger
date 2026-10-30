@@ -46,13 +46,28 @@ public sealed class ClipboardService : IClipboardService, IViewDeviceClipboardSe
                 () => InvokeOnUiAsync(
                     () =>
                     {
-                        Clipboard.SetText(text);
+                        WriteClipboardText(text);
                         return true;
                     },
                     cancellationToken),
                 cancellationToken,
                 LogBusyClipboardFailureAsync)
             .ConfigureAwait(false);
+    }
+
+    public Task<bool> TrySetTextAsync(string text, Func<Action, bool> tryCommit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(tryCommit);
+        return ExecuteWithBusyRetryAsync(
+            () => InvokeOnUiAsync(() => tryCommit(() => WriteClipboardText(text)), cancellationToken),
+            cancellationToken, LogBusyClipboardFailureAsync);
+    }
+
+    private static void WriteClipboardText(string text)
+    {
+        if (text.Length == 0) Clipboard.Clear();
+        else Clipboard.SetText(text);
     }
 
     internal static async Task<T?> ExecuteWithBusyRetryAsync<T>(

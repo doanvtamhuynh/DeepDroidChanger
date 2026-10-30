@@ -31,6 +31,7 @@ public sealed partial class ViewDeviceToolsWindow : Window
         PreviewMouseDown += OnPreviewMouseDown;
     }
 
+
     internal void DismissDetailWindow()
     {
         _viewModel.CloseToolEditor();

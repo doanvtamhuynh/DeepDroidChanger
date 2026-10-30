@@ -10,10 +10,10 @@ namespace DeepDroidChanger.Tests.Services.Implementations.ViewDevices;
 public sealed class ScrcpyPlanRegressionTests
 {
     [TestMethod]
-    public void VideoPacketHeader_ParsesV123FlagsAndMaskedPresentationTime()
+    public void VideoPacketHeader_ParsesV501FlagsAndMaskedPresentationTime()
     {
-        const ulong configFlag = 1UL << 63;
-        const ulong keyFrameFlag = 1UL << 62;
+        const ulong configFlag = 1UL << 62;
+        const ulong keyFrameFlag = 1UL << 61;
         const long presentationTimeUs = 0x123456789ABCDE;
 
         ScrcpyVideoPacketHeader header = ScrcpyVideoPacketHeader.Parse(

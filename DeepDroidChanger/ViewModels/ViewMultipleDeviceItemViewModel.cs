@@ -37,6 +37,8 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
     private readonly ISingleViewDeviceSessionFactory _sessionFactory;
     private readonly IAdbDeviceTrackerService _deviceTracker;
     private readonly IViewDeviceClipboardService _clipboardService;
+    private readonly IViewDeviceInteractionService? _interactionService;
+    public ViewDeviceControlsViewModel Controls { get; }
     private readonly ILocalizationService _localization;
     private readonly IUiDispatcherService _uiDispatcher;
     private readonly ILogger<ViewMultipleDeviceItemViewModel> _logger;
@@ -45,6 +47,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
     private readonly IViewDevicePresentationCoordinator _presentationCoordinator;
     private readonly Func<ViewMultipleDeviceItemViewModel, CancellationToken, Task>? _openViewDeviceRequest;
     private readonly SemaphoreSlim _sessionGate = new(1, 1);
+    private readonly CancellationTokenSource _featureLifetimeCancellation = new();
     private readonly object _sessionStateGate = new();
     private readonly object _retryGate = new();
 
@@ -80,7 +83,9 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         IViewDevicePresentationCoordinator presentationCoordinator,
         Action<ViewMultipleDeviceItemViewModel, int>? retryRequest = null,
         Func<TimeSpan, CancellationToken, Task>? retryDelay = null,
-        Func<ViewMultipleDeviceItemViewModel, CancellationToken, Task>? openViewDeviceRequest = null)
+        Func<ViewMultipleDeviceItemViewModel, CancellationToken, Task>? openViewDeviceRequest = null,
+        IViewDeviceInteractionService? interactionService = null,
+        IPackageInstallService? packageInstaller = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         ArgumentNullException.ThrowIfNull(sessionFactory);
@@ -96,6 +101,18 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         _sessionFactory = sessionFactory;
         _deviceTracker = deviceTracker;
         _clipboardService = clipboardService;
+        _interactionService = interactionService;
+        Controls = new(interactionService, clipboardService, localization, uiDispatcher, logger,
+            packageInstaller is null ? null : async (path, token) =>
+            {
+                await ExecuteExternalToolAsync(async () =>
+                {
+                    var result = await packageInstaller.InstallAsync(Serial, path,
+                        new InstallPackageOptions(grantPermissions: false, allowDowngrade: false), token).ConfigureAwait(false);
+                    if (!result.Success) throw new InvalidOperationException("Package installation failed.");
+                    return true;
+                }, token).ConfigureAwait(false);
+            });
         _localization = localization;
         _uiDispatcher = uiDispatcher;
         _logger = logger;
@@ -112,6 +129,10 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         OpenViewDeviceCommand = new AsyncRelayCommand(
             OpenViewDeviceAsync,
             CanOpenViewDevice);
+        Controls.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ViewDeviceControlsViewModel.IsPaused)) NotifyCommandStateChanged();
+        };
     }
 
     public string Serial { get; }
@@ -203,6 +224,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         get => _scrcpyClient;
         private set
         {
+            if (value is null) Controls.Detach();
             if (!SetProperty(ref _scrcpyClient, value))
                 return;
 
@@ -302,7 +324,8 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
                 .ConfigureAwait(false);
             await StopCurrentSessionCoreAsync().ConfigureAwait(false);
 
-            session = _sessionFactory.Create(ViewDeviceLaunchOptions.ForMultiView(Serial));
+            ViewDeviceLaunchOptions options = ViewDeviceLaunchOptions.ForMultiView(Serial);
+            session = _sessionFactory.Create(_interactionService?.PrepareOptions(options) ?? options);
             SetCurrentSession(session);
             SubscribeToSession(session);
 
@@ -322,6 +345,10 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
             }
             await PublishRunningSessionAsync(session, cancellationToken)
                 .ConfigureAwait(false);
+            await _uiDispatcher.InvokeAsync(() =>
+            {
+                if (IsCurrentSession(session)) Controls.Attach(session, ReconnectForFeaturesAsync);
+            }, cancellationToken).ConfigureAwait(false);
             ResetRetryState();
         }
         catch (OperationCanceledException)
@@ -380,6 +407,18 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         }
     }
 
+    private async Task ReconnectForFeaturesAsync()
+    {
+        await _sessionGate.WaitAsync(_featureLifetimeCancellation.Token).ConfigureAwait(false);
+        try
+        {
+            if (Volatile.Read(ref _disposed) != 0) return;
+            await StopCurrentSessionCoreAsync().ConfigureAwait(false);
+            await StartCoreAsync(_featureLifetimeCancellation.Token).ConfigureAwait(false);
+        }
+        finally { _sessionGate.Release(); }
+    }
+
     internal async Task SuspendForDedicatedViewAsync(CancellationToken cancellationToken)
     {
         ResetRetryState();
@@ -406,6 +445,8 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
 
         ResetRetryState();
         _localization.LanguageChanged -= OnLanguageChanged;
+        _featureLifetimeCancellation.Cancel();
+        await _uiDispatcher.InvokeAsync(Controls.Dispose).ConfigureAwait(false);
         await _sessionGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
@@ -417,6 +458,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         {
             _sessionGate.Release();
             _sessionGate.Dispose();
+            _featureLifetimeCancellation.Dispose();
         }
     }
 
@@ -462,7 +504,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
     {
         return Volatile.Read(ref _disposed) == 0 &&
                IsRunning &&
-               ScrcpyClient is not null;
+               ScrcpyClient is not null && !ScrcpyClient.IsVideoPaused;
     }
 
     private void NotifyCommandStateChanged()

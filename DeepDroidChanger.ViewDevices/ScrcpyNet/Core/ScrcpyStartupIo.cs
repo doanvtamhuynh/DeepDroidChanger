@@ -4,6 +4,15 @@ namespace ScrcpyNet;
 
 internal static class ScrcpyStartupIo
 {
+    public static async Task<string> ReadVideoMetadataAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        byte[] prefix = new byte[68]; // 64-byte device name followed by the codec id (no dimensions).
+        await ScrcpyDeviceMessageReader.ReadExactAsync(stream, prefix, cancellationToken).ConfigureAwait(false);
+        if (System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(64)) != 0x68323634)
+            throw new InvalidDataException("The scrcpy video stream is not H.264.");
+        return System.Text.Encoding.UTF8.GetString(prefix, 0, 64).TrimEnd('\0');
+    }
+
     public static CancellationTokenSource CreateDeadline(
         long timeoutMs,
         CancellationToken callerToken)

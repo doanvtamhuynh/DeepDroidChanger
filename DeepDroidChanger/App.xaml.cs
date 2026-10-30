@@ -139,6 +139,7 @@ public sealed partial class App : Application
         services.AddSingleton<IScrcpyNetDeviceLeaseCoordinator, ScrcpyNetDeviceLeaseCoordinator>();
         services.AddSingleton<ISingleViewDeviceSessionFactory, ScrcpyNetSingleViewDeviceSessionFactory>();
         services.AddSingleton<IViewDevicePresentationCoordinator, ViewDevicePresentationCoordinator>();
+        services.AddSingleton<IViewDeviceInteractionService, ViewDeviceInteractionService>();
         services.AddSingleton<IViewDeviceWindowService, ViewDeviceWindowService>();
         services.AddSingleton<IDeviceMetadataChangeNotifier, DeviceMetadataChangeNotifier>();
         services.AddSingleton<IViewDeviceScreenshotService, ViewDeviceScreenshotService>();

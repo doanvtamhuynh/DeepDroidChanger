@@ -31,6 +31,7 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
     private readonly IDeviceMetadataChangeNotifier? _metadataChangeNotifier;
     private readonly IViewDeviceWindowService _viewDeviceWindowService;
     private readonly IViewDevicePresentationCoordinator _presentationCoordinator;
+    private readonly IViewDeviceInteractionService? _interactionService;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly object _navigationSchedulingGate = new();
@@ -83,7 +84,8 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
         IFilePickerDialogService? filePicker = null,
         IFileSystemService? fileSystem = null,
         IViewMultipleDeviceArtifactService? artifactService = null,
-        IDeviceActionCoordinatorService? actionCoordinator = null)
+        IDeviceActionCoordinatorService? actionCoordinator = null,
+        IViewDeviceInteractionService? interactionService = null)
     {
         ArgumentNullException.ThrowIfNull(deviceStoreService);
         ArgumentNullException.ThrowIfNull(deviceTracker);
@@ -107,6 +109,7 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
         _metadataChangeNotifier = metadataChangeNotifier;
         _viewDeviceWindowService = viewDeviceWindowService;
         _presentationCoordinator = presentationCoordinator;
+        _interactionService = interactionService;
         _zoomIndex = DefaultZoomIndex;
 
         ZoomOutCommand = new RelayCommand(ZoomOut, CanZoomOut);
@@ -422,7 +425,9 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
             _loggerFactory.CreateLogger<ViewMultipleDeviceItemViewModel>(),
             _presentationCoordinator,
             RequestItemRetry,
-            openViewDeviceRequest: OpenViewDeviceAsync);
+            openViewDeviceRequest: OpenViewDeviceAsync,
+            interactionService: _interactionService,
+            packageInstaller: _toolPackages);
     }
 
     private void OnDeviceNameChanged(object? sender, DeviceNameChangedEventArgs eventArgs)

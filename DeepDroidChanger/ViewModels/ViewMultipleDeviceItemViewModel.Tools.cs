@@ -25,9 +25,11 @@ public sealed partial class ViewMultipleDeviceItemViewModel
     public double ViewAspectRatio => _viewRotationQuarterTurns % 2 == 0
         ? DeviceAspectRatio : 1 / DeviceAspectRatio;
 
-    internal void RotateView()
+    internal void RotateView() => RotateView(1);
+
+    internal void RotateView(int direction)
     {
-        _viewRotationQuarterTurns = (_viewRotationQuarterTurns + 1) % 4;
+        _viewRotationQuarterTurns = (_viewRotationQuarterTurns + direction + 4) % 4;
         OnPropertyChanged(nameof(ViewRotationAngle));
         OnPropertyChanged(nameof(ViewAspectRatio));
     }

@@ -35,6 +35,7 @@ public sealed class ScrcpyNetClient : IScrcpyNetClient
     public event EventHandler<ScrcpyNetErrorEventArgs>? Failed;
     public event EventHandler? Exited;
     public event EventHandler<ScrcpyClipboardChangedEventArgs>? ClipboardChanged;
+    public event EventHandler? FeaturesChanged;
 
     public ScrcpyNetClient(Scrcpy client)
         : this(client, null)
@@ -49,6 +50,7 @@ public sealed class ScrcpyNetClient : IScrcpyNetClient
         _client.Failed += OnFailed;
         _client.Exited += OnExited;
         _client.ClipboardChanged += OnClipboardChanged;
+        _client.FeaturesChanged += OnFeaturesChanged;
     }
 
     // Keeps lease lifecycle tests independent from the native FFmpeg decoder.
@@ -124,6 +126,7 @@ public sealed class ScrcpyNetClient : IScrcpyNetClient
                 _client.Failed -= OnFailed;
                 _client.Exited -= OnExited;
                 _client.ClipboardChanged -= OnClipboardChanged;
+                _client.FeaturesChanged -= OnFeaturesChanged;
                 _client.Dispose();
             }
         }
@@ -197,6 +200,8 @@ public sealed class ScrcpyNetClient : IScrcpyNetClient
 
         ClipboardChanged?.Invoke(this, eventArgs);
     }
+
+    private void OnFeaturesChanged(object? sender, EventArgs eventArgs) => FeaturesChanged?.Invoke(this, eventArgs);
 
     private void AddDiagnostic(string diagnostic)
     {

@@ -224,10 +224,22 @@
     <sys:String x:Key="ViewDevice_RuntimeToggleFailed">Không thể đổi trạng thái thiết bị</sys:String>
     <sys:String x:Key="ViewDevice_RuntimeToggleVerificationFailed">Trạng thái thiết bị không đạt giá trị yêu cầu</sys:String>
     <sys:String x:Key="ViewDevice_RuntimeToggleUnableToVerify">Không thể xác minh trạng thái thiết bị</sys:String>
-    <sys:String x:Key="ViewDevice_DropPackageOverlay">Thả APK/XAPK để cài đặt</sys:String>
+    <sys:String x:Key="ViewDevice_DropPackageOverlay">Thả APK/XAPK để cài hoặc file để chép vào Download</sys:String>
     <sys:String x:Key="ViewDevice_RestartSent">Đã gửi lệnh khởi động lại</sys:String>
     <sys:String x:Key="ViewDevice_RestartFailed">Không thể khởi động lại thiết bị</sys:String>
     <sys:String x:Key="ViewDevice_InstallFileInvalid">Hãy chọn một file APK hoặc XAPK</sys:String>
     <sys:String x:Key="ViewDevice_InstallSucceeded">Cài đặt gói hoàn tất</sys:String>
     <sys:String x:Key="ViewDevice_InstallFailed">Cài đặt gói thất bại</sys:String>
+    <sys:String x:Key="ViewDevice_Audio">Bật/tắt âm thanh thiết bị (kết nối lại phiên xem)</sys:String>
+    <sys:String x:Key="ViewDevice_FeaturesReady">Điều khiển thiết bị sẵn sàng</sys:String>
+    <sys:String x:Key="ViewDevice_AudioStarting">Đang khởi động âm thanh thiết bị…</sys:String>
+    <sys:String x:Key="ViewDevice_AudioPlaying">Âm thanh thiết bị đang phát trên PC</sys:String>
+    <sys:String x:Key="ViewDevice_AudioUnavailable">Không có âm thanh; vẫn tiếp tục video. Cần Android 11 trở lên; mở khóa Android 11 trước khi kết nối.</sys:String>
+    <sys:String x:Key="ViewDevice_UhidFallback">UHID không khả dụng. Đã dùng SDK; dán Unicode bằng Ctrl+V.</sys:String>
+    <sys:String x:Key="ViewDevice_ClipboardFailed">Không đồng bộ được clipboard. Hãy thử Copy lại.</sys:String>
+    <sys:String x:Key="ViewDevice_ClipboardTooLarge">Clipboard vượt giới hạn UTF-8 262130 byte; chưa dán nội dung.</sys:String>
+    <sys:String x:Key="ViewDevice_ClipboardUseNativePaste">Chế độ gõ chỉ hỗ trợ ASCII tối đa 300 byte. Dùng Ctrl+V để giữ nguyên Unicode.</sys:String>
+    <sys:String x:Key="ViewDevice_ControlFailed">Thao tác thất bại. Kiểm tra kết nối và thử lại.</sys:String>
+    <sys:String x:Key="ViewDevice_FileTransferred">Đã chuyển file</sys:String>
+    <sys:String x:Key="ViewDevice_VideoPaused">Đã dừng hình và khóa điều khiển. Alt+Shift+Z để tiếp tục.</sys:String>
 </ResourceDictionary>

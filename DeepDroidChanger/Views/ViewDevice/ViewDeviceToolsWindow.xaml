@@ -18,121 +18,126 @@
         FontFamily="{StaticResource Metric.FontFamily}">
 
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ViewDeviceControlsResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
-        <Style x:Key="ViewDeviceToolActionStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="44"/>
-            <Setter Property="MinHeight" Value="44"/>
-            <Setter Property="Margin" Value="0,1"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="BorderBrush" Value="Transparent"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceToolActionStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
+                <Setter Property="Height" Value="Auto"/>
+                <Setter Property="MinHeight" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
+                <Setter Property="Margin" Value="{StaticResource ViewDevice.ControlBottomSpacing}"/>
+                <Setter Property="Padding" Value="{StaticResource Spacing.ControlPadding}"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                    </Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewDeviceToolQuickButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="MinHeight" Value="40"/>
-            <Setter Property="Margin" Value="1"/>
-            <Setter Property="Padding" Value="5,0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
-                </Trigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceToolQuickButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
+                <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+                <Setter Property="MinHeight" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+                <Setter Property="Margin" Value="{StaticResource ViewDevice.ControlCellSpacing}"/>
+                <Setter Property="Padding" Value="5,0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                    </Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewDeviceToolInlineButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Padding" Value="10,0"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
-            <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-        </Style>
+            <Style x:Key="ViewDeviceToolInlineButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
+                <Setter Property="Height" Value="32"/>
+                <Setter Property="MinHeight" Value="0"/>
+                <Setter Property="Padding" Value="10,0"/>
+                <Setter Property="Margin" Value="0,0,4,0"/>
+                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+            </Style>
 
-        <Style x:Key="ViewDeviceToolIconStyle" TargetType="materialDesign:PackIcon">
-            <Setter Property="Width" Value="18"/>
-            <Setter Property="Height" Value="18"/>
-            <Setter Property="Margin" Value="0,0,10,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
-                             Value="False">
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceToolIconStyle" TargetType="materialDesign:PackIcon">
+                <Setter Property="Width" Value="18"/>
+                <Setter Property="Height" Value="18"/>
+                <Setter Property="Margin" Value="0,0,10,0"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+                                 Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewDeviceToolTitleStyle" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
-            <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
-                             Value="False">
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceToolTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
+                                 Value="False">
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewDeviceToolQuickTitleStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ViewDeviceToolTitleStyle}">
-            <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
+            <Style x:Key="ViewDeviceToolQuickTitleStyle"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource ViewDeviceToolTitleStyle}">
+                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+            </Style>
 
-        <Style x:Key="ViewDeviceToolScreenQuickTitleStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource ViewDeviceToolQuickTitleStyle}">
-            <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Micro}"/>
-            <Setter Property="TextTrimming" Value="None"/>
-        </Style>
+            <Style x:Key="ViewDeviceToolScreenQuickTitleStyle"
+                   TargetType="TextBlock"
+                   BasedOn="{StaticResource ViewDeviceToolQuickTitleStyle}">
+                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Micro}"/>
+                <Setter Property="TextTrimming" Value="None"/>
+            </Style>
+            </ResourceDictionary>
     </Window.Resources>
 
     <Border x:Name="RootBorder"
@@ -190,19 +195,19 @@
                           CanContentScroll="True">
                 <StackPanel x:Name="ActionsPanel"
                             Margin="{StaticResource Spacing.CardPadding.Compact}">
-                    <Grid x:Name="QuickControlsPanel" Margin="0,0,0,4">
+                    <Grid x:Name="QuickControlsPanel" Margin="{StaticResource ViewDevice.ControlBottomSpacing}">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <Button x:Name="VolumeDownButton"
-                                Grid.Row="0"
+                                Grid.Row="1"
                                 Grid.Column="0"
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding VolumeDownCommand}"
@@ -218,7 +223,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="VolumeUpButton"
-                                Grid.Row="0"
+                                Grid.Row="1"
                                 Grid.Column="1"
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding VolumeUpCommand}"
@@ -235,7 +240,7 @@
                         </Button>
                         <Button x:Name="PowerButton"
                                 Grid.Row="0"
-                                Grid.Column="2"
+                                Grid.Column="0"
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding PowerCommand}"
                                 ToolTip="{DynamicResource ViewDevice_PowerDescription}">
@@ -250,8 +255,8 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="ReconnectButton"
-                                Grid.Row="1"
-                                Grid.Column="0"
+                                Grid.Row="0"
+                                Grid.Column="1"
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding ReconnectCommand}"
                                 ToolTip="{DynamicResource ViewDevice_ReconnectDescription}">
@@ -266,8 +271,8 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="ScreenButton"
-                                Grid.Row="1"
-                                Grid.Column="1"
+                                Grid.Row="2"
+                                Grid.Column="0"
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding ToggleScreenCommand}"
                                 IsEnabled="{Binding IsScreenActionAvailable}"
@@ -283,8 +288,8 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="RebootButton"
-                                Grid.Row="1"
-                                Grid.Column="2"
+                                Grid.Row="2"
+                                Grid.Column="1"
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding RebootDeviceCommand}"
                                 ToolTip="{DynamicResource ViewDevice_RestartDescription}">

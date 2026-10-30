@@ -18,7 +18,7 @@ namespace DeepDroidChanger.Tests.Services.Implementations.ViewDevices;
 public sealed class ScrcpyProtocolTests
 {
     [TestMethod]
-    public void InjectKeycode_UsesScrcpyV123GoldenBytes()
+    public void InjectKeycode_UsesScrcpyV501GoldenBytes()
     {
         KeycodeControlMessage message = new()
         {
@@ -34,7 +34,7 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void InjectText_UsesScrcpyV123Utf8WireFormat()
+    public void InjectText_UsesScrcpyV501Utf8WireFormat()
     {
         InjectTextControlMessage message = new() { Text = "é" };
 
@@ -65,7 +65,7 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void ClipboardControlMessages_UseScrcpyV123GoldenBytes()
+    public void ClipboardControlMessages_UseScrcpyV501GoldenBytes()
     {
         AssertBytes(
             new byte[] { 8, 0 },
@@ -159,7 +159,7 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void ClipboardPanelMessages_UseOneByteScrcpyV123Types()
+    public void ClipboardPanelMessages_UseOneByteScrcpyV501Types()
     {
         AssertBytes(new byte[] { 5 }, new ExpandNotificationPanelControlMessage().ToBytes());
         AssertBytes(new byte[] { 6 }, new ExpandSettingsPanelControlMessage().ToBytes());
@@ -1341,7 +1341,7 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void TouchDown_UsesScrcpyV123GoldenBytes()
+    public void TouchDown_UsesScrcpyV501GoldenBytes()
     {
         TouchEventControlMessage message = new()
         {
@@ -1361,6 +1361,7 @@ public sealed class ScrcpyProtocolTests
                 4, 0x38,
                 8, 0xAC,
                 0xFF, 0xFF,
+                0, 0, 0, 0,
                 0, 0, 0, 1
             },
             message.ToBytes());
@@ -1388,13 +1389,14 @@ public sealed class ScrcpyProtocolTests
                 4, 0x38,
                 8, 0xAC,
                 0xFF, 0xFF,
+                0, 0, 0, 0,
                 0, 0, 0, 1
             },
             message.ToBytes());
     }
 
     [TestMethod]
-    public void TouchUp_UsesScrcpyV123GoldenBytes()
+    public void TouchUp_UsesScrcpyV501GoldenBytes()
     {
         TouchEventControlMessage message = new()
         {
@@ -1415,6 +1417,7 @@ public sealed class ScrcpyProtocolTests
                 1, 0x90,
                 3, 0x20,
                 0, 0,
+                0, 0, 0, 0,
                 0, 0, 0, 0
             },
             message.ToBytes());
@@ -1442,13 +1445,14 @@ public sealed class ScrcpyProtocolTests
                 1, 0x90,
                 3, 0x20,
                 0, 0,
+                0, 0, 0, 0,
                 0, 0, 0, 0
             },
             message.ToBytes());
     }
 
     [TestMethod]
-    public void TouchPressure_UsesOfficialScrcpyV123FixedPointConversion()
+    public void TouchPressure_UsesOfficialScrcpyV501FixedPointConversion()
     {
         Assert.AreEqual(0, TouchEventControlMessage.ToFixedPoint16(0f));
         Assert.AreEqual(32768, TouchEventControlMessage.ToFixedPoint16(0.5f));
@@ -1467,7 +1471,7 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void Scroll_Uses25ByteScrcpyV123PacketAndSerializesButtons()
+    public void Scroll_Uses21ByteScrcpyV501PacketAndSerializesButtons()
     {
         ScrollEventControlMessage message = new()
         {
@@ -1479,7 +1483,7 @@ public sealed class ScrcpyProtocolTests
 
         byte[] actual = message.ToBytes().ToArray();
 
-        Assert.AreEqual(25, actual.Length);
+        Assert.AreEqual(21, actual.Length);
         CollectionAssert.AreEqual(
             new byte[]
             {
@@ -1488,16 +1492,16 @@ public sealed class ScrcpyProtocolTests
                 0, 0, 0, 20,
                 4, 0x38,
                 8, 0xAC,
-                0xFF, 0xFF, 0xFF, 0xFE,
-                0, 0, 0, 3,
+                0xF0, 0,
+                0x18, 0,
                 0, 0, 0, 2
             },
             actual);
-        CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 2 }, actual[21..]);
+        CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 2 }, actual[17..]);
     }
 
     [TestMethod]
-    public void BackOrScreenOn_UsesScrcpyV123GoldenBytes()
+    public void BackOrScreenOn_UsesScrcpyV501GoldenBytes()
     {
         BackOrScreenOnControlMessage message = new()
         {
@@ -1508,16 +1512,16 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void RotateDevice_UsesOneByteScrcpyV123Message()
+    public void RotateDevice_UsesOneByteScrcpyV501Message()
     {
         AssertBytes(new byte[] { 11 }, new RotateDeviceControlMessage().ToBytes());
     }
 
     [TestMethod]
-    public void SetScreenPowerMode_UsesV123OffAndNormalValues()
+    public void SetScreenPowerMode_UsesV501OffAndNormalValues()
     {
         AssertBytes(
-            new byte[] { 10, 2 },
+            new byte[] { 10, 1 },
             new SetScreenPowerModeControlMessage
             {
                 Mode = AndroidScreenPowerMode.POWER_MODE_NORMAL
@@ -1531,7 +1535,7 @@ public sealed class ScrcpyProtocolTests
     }
 
     [TestMethod]
-    public void SingleViewServerArguments_ContainBoundedV123VideoProfile()
+    public void SingleViewServerArguments_ContainBoundedV501VideoProfile()
     {
         ViewDeviceLaunchOptions options = new("SERIAL")
         {
@@ -1546,8 +1550,8 @@ public sealed class ScrcpyProtocolTests
                 options.MaxFps)
             .ToArray();
 
-        CollectionAssert.Contains(arguments, "1.23");
-        CollectionAssert.Contains(arguments, "bit_rate=4000000");
+        CollectionAssert.Contains(arguments, "5.0.1");
+        CollectionAssert.Contains(arguments, "video_bit_rate=4000000");
         CollectionAssert.Contains(arguments, "max_size=1280");
         CollectionAssert.Contains(arguments, "max_fps=30");
         CollectionAssert.Contains(arguments, "control=true");
@@ -1566,13 +1570,33 @@ public sealed class ScrcpyProtocolTests
         CollectionAssert.AreEqual(
             new[]
             {
-                ScrcpyNetServerLifecycle.RemoteEndpoint,
-                ScrcpyNetServerLifecycle.RemoteEndpoint
+                lifecycle.SessionEndpoint
             },
             adb.RemovedReverseEndpoints);
         Assert.AreEqual("tcp:43123", adb.CreatedReverseLocal);
-        Assert.AreEqual(ScrcpyNetServerLifecycle.RemoteEndpoint, adb.CreatedReverseRemote);
+        Assert.AreEqual(lifecycle.SessionEndpoint, adb.CreatedReverseRemote);
         Assert.AreEqual("server.jar", adb.UploadedServerFile);
+    }
+
+    [TestMethod]
+    public async Task ServerLifecycle_UsesDistinctOwnedPathsAndCleansOnlyItsOwnServerFile()
+    {
+        FakeAdbOperations adb = new();
+        ScrcpyNetServerLifecycle first = new(CreateDevice(), adb);
+        ScrcpyNetServerLifecycle second = new(CreateDevice(), adb);
+        first.Setup(41001, "first.jar", CancellationToken.None);
+        second.Setup(41002, "second.jar", CancellationToken.None);
+        string firstPath = first.RemoteServerPath;
+        string secondPath = second.RemoteServerPath;
+        Assert.AreNotEqual(firstPath, secondPath);
+        Assert.AreNotEqual(first.SessionEndpoint, second.SessionEndpoint);
+        StringAssert.StartsWith(firstPath, "/data/local/tmp/deepdroid-scrcpy-");
+        await first.CleanupServerFileAsync(CancellationToken.None);
+        CollectionAssert.AreEqual(new[] { "rm -f " + firstPath }, adb.Commands);
+        Assert.AreEqual(secondPath, second.RemoteServerPath);
+        await first.CleanupServerFileAsync(CancellationToken.None);
+        Assert.HasCount(1, adb.Commands);
+        first.Cleanup(); second.Cleanup();
     }
 
     [TestMethod]
@@ -1843,6 +1867,7 @@ public sealed class ScrcpyProtocolTests
 
     private sealed class FakeAdbOperations : IScrcpyNetAdbOperations
     {
+        public List<string> Commands { get; } = [];
         public List<string> RemovedReverseEndpoints { get; } = [];
         public string? CreatedReverseRemote { get; private set; }
         public string? CreatedReverseLocal { get; private set; }
@@ -1865,6 +1890,7 @@ public sealed class ScrcpyProtocolTests
             IShellOutputReceiver receiver,
             CancellationToken cancellationToken)
         {
+            Commands.Add(command);
             return Task.CompletedTask;
         }
 

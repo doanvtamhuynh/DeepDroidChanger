@@ -36,6 +36,8 @@ public sealed partial class ViewDeviceWindow : Window
         PreviewMouseDown += OnPreviewMouseDown;
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewKeyUp += OnPreviewKeyUp;
+        ScrcpyDisplay.GotKeyboardFocus += (_, _) => _viewModel.Controls.Activate();
+        ScrcpyDisplay.PreviewMouseDown += (_, _) => _viewModel.Controls.Activate();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs eventArgs)
@@ -369,7 +371,9 @@ public sealed partial class ViewDeviceWindow : Window
     private void OnPreviewKeyDown(object sender, KeyEventArgs eventArgs)
     {
         Key physicalKey = NormalizePhysicalKey(eventArgs.Key, eventArgs.SystemKey);
+        if (!ScrcpyDisplay.IsKeyboardFocusWithin) return;
         ModifierKeys modifiers = eventArgs.KeyboardDevice.Modifiers;
+        if (Keyboard.IsKeyDown(Key.RightAlt) && !Keyboard.IsKeyDown(Key.LeftAlt)) return;
         ViewDeviceShortcutResolution resolution = _shortcutResolver.Resolve(
             physicalKey,
             modifiers,
@@ -419,20 +423,8 @@ public sealed partial class ViewDeviceWindow : Window
             case ViewDeviceShortcutAction.ScreenOn:
                 _viewModel.ScreenOnCommand.Execute(null);
                 break;
-            case ViewDeviceShortcutAction.Copy:
-                _viewModel.CopyClipboardCommand.Execute(null);
-                break;
-            case ViewDeviceShortcutAction.Cut:
-                _viewModel.CutClipboardCommand.Execute(null);
-                break;
             case ViewDeviceShortcutAction.Paste:
-                _viewModel.PasteHostClipboardCommand.Execute(null);
-                break;
-            case ViewDeviceShortcutAction.PasteWithPasteKey:
-                _viewModel.PasteHostClipboardWithPasteKeyCommand.Execute(null);
-                break;
-            case ViewDeviceShortcutAction.InjectClipboardText:
-                _viewModel.InjectHostClipboardCommand.Execute(null);
+                _viewModel.Controls.PasteCommand.Execute(null);
                 break;
             case ViewDeviceShortcutAction.ExpandNotifications:
                 _viewModel.ExpandNotificationPanelCommand.Execute(null);
@@ -446,6 +438,7 @@ public sealed partial class ViewDeviceWindow : Window
             case ViewDeviceShortcutAction.Menu:
                 _viewModel.MenuCommand.Execute(null);
                 break;
+
         }
     }
 
@@ -473,7 +466,8 @@ public sealed partial class ViewDeviceWindow : Window
 
     private void UpdatePackageDropState(DragEventArgs eventArgs)
     {
-        bool canInstall = CanAcceptPackageDrop(_viewModel, eventArgs.Data);
+        bool canInstall = CanAcceptPackageDrop(_viewModel, eventArgs.Data) ||
+            (GetDroppedFiles(eventArgs.Data) is { } files && _viewModel.Controls.DropFilesCommand.CanExecute(files));
         eventArgs.Effects = canInstall
             ? DragDropEffects.Copy
             : DragDropEffects.None;
@@ -486,9 +480,10 @@ public sealed partial class ViewDeviceWindow : Window
     private void OnDrop(object sender, DragEventArgs eventArgs)
     {
         PackageDropOverlay.Visibility = Visibility.Collapsed;
-        if (CanAcceptPackageDrop(_viewModel, eventArgs.Data) &&
-            TryGetSupportedPackagePath(eventArgs.Data, out string path))
-            _viewModel.InstallPackageCommand.Execute(path);
+        if (CanAcceptPackageDrop(_viewModel, eventArgs.Data) && TryGetSupportedPackagePath(eventArgs.Data, out string package))
+            _viewModel.InstallPackageCommand.Execute(package);
+        else if (GetDroppedFiles(eventArgs.Data) is { } files && _viewModel.Controls.DropFilesCommand.CanExecute(files))
+            _viewModel.Controls.DropFilesCommand.Execute(files);
 
         eventArgs.Effects = DragDropEffects.None;
         eventArgs.Handled = true;
@@ -502,6 +497,10 @@ public sealed partial class ViewDeviceWindow : Window
         return TryGetSupportedPackagePath(data, out string path) &&
                viewModel.InstallPackageCommand.CanExecute(path);
     }
+
+    internal static string[]? GetDroppedFiles(IDataObject data) =>
+        data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files &&
+        files.All(file => !string.IsNullOrWhiteSpace(file)) ? files.ToArray() : null;
 
     internal static bool TryGetSupportedPackagePath(
         IDataObject data,

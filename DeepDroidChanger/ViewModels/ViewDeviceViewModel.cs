@@ -37,6 +37,8 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
     private readonly IPollingService _pollingService;
     private readonly IUiDispatcherService _uiDispatcher;
     private readonly IViewDeviceClipboardService _clipboardService;
+    private readonly IViewDeviceInteractionService? _interactionService;
+    public ViewDeviceControlsViewModel Controls { get; }
     private readonly ILogger<ViewDeviceViewModel> _logger;
     private readonly TimeSpan[] _restartDelays;
     private readonly Func<TimeSpan, CancellationToken, Task> _powerCooldownDelay;
@@ -79,7 +81,8 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         IDeviceConfigService deviceConfigService,
         IDeviceActionService deviceActionService,
         IPackageInstallService packageInstallService,
-        IPollingService pollingService)
+        IPollingService pollingService,
+        IViewDeviceInteractionService? interactionService = null)
         : this(
             sessionFactory,
             deviceTracker,
@@ -94,7 +97,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
             deviceActionService,
             packageInstallService,
             pollingService,
-            DefaultRestartDelays)
+            DefaultRestartDelays, interactionService: interactionService)
     {
     }
 
@@ -114,7 +117,8 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         IPollingService pollingService,
         IReadOnlyList<TimeSpan> restartDelays,
         Func<TimeSpan, CancellationToken, Task>? powerCooldownDelay = null,
-        Func<TimeSpan, CancellationToken, Task>? runtimeVerificationDelay = null)
+        Func<TimeSpan, CancellationToken, Task>? runtimeVerificationDelay = null,
+        IViewDeviceInteractionService? interactionService = null)
     {
         _sessionFactory = sessionFactory;
         _deviceTracker = deviceTracker;
@@ -128,6 +132,9 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         _pollingService = pollingService;
         _uiDispatcher = uiDispatcher;
         _clipboardService = clipboardService;
+        _interactionService = interactionService;
+        Controls = new(interactionService, clipboardService, localization, uiDispatcher, logger,
+            (path, _) => InstallPackageCommand.ExecuteAsync(path));
         _logger = logger;
         ArgumentNullException.ThrowIfNull(restartDelays);
         _restartDelays = restartDelays.ToArray();
@@ -161,6 +168,10 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
             () => SendKeyAsync((int)AndroidKeycode.AKEYCODE_MENU),
             CanInteract);
         InitializeToolCommands();
+        Controls.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(ViewDeviceControlsViewModel.IsPaused)) NotifyCommandStateChanged();
+        };
         StatusText = GetStateText(State);
     }
 
@@ -200,7 +211,11 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
     public ScrcpyNet.Scrcpy? ScrcpyClient
     {
         get => _scrcpyClient;
-        private set => SetProperty(ref _scrcpyClient, value);
+        private set
+        {
+            if (value is null) Controls.Detach();
+            SetProperty(ref _scrcpyClient, value);
+        }
     }
 
     public int ContentWidth
@@ -222,7 +237,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
     public int ViewRotationQuarterTurns
     {
         get => _viewRotationQuarterTurns;
-        private set
+        internal set
         {
             int normalized = ((value % 4) + 4) % 4;
             if (!SetProperty(ref _viewRotationQuarterTurns, normalized))
@@ -349,6 +364,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         _deviceTracker.HealthChanged -= OnTrackerHealthChanged;
         await StopRuntimePollingAsync().ConfigureAwait(true);
         _localization.LanguageChanged -= OnLanguageChanged;
+        Controls.Dispose();
         _lifetimeCancellation.Cancel();
         Interlocked.Increment(ref _generation);
 
@@ -696,7 +712,8 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
                 return;
             }
 
-            session = _sessionFactory.Create(new ViewDeviceLaunchOptions(Serial));
+            ViewDeviceLaunchOptions options = new(Serial);
+            session = _sessionFactory.Create(_interactionService?.PrepareOptions(options) ?? options);
             Volatile.Write(ref _session, session);
             session.StateChanged += OnSessionStateChanged;
             session.ContentSizeChanged += OnSessionContentSizeChanged;
@@ -723,6 +740,10 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
                     cancellationToken)
                 .ConfigureAwait(false);
 
+            await _uiDispatcher.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_session, session)) Controls.Attach(session, ReconnectAsync);
+            }, cancellationToken).ConfigureAwait(false);
             _hasRun = true;
             Interlocked.Exchange(ref _restartAttempt, 0);
         }
@@ -1106,6 +1127,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         object? sender,
         ScrcpyClipboardChangedEventArgs eventArgs)
     {
+        if (_interactionService is not null) return;
         if (sender is not ISingleViewDeviceSession session)
             return;
 
@@ -1921,7 +1943,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
 
     private bool CanInteract()
     {
-        return GetInteractiveSession() is not null;
+        return GetInteractiveSession() is not null && ScrcpyClient?.IsVideoPaused != true;
     }
 
     private bool CanSendPower()

@@ -88,6 +88,7 @@ public sealed class ViewDeviceWindowService : IViewDeviceWindowService, IAsyncDi
         await OpenCoreAsync(serial, displayName, cancellationToken).ConfigureAwait(true);
     }
 
+
     public async Task CloseAllAsync(CancellationToken cancellationToken = default)
     {
         if (!_uiDispatcher.CheckAccess())

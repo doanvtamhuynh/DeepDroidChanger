@@ -14,7 +14,18 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
     private const int DiagnosticCapacity = 64;
     private static readonly TimeSpan DefaultFirstFrameTimeout = TimeSpan.FromSeconds(5);
 
-    private readonly ViewDeviceLaunchOptions _options;
+    private ViewDeviceLaunchOptions _options;
+    private DateTime _startedAt;
+    public ViewDeviceKeyboardMode KeyboardMode => _options.KeyboardMode;
+    public bool UhidFallback { get; private set; }
+    public event EventHandler? FeaturesChanged;
+
+    public Task ResetVideoAsync(CancellationToken cancellationToken = default) =>
+        SendPanelCommandAsync(new ResetVideoControlMessage(), cancellationToken);
+    public Task OpenKeyboardSettingsAsync(CancellationToken cancellationToken = default) =>
+        SendPanelCommandAsync(new OpenHardKeyboardSettingsControlMessage(), cancellationToken);
+    public Task ScanFileAsync(string path, CancellationToken cancellationToken = default) =>
+        SendPanelCommandAsync(new ScanFileControlMessage { Path = path }, cancellationToken);
     private readonly ISharpAdbDeviceResolver _deviceResolver;
     private readonly IScrcpyNetClientFactory _clientFactory;
     private readonly ILogger<ScrcpyNetSingleViewDeviceSession> _logger;
@@ -110,6 +121,18 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        try { await StartOnceAsync(cancellationToken).ConfigureAwait(false); }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested && KeyboardMode == ViewDeviceKeyboardMode.Uhid)
+        {
+            _options = _options with { KeyboardMode = ViewDeviceKeyboardMode.Sdk };
+            UhidFallback = true;
+            await StartOnceAsync(cancellationToken).ConfigureAwait(false);
+            InvokeSafely(FeaturesChanged, EventArgs.Empty);
+        }
+    }
+
+    private async Task StartOnceAsync(CancellationToken cancellationToken)
+    {
         ThrowIfDisposed();
         await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -133,6 +156,13 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
                     .ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
 
+                if (KeyboardMode == ViewDeviceKeyboardMode.Uhid &&
+                    !await _clientFactory.CanUseUhidAsync(device, cancellationToken).ConfigureAwait(false))
+                {
+                    _options = _options with { KeyboardMode = ViewDeviceKeyboardMode.Sdk };
+                    UhidFallback = true;
+                }
+                _startedAt = DateTime.UtcNow;
                 IScrcpyNetClient client = _clientFactory.Create(device, _options);
                 TaskCompletionSource firstFrameReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 lock (_gate)
@@ -336,6 +366,7 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
     {
         ArgumentNullException.ThrowIfNull(text);
         cancellationToken.ThrowIfCancellationRequested();
+        ValidateClipboardText(text);
         if (text.Length == 0)
             return Task.CompletedTask;
 
@@ -343,6 +374,17 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         if (unavailable is not null)
             return unavailable;
 
+        if (operation == "Ctrl+V clipboard paste" && KeyboardMode == ViewDeviceKeyboardMode.Uhid && client!.Client is { } nativeClient)
+        {
+            ScrcpyHidKeyboard hid = nativeClient.HidKeyboard;
+            byte[] down = hid.SetKey(0x19, true); // V, preserving held modifiers
+            down[0] = (byte)((down[0] | 1) & ~0x44); // Ctrl+V; never inherit Alt from a host shortcut.
+            byte[] up = hid.SetKey(0x19, false);
+            return SendCriticalBatch(client,
+                [new SetClipboardControlMessage { Text = text },
+                 new UhidInputControlMessage { Data = down },
+                 new UhidInputControlMessage { Data = up }], operation);
+        }
         return SendCriticalBatch(
             client!,
             [
@@ -359,6 +401,8 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
     public Task InjectTextAsync(string text, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(text);
+        if (text.Length > InjectTextControlMessage.MaxTextBytes || text.Any(character => character > 0x7f))
+            throw new ArgumentException("ViewDevice_ClipboardUseNativePaste", nameof(text));
         cancellationToken.ThrowIfCancellationRequested();
         Task? unavailable = RequireInteractiveClient(
             "clipboard text injection",
@@ -380,6 +424,13 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         return accepted
             ? Task.CompletedTask
             : RejectedControlBatch("clipboard text injection");
+    }
+
+    private static void ValidateClipboardText(string text)
+    {
+        int length = new UTF8Encoding(false, true).GetByteCount(text);
+        if (length > SetClipboardControlMessage.MaxTextBytes)
+            throw new ArgumentException("ViewDevice_ClipboardTooLarge", nameof(text));
     }
 
     public Task RequestClipboardAsync(
@@ -539,6 +590,7 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         client.Failed += OnClientFailed;
         client.Exited += OnClientExited;
         client.ClipboardChanged += OnClientClipboardChanged;
+        client.FeaturesChanged += OnClientFeaturesChanged;
     }
 
     private void UnsubscribeFromClient(IScrcpyNetClient client)
@@ -547,6 +599,13 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         client.Failed -= OnClientFailed;
         client.Exited -= OnClientExited;
         client.ClipboardChanged -= OnClientClipboardChanged;
+        client.FeaturesChanged -= OnClientFeaturesChanged;
+    }
+
+    private void OnClientFeaturesChanged(object? sender, EventArgs eventArgs)
+    {
+        lock (_gate) if (!ReferenceEquals(_client, sender)) return;
+        InvokeSafely(FeaturesChanged, eventArgs);
     }
 
     private void OnClientFrameReceived(object? sender, ScrcpyNetFrameEventArgs eventArgs)
@@ -653,6 +712,12 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
             stateChanged = new(state, SingleViewDeviceSessionState.Failed);
         }
 
+        if (KeyboardMode == ViewDeviceKeyboardMode.Uhid && DateTime.UtcNow - _startedAt < TimeSpan.FromSeconds(3))
+        {
+            _options = _options with { KeyboardMode = ViewDeviceKeyboardMode.Sdk };
+            UhidFallback = true;
+            InvokeSafely(FeaturesChanged, EventArgs.Empty);
+        }
         InvokeSafely(StateChanged, stateChanged);
         if (state == SingleViewDeviceSessionState.Running)
             InvokeSafely(Exited, EventArgs.Empty);
@@ -755,7 +820,7 @@ public sealed class ScrcpyNetSingleViewDeviceSession : ISingleViewDeviceSession
         out IScrcpyNetClient? client)
     {
         client = GetInteractiveClient();
-        return client is null
+        return client is null || _options.NoControl || (operation != "control flush" && client.Client?.IsVideoPaused == true)
             ? UnavailableControlSession(operation)
             : null;
     }

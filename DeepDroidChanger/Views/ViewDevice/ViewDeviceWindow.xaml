@@ -19,65 +19,70 @@
         FontFamily="{StaticResource Metric.FontFamily}">
 
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
-        <views:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ViewDeviceControlsResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+            <views:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
 
-        <Style x:Key="ViewDeviceSettingsButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Width" Value="36"/>
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}"
-                             Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
-                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
-                </DataTrigger>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceSettingsButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource ViewDeviceIconButtonStyle}">
+                <Setter Property="Width" Value="{StaticResource Metric.ControlHeight}"/>
+                <Setter Property="Height" Value="{StaticResource Metric.ControlHeight}"/>
+                <Setter Property="MinHeight" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource Self}, Path=Tag}"
+                                 Value="True">
+                        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                    </DataTrigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewDeviceNavigationButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
-            <Setter Property="MinHeight" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="Padding" Value="6,3"/>
-            <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Style.Triggers>
-                <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceNavigationButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
+                <Setter Property="Height" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
+                <Setter Property="MinHeight" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="Padding" Value="6,3"/>
+                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Style.Triggers>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
-        <Style x:Key="ViewDeviceStatusDotStyle" TargetType="Ellipse">
-            <Setter Property="Fill" Value="{DynamicResource Brush.Warning}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Running}">
-                    <Setter Property="Fill" Value="{DynamicResource Brush.Success}"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Failed}">
-                    <Setter Property="Fill" Value="{DynamicResource Brush.Danger}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+            <Style x:Key="ViewDeviceStatusDotStyle" TargetType="Ellipse">
+                <Setter Property="Fill" Value="{DynamicResource Brush.Warning}"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Running}">
+                        <Setter Property="Fill" Value="{DynamicResource Brush.Success}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding State}" Value="{x:Static models:ViewDeviceSessionState.Failed}">
+                        <Setter Property="Fill" Value="{DynamicResource Brush.Danger}"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+            </ResourceDictionary>
     </Window.Resources>
 
     <Border x:Name="RootBorder"
@@ -227,6 +232,9 @@
                             </StackPanel>
                         </Grid>
 
+                        <TextBlock Text="{Binding Controls.StatusText}" VerticalAlignment="Bottom" IsHitTestVisible="False"
+                                   Background="{DynamicResource Brush.Surface}" Foreground="{DynamicResource Brush.TextPrimary}"
+                                   FontSize="{StaticResource Metric.FontSize.Small}" TextWrapping="Wrap"/>
                         <Border x:Name="PackageDropOverlay"
                                 Visibility="Collapsed"
                                 IsHitTestVisible="False"
@@ -247,17 +255,16 @@
                     </Grid>
                 </Border>
 
-                <Grid x:Name="NavigationPanel"
-                      Grid.Row="1"
-                      Margin="8,0,8,8">
+                <DockPanel Grid.Row="1" Margin="8,0,8,8" LastChildFill="True">
+                    <views:ViewDeviceAudioButton DockPanel.Dock="Right" Margin="{StaticResource ViewDevice.ControlSpacing}" DataContext="{Binding Controls}"/>
+                <Grid x:Name="NavigationPanel">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="2"/>
+                        <ColumnDefinition Width="{StaticResource ViewDevice.ControlGap}"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="2"/>
+                        <ColumnDefinition Width="{StaticResource ViewDevice.ControlGap}"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
                     <Button x:Name="RecentButton"
                             Grid.Column="0"
                             Style="{StaticResource ViewDeviceNavigationButtonStyle}"
@@ -303,6 +310,7 @@
                         </StackPanel>
                     </Button>
                 </Grid>
+                </DockPanel>
             </Grid>
         </Grid>
     </Border>

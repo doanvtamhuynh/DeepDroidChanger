@@ -7,7 +7,8 @@ namespace ScrcpyNet;
 public enum ScrcpyDeviceMessageType : byte
 {
     Clipboard = 0,
-    AckClipboard = 1
+    AckClipboard = 1,
+    UhidOutput = 2
 }
 
 public abstract record ScrcpyDeviceMessage(ScrcpyDeviceMessageType Type);
@@ -20,6 +21,9 @@ public sealed record ScrcpyClipboardDeviceMessage(string Text)
 
 public sealed record ScrcpyClipboardAckDeviceMessage(ulong Sequence)
     : ScrcpyDeviceMessage(ScrcpyDeviceMessageType.AckClipboard);
+
+public sealed record ScrcpyUhidOutputDeviceMessage(ushort Id, byte[] Data)
+    : ScrcpyDeviceMessage(ScrcpyDeviceMessageType.UhidOutput);
 
 public sealed class ScrcpyClipboardChangedEventArgs : EventArgs
 {
@@ -87,6 +91,17 @@ internal static class ScrcpyDeviceMessageReader
                 await ReadExactAsync(stream, sequenceBuffer, cancellationToken).ConfigureAwait(false);
                 return new ScrcpyClipboardAckDeviceMessage(
                     BinaryPrimitives.ReadUInt64BigEndian(sequenceBuffer));
+            }
+            case ScrcpyDeviceMessageType.UhidOutput:
+            {
+                byte[] header = new byte[4];
+                await ReadExactAsync(stream, header, cancellationToken).ConfigureAwait(false);
+                ushort id = BinaryPrimitives.ReadUInt16BigEndian(header);
+                ushort length = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(2));
+                if (length > 4096) throw new InvalidDataException("UHID output exceeds 4096 bytes.");
+                byte[] data = new byte[length];
+                await ReadExactAsync(stream, data, cancellationToken).ConfigureAwait(false);
+                return new ScrcpyUhidOutputDeviceMessage(id, data);
             }
             default:
                 throw new InvalidDataException(

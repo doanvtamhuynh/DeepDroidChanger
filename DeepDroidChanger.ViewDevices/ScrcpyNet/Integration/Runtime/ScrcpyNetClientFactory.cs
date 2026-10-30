@@ -42,6 +42,9 @@ public sealed class ScrcpyNetClientFactory : IScrcpyNetClientFactory
                 Bitrate = ParseBitrate(options.VideoBitRate),
                 MaxSize = options.MaxSize,
                 MaxFramerate = options.MaxFps,
+                AudioEnabled = !options.NoAudio,
+                ControlEnabled = !options.NoControl,
+                KeyboardMode = options.KeyboardMode,
                 ScrcpyServerFile = runtime.ServerPath
             };
             ScrcpyNetClient wrapper = new(client, lease);
@@ -53,6 +56,24 @@ public sealed class ScrcpyNetClientFactory : IScrcpyNetClientFactory
             client?.Dispose();
             lease?.Dispose();
             throw;
+        }
+    }
+
+    public async Task<bool> CanUseUhidAsync(DeviceData device, CancellationToken cancellationToken)
+    {
+        UhidAccessReceiver receiver = new();
+        await new AdbClient().ExecuteRemoteCommandAsync(
+            "if [ -r /dev/uhid ] && [ -w /dev/uhid ]; then echo uhid-ok; fi",
+            device, receiver, cancellationToken).ConfigureAwait(false);
+        return receiver.Available;
+    }
+
+    private sealed class UhidAccessReceiver : MultiLineReceiver
+    {
+        public bool Available { get; private set; }
+        protected override void ProcessNewLines(IEnumerable<string> lines)
+        {
+            if (lines.Any(line => line.Trim() == "uhid-ok")) Available = true;
         }
     }
 

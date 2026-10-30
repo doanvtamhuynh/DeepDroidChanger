@@ -11,6 +11,13 @@ public interface ISingleViewDeviceSession : IAsyncDisposable
     int ContentWidth { get; }
     int ContentHeight { get; }
     IReadOnlyList<string> RecentDiagnostics { get; }
+    ViewDeviceKeyboardMode KeyboardMode => ViewDeviceKeyboardMode.Sdk;
+    bool UhidFallback => false;
+    ScrcpyAudioState AudioState => Client?.AudioState ?? ScrcpyAudioState.Disabled;
+    event EventHandler? FeaturesChanged { add { } remove { } }
+    Task ResetVideoAsync(CancellationToken cancellationToken = default) => Task.FromException(new NotSupportedException());
+    Task OpenKeyboardSettingsAsync(CancellationToken cancellationToken = default) => Task.FromException(new NotSupportedException());
+    Task ScanFileAsync(string path, CancellationToken cancellationToken = default) => Task.FromException(new NotSupportedException());
 
     event EventHandler<SingleViewDeviceSessionStateChangedEventArgs>? StateChanged;
     event EventHandler<SingleViewDeviceContentSizeChangedEventArgs>? ContentSizeChanged;

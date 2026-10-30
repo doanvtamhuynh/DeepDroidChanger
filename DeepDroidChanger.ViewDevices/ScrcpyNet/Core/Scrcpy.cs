@@ -11,17 +11,18 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DeepDroidChanger.ViewDevices.Models;
 
 namespace ScrcpyNet
 {
     /// <summary>
-    /// A scrcpy client using the protocol implemented by the pinned 1.23 server.
+    /// A scrcpy client using the protocol implemented by the pinned 5.0.1 server.
     /// The async lifecycle methods are intentionally kept small so existing
     /// callers can continue using the synchronous Start/Stop wrappers.
     /// </summary>
     public class Scrcpy : IDisposable
     {
-        private const int DeviceInfoLength = 68;
+        public const string ServerVersion = "5.0.1";
         private const int PacketMetadataLength = ScrcpyVideoPacketHeader.HeaderLength;
         private static readonly TimeSpan AcceptPollInterval = TimeSpan.FromMilliseconds(10);
         private static readonly TimeSpan ServerTaskStopTimeout = TimeSpan.FromSeconds(2);
@@ -34,6 +35,20 @@ namespace ScrcpyNet
         public int MaxSize { get; set; }
         public int MaxFramerate { get; set; }
         public string ScrcpyServerFile { get; set; } = "ScrcpyNet/scrcpy-server.jar";
+        public bool AudioEnabled { get; set; }
+        public bool ControlEnabled { get; set; } = true;
+        public bool ClipboardAutosync { get; set; } = true;
+        public ViewDeviceKeyboardMode KeyboardMode { get; set; }
+        public ScrcpyHidKeyboard HidKeyboard { get; } = new();
+        public ScrcpyAudioState AudioState { get; private set; }
+        public bool IsVideoPaused { get; private set; }
+        public event EventHandler? FeaturesChanged;
+
+        public void SetVideoPaused(bool paused)
+        {
+            IsVideoPaused = paused;
+            InvokeSafely(FeaturesChanged, EventArgs.Empty);
+        }
 
         public bool Connected => Volatile.Read(ref connected) != 0;
 
@@ -59,12 +74,14 @@ namespace ScrcpyNet
 
         private TcpClient? videoClient;
         private TcpClient? controlClient;
+        private TcpClient? audioClient;
         private TcpListener? listener;
         private CancellationTokenSource? cts;
         private CancellationTokenSource? serverCancellation;
         private Task? serverTask;
         private Task serverLifecycleCompletion = Task.CompletedTask;
         private Task? videoTask;
+        private Task? audioTask;
         private Task? controlTask;
         private Task? controlReaderTask;
         private int connected;
@@ -88,8 +105,7 @@ namespace ScrcpyNet
             VideoStreamDecoder.Scrcpy = this;
             serverLifecycle = new ScrcpyNetServerLifecycle(
                 device,
-                new SharpAdbClientOperations(),
-                exception => Log.Debug(exception, "No stale ScrcpyNet reverse rule was removed."));
+                new SharpAdbClientOperations());
         }
 
         public void Start(long timeoutMs = 5000)
@@ -157,7 +173,7 @@ namespace ScrcpyNet
         public Task FlushControlAsync(CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Connected)
+            if (!Connected || controlClient is null)
             {
                 return Task.FromException(
                     new InvalidOperationException("The scrcpy control session is not connected."));
@@ -234,13 +250,24 @@ namespace ScrcpyNet
                     .ConfigureAwait(false);
                 videoClient = currentVideoClient;
 
-                startupStage = "waiting for the scrcpy control socket";
-                TcpClient currentControlClient = await AcceptClientAsync(
+                TcpClient? currentAudioClient = null;
+                if (AudioEnabled)
+                {
+                    startupStage = "waiting for the scrcpy audio socket";
+                    currentAudioClient = await AcceptClientAsync(currentListener, "audio", startup.Token).ConfigureAwait(false);
+                    audioClient = currentAudioClient;
+                }
+                TcpClient? currentControlClient = null;
+                if (ControlEnabled)
+                {
+                    startupStage = "waiting for the scrcpy control socket";
+                    currentControlClient = await AcceptClientAsync(
                         currentListener,
                         "control",
                         startup.Token)
                     .ConfigureAwait(false);
                 controlClient = currentControlClient;
+                }
 
                 startupStage = "reading scrcpy device metadata";
                 await ReadDeviceInfoAsync(
@@ -254,6 +281,8 @@ namespace ScrcpyNet
                 cts = sessionCancellation;
                 Volatile.Write(ref connected, 1);
                 videoTask = Task.Run(() => VideoMainAsync(currentVideoClient, sessionCancellation.Token));
+                if (currentControlClient is not null)
+                {
                 controlTask = Task.Run(() => ControllerMainAsync(
                         currentControlClient,
                         controlSession,
@@ -261,6 +290,14 @@ namespace ScrcpyNet
                 controlReaderTask = Task.Run(() => ControlReceiverMainAsync(
                     currentControlClient,
                     sessionCancellation.Token));
+                }
+                if (currentAudioClient is not null)
+                    audioTask = Task.Run(() => AudioMainAsync(currentAudioClient, sessionCancellation.Token));
+                if (ControlEnabled && KeyboardMode == ViewDeviceKeyboardMode.Uhid)
+                {
+                    if (!TrySendControlCommands([new UhidCreateControlMessage()]))
+                        throw new IOException("Could not create the UHID keyboard.");
+                }
 
                 currentListener.Stop();
                 listener = null;
@@ -294,6 +331,16 @@ namespace ScrcpyNet
         private async Task StopCoreAsync()
         {
             Volatile.Write(ref intentionalStop, 1);
+            if (Connected && ControlEnabled && KeyboardMode == ViewDeviceKeyboardMode.Uhid)
+            {
+                using CancellationTokenSource releaseDeadline = new(TimeSpan.FromMilliseconds(500));
+                try
+                {
+                    TrySendControlCommands([new UhidInputControlMessage { Data = HidKeyboard.ReleaseAll() }, new UhidDestroyControlMessage()]);
+                    await FlushControlAsync(releaseDeadline.Token).ConfigureAwait(false);
+                }
+                catch (Exception exception) { Log.Debug(exception, "UHID shutdown release did not complete."); }
+            }
             Volatile.Write(ref connected, 0);
 
             CancellationTokenSource? sessionCancellation = cts;
@@ -335,6 +382,7 @@ namespace ScrcpyNet
 
             CloseClient(videoClient);
             CloseClient(controlClient);
+            CloseClient(audioClient);
             TryMobileServerCleanup();
             videoPacketAssembler.Clear();
 
@@ -345,23 +393,35 @@ namespace ScrcpyNet
                     currentControlTask,
                     currentControlReaderTask)
                 .ConfigureAwait(false);
+            await ObserveBackgroundTaskAsync(audioTask, "audio").ConfigureAwait(false);
             await WaitForBackgroundTaskAsync(
                     currentServerTask,
                     "server",
                     ServerTaskStopTimeout)
                 .ConfigureAwait(false);
-            Volatile.Write(
-                ref serverLifecycleCompletion,
-                currentServerTask is null || currentServerTask.IsCompleted
-                    ? Task.CompletedTask
-                    : currentServerTask);
+            using (CancellationTokenSource cleanupDeadline = new(TimeSpan.FromSeconds(2)))
+            {
+                try { await serverLifecycle.CleanupServerFileAsync(cleanupDeadline.Token).WaitAsync(cleanupDeadline.Token).ConfigureAwait(false); }
+                catch (Exception exception) { Log.Debug(exception, "The session's temporary server file could not be removed."); }
+            }
+            // Stop is commonly followed by Dispose. A second stop with no current
+            // server task must not erase the pending completion used by the lease.
+            if (currentServerTask is not null)
+                Volatile.Write(ref serverLifecycleCompletion,
+                    currentServerTask.IsCompleted ? Task.CompletedTask : currentServerTask);
             videoPacketAssembler.Clear();
 
             DisposeClient(videoClient);
             DisposeClient(controlClient);
+            DisposeClient(audioClient);
 
             videoClient = null;
             controlClient = null;
+            audioClient = null;
+            audioTask = null;
+            AudioState = ScrcpyAudioState.Disabled;
+            IsVideoPaused = false;
+            HidKeyboard.ReleaseAll();
             videoTask = null;
             controlTask = null;
             controlReaderTask = null;
@@ -415,22 +475,7 @@ namespace ScrcpyNet
             CancellationToken callerToken)
         {
             NetworkStream infoStream = client.GetStream();
-            byte[] deviceInfoBuffer = new byte[DeviceInfoLength];
-            await ScrcpyStartupIo.ReadExactAsync(
-                    infoStream,
-                    deviceInfoBuffer,
-                    0,
-                    deviceInfoBuffer.Length,
-                    startupToken,
-                    callerToken,
-                    "reading scrcpy device metadata")
-                .ConfigureAwait(false);
-
-            DeviceName = Encoding.UTF8
-                .GetString(deviceInfoBuffer, 0, 64)
-                .TrimEnd('\0');
-            Width = BinaryPrimitives.ReadUInt16BigEndian(deviceInfoBuffer.AsSpan(64, 2));
-            Height = BinaryPrimitives.ReadUInt16BigEndian(deviceInfoBuffer.AsSpan(66, 2));
+            DeviceName = await ScrcpyStartupIo.ReadVideoMetadataAsync(infoStream, startupToken).ConfigureAwait(false);
             Log.Information("Connected to {DeviceName}; initial texture: {Width}x{Height}", DeviceName, Width, Height);
         }
 
@@ -452,6 +497,14 @@ namespace ScrcpyNet
 
                     ScrcpyVideoPacketHeader header = ScrcpyVideoPacketHeader.Parse(
                         metadataBuffer.AsSpan(0, PacketMetadataLength));
+                    if (header.IsSession)
+                    {
+                        Width = header.Width;
+                        Height = header.Height;
+                        Log.Debug("Video encoding session for {Serial}: {Width}x{Height}", device.Serial, Width, Height);
+                        videoPacketAssembler.Clear();
+                        continue;
+                    }
                     byte[] packetBuffer = pool.Rent(header.PacketSize);
                     try
                     {
@@ -507,6 +560,62 @@ namespace ScrcpyNet
                 videoPacketAssembler.Clear();
                 pool.Return(metadataBuffer);
             }
+        }
+
+        private async Task AudioMainAsync(TcpClient client, CancellationToken cancellationToken)
+        {
+            SdlPcmAudioPlayer? output = null;
+            byte[] header = new byte[12];
+            byte[]? packet = null;
+            SetAudioState(ScrcpyAudioState.Starting);
+            try
+            {
+                NetworkStream stream = client.GetStream();
+                await ReadExactAsync(stream, header, 0, 4, cancellationToken).ConfigureAwait(false);
+                uint codec = BinaryPrimitives.ReadUInt32BigEndian(header);
+                if (codec == 0) { SetAudioState(ScrcpyAudioState.Unavailable); return; }
+                if (codec != 0x00726177) throw new InvalidDataException("Unsupported scrcpy audio codec.");
+                output = new SdlPcmAudioPlayer(Path.GetDirectoryName(Path.GetFullPath(ScrcpyServerFile))!);
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await ReadExactAsync(stream, header, 0, 12, cancellationToken).ConfigureAwait(false);
+                    ScrcpyVideoPacketHeader frame = ScrcpyVideoPacketHeader.Parse(header);
+                    if (frame.IsSession || frame.IsConfig || frame.PacketSize > 4096)
+                        throw new InvalidDataException("Invalid raw audio packet.");
+                    packet = pool.Rent(frame.PacketSize);
+                    await ReadExactAsync(stream, packet, 0, frame.PacketSize, cancellationToken).ConfigureAwait(false);
+                    output.Write(packet, frame.PacketSize);
+                    pool.Return(packet);
+                    packet = null;
+                    if (AudioState != ScrcpyAudioState.Playing) SetAudioState(ScrcpyAudioState.Playing);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                Log.Warning(exception, "Device audio is unavailable for {Serial}; video remains active.", device.Serial);
+                SetAudioState(ScrcpyAudioState.Unavailable);
+                // Keep draining an established stream if only the local player failed.
+                // Closing a server audio socket can otherwise stop video as well.
+                try
+                {
+                    byte[] discard = new byte[8192];
+                    while (await client.GetStream().ReadAsync(discard, cancellationToken).ConfigureAwait(false) != 0) { }
+                }
+                catch (Exception) when (cancellationToken.IsCancellationRequested) { }
+                catch (IOException) { }
+            }
+            finally
+            {
+                if (packet is not null) pool.Return(packet);
+                output?.Dispose();
+            }
+        }
+
+        private void SetAudioState(ScrcpyAudioState state)
+        {
+            AudioState = state;
+            InvokeSafely(FeaturesChanged, EventArgs.Empty);
         }
 
         private async Task ControllerMainAsync(
@@ -609,6 +718,9 @@ namespace ScrcpyNet
                                 ClipboardAcknowledged,
                                 new ScrcpyClipboardAcknowledgedEventArgs(acknowledgement.Sequence));
                             break;
+                        case ScrcpyUhidOutputDeviceMessage output:
+                            if (output.Id == ScrcpyHidKeyboard.DeviceId) HidKeyboard.UpdateLeds(output.Data);
+                            break;
                         default:
                             throw new InvalidDataException(
                                 $"Unsupported scrcpy device message {message.Type}.");
@@ -699,7 +811,8 @@ namespace ScrcpyNet
             Log.Information("Starting scrcpy server...");
 
             SerilogOutputReceiver receiver = new();
-            IReadOnlyList<string> commands = BuildServerArguments(Bitrate, MaxSize, MaxFramerate);
+            IReadOnlyList<string> commands = BuildServerArguments(Bitrate, MaxSize, MaxFramerate,
+                AudioEnabled, ControlEnabled, serverLifecycle.Scid, serverLifecycle.RemoteServerPath, ClipboardAutosync);
 
             string command = string.Join(" ", commands);
             Log.Information("Starting scrcpy server command: {Command}", command);
@@ -709,28 +822,42 @@ namespace ScrcpyNet
         internal static IReadOnlyList<string> BuildServerArguments(
             long bitrate,
             int maxSize,
-            int maxFramerate)
+            int maxFramerate,
+            bool audioEnabled = false,
+            bool controlEnabled = true,
+            int scid = -1,
+            string remoteServerPath = "/data/local/tmp/scrcpy-server.jar",
+            bool clipboardAutosync = true)
         {
             List<string> commands = new()
             {
-                "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
+                $"CLASSPATH={remoteServerPath}",
                 "app_process",
                 "/",
                 "com.genymobile.scrcpy.Server",
-                "1.23",
+                ServerVersion,
                 "log_level=debug",
             };
 
             if (bitrate > 0 && bitrate <= int.MaxValue)
-                commands.Add($"bit_rate={bitrate}");
+                commands.Add($"video_bit_rate={bitrate}");
             if (maxSize > 0)
                 commands.Add($"max_size={maxSize}");
             if (maxFramerate > 0)
                 commands.Add($"max_fps={maxFramerate}");
 
             commands.Add("tunnel_forward=false");
-            commands.Add("control=true");
-            commands.Add("clipboard_autosync=true");
+            commands.Add($"control={controlEnabled.ToString().ToLowerInvariant()}");
+            commands.Add($"audio={audioEnabled.ToString().ToLowerInvariant()}");
+            commands.Add("audio_codec=raw");
+            commands.Add("audio_source=output");
+            commands.Add("video_codec=h264");
+            commands.Add("send_stream_meta=true");
+            commands.Add("send_frame_meta=true");
+            commands.Add("send_device_meta=true");
+            commands.Add("send_dummy_byte=false");
+            if (scid >= 0) commands.Add($"scid={scid:x8}");
+            commands.Add($"clipboard_autosync={clipboardAutosync.ToString().ToLowerInvariant()}");
             commands.Add("display_id=0");
             commands.Add("show_touches=false");
             commands.Add("stay_awake=false");
@@ -783,6 +910,7 @@ namespace ScrcpyNet
 
             CloseClient(videoClient);
             CloseClient(controlClient);
+            CloseClient(audioClient);
             try
             {
                 listener?.Stop();

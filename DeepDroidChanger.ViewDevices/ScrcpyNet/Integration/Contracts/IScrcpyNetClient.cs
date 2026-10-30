@@ -16,6 +16,7 @@ public interface IScrcpyNetClient : IDisposable
     event EventHandler<ScrcpyNetErrorEventArgs>? Failed;
     event EventHandler? Exited;
     event EventHandler<ScrcpyClipboardChangedEventArgs>? ClipboardChanged;
+    event EventHandler? FeaturesChanged { add { } remove { } }
 
     Task StartAsync(CancellationToken cancellationToken);
     Task StopAsync(CancellationToken cancellationToken = default);
@@ -28,6 +29,7 @@ public interface IScrcpyNetClient : IDisposable
 
 public interface IScrcpyNetClientFactory
 {
+    Task<bool> CanUseUhidAsync(DeviceData device, CancellationToken cancellationToken) => Task.FromResult(true);
     IScrcpyNetClient Create(DeviceData device, ViewDeviceLaunchOptions options);
 }
 

@@ -2,6 +2,9 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime"
                     xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="../ViewDevice/ViewDeviceControlsResources.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
     <Thickness x:Key="ViewMultipleDevices.TileMargin">6</Thickness>
     <sys:Double x:Key="ViewMultipleDevices.TileHeaderHeight">64</sys:Double>
     <sys:Double x:Key="ViewMultipleDevices.PanelWidth">352</sys:Double>
@@ -15,17 +18,18 @@
     <sys:Double x:Key="ViewMultipleDevices.ResultMaxHeight">200</sys:Double>
     <BooleanToVisibilityConverter x:Key="MultipleDevicesBooleanVisibility"/>
 
-    <Style x:Key="MultipleDevicesIconButton" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
+    <Style x:Key="MultipleDevicesIconButton" TargetType="Button" BasedOn="{StaticResource ViewDeviceIconButtonStyle}">
         <Setter Property="Width" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
         <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
     </Style>
-    <Style x:Key="MultipleDevicesPanelButton" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
+    <Style x:Key="MultipleDevicesPanelButton" TargetType="Button" BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
         <Setter Property="Height" Value="Auto"/>
         <Setter Property="MinHeight" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
         <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
         <Setter Property="Padding" Value="{StaticResource Spacing.ControlPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource ViewDevice.ControlCellSpacing}"/>
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
     </Style>
     <Style x:Key="MultipleDevicesHint" TargetType="TextBlock" BasedOn="{StaticResource AppLabelTextStyle}">
