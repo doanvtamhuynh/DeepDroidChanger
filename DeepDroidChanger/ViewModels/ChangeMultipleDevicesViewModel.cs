@@ -21,6 +21,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly IAddDevicesDialogService _addDevicesDialogService;
     private readonly IAdvancedChangeConfigDialogService _advancedChangeConfigDialogService;
     private readonly ICarrierDataService _carrierDataService;
+    private readonly IDeviceInfoCatalogService? _deviceInfoCatalog;
     private readonly IDeviceActionConfirmationDialogService _deviceActionConfirmationDialogService;
     private readonly IDeviceActionService _deviceActionService;
     private readonly ITwrpRecoveryService _twrpRecovery;
@@ -166,11 +167,13 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         IDeviceActionFeedbackService deviceActionFeedbackService,
         IClipboardService clipboardService,
         IViewDeviceWindowService viewDeviceWindowService,
-        ITwrpRecoveryService twrpRecovery)
+        ITwrpRecoveryService twrpRecovery,
+        IDeviceInfoCatalogService? deviceInfoCatalog = null)
     {
         _addDevicesDialogService = addDevicesDialogService;
         _advancedChangeConfigDialogService = advancedChangeConfigDialogService;
         _carrierDataService = carrierDataService;
+        _deviceInfoCatalog = deviceInfoCatalog;
         _deviceActionConfirmationDialogService = deviceActionConfirmationDialogService;
         _deviceActionService = deviceActionService;
         _twrpRecovery = twrpRecovery;
@@ -209,7 +212,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         Countries = [];
         Carriers = [];
         AndroidVersions = [];
-        Brands = DeviceProfileOptionsHelper.Brands;
+        Brands = DeviceProfileOptionsHelper.GetBrands(_deviceInfoCatalog);
         TypeOptions = ["sargo", "starlte", "tissot", "unknown"];
         _isApplyingConfiguration = true;
         try
@@ -4121,7 +4124,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private void UpdateAndroidVersionOptions(string? brand, string? preferredVersion)
     {
         AndroidVersions.Clear();
-        foreach (string version in DeviceProfileOptionsHelper.GetAndroidVersions(brand))
+        foreach (string version in DeviceProfileOptionsHelper.GetAndroidVersions(brand, _deviceInfoCatalog))
             AndroidVersions.Add(version);
 
         SelectedAndroidVersion =

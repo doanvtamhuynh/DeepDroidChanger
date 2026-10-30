@@ -24,9 +24,17 @@ namespace DeepDroidChanger.Services
             "35167509", "35167530", "35167549", "35167564", "35167584", "35167656",
             "35167682", "35167709"
         ];
-        private IReadOnlyDictionary<string, IReadOnlyList<string>>? _imeiTacs;
-        private IReadOnlyDictionary<string, IReadOnlyList<string>>? _macPrefixes;
-        private IReadOnlyList<string>? _names;
+        private readonly Lazy<IReadOnlyDictionary<string, IReadOnlyList<string>>> _imeiTacs = new(LoadImeiTacs);
+        private readonly Lazy<IReadOnlyDictionary<string, IReadOnlyList<string>>> _macPrefixes = new(LoadMacPrefixes);
+        private readonly Lazy<IReadOnlyList<string>> _imeiPool;
+        private readonly Lazy<IReadOnlyList<string>> _macPool;
+        private readonly Lazy<IReadOnlyList<string>> _names = new(LoadNames);
+
+        public RandomService()
+        {
+            _imeiPool = new(() => _imeiTacs.Value.Values.SelectMany(values => values).Distinct().ToArray());
+            _macPool = new(() => _macPrefixes.Value.Values.SelectMany(values => values).Distinct().ToArray());
+        }
 
         public int RandomInRange(int minValue, int maxValue)
         {
@@ -87,12 +95,12 @@ namespace DeepDroidChanger.Services
 
         public string GenerateName(bool requireSingle = false)
         {
-            _names ??= LoadNames();
+            IReadOnlyList<string> names = _names.Value;
             bool isSingleWord = RandomInRange(1, 7) % 4 != 0;
             if (isSingleWord || requireSingle)
-                return PickRandom(_names);
+                return PickRandom(names);
 
-            return string.Concat(PickRandom(_names), " ", PickRandom(_names));
+            return string.Concat(PickRandom(names), " ", PickRandom(names));
         }
 
         public string GenerateImei(string brand, string? preferredTac = null)
@@ -110,76 +118,67 @@ namespace DeepDroidChanger.Services
         public string GenerateWifiMacAddress(string brand)
         {
             var prefix = PickMacPrefix(brand);
-            var suffix = string.Join(":", Enumerable.Range(0, 3).Select(_ => RandomInRange(0, 253).ToString("x2")));
+            var suffix = string.Join(":", Enumerable.Range(0, 3).Select(_ => RandomInRange(0, 256).ToString("x2")));
             return string.Concat(prefix, ":", suffix);
         }
 
         private string PickMacPrefix(string brand)
         {
-            _macPrefixes ??= LoadMacPrefixes();
-            var normalizedBrand = string.IsNullOrWhiteSpace(brand) ? "samsung" : brand.Trim().ToLowerInvariant();
+            string normalizedBrand = brand?.Trim().ToLowerInvariant() ?? string.Empty;
+            var prefixesByBrand = _macPrefixes.Value;
 
-            if (_macPrefixes.TryGetValue(normalizedBrand, out var prefixes) && prefixes.Count > 0)
+            if (prefixesByBrand.TryGetValue(normalizedBrand, out var prefixes) && prefixes.Count > 0)
                 return PickRandom(prefixes);
 
-            return PickRandom(FallbackMacPrefixes);
+            string alias = normalizedBrand switch
+            {
+                "poco" or "redmi" => "xiaomi",
+                "oppo" => "oneplus",
+                _ => normalizedBrand
+            };
+            if (prefixesByBrand.TryGetValue(alias, out prefixes) && prefixes.Count > 0)
+                return PickRandom(prefixes);
+            return PickRandom(_macPool.Value.Count > 0 ? _macPool.Value : FallbackMacPrefixes);
         }
 
         private string PickImeiTac(string brand)
         {
-            _imeiTacs ??= LoadImeiTacs();
             string normalizedBrand = string.IsNullOrWhiteSpace(brand)
                 ? string.Empty
                 : brand.Trim().ToLowerInvariant();
+            var tacsByBrand = _imeiTacs.Value;
 
-            if (_imeiTacs.TryGetValue(normalizedBrand, out IReadOnlyList<string>? tacs) && tacs.Count > 0)
+            if (tacsByBrand.TryGetValue(normalizedBrand, out IReadOnlyList<string>? tacs) && tacs.Count > 0)
                 return PickRandom(tacs);
 
-            return PickRandom(FallbackImeiTacs);
+            string alias = normalizedBrand is "poco" or "redmi" ? "xiaomi" : normalizedBrand;
+            if (tacsByBrand.TryGetValue(alias, out tacs) && tacs.Count > 0)
+                return PickRandom(tacs);
+            return PickRandom(_imeiPool.Value.Count > 0 ? _imeiPool.Value : FallbackImeiTacs);
         }
 
         private static IReadOnlyDictionary<string, IReadOnlyList<string>> LoadImeiTacs()
-        {
-            try
-            {
-                string json = AssetDataReader.ReadText(AssetConstants.Data.ImeiTacsPath);
-                Dictionary<string, string[]>? source = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
-                return source?.ToDictionary(
-                    pair => pair.Key,
-                    pair => (IReadOnlyList<string>)pair.Value
-                        .Where(IsValidTac)
-                        .Distinct(StringComparer.Ordinal)
-                        .ToArray(),
-                    StringComparer.OrdinalIgnoreCase)
-                    ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-            }
-            catch (IOException)
-            {
-                return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-            }
-            catch (JsonException)
-            {
-                return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-            }
-        }
+            => LoadIdentifierValues(AssetConstants.Data.ImeiTacsPath, IsValidTac);
 
         private static IReadOnlyDictionary<string, IReadOnlyList<string>> LoadMacPrefixes()
+            => LoadIdentifierValues(AssetConstants.Data.MacVendorsPath, IsValidMacPrefix);
+
+        private static IReadOnlyDictionary<string, IReadOnlyList<string>> LoadIdentifierValues(
+            string path, Func<string?, bool> isValid)
         {
             try
             {
-                var json = AssetDataReader.ReadText(AssetConstants.Data.MacVendorsPath);
-                var prefixes = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
-                return prefixes?.ToDictionary(
+                string json = AssetDataReader.ReadText(path);
+                var source = JsonSerializer.Deserialize<Dictionary<string, string[]>>(json);
+                return source?.ToDictionary(
                     pair => pair.Key,
-                    pair => (IReadOnlyList<string>)pair.Value,
+                    pair => (IReadOnlyList<string>)pair.Value.Where(isValid)
+                        .Select(value => value.ToLowerInvariant())
+                        .Distinct(StringComparer.Ordinal).ToArray(),
                     StringComparer.OrdinalIgnoreCase)
                     ?? new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             }
-            catch (IOException)
-            {
-                return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
-            }
-            catch (JsonException)
+            catch (Exception exception) when (exception is IOException or JsonException)
             {
                 return new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             }
@@ -205,6 +204,15 @@ namespace DeepDroidChanger.Services
         private static bool IsValidTac(string? value)
         {
             return value is { Length: 8 } && value.All(char.IsDigit);
+        }
+
+        private static bool IsValidMacPrefix(string? value)
+        {
+            if (value is not { Length: 8 })
+                return false;
+            string[] parts = value.Split(':');
+            return parts.Length == 3 && parts.All(part => part.Length == 2 && part.All(Uri.IsHexDigit))
+                && (Convert.ToByte(parts[0], 16) & 1) == 0;
         }
 
         private string GenerateDigits(int length)

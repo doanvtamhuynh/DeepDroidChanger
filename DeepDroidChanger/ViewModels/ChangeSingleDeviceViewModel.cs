@@ -18,6 +18,7 @@ namespace DeepDroidChanger.ViewModels
 
         private readonly IAddDevicesDialogService _addDevicesDialogService;
         private readonly ICarrierDataService _carrierDataService;
+        private readonly IDeviceInfoCatalogService? _deviceInfoCatalog;
         private readonly IChangeTimezoneDialogService _changeTimezoneDialogService;
         private readonly IDeviceTimezoneService _deviceTimezoneService;
         private readonly IChangeLocationDialogService _changeLocationDialogService;
@@ -140,10 +141,12 @@ namespace DeepDroidChanger.ViewModels
             IDeviceActionFeedbackService deviceActionFeedbackService,
             IClipboardService clipboardService,
             IViewDeviceWindowService viewDeviceWindowService,
-            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
+            IDeviceMetadataChangeNotifier? metadataChangeNotifier = null,
+            IDeviceInfoCatalogService? deviceInfoCatalog = null)
         {
             _addDevicesDialogService = addDevicesDialogService;
             _carrierDataService = carrierDataService;
+            _deviceInfoCatalog = deviceInfoCatalog;
             _changeTimezoneDialogService = changeTimezoneDialogService;
             _deviceTimezoneService = deviceTimezoneService;
             _changeLocationDialogService = changeLocationDialogService;
@@ -193,7 +196,7 @@ namespace DeepDroidChanger.ViewModels
             _deviceProcessStateService.ProcessChanged += OnDeviceProcessChanged;
             _metadataChangeNotifier?.DeviceNameChanged += OnDeviceNameChanged;
 
-            Brands = DeviceProfileOptionsHelper.Brands;
+            Brands = DeviceProfileOptionsHelper.GetBrands(_deviceInfoCatalog);
             UpdateAndroidVersionOptions("Random", null);
             TypeOptions = ["sargo", "starlte", "tissot", "unknown"];
             NewDeviceCountText = string.Format(_localizationService.GetString("ChangeSingleDevice_NewDeviceCount"), 0);
@@ -3209,7 +3212,7 @@ namespace DeepDroidChanger.ViewModels
         private void UpdateAndroidVersionOptions(string? brand, string? preferredVersion)
         {
             AndroidVersions.Clear();
-            foreach (string version in DeviceProfileOptionsHelper.GetAndroidVersions(brand))
+            foreach (string version in DeviceProfileOptionsHelper.GetAndroidVersions(brand, _deviceInfoCatalog))
                 AndroidVersions.Add(version);
 
             SelectedAndroidVersion =

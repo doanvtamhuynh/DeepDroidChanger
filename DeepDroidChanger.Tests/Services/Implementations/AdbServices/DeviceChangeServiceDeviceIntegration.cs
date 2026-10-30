@@ -1,22 +1,15 @@
-using DeepDroidChanger.Authentication;
 using DeepDroidChanger.Constants;
-using DeepDroidChanger.Helpers;
 using DeepDroidChanger.Models;
 using DeepDroidChanger.Services;
-using DeepDroidChanger.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace DeepDroidChanger.Tests.Services.Implementations.AdbServices;
 
 public sealed partial class DeviceChangeServiceTests
 {
-    private const string RunApiEnvironmentVariable = "DEEPDROID_RUN_DEVICE_API_MATRIX";
+    private const string RunCatalogEnvironmentVariable = "DEEPDROID_RUN_DEVICE_CATALOG_MATRIX";
     private const string RunDeviceEnvironmentVariable = "DEEPDROID_RUN_DEVICE_CHANGE_MATRIX";
-    private const string UsernameEnvironmentVariable = "DEEPDROID_DEVICE_API_USERNAME";
-    private const string PasswordEnvironmentVariable = "DEEPDROID_DEVICE_API_PASSWORD";
     private const string SerialEnvironmentVariable = "DEEPDROID_DEVICE_SERIAL";
     private const string StartIndexEnvironmentVariable = "DEEPDROID_DEVICE_MATRIX_START_INDEX";
     private const string MarkerFileName = "deepdroidchanger_matrix_marker";
@@ -32,8 +25,8 @@ public sealed partial class DeviceChangeServiceTests
         ("Xiaomi", "Android 13"),
         ("Xiaomi", "Android 14"),
         ("Xiaomi", "Android 15"),
-        ("OnePlus", "Android 13"),
-        ("OPPO", "Android 14"),
+        ("OnePlus", "Android 11"),
+        ("OPPO", "Android 11"),
         ("vivo", "Android 14")
     ];
 
@@ -42,13 +35,10 @@ public sealed partial class DeviceChangeServiceTests
     [TestMethod]
     [TestCategory("DeviceIntegration")]
     [Timeout(300_000)]
-    public async Task DeviceInfoApi_AllSupportedBrandVersions_ReturnValidatedProfiles()
+    public async Task DeviceInfoCatalog_SelectedBrandVersions_ReturnValidatedProfiles()
     {
-        RequireOptIn(RunApiEnvironmentVariable);
-        AccountSession session = await AuthenticateAsync(CancellationToken.None);
-        var sessionService = new FakeAuthenticationSessionService();
-        sessionService.SetSession(session);
-        IDeviceRandomProfileService profiles = CreateProfileService(sessionService);
+        RequireOptIn(RunCatalogEnvironmentVariable);
+        IDeviceRandomProfileService profiles = await CreateProfileServiceAsync();
 
         foreach ((string brand, string androidVersion) in Matrix)
         {
@@ -59,15 +49,15 @@ public sealed partial class DeviceChangeServiceTests
             Assert.AreEqual(
                 ExpectedSdk(androidVersion),
                 profile.Sdk,
-                $"Server SDK mismatch for {brand} {androidVersion}.");
+                $"Catalog SDK mismatch for {brand} {androidVersion}.");
             Assert.AreEqual(
                 ExpectedRelease(androidVersion),
                 profile.Release,
-                $"Server release mismatch for {brand} {androidVersion}.");
+                $"Catalog release mismatch for {brand} {androidVersion}.");
             Assert.IsFalse(string.IsNullOrWhiteSpace(profile.Model));
             Assert.IsFalse(string.IsNullOrWhiteSpace(profile.Fingerprint));
             TestContext.WriteLine(
-                "API PASS | {0} | {1} | model={2} | release={3} | sdk={4}",
+                "CATALOG PASS | {0} | {1} | model={2} | release={3} | sdk={4}",
                 brand,
                 androidVersion,
                 profile.Model,
@@ -79,12 +69,11 @@ public sealed partial class DeviceChangeServiceTests
     [TestMethod]
     [TestCategory("DeviceIntegration")]
     [Timeout(10_800_000)]
-    public async Task RootedDevice_AllSupportedBrandVersions_RunThreeWorkflows()
+    public async Task RootedDevice_SelectedBrandVersions_RunThreeWorkflows()
     {
         RequireOptIn(RunDeviceEnvironmentVariable);
         string serial = RequireEnvironmentVariable(SerialEnvironmentVariable);
-        var sessionService = new FakeAuthenticationSessionService();
-        IDeviceRandomProfileService profiles = CreateProfileService(sessionService);
+        IDeviceRandomProfileService profiles = await CreateProfileServiceAsync();
         (IAdbCommandService adb, IDeviceChangeService change) = CreateDeviceServices();
         int startIndex = ReadStartIndex();
 
@@ -104,8 +93,6 @@ public sealed partial class DeviceChangeServiceTests
         {
             (string brand, string androidVersion) = Matrix[index];
             DeviceChangeOptions options = CreateOptions(index, packageName);
-            AccountSession session = await AuthenticateAsync(CancellationToken.None);
-            sessionService.SetSession(session);
 
             DeviceInfoApiDevice fullProfile = await profiles.CreateRandomProfileAsync(
                 CreateRequest(brand, androidVersion),
@@ -204,16 +191,14 @@ public sealed partial class DeviceChangeServiceTests
         }
     }
 
-    private static IDeviceRandomProfileService CreateProfileService(
-        IAuthenticationSessionService sessionService)
+    private static async Task<IDeviceRandomProfileService> CreateProfileServiceAsync()
     {
         IDeviceIntegrityService integrity = Substitute.For<IDeviceIntegrityService>();
         IRandomService random = new RandomService();
+        var catalog = new DeviceInfoCatalogService(random, NullLogger<DeviceInfoCatalogService>.Instance);
+        await catalog.InitializeAsync(CancellationToken.None);
         return new DeviceRandomProfileService(
-            new DeviceRandomApiService(
-                Options.Create(CreateDeviceInfoApiOptions()),
-                sessionService,
-                NullLogger<DeviceRandomApiService>.Instance),
+            catalog,
             integrity,
             random,
             new SimProfileService(random));
@@ -237,40 +222,6 @@ public sealed partial class DeviceChangeServiceTests
             integrity,
             NullLogger<DeviceChangeService>.Instance);
         return (adb, change);
-    }
-
-    private static async Task<AccountSession> AuthenticateAsync(CancellationToken cancellationToken)
-    {
-        string username = RequireEnvironmentVariable(UsernameEnvironmentVariable);
-        string password = RequireEnvironmentVariable(PasswordEnvironmentVariable);
-        ServiceCollection services = new();
-        services.AddLogging();
-        services.AddDeepDroidAuthentication();
-        await using ServiceProvider provider = services.BuildServiceProvider();
-        IAccountAuthenticationService authentication =
-            provider.GetRequiredService<IAccountAuthenticationService>();
-        AccountAuthenticationResult result = await authentication.AuthenticateAsync(
-            new AccountLoginRequest
-            {
-                Username = username,
-                Password = password,
-                RememberAccount = false
-            },
-            cancellationToken);
-
-        Assert.AreEqual(
-            AccountAuthenticationStatus.Success,
-            result.Status,
-            "Cognito authentication failed.");
-        return result.Session
-            ?? throw new AssertFailedException("Authentication returned no Device Info API session.");
-    }
-
-    private static DeviceInfoApiOptions CreateDeviceInfoApiOptions()
-    {
-        DeviceInfoApiOptions options = new();
-        DeviceInfoApiOptionsHelper.ApplyDefaults(options);
-        return options;
     }
 
     private static async Task EnsureSingleRootedDeviceAsync(
@@ -527,6 +478,7 @@ public sealed partial class DeviceChangeServiceTests
     {
         return androidVersion switch
         {
+            "Android 11" => "30",
             "Android 13" => "33",
             "Android 14" => "34",
             "Android 15" => "35",
@@ -538,6 +490,7 @@ public sealed partial class DeviceChangeServiceTests
     {
         return androidVersion switch
         {
+            "Android 11" => "11",
             "Android 13" => "13",
             "Android 14" => "14",
             "Android 15" => "15",

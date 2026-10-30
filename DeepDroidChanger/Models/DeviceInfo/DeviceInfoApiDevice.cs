@@ -72,6 +72,10 @@ namespace DeepDroidChanger.Models
         public string Code { get; set; } = string.Empty;
         public string Release { get; set; } = string.Empty;
         public string Sdk { get; set; } = string.Empty;
+        public string SocManufacturer { get; set; } = string.Empty;
+        public string SocModel { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Tags { get; set; } = string.Empty;
         public string Serial { get; set; } = string.Empty;
         public string Imsi { get; set; } = string.Empty;
         public string Iccid { get; set; } = string.Empty;

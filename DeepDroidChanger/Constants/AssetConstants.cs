@@ -7,6 +7,7 @@ public static class AssetConstants
         public const string RootPath = "Assets/Data/";
         public const string Bip0039Path = RootPath + "bip0039.txt";
         public const string CarriersPath = RootPath + "carriers.json";
+        public const string DeviceInfoPath = RootPath + "DeviceInfo/";
         public const string ImeiTacsPath = RootPath + "imei_tacs.json";
         public const string LocationTimezonesPath = RootPath + "location-timezones.json";
         public const string MacVendorsPath = RootPath + "mac_vendors.json";

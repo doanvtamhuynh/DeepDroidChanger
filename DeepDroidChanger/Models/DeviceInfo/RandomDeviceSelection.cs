@@ -10,5 +10,7 @@ namespace DeepDroidChanger.Models
 
         public string Brand { get; }
         public int Sdk { get; }
+        /// <summary>Optional exact Android release. SDK zero means any SDK.</summary>
+        public string? Release { get; init; }
     }
 }

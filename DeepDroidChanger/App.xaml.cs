@@ -62,6 +62,10 @@ public sealed partial class App : Application
                 return;
             }
 
+            startupStage = "loading the embedded device info catalog";
+            await _host.Services.GetRequiredService<IDeviceInfoCatalogService>()
+                .InitializeAsync(CancellationToken.None).ConfigureAwait(true);
+
             startupStage = "resolving MainWindow and its eager dependencies";
             MainWindow mainWindow = _host.Services.GetRequiredService<MainWindow>();
             MainWindow = mainWindow;
@@ -148,11 +152,12 @@ public sealed partial class App : Application
         services.AddSingleton<ICarrierDataService, CarrierDataService>();
         services.AddSingleton<ILocationDataService, LocationDataService>();
         services.AddDeepDroidAuthentication();
-        services.AddSingleton<IDeviceRandomApiService, DeviceRandomApiService>();
+        services.AddSingleton<DeviceInfoCatalogService>();
+        services.AddSingleton<IDeviceInfoCatalogService>(provider =>
+            provider.GetRequiredService<DeviceInfoCatalogService>());
+        services.AddSingleton<IDeviceRandomApiService>(provider =>
+            provider.GetRequiredService<DeviceInfoCatalogService>());
         services.AddSingleton<IIpGeolocationService, IpGeolocationService>();
-        services.AddOptions<DeviceInfoApiOptions>()
-            .Configure(DeviceInfoApiOptionsHelper.ApplyDefaults)
-            .Validate(DeviceInfoApiOptionsHelper.IsValid, "Device Info API configuration is invalid.");
 
         services.AddSingleton<IAdbCommandService, AdbCommandService>();
         services.AddSingleton<IAdbRootAccessService, AdbRootAccessService>();
