@@ -1,0 +1,447 @@
+<UserControl x:Class="DeepDroidChanger.Views.ViewMultipleDevicesControlPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:views="clr-namespace:DeepDroidChanger.Views"
+             FontFamily="{StaticResource Metric.FontFamily}"
+             Foreground="{DynamicResource Brush.TextPrimary}"
+             PreviewKeyDown="OnPanelPreviewKeyDown">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ViewMultipleDevicesResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <views:InverseBooleanToVisibilityConverter x:Key="InverseBooleanVisibility"/>
+            <Style x:Key="ToolButton" TargetType="Button" BasedOn="{StaticResource MultipleDevicesPanelButton}">
+                <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            </Style>
+            <Style x:Key="OrderHandle" TargetType="Button" BasedOn="{StaticResource MultipleDevicesIconButton}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding DataContext.CanChangeLayout, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                        <Setter Property="IsEnabled" Value="False"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding DataContext.SortIndex, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="1">
+                        <Setter Property="IsEnabled" Value="False"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Border Margin="8" Background="{DynamicResource Brush.Surface}"
+            BorderBrush="{DynamicResource Brush.BorderStrong}"
+            BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
+            CornerRadius="{StaticResource Radius.Overlay}">
+        <Border.Effect>
+            <DropShadowEffect Color="{DynamicResource Color.Overlay}"
+                              BlurRadius="{StaticResource Metric.Elevation.FloatingBlurRadius}"
+                              ShadowDepth="{StaticResource Metric.Elevation.FloatingShadowDepth}"
+                              Opacity="{StaticResource Metric.Elevation.FloatingShadowOpacity}"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Background="{DynamicResource Brush.SurfaceAlt}" CornerRadius="{StaticResource Radius.TopMedium}"
+                    Padding="{StaticResource Spacing.CardPadding.Compact}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Thumb x:Name="MoveHandle" Cursor="SizeAll" DragDelta="OnMoveDelta" Focusable="True"
+                           ToolTip="{DynamicResource ViewMultipleDevices_MovePanel}"
+                           AutomationProperties.Name="{DynamicResource ViewMultipleDevices_MovePanel}"
+                           FocusVisualStyle="{StaticResource AppFocusVisualStyle}" PreviewKeyDown="OnMoveKeyDown">
+                        <Thumb.Template>
+                            <ControlTemplate TargetType="Thumb">
+                                <Border x:Name="HandleBorder" Background="Transparent" CornerRadius="{StaticResource Radius.Small}">
+                                    <ContentPresenter Content="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="HandleBorder" Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsDragging" Value="True">
+                                        <Setter TargetName="HandleBorder" Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                        <Thumb.Tag>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource ViewMultipleDevices_ControlPanel}"
+                                           FontSize="{StaticResource Metric.FontSize.Subtitle}" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                    <TextBlock x:Name="OnlineSummary" Style="{StaticResource MultipleDevicesHint}">
+                                        <Run Text="{Binding OnlineDeviceCount, Mode=OneWay}"/><Run Text=" "/>
+                                        <Run Text="{DynamicResource ViewMultipleDevices_OnlineShort}"/><Run Text=" · "/>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource MultipleDevicesHint}">
+                                        <Run Text="{Binding SelectedDeviceCount, Mode=OneWay}"/><Run Text=" "/>
+                                        <Run Text="{DynamicResource ViewMultipleDevices_Selected}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </StackPanel>
+                        </Thumb.Tag>
+                    </Thumb>
+                    <Button x:Name="CollapseButton" Grid.Column="1" Margin="8,0,0,0"
+                            Style="{StaticResource MultipleDevicesIconButton}" Click="OnToggleCollapsed"
+                            ToolTip="{DynamicResource ViewMultipleDevices_CollapsePanel}"
+                            AutomationProperties.Name="{DynamicResource ViewMultipleDevices_CollapsePanel}">
+                        <materialDesign:PackIcon x:Name="CollapseIcon" Kind="ChevronDoubleRight"/>
+                    </Button>
+                </Grid>
+            </Border>
+            <ScrollViewer x:Name="PanelBody" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+                <StackPanel Margin="{StaticResource Spacing.CardPadding.Compact}">
+                    <Expander x:Name="DisplaySection" Style="{StaticResource MultipleDevicesSectionExpander}"
+                              Header="{DynamicResource ViewMultipleDevices_Display}" Tag="Monitor">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Command="{Binding PreviousPageCommand}" Style="{StaticResource MultipleDevicesIconButton}"
+                                        AutomationProperties.Name="{DynamicResource ViewMultipleDevices_Previous}"
+                                        ToolTip="{DynamicResource ViewMultipleDevices_Previous}">
+                                    <materialDesign:PackIcon Kind="ChevronLeft"/>
+                                </Button>
+                                <TextBlock Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Run Text="{DynamicResource ViewMultipleDevices_Page}"/><Run Text=" "/>
+                                    <Run Text="{Binding CurrentPage, Mode=OneWay}"/><Run Text=" / "/>
+                                    <Run Text="{Binding TotalPages, Mode=OneWay}"/>
+                                </TextBlock>
+                                <Button Grid.Column="2" Command="{Binding NextPageCommand}" Style="{StaticResource MultipleDevicesIconButton}"
+                                        AutomationProperties.Name="{DynamicResource ViewMultipleDevices_Next}"
+                                        ToolTip="{DynamicResource ViewMultipleDevices_Next}">
+                                    <materialDesign:PackIcon Kind="ChevronRight"/>
+                                </Button>
+                            </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Command="{Binding ZoomOutCommand}" Style="{StaticResource MultipleDevicesIconButton}"
+                                        ToolTip="{DynamicResource ViewMultipleDevices_ZoomOut}"
+                                        AutomationProperties.Name="{DynamicResource ViewMultipleDevices_ZoomOut}">
+                                    <materialDesign:PackIcon Kind="Minus"/>
+                                </Button>
+                                <TextBlock Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           ToolTip="{DynamicResource ViewMultipleDevices_Zoom}">
+                                    <Run Text="{Binding ZoomPercent, Mode=OneWay}"/><Run Text="%"/>
+                                </TextBlock>
+                                <Button Grid.Column="2" Command="{Binding ZoomInCommand}" Style="{StaticResource MultipleDevicesIconButton}"
+                                        ToolTip="{DynamicResource ViewMultipleDevices_ZoomIn}"
+                                        AutomationProperties.Name="{DynamicResource ViewMultipleDevices_ZoomIn}">
+                                    <materialDesign:PackIcon Kind="Plus"/>
+                                </Button>
+                                <Button Grid.Column="3" Command="{Binding FitCommand}" Style="{StaticResource MultipleDevicesPanelButton}"
+                                        Content="{DynamicResource ViewMultipleDevices_Fit}" Margin="8,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="LayoutSection" Style="{StaticResource MultipleDevicesSectionExpander}"
+                              Header="{DynamicResource ViewMultipleDevices_LayoutSorting}" Tag="Sort">
+                        <StackPanel IsEnabled="{Binding CanChangeLayout}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="{DynamicResource ViewMultipleDevices_DevicesPerPageShort}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
+                                <TextBlock Grid.Row="2" Text="{DynamicResource ViewMultipleDevices_SortByShort}" Style="{StaticResource MultipleDevicesHint}" Margin="0,8,0,4"/>
+                                <ComboBox Grid.Row="1" ItemsSource="{Binding PageSizes}" SelectedItem="{Binding DevicesPerPage, Mode=TwoWay}"
+                                          Style="{StaticResource FlatComboBoxStyle}"
+                                          AutomationProperties.Name="{DynamicResource ViewMultipleDevices_DevicesPerPage}"/>
+                                <ComboBox Grid.Row="3" SelectedIndex="{Binding SortIndex, Mode=TwoWay}" Style="{StaticResource FlatComboBoxStyle}"
+                                          AutomationProperties.Name="{DynamicResource ViewMultipleDevices_SortBy}">
+                                    <ComboBoxItem Content="{DynamicResource ViewMultipleDevices_SortIndex}"/>
+                                    <ComboBoxItem Content="{DynamicResource ViewMultipleDevices_SortType}"/>
+                                </ComboBox>
+                            </Grid>
+                            <Button Command="{Binding EditOrderCommand}" Style="{StaticResource MultipleDevicesPanelButton}"
+                                    Content="{DynamicResource ViewMultipleDevices_EditIndex}" Margin="0,8,0,0"/>
+                            <TextBlock Text="{DynamicResource ViewMultipleDevices_OrderHint}"
+                                       Style="{StaticResource MultipleDevicesHint}" Margin="0,8,0,0"/>
+                            <StackPanel Visibility="{Binding IsOrderEditorOpen, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                <TextBlock Text="{DynamicResource ViewMultipleDevices_DragOrderHint}"
+                                           Style="{StaticResource MultipleDevicesHint}" Margin="0,12,0,4"/>
+                                <ItemsControl x:Name="OrderItems" ItemsSource="{Binding OrderedDevices}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel>
+                                                <Border Background="{DynamicResource Brush.SurfaceAlt}" Padding="{StaticResource Spacing.CardPadding.Compact}"
+                                                        CornerRadius="{StaticResource Radius.Small}" Margin="0,8,0,4"
+                                                        Visibility="{Binding IsPageStart, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                                    <TextBlock Style="{StaticResource MultipleDevicesHint}">
+                                                        <Run Text="{DynamicResource ViewMultipleDevices_Page}"/><Run Text=" "/>
+                                                        <Run Text="{Binding PageNumber, Mode=OneWay}"/><Run Text=" · "/>
+                                                        <Run Text="{Binding PageStart, Mode=OneWay}"/><Run Text="–"/>
+                                                        <Run Text="{Binding PageEnd, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                </Border>
+                                                <Border Style="{StaticResource MultipleDevicesSelectableBorder}" Padding="8" Margin="0,2"
+                                                        AllowDrop="True" DragOver="OnOrderDragOver" DragLeave="OnOrderDragLeave" Drop="OnOrderDrop">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Button Style="{StaticResource OrderHandle}" Cursor="SizeNS"
+                                                                PreviewMouseLeftButtonDown="OnOrderDragStart" PreviewMouseMove="OnOrderDragMove"
+                                                                PreviewKeyDown="OnOrderMoveKeyDown" ToolTip="{DynamicResource ViewMultipleDevices_DragOrderHint}"
+                                                                AutomationProperties.Name="{DynamicResource ViewMultipleDevices_MoveDevice}">
+                                                            <materialDesign:PackIcon Kind="DragVertical"/>
+                                                        </Button>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Index}" VerticalAlignment="Center" Margin="4,0,8,0"
+                                                                   Foreground="{DynamicResource Brush.Accent}" FontWeight="SemiBold"/>
+                                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding DeviceName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DeviceName}"/>
+                                                            <TextBlock Text="{Binding DeviceType}" Style="{StaticResource MultipleDevicesHint}"/>
+                                                            <TextBlock Text="{Binding Serial}" Style="{StaticResource MultipleDevicesHint}"
+                                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Serial}"/>
+                                                        </StackPanel>
+                                                        <CheckBox Grid.Column="3" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="8,0,0,0"
+                                                                  Style="{StaticResource MultipleDevicesSelectionCheckBox}"
+                                                                  AutomationProperties.Name="{DynamicResource ViewMultipleDevices_SelectDevice}"/>
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{DynamicResource ViewMultipleDevices_NoOnlineDevices}" Style="{StaticResource MultipleDevicesHint}" Margin="0,8"
+                                           Visibility="{Binding HasOnlineDevices, Converter={StaticResource InverseBooleanVisibility}}"/>
+                                <Button Command="{Binding ResetOrderCommand}" Style="{StaticResource MultipleDevicesPanelButton}"
+                                        Content="{DynamicResource ViewMultipleDevices_ResetOrder}" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="SelectionSection" Style="{StaticResource MultipleDevicesSectionExpander}"
+                              Header="{DynamicResource ViewMultipleDevices_Selection}" Tag="CheckboxMarkedOutline">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Button Command="{Binding SelectPageCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,0,4,0">
+                                    <TextBlock Text="{DynamicResource ViewMultipleDevices_SelectPage}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                </Button>
+                                <Button Grid.Column="1" Command="{Binding SelectAllCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="4,0,0,0">
+                                    <TextBlock Text="{DynamicResource ViewMultipleDevices_SelectAll}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                </Button>
+                                <Button Grid.Row="1" Grid.ColumnSpan="2" Command="{Binding ClearSelectionCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,0">
+                                    <TextBlock Text="{DynamicResource ViewMultipleDevices_ClearSelection}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Expander>
+                    <Expander x:Name="ToolsSection" Style="{StaticResource MultipleDevicesSectionExpander}"
+                              Header="{DynamicResource ViewMultipleDevices_DeviceTools}" Tag="Tools">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,8">
+                                <Run Text="{DynamicResource ViewMultipleDevices_Targets}"/><Run Text=" "/>
+                                <Run Text="{Binding SelectedDeviceCount, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Text="{DynamicResource ViewMultipleDevices_QuickControls}" Style="{StaticResource MultipleDevicesHint}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Button Command="{Binding VolumeDownCommand}"  Style="{StaticResource ToolButton}" Grid.Row="0" Grid.Column="0" Margin="0,0,4,8">
+                                    <DockPanel>
+                                        <materialDesign:PackIcon Kind="VolumeMinus" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_VolumeDown}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                </Button>
+                                <Button Command="{Binding VolumeUpCommand}"  Style="{StaticResource ToolButton}" Grid.Row="0" Grid.Column="1" Margin="4,0,0,8">
+                                    <DockPanel>
+                                        <materialDesign:PackIcon Kind="VolumePlus" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_VolumeUp}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                </Button>
+                                <Button Command="{Binding PowerCommand}"  Style="{StaticResource ToolButton}" Grid.Row="1" Grid.Column="0" Margin="0,0,4,8">
+                                    <DockPanel>
+                                        <materialDesign:PackIcon Kind="Power" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_Power}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                </Button>
+                                <Button Command="{Binding ReconnectCommand}"  Style="{StaticResource ToolButton}" Grid.Row="1" Grid.Column="1" Margin="4,0,0,8">
+                                    <DockPanel>
+                                        <materialDesign:PackIcon Kind="Refresh" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_Reconnect}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                </Button>
+                                <Button Command="{Binding OpenToolEditorCommand}" Click="OnOpenToolEditorClick" CommandParameter="Screen" Style="{StaticResource ToolButton}" Grid.Row="2" Grid.Column="0" Margin="0,0,4,8">
+                                    <DockPanel>
+                                        <materialDesign:PackIcon Kind="Monitor" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_ScreenToggle}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                </Button>
+                                <Button Command="{Binding RebootCommand}"  Style="{StaticResource ToolButton}" Grid.Row="2" Grid.Column="1" Margin="4,0,0,8">
+                                    <DockPanel>
+                                        <materialDesign:PackIcon Kind="Restart" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_Reboot}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                </Button>
+                            </Grid>
+                            <Separator Margin="0,4,0,12"/>
+                            <TextBlock Text="{DynamicResource ViewMultipleDevices_ContentApps}" Style="{StaticResource MultipleDevicesHint}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <Button Command="{Binding OpenToolEditorCommand}" Click="OnOpenToolEditorClick" CommandParameter="Input" Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="Keyboard" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_InputAdb}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Button Command="{Binding RotateViewsCommand}"  Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="RotateRight" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_RotateScreen}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Button Command="{Binding OpenToolEditorCommand}" Click="OnOpenToolEditorClick" CommandParameter="Wifi" Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="Wifi" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_Wifi}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Button Command="{Binding OpenToolEditorCommand}" Click="OnOpenToolEditorClick" CommandParameter="Gms" Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="Google" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_Gms}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Button Command="{Binding OpenToolEditorCommand}" Click="OnOpenToolEditorClick" CommandParameter="PlayStore" Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="GooglePlay" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_PlayStore}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Button Command="{Binding InstallPackageCommand}"  Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="PackageDown" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_InstallPackage}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Separator Margin="0,4,0,12"/>
+                            <TextBlock Text="{DynamicResource ViewMultipleDevices_FilesImages}" Style="{StaticResource MultipleDevicesHint}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                            <Button Command="{Binding OpenToolEditorCommand}" Click="OnOpenToolEditorClick" CommandParameter="Files" Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="FolderSync" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_ImportExport}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <Button Command="{Binding ScreenshotCommand}"  Style="{StaticResource ToolButton}" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <materialDesign:PackIcon Kind="Camera" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource ViewDevice_Screenshot}" TextWrapping="Wrap"/>
+                                </DockPanel>
+                            </Button>
+                            <TextBlock Style="{StaticResource MultipleDevicesHint}" Margin="0,4,0,8">
+                                <Run Text="{DynamicResource ViewMultipleDevices_BackgroundSessions}"/><Run Text=" "/>
+                                <Run Text="{Binding BackgroundSessionCount, Mode=OneWay}"/>
+                            </TextBlock>
+                            <Border x:Name="ToolEditorPanel" Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Border}"
+                                    BorderThickness="{StaticResource Metric.BorderThickness.Uniform}" CornerRadius="{StaticResource Radius.Medium}"
+                                    Padding="{StaticResource Spacing.CardPadding.Compact}" Margin="0,4,0,8"
+                                    Visibility="{Binding HasToolEditor, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Command="{Binding CloseToolEditorCommand}" Style="{StaticResource MultipleDevicesIconButton}"
+                                                AutomationProperties.Name="{DynamicResource ViewMultipleDevices_CloseEditor}" ToolTip="{DynamicResource ViewMultipleDevices_CloseEditor}">
+                                            <materialDesign:PackIcon Kind="Close"/>
+                                        </Button>
+                                        <TextBlock Text="{Binding ToolEditorTitle}" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    </DockPanel>
+                                    <TextBlock Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,8">
+                                        <Run Text="{DynamicResource ViewMultipleDevices_Targets}"/><Run Text=" "/><Run Text="{Binding SelectedDeviceCount, Mode=OneWay}"/>
+                                    </TextBlock>
+                                    <Grid Visibility="{Binding IsToggleEditorOpen, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <Button Command="{Binding EnableAllCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,0,4,0">
+                                            <TextBlock Text="{DynamicResource ViewMultipleDevices_EnableAll}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                        </Button>
+                                        <Button Grid.Column="1" Command="{Binding DisableAllCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="4,0,0,0">
+                                            <TextBlock Text="{DynamicResource ViewMultipleDevices_DisableAll}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                        </Button>
+                                    </Grid>
+                                    <StackPanel IsEnabled="{Binding CanChangeLayout}" Visibility="{Binding IsInputEditorOpen, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                        <TextBlock Text="{DynamicResource ViewDevice_InputTextPrompt}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
+                                        <TextBox Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatTextBoxStyle}"
+                                                 AcceptsReturn="True" TextWrapping="Wrap" Height="Auto" VerticalScrollBarVisibility="Auto"
+                                                 MinHeight="{StaticResource Metric.ControlHeight.Comfortable}" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
+                                                 AutomationProperties.Name="{DynamicResource ViewDevice_InputTextPrompt}"/>
+                                        <Button Command="{Binding SendInputTextCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,12"
+                                                Content="{DynamicResource ViewDevice_Input}"/>
+                                        <TextBlock Text="{DynamicResource ViewDevice_AdbShellPrompt}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
+                                        <TextBox Text="{Binding AdbShellCommand, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatTextBoxStyle}"
+                                                 AcceptsReturn="True" TextWrapping="Wrap" Height="Auto" VerticalScrollBarVisibility="Auto"
+                                                 MinHeight="{StaticResource Metric.ControlHeight.Comfortable}" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
+                                                 AutomationProperties.Name="{DynamicResource ViewDevice_AdbShellPrompt}"/>
+                                        <Button Command="{Binding RunAdbShellCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,0"
+                                                Content="{DynamicResource ViewDevice_Run}"/>
+                                    </StackPanel>
+                                    <StackPanel IsEnabled="{Binding CanChangeLayout}" Visibility="{Binding IsFileEditorOpen, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                        <TextBlock Text="{DynamicResource ViewDevice_ComputerFilePath}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
+                                        <TextBox Text="{Binding ComputerFilePath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatTextBoxStyle}"
+                                                 AutomationProperties.Name="{DynamicResource ViewDevice_ComputerFilePath}"/>
+                                        <Button Command="{Binding BrowseComputerFileCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,12"
+                                                Content="{DynamicResource ViewDevice_Browse}"/>
+                                        <TextBlock Text="{DynamicResource ViewDevice_AndroidFilePath}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
+                                        <TextBox Text="{Binding AndroidFilePath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatTextBoxStyle}"
+                                                 AutomationProperties.Name="{DynamicResource ViewDevice_AndroidFilePath}"/>
+                                        <Button Command="{Binding ImportFileCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,8">
+                                            <TextBlock Text="{DynamicResource ViewMultipleDevices_Import}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                        </Button>
+                                        <Button Command="{Binding ExportFileCommand}" Style="{StaticResource MultipleDevicesPanelButton}">
+                                            <TextBlock Text="{DynamicResource ViewMultipleDevices_Export}" TextWrapping="Wrap" TextAlignment="Center"/>
+                                        </Button>
+                                        <TextBlock Text="{DynamicResource ViewMultipleDevices_ExportHint}" Style="{StaticResource MultipleDevicesHint}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Visibility="{Binding HasToolResults, Converter={StaticResource MultipleDevicesBooleanVisibility}}">
+                                <Separator Margin="0,8"/>
+                                <TextBlock Text="{Binding ActiveToolText}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding BatchSummary}" Style="{StaticResource MultipleDevicesHint}" Margin="0,4,0,8" AutomationProperties.LiveSetting="Polite"/>
+                                <Button Command="{Binding StopToolsCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,0,0,8"
+                                        Content="{DynamicResource ViewMultipleDevices_StopTools}" Visibility="{Binding IsBatchBusy, Converter={StaticResource MultipleDevicesBooleanVisibility}}"/>
+                                <TextBlock Text="{DynamicResource ViewMultipleDevices_StopHint}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,8"
+                                           Visibility="{Binding IsBatchBusy, Converter={StaticResource MultipleDevicesBooleanVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ToolResults}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Expander Header="{Binding Title}" Tag="InformationOutline" Style="{StaticResource MultipleDevicesSectionExpander}">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Serial}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
+                                                    <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
+                                                             Height="Auto" MinHeight="{StaticResource Metric.ControlHeight.Comfortable}"
+                                                             VerticalScrollBarVisibility="Auto" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
+                                                             Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="{Binding Serial}"/>
+                                                </StackPanel>
+                                            </Expander>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
+            <Thumb x:Name="ResizeHandle" Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE"
+                   Width="{StaticResource ViewMultipleDevices.ResizeGripSize}" Height="{StaticResource ViewMultipleDevices.ResizeGripSize}"
+                   DragStarted="OnResizeStarted" DragDelta="OnResizeDelta" PreviewKeyDown="OnResizeKeyDown" Focusable="True"
+                   AutomationProperties.Name="{DynamicResource ViewMultipleDevices_ResizePanel}"
+                   ToolTip="{DynamicResource ViewMultipleDevices_ResizePanel}" FocusVisualStyle="{StaticResource AppFocusVisualStyle}">
+                <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="Transparent"><materialDesign:PackIcon Kind="ResizeBottomRight" Foreground="{DynamicResource Brush.TextSecondary}"/></Border>
+                    </ControlTemplate>
+                </Thumb.Template>
+            </Thumb>
+        </Grid>
+    </Border>
+</UserControl>

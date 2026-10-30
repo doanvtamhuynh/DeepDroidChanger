@@ -142,6 +142,7 @@ public sealed partial class App : Application
         services.AddSingleton<IViewDeviceWindowService, ViewDeviceWindowService>();
         services.AddSingleton<IDeviceMetadataChangeNotifier, DeviceMetadataChangeNotifier>();
         services.AddSingleton<IViewDeviceScreenshotService, ViewDeviceScreenshotService>();
+        services.AddSingleton<IViewMultipleDeviceArtifactService, ViewMultipleDeviceArtifactService>();
         services.AddSingleton<IUiDispatcherService, UiDispatcherService>();
         services.AddSingleton<IPollingService, PollingService>();
         services.AddSingleton<IFileSystemService, FileSystemService>();

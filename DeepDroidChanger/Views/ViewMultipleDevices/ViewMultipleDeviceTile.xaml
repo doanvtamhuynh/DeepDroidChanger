@@ -28,10 +28,7 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Border Background="{DynamicResource Brush.Surface}"
-            BorderBrush="{DynamicResource Brush.Border}"
-            BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
-            CornerRadius="{StaticResource Radius.Medium}"
+    <Border Style="{StaticResource MultipleDevicesSelectableBorder}"
             ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
@@ -42,7 +39,7 @@
             <Border Grid.Row="0"
                     MinHeight="{StaticResource ViewMultipleDevices.TileHeaderHeight}"
                     Padding="{StaticResource Spacing.CardPadding.Compact}"
-                    Background="{DynamicResource Brush.Surface}"
+                    Background="{Binding Background, RelativeSource={RelativeSource AncestorType=Border}}"
                     BorderBrush="{DynamicResource Brush.Border}"
                     BorderThickness="0,0,0,1">
                 <Grid>
@@ -51,12 +48,20 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
+                    <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                              IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                              Style="{StaticResource MultipleDevicesSelectionCheckBox}"
+                              AutomationProperties.Name="{DynamicResource ViewMultipleDevices_SelectDevice}"
+                              ToolTip="{DynamicResource ViewMultipleDevices_SelectDevice}"
+                              Margin="0,0,8,0"/>
+
                     <TextBlock Grid.Row="0"
-                               Grid.Column="0"
+                               Grid.Column="1"
                                Text="{Binding DeviceName}"
                                Style="{StaticResource DialogHeaderTextStyle}"
                                TextTrimming="CharacterEllipsis"
@@ -64,7 +69,7 @@
 
                     <Button x:Name="OpenViewDeviceButton"
                             Grid.Row="0"
-                            Grid.Column="1"
+                            Grid.Column="2"
                             Style="{StaticResource ViewMultipleDeviceOpenViewButtonStyle}"
                             Command="{Binding OpenViewDeviceCommand}"
                             AutomationProperties.Name="{DynamicResource ViewMultipleDevices_OpenView}"
@@ -75,7 +80,7 @@
                     </Button>
 
                     <TextBlock Grid.Row="1"
-                               Grid.Column="0"
+                               Grid.Column="1"
                                Grid.ColumnSpan="2"
                                Text="{Binding Serial}"
                                Style="{StaticResource AppLabelTextStyle}"
@@ -91,12 +96,17 @@
                   ClipToBounds="True"
                   MinHeight="1"
                   SizeChanged="OnStreamViewportSizeChanged">
-                <scrcpy:ScrcpyDisplay x:Name="ScrcpyDisplay"
+                <Grid x:Name="RotatedDisplayHost" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid.LayoutTransform>
+                        <RotateTransform Angle="{Binding ViewRotationAngle}"/>
+                    </Grid.LayoutTransform>
+                    <scrcpy:ScrcpyDisplay x:Name="ScrcpyDisplay"
                                       Scrcpy="{Binding ScrcpyClient}"
                                       Focusable="True"
                                       HorizontalAlignment="Stretch"
                                       VerticalAlignment="Stretch"
                                       Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </Grid>
 
                 <Grid Background="{DynamicResource Brush.WindowBackground}"
                       IsHitTestVisible="False"

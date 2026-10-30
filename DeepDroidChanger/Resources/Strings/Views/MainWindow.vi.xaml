@@ -10,7 +10,7 @@
     <sys:String x:Key="Nav_DevicesManagerTooltip">Mở Quản lí thiết bị để chọn thao tác cho một hoặc nhiều thiết bị.</sys:String>
     <sys:String x:Key="Nav_ChangeSingleDeviceTooltip">Mở khu vực cấu hình và đổi cho một thiết bị đang chọn.</sys:String>
     <sys:String x:Key="Nav_ChangeMultipleDeviceTooltip">Mở khu vực áp dụng thao tác cho nhiều thiết bị đã chọn.</sys:String>
-    <sys:String x:Key="Nav_ViewMultipleDevicesTooltip">Theo dõi tối đa tám thiết bị trực tuyến đã lưu trong một khu vực.</sys:String>
+    <sys:String x:Key="Nav_ViewMultipleDevicesTooltip">Theo dõi và điều khiển nhiều thiết bị trực tuyến đã lưu trong một khu vực.</sys:String>
     <sys:String x:Key="Nav_SettingsTooltip">Mở cài đặt và tùy chọn của ứng dụng.</sys:String>
     <sys:String x:Key="Nav_ToggleSidebarTooltip">Mở rộng hoặc thu gọn thanh điều hướng mà không thay đổi khu vực đang làm việc.</sys:String>
     <sys:String x:Key="Nav_LanguageTooltip">Chuyển ngôn ngữ ứng dụng giữa các bản địa hóa hiện có.</sys:String>

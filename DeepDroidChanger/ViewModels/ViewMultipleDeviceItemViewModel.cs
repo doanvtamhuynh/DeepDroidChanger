@@ -10,7 +10,7 @@ using ScrcpyNet;
 
 namespace DeepDroidChanger.ViewModels;
 
-public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDisposable
+public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDisposable
 {
     internal static readonly TimeSpan InputReleaseFlushTimeout =
         TimeSpan.FromMilliseconds(500);
@@ -60,6 +60,13 @@ public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDi
     private CancellationTokenSource? _retryCancellation;
     private int _retryAttempt;
     private int _disposed;
+    private bool _isSelected;
+    private string _deviceType = string.Empty;
+    private int _index;
+    private int _pageNumber;
+    private int _pageStart;
+    private int _pageEnd;
+    private bool _isPageStart;
 
     public ViewMultipleDeviceItemViewModel(
         string serial,
@@ -108,6 +115,52 @@ public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDi
     }
 
     public string Serial { get; }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (SetProperty(ref _isSelected, value) && !value)
+                Volatile.Write(ref _keepConnectedWhileSelected, 0);
+        }
+    }
+
+    public string DeviceType
+    {
+        get => _deviceType;
+        internal set => SetProperty(ref _deviceType, value);
+    }
+
+    public int Index
+    {
+        get => _index;
+        internal set => SetProperty(ref _index, value);
+    }
+
+    public int PageNumber
+    {
+        get => _pageNumber;
+        internal set => SetProperty(ref _pageNumber, value);
+    }
+
+    public int PageStart
+    {
+        get => _pageStart;
+        internal set => SetProperty(ref _pageStart, value);
+    }
+
+    public int PageEnd
+    {
+        get => _pageEnd;
+        internal set => SetProperty(ref _pageEnd, value);
+    }
+
+    public bool IsPageStart
+    {
+        get => _isPageStart;
+        internal set => SetProperty(ref _isPageStart, value);
+    }
 
     public string DeviceName
     {
@@ -207,6 +260,18 @@ public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDi
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await _sessionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await StartCoreAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _sessionGate.Release();
+        }
+    }
+
+    private async Task StartCoreAsync(CancellationToken cancellationToken)
+    {
         ISingleViewDeviceSession? session = null;
         try
         {
@@ -250,6 +315,11 @@ public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDi
                     "The Multiple View session did not reach a valid first-frame state.");
             }
 
+            if (Volatile.Read(ref _keepScreenOff) != 0)
+            {
+                await session.SetScreenPowerModeAsync(AndroidScreenPowerMode.POWER_MODE_OFF, cancellationToken).ConfigureAwait(false);
+                await session.FlushControlAsync(cancellationToken).ConfigureAwait(false);
+            }
             await PublishRunningSessionAsync(session, cancellationToken)
                 .ConfigureAwait(false);
             ResetRetryState();
@@ -291,10 +361,6 @@ public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDi
             await SetDisplayStateAsync(DisplayState.Failed, CancellationToken.None)
                 .ConfigureAwait(false);
             ScheduleRetryIfEligible();
-        }
-        finally
-        {
-            _sessionGate.Release();
         }
     }
 
@@ -805,6 +871,7 @@ public sealed class ViewMultipleDeviceItemViewModel : ObservableObject, IAsyncDi
         if (heightChanged)
             OnPropertyChanged(nameof(ContentHeight));
         OnPropertyChanged(nameof(DeviceAspectRatio));
+        OnPropertyChanged(nameof(ViewAspectRatio));
     }
 
     private void RefreshStatusTextCore()

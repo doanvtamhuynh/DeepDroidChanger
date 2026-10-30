@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.ViewModels;
 
-public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDisposable
+public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDisposable
 {
     public const int PageSize = 8;
     private const int BaseTilesPerRow = 4;
@@ -75,7 +75,15 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         ILogger<ViewMultipleDevicesViewModel> logger,
         IViewDeviceWindowService viewDeviceWindowService,
         IViewDevicePresentationCoordinator presentationCoordinator,
-        IDeviceMetadataChangeNotifier? metadataChangeNotifier = null)
+        IDeviceMetadataChangeNotifier? metadataChangeNotifier = null,
+        IAdbCommandService? adbCommandService = null,
+        IDeviceActionService? deviceActionService = null,
+        IPackageInstallService? packageInstallService = null,
+        IViewDeviceScreenshotService? screenshotService = null,
+        IFilePickerDialogService? filePicker = null,
+        IFileSystemService? fileSystem = null,
+        IViewMultipleDeviceArtifactService? artifactService = null,
+        IDeviceActionCoordinatorService? actionCoordinator = null)
     {
         ArgumentNullException.ThrowIfNull(deviceStoreService);
         ArgumentNullException.ThrowIfNull(deviceTracker);
@@ -106,6 +114,9 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         FitCommand = new RelayCommand(FitToViewport, CanFit);
         PreviousPageCommand = new RelayCommand(RequestPreviousPage, CanNavigatePrevious);
         NextPageCommand = new RelayCommand(RequestNextPage, CanNavigateNext);
+        InitializePresentation();
+        InitializeTools(adbCommandService, deviceActionService, packageInstallService,
+            screenshotService, filePicker, fileSystem, artifactService, actionCoordinator);
         _metadataChangeNotifier?.DeviceNameChanged += OnDeviceNameChanged;
     }
 
@@ -141,11 +152,11 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     public int ShowingStart => CatalogDeviceCount == 0
         ? 0
-        : ((CurrentPage - 1) * PageSize) + 1;
+        : ((CurrentPage - 1) * DevicesPerPage) + 1;
 
     public int ShowingEnd => CatalogDeviceCount == 0
         ? 0
-        : Math.Min(CurrentPage * PageSize, CatalogDeviceCount);
+        : Math.Min(CurrentPage * DevicesPerPage, CatalogDeviceCount);
 
     public int ZoomPercent => ZoomLevels[_zoomIndex];
 
@@ -305,7 +316,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             lock (_trackerSchedulingGate)
             lock (_retrySchedulingGate)
             {
-                operations = new[] { _navigationTask, _trackerTask }
+                operations = new[] { _navigationTask, _trackerTask, _batchTask }
                     .Concat(_retryTasks)
                     .Where(task => !task.IsCompleted)
                     .Distinct()
@@ -336,6 +347,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         {
             CancelCancellation(_lifetimeCancellation);
             _metadataChangeNotifier?.DeviceNameChanged -= OnDeviceNameChanged;
+            _localization.LanguageChanged -= OnToolsLanguageChanged;
             _lifetimeCancellation.Dispose();
             _lifecycleGate.Release();
             _lifecycleGate.Dispose();
@@ -353,6 +365,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             ref _activationCancellation,
             null);
         CancelCancellation(activation);
+        await StopBatchAsync().ConfigureAwait(false);
         await CancelItemRetriesAsync().ConfigureAwait(false);
         await CancelOperationsAndWaitAsync().ConfigureAwait(false);
         try
@@ -456,7 +469,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         }
         catch
         {
-            await StopItemsAsync(distinctItems).ConfigureAwait(false);
+            await StopItemsAsync(distinctItems, onlyIfUnused: true).ConfigureAwait(false);
             throw;
         }
     }
@@ -471,7 +484,14 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             return;
         }
 
-        await item.StartAsync(cancellationToken).ConfigureAwait(false);
+        await item.StartMaintainedSessionAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task StartBackgroundItemsAsync(CancellationToken token)
+    {
+        ViewMultipleDeviceItemViewModel[] items = await SnapshotOnlineItemsAsync().ConfigureAwait(false);
+        await StartItemsAsync(items.Where(item => item.KeepSessionInBackground && !item.IsRunning &&
+            !item.IsFailed && !item.IsBusy && !item.IsDedicatedView), token).ConfigureAwait(false);
     }
 
     private async Task<bool> ApplyVisiblePageAsync(
@@ -488,14 +508,14 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         ViewMultipleDeviceItemViewModel[] oldVisibleItems =
             await SnapshotVisibleItemsAsync().ConfigureAwait(false);
         ViewMultipleDeviceItemViewModel[] catalog =
-            await SnapshotOnlineItemsAsync().ConfigureAwait(false);
+            await SnapshotOrderedItemsAsync().ConfigureAwait(false);
         int targetPage = Math.Clamp(
             requestedPage,
             1,
             CalculateTotalPages(catalog.Length));
         ViewMultipleDeviceItemViewModel[] desiredVisibleItems = catalog
-            .Skip((targetPage - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((targetPage - 1) * DevicesPerPage)
+            .Take(DevicesPerPage)
             .ToArray();
         bool applied = false;
         await _uiDispatcher
@@ -524,8 +544,9 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         ViewMultipleDeviceItemViewModel[] newlyVisibleItems = desiredVisibleItems
             .Except(oldVisibleItems)
             .ToArray();
-        await StopItemsAsync(noLongerVisibleItems).ConfigureAwait(false);
+        await StopItemsAsync(noLongerVisibleItems, onlyIfUnused: true).ConfigureAwait(false);
         await StartItemsAsync(newlyVisibleItems, cancellationToken).ConfigureAwait(false);
+        await StartBackgroundItemsAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
 
@@ -558,6 +579,8 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         Dictionary<string, ViewMultipleDeviceItemViewModel> existingBySerial = existingItems
             .ToDictionary(item => item.Serial, StringComparer.OrdinalIgnoreCase);
         Dictionary<string, string?> desiredNames = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string> desiredTypes = desiredConfigs.ToDictionary(
+            device => device.Serial, device => device.Type, StringComparer.OrdinalIgnoreCase);
         List<ViewMultipleDeviceItemViewModel> addedItems = [];
         List<ViewMultipleDeviceItemViewModel> desiredItems = [];
         foreach (StoredDeviceConfig device in desiredConfigs)
@@ -577,14 +600,8 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
         ViewMultipleDeviceItemViewModel[] oldVisibleItems = await SnapshotVisibleItemsAsync()
             .ConfigureAwait(false);
-        int targetPage = Math.Clamp(
-            requestedPage,
-            1,
-            CalculateTotalPages(desiredItems.Count));
-        ViewMultipleDeviceItemViewModel[] desiredVisibleItems = desiredItems
-            .Skip((targetPage - 1) * PageSize)
-            .Take(PageSize)
-            .ToArray();
+        int targetPage = 1;
+        ViewMultipleDeviceItemViewModel[] desiredVisibleItems = [];
         bool applied = false;
         try
         {
@@ -598,15 +615,19 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
                     }
 
                     ApplyCollectionOrder(OnlineDevices, desiredItems);
-                    ApplyCollectionOrder(VisibleDevices, desiredVisibleItems);
                     double tileWidth = CalculateScaledTileWidth();
                     foreach (ViewMultipleDeviceItemViewModel item in desiredItems)
                     {
                         if (desiredNames.TryGetValue(item.Serial, out string? desiredName))
                             item.UpdateDeviceName(desiredName ?? item.Serial);
+                        item.DeviceType = desiredTypes[item.Serial];
                         item.SetTileSize(tileWidth);
                     }
 
+                    SynchronizeDeviceStack();
+                    targetPage = Math.Clamp(requestedPage, 1, CalculateTotalPages(desiredItems.Count));
+                    desiredVisibleItems = OrderedDevices.Skip((targetPage - 1) * DevicesPerPage).Take(DevicesPerPage).ToArray();
+                    ApplyCollectionOrder(VisibleDevices, desiredVisibleItems);
                     _requestedPage = targetPage;
                     CurrentPage = targetPage;
                     NotifyCollectionSummary();
@@ -627,13 +648,16 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
                 .Except(desiredVisibleItems)
                 .Except(removedItems)
                 .ToArray();
-            await StopItemsAsync(removedItems.Concat(noLongerVisibleItems))
-                .ConfigureAwait(false);
+            await StopItemsAsync(removedItems).ConfigureAwait(false);
+            await StopItemsAsync(noLongerVisibleItems, onlyIfUnused: true).ConfigureAwait(false);
             await DisposeItemsAsync(removedItems).ConfigureAwait(false);
+            await StopItemsAsync(desiredItems.Where(item => !desiredVisibleItems.Contains(item) &&
+                !item.KeepSessionInBackground && item.IsRunning), onlyIfUnused: true).ConfigureAwait(false);
             ViewMultipleDeviceItemViewModel[] newlyVisibleItems = desiredVisibleItems
                 .Except(oldVisibleItems)
                 .ToArray();
             await StartItemsAsync(newlyVisibleItems, cancellationToken).ConfigureAwait(false);
+            await StartBackgroundItemsAsync(cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch
@@ -710,10 +734,10 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
             ViewMultipleDeviceItemViewModel[] visibleItems = await SnapshotVisibleItemsAsync()
                 .ConfigureAwait(false);
-            if (visibleItems.Contains(item) &&
+            if ((visibleItems.Contains(item) || item.KeepSessionInBackground) &&
                 !_presentationCoordinator.IsDedicatedViewActive(serial))
             {
-                await item.StartAsync(cancellationToken).ConfigureAwait(false);
+                await item.StartMaintainedSessionAsync(cancellationToken).ConfigureAwait(false);
             }
         }
         finally
@@ -861,6 +885,12 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     private void RequestPage(int direction)
     {
+        if (IsBatchBusy) return;
+        RequestAbsolutePage(_requestedPage + direction);
+    }
+
+    private void RequestAbsolutePage(int requestedPage)
+    {
         if (Volatile.Read(ref _disposed) != 0 ||
             !Volatile.Read(ref _isActive) ||
             _deviceTracker.Health != AdbDeviceTrackerHealth.Connected)
@@ -879,12 +909,13 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             }
 
             int targetPage = Math.Clamp(
-                _requestedPage + direction,
+                requestedPage,
                 1,
                 CalculateTotalPages(CatalogDeviceCount));
-            if (targetPage == _requestedPage)
+            if (targetPage == _requestedPage && !_layoutRefreshRequested)
                 return;
 
+            _layoutRefreshRequested = false;
             _requestedPage = targetPage;
             int generation = Interlocked.Increment(ref _generation);
             CancellationToken activationToken = _activationCancellation?.Token
@@ -899,9 +930,9 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             CancelCancellation(previous);
         }
 
-        foreach (ViewMultipleDeviceItemViewModel item in OnlineDevices)
+        foreach (ViewMultipleDeviceItemViewModel item in OnlineDevices.Where(item => !item.KeepSessionInBackground))
             item.CancelRetry();
-        CancelPendingRetryTasks();
+        CancelPendingRetryTasks(keepBackground: true);
         NotifyPaginationCommands();
     }
 
@@ -1060,7 +1091,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
             await _transitionGate.WaitAsync(retryCancellation.Token).ConfigureAwait(false);
             try
             {
-                if (!IsCurrentOperation(navigationGeneration, retryCancellation.Token) ||
+                if (!IsCurrentOperation(item.KeepSessionInBackground ? null : navigationGeneration, retryCancellation.Token) ||
                     _deviceTracker.Health != AdbDeviceTrackerHealth.Connected ||
                     _deviceTracker.GetDevice(item.Serial)?.Status != AdbDeviceStatus.Online ||
                     !await IsVisibleItemAsync(item, retryCancellation.Token).ConfigureAwait(false))
@@ -1068,7 +1099,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
                     return;
                 }
 
-                await item.StartAsync(retryCancellation.Token).ConfigureAwait(false);
+                await item.StartMaintainedSessionAsync(retryCancellation.Token).ConfigureAwait(false);
             }
             finally
             {
@@ -1110,18 +1141,20 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
     {
         bool isVisible = false;
         await _uiDispatcher
-            .InvokeAsync(() => isVisible = VisibleDevices.Contains(item), cancellationToken)
+            .InvokeAsync(() => isVisible = OnlineDevices.Contains(item) && (VisibleDevices.Contains(item) || item.KeepSessionInBackground), cancellationToken)
             .ConfigureAwait(false);
         return isVisible;
     }
 
-    private void CancelPendingRetryTasks()
+    private void CancelPendingRetryTasks(bool keepBackground = false)
     {
         CancellationTokenSource[] pending;
         lock (_retrySchedulingGate)
         {
-            pending = _retryCancellations.Values.ToArray();
-            _retryCancellations.Clear();
+            var canceled = _retryCancellations.Where(pair => !keepBackground || !pair.Key.KeepSessionInBackground).ToArray();
+            pending = canceled.Select(pair => pair.Value).ToArray();
+            foreach (var pair in canceled)
+                _retryCancellations.Remove(pair.Key);
         }
 
         foreach (CancellationTokenSource cancellation in pending)
@@ -1232,25 +1265,31 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         await StopItemsAsync(items).ConfigureAwait(false);
     }
 
-    private async Task StopItemsAsync(IEnumerable<ViewMultipleDeviceItemViewModel> items)
+    private async Task StopItemsAsync(IEnumerable<ViewMultipleDeviceItemViewModel> items, bool onlyIfUnused = false)
     {
         ViewMultipleDeviceItemViewModel[] distinctItems = items
             .Distinct()
             .ToArray();
-        foreach (ViewMultipleDeviceItemViewModel item in distinctItems)
-            CancelRetryForItem(item);
+        if (!onlyIfUnused)
+        {
+            foreach (ViewMultipleDeviceItemViewModel item in distinctItems)
+                CancelRetryForItem(item);
+        }
 
         Task[] stopTasks = distinctItems
-            .Select(StopItemSafelyAsync)
+            .Select(item => StopItemSafelyAsync(item, onlyIfUnused))
             .ToArray();
         await Task.WhenAll(stopTasks).ConfigureAwait(false);
     }
 
-    private async Task StopItemSafelyAsync(ViewMultipleDeviceItemViewModel item)
+    private async Task StopItemSafelyAsync(ViewMultipleDeviceItemViewModel item, bool onlyIfUnused)
     {
         try
         {
-            await item.StopSessionAsync().ConfigureAwait(false);
+            if (onlyIfUnused)
+                await item.StopUnusedSessionAsync().ConfigureAwait(false);
+            else
+                await item.StopSessionAsync().ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -1420,6 +1459,11 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     private void ResetPagingForActivation()
     {
+        SetProperty(ref _sortIndex, 0, nameof(SortIndex));
+        SetProperty(ref _devicesPerPage, PageSize, nameof(DevicesPerPage));
+        _layoutRefreshRequested = false;
+        ResetToolPresentation();
+        IsOrderEditorOpen = false;
         _requestedPage = 1;
         CurrentPage = 1;
         _fitPending = true;
@@ -1430,6 +1474,7 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     private void NotifyCollectionSummary()
     {
+        SynchronizeDeviceStack();
         OnPropertyChanged(nameof(OnlineDeviceCount));
         OnPropertyChanged(nameof(CatalogDeviceCount));
         OnPropertyChanged(nameof(HasOnlineDevices));
@@ -1483,14 +1528,14 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
 
     private bool CanNavigatePrevious()
     {
-        return Volatile.Read(ref _isActive) &&
+        return Volatile.Read(ref _isActive) && !IsBatchBusy &&
                _deviceTracker.Health == AdbDeviceTrackerHealth.Connected &&
                Volatile.Read(ref _requestedPage) > 1;
     }
 
     private bool CanNavigateNext()
     {
-        return Volatile.Read(ref _isActive) &&
+        return Volatile.Read(ref _isActive) && !IsBatchBusy &&
                _deviceTracker.Health == AdbDeviceTrackerHealth.Connected &&
                Volatile.Read(ref _requestedPage) < CalculateTotalPages(CatalogDeviceCount);
     }
@@ -1538,9 +1583,9 @@ public sealed class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDispo
         }
     }
 
-    private static int CalculateTotalPages(int itemCount)
+    private int CalculateTotalPages(int itemCount)
     {
-        return Math.Max(1, (itemCount + PageSize - 1) / PageSize);
+        return Math.Max(1, (itemCount + DevicesPerPage - 1) / DevicesPerPage);
     }
 
     private void CancelCancellation(CancellationTokenSource? cancellation)

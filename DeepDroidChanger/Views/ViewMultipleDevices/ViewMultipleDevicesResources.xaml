@@ -1,6 +1,144 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
     <Thickness x:Key="ViewMultipleDevices.TileMargin">6</Thickness>
     <sys:Double x:Key="ViewMultipleDevices.TileHeaderHeight">64</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.PanelWidth">352</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.PanelMinWidth">296</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.PanelHeight">700</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.PanelMinHeight">260</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.PanelCollapsedWidth">232</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.PanelHeaderHeight">80</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.ResizeGripSize">18</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.SectionIconSize">16</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.ResultMaxHeight">200</sys:Double>
+    <BooleanToVisibilityConverter x:Key="MultipleDevicesBooleanVisibility"/>
+
+    <Style x:Key="MultipleDevicesIconButton" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
+        <Setter Property="Width" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+        <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+    </Style>
+    <Style x:Key="MultipleDevicesPanelButton" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
+        <Setter Property="Height" Value="Auto"/>
+        <Setter Property="MinHeight" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="Padding" Value="{StaticResource Spacing.ControlPadding}"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+    </Style>
+    <Style x:Key="MultipleDevicesHint" TargetType="TextBlock" BasedOn="{StaticResource AppLabelTextStyle}">
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style x:Key="MultipleDevicesSectionHeader" TargetType="ToggleButton">
+        <Setter Property="MinHeight" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+        <Setter Property="Padding" Value="{StaticResource Spacing.ControlPadding}"/>
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="HeaderBorder" Background="{DynamicResource Brush.Surface}"
+                            CornerRadius="{StaticResource Radius.Medium}"
+                            BorderBrush="{DynamicResource Brush.Border}" Padding="{TemplateBinding Padding}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <materialDesign:PackIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                                     Width="{StaticResource ViewMultipleDevices.SectionIconSize}"
+                                                     Height="{StaticResource ViewMultipleDevices.SectionIconSize}"
+                                                     VerticalAlignment="Center" Margin="0,0,8,0"
+                                                     Foreground="{TemplateBinding Foreground}"/>
+                            <TextBlock Grid.Column="1" Text="{TemplateBinding Content}" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" Foreground="{TemplateBinding Foreground}"
+                                       FontSize="{TemplateBinding FontSize}" FontWeight="{TemplateBinding FontWeight}"/>
+                            <materialDesign:PackIcon x:Name="Chevron" Grid.Column="2" Kind="ChevronRight"
+                                                     Width="{StaticResource ViewMultipleDevices.SectionIconSize}"
+                                                     Height="{StaticResource ViewMultipleDevices.SectionIconSize}"
+                                                     VerticalAlignment="Center" Margin="8,0,0,0"
+                                                     Foreground="{TemplateBinding Foreground}"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                            <Setter TargetName="HeaderBorder" Property="CornerRadius" Value="{StaticResource Radius.TopMedium}"/>
+                            <Setter TargetName="HeaderBorder" Property="BorderThickness" Value="0,0,0,1"/>
+                            <Setter TargetName="Chevron" Property="Kind" Value="ChevronDown"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                            <Setter TargetName="HeaderBorder" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                            <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="MultipleDevicesSectionExpander" TargetType="Expander">
+        <Setter Property="IsExpanded" Value="False"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border Background="{DynamicResource Brush.SurfaceAlt}" BorderBrush="{DynamicResource Brush.Border}"
+                            BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
+                            CornerRadius="{StaticResource Radius.Medium}">
+                        <StackPanel>
+                            <ToggleButton x:Name="SectionHeader" Style="{StaticResource MultipleDevicesSectionHeader}"
+                                          Content="{TemplateBinding Header}" Tag="{TemplateBinding Tag}"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <ContentPresenter x:Name="ExpandedContent" ContentSource="Content" Visibility="Collapsed"
+                                              Margin="{StaticResource Spacing.CardPadding.Compact}"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandedContent" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="MultipleDevicesSelectionCheckBox" TargetType="CheckBox" BasedOn="{StaticResource FlatCheckBoxStyle}">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="MultipleDevicesSelectableBorder" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource Metric.BorderThickness.Uniform}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Medium}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                <Setter Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+            </DataTrigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 </ResourceDictionary>

@@ -47,7 +47,8 @@ public sealed partial class ViewMultipleDeviceTile : UserControl
     {
         if (sender is ViewMultipleDeviceItemViewModel item &&
             ReferenceEquals(item, _viewModel) &&
-            eventArgs.PropertyName == nameof(ViewMultipleDeviceItemViewModel.DeviceAspectRatio))
+            eventArgs.PropertyName is nameof(ViewMultipleDeviceItemViewModel.DeviceAspectRatio) or
+                nameof(ViewMultipleDeviceItemViewModel.ViewAspectRatio))
         {
             UpdateStreamViewportLayout();
         }
@@ -89,7 +90,7 @@ public sealed partial class ViewMultipleDeviceTile : UserControl
 
         double height = ViewMultipleDevicesLayout.CalculateStreamHeight(
             width,
-            _viewModel?.DeviceAspectRatio ?? ViewMultipleDevicesLayout.FallbackDeviceAspectRatio);
+            _viewModel?.ViewAspectRatio ?? ViewMultipleDevicesLayout.FallbackDeviceAspectRatio);
         if (height <= 0)
             return;
 
@@ -98,5 +99,8 @@ public sealed partial class ViewMultipleDeviceTile : UserControl
         {
             StreamViewport.Height = height;
         }
+        bool rotated = _viewModel?.ViewRotationAngle is 90 or 270;
+        RotatedDisplayHost.Width = rotated ? height : width;
+        RotatedDisplayHost.Height = rotated ? width : height;
     }
 }
