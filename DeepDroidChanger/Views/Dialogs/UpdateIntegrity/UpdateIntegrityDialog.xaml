@@ -1,13 +1,13 @@
 
-<Window x:Class="DeepDroidChanger.Views.UpdateIntegrityDialog"
+<Window Style="{StaticResource DialogWindowStyle}" x:Class="DeepDroidChanger.Views.UpdateIntegrityDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{DynamicResource UpdateIntegrity_WindowTitle}"
         Width="680"
         Height="680"
-        MinWidth="600"
-        MinHeight="600"
+        MinWidth="520"
+        MinHeight="420"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{DynamicResource Brush.WindowBackground}"
@@ -88,15 +88,8 @@
     </Window.Resources>
 
     <Grid Style="{StaticResource DialogRootGridStyle}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <Border Grid.Row="0"
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<Border Grid.Row="0"
                 Style="{StaticResource DialogHeaderBorderStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -111,17 +104,16 @@
                            Style="{StaticResource DialogHeaderTextStyle}"/>
             </Grid>
         </Border>
-
-        <GroupBox Grid.Row="1"
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" Padding="0,0,8,0">
+            <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+<GroupBox Grid.Row="0"
                   Header="{DynamicResource UpdateIntegrity_SourceGroupHeader}"
                   Style="{StaticResource DialogOptionGroupBoxStyle}">
             <CheckBox Content="{DynamicResource UpdateIntegrity_SourceServer}"
                       IsChecked="{Binding UpdateIntegrityFromServer, Mode=TwoWay}"
                       ToolTip="{DynamicResource Shared_TooltipOption}"
                       Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
-        </GroupBox>
-
-        <GroupBox Grid.Row="2"
+        </GroupBox><GroupBox Grid.Row="1"
                   Header="{DynamicResource UpdateIntegrity_TargetGroupHeader}"
                   Style="{StaticResource DialogOptionGroupBoxStyle}">
             <Grid>
@@ -154,9 +146,7 @@
                           ToolTip="{DynamicResource Shared_TooltipOption}"
                           Style="{StaticResource UpdateIntegrityCheckBoxStyle}"/>
             </Grid>
-        </GroupBox>
-
-        <Border Grid.Row="3"
+        </GroupBox><Border Grid.Row="2"
                 Style="{StaticResource UpdateIntegritySectionBorderStyle}">
             <StackPanel>
                 <Grid Style="{StaticResource UpdateIntegritySelectorGridStyle}">
@@ -226,8 +216,9 @@
                 </Grid>
             </StackPanel>
         </Border>
-
-        <Grid Grid.Row="4"
+            </Grid>
+        </ScrollViewer>
+<Grid Grid.Row="2"
               Style="{StaticResource DialogActionGridStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>

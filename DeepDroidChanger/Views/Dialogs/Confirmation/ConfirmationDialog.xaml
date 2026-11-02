@@ -197,7 +197,7 @@
                     <materialDesign:PackIcon Kind="Close"
                                              Width="{StaticResource Metric.ConfirmationDialog.CloseGlyphSize}"
                                              Height="{StaticResource Metric.ConfirmationDialog.CloseGlyphSize}"
-                                             Foreground="{DynamicResource Brush.AccentForeground}"/>
+                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                 </Button>
             </Grid>
 
@@ -233,7 +233,7 @@
                         </Button.Style>
                         <TextBlock x:Name="YesButtonText"
                                    Text="{Binding ConfirmButtonText}"
-                                   Foreground="{DynamicResource Brush.AccentForeground}"/>
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                     </Button>
                 </StackPanel>
             </Border>

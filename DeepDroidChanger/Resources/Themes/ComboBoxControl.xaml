@@ -3,6 +3,7 @@
         <ResourceDictionary Source="DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
     <Style TargetType="{x:Type ComboBox}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight}" />
         <Setter Property="Padding" Value="10,6" />
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
@@ -13,6 +14,7 @@
         <Setter Property="HorizontalContentAlignment" Value="Left" />
     </Style>
     <Style TargetType="{x:Type ComboBoxItem}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="Padding" Value="{StaticResource Spacing.ItemPadding}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
@@ -31,6 +33,7 @@
         </Style.Triggers>
     </Style>
     <Style x:Key="FlatComboBoxItemStyle" TargetType="ComboBoxItem" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="Height" Value="{DynamicResource Metric.ControlHeight.Comfortable}" />
         <Setter Property="Padding" Value="{StaticResource Spacing.ControlPadding}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
@@ -63,6 +66,7 @@
         </Setter>
     </Style>
     <Style x:Key="FlatComboBoxStyle" TargetType="ComboBox" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="Height" Value="{DynamicResource Metric.ControlHeight.Comfortable}" />
         <Setter Property="Padding" Value="{StaticResource Spacing.ControlPadding}" />
         <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
@@ -132,6 +136,7 @@
         </Setter>
     </Style>
     <Style x:Key="InlineDataGridComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource FlatComboBoxStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="VerticalAlignment" Value="Stretch" />
@@ -152,6 +157,7 @@
         </Setter>
     </Style>
     <Style x:Key="DialogFormComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource FlatComboBoxStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Left" />
         <Setter Property="Margin" Value="0,0,0,8" />

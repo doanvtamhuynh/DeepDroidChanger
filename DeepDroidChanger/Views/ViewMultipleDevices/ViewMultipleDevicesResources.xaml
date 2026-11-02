@@ -16,6 +16,7 @@
     <sys:Double x:Key="ViewMultipleDevices.ResizeGripSize">18</sys:Double>
     <sys:Double x:Key="ViewMultipleDevices.SectionIconSize">16</sys:Double>
     <sys:Double x:Key="ViewMultipleDevices.ResultMaxHeight">200</sys:Double>
+    <sys:Double x:Key="ViewMultipleDevices.TileActionSize">30</sys:Double>
     <BooleanToVisibilityConverter x:Key="MultipleDevicesBooleanVisibility"/>
 
     <Style x:Key="MultipleDevicesIconButton" TargetType="Button" BasedOn="{StaticResource ViewDeviceIconButtonStyle}">
@@ -49,7 +50,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
                     <Border x:Name="HeaderBorder" Background="{DynamicResource Brush.Surface}"
-                            CornerRadius="{StaticResource Radius.Medium}"
+                            CornerRadius="{StaticResource Radius.Large}"
                             BorderBrush="{DynamicResource Brush.Border}" Padding="{TemplateBinding Padding}">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -106,7 +107,7 @@
                 <ControlTemplate TargetType="Expander">
                     <Border Background="{DynamicResource Brush.SurfaceAlt}" BorderBrush="{DynamicResource Brush.Border}"
                             BorderThickness="{StaticResource Metric.BorderThickness.Uniform}"
-                            CornerRadius="{StaticResource Radius.Medium}">
+                            CornerRadius="{StaticResource Radius.Large}">
                         <StackPanel>
                             <ToggleButton x:Name="SectionHeader" Style="{StaticResource MultipleDevicesSectionHeader}"
                                           Content="{TemplateBinding Header}" Tag="{TemplateBinding Tag}"

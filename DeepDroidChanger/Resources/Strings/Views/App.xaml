@@ -18,4 +18,11 @@
     <sys:String x:Key="Shared_TooltipConfirm">Confirm and run the operation shown in this dialog.</sys:String>
     <sys:String x:Key="Shared_TooltipCancel">Close this dialog without applying the pending operation.</sys:String>
     <sys:String x:Key="Shared_TooltipList">Select an item to use with the actions in this dialog.</sys:String>
+    <sys:String x:Key="Workspace_SingleDescription">Manage a device profile, configure changes and run tools from one workspace.</sys:String>
+    <sys:String x:Key="Workspace_MultipleDescription">Select devices, prepare a shared configuration and track your batch actions.</sys:String>
+    <sys:String x:Key="Workspace_ResizePanels">Drag to resize the device list and configuration panels.</sys:String>
+    <sys:String x:Key="Workspace_EmptyTitle">No devices to display</sys:String>
+    <sys:String x:Key="Workspace_EmptyHint">Add devices or adjust your search and filters to get started.</sys:String>
+    <sys:String x:Key="Workspace_MonitorDescription">Keep your device screens and tools together in one workspace.</sys:String>
+    <sys:String x:Key="Workspace_OnlineHint">Connect a saved device to start viewing.</sys:String>
 </ResourceDictionary>

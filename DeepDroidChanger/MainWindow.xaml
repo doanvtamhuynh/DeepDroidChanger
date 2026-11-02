@@ -7,8 +7,8 @@
         WindowState="Maximized"
         WindowStyle="SingleBorderWindow"
         ResizeMode="CanResize"
-        MinWidth="1280"
-        MinHeight="720"
+        MinWidth="840"
+        MinHeight="480"
         Background="{DynamicResource Brush.WindowBackground}"
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
         FontFamily="{DynamicResource Metric.FontFamily}">

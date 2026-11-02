@@ -4,6 +4,7 @@
         <ResourceDictionary Source="Control.xaml" />
     </ResourceDictionary.MergedDictionaries>
     <Style TargetType="{x:Type CheckBox}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
@@ -42,6 +43,7 @@
         </Setter>
     </Style>
     <Style x:Key="FlatCheckBoxStyle" TargetType="CheckBox" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
         <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
         <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
@@ -91,6 +93,7 @@
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style x:Key="FormCheckBoxStyle" TargetType="CheckBox" BasedOn="{StaticResource FlatCheckBoxStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="Margin" Value="0,6,0,0" />
         <Setter Property="Cursor" Value="Hand" />
     </Style>

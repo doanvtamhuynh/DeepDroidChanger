@@ -1,3 +1,4 @@
+using DeepDroidChanger.Helpers;
 using DeepDroidChanger.ViewModels;
 using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
@@ -27,6 +28,22 @@ namespace DeepDroidChanger.Views
             DataContext = viewModel;
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
+        }
+
+        protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+        {
+            base.OnPropertyChanged(e);
+            if (e.Property == FontSizeProperty && IsInitialized)
+                UpdateWorkspaceLayout();
+        }
+
+        private void OnWorkspaceSizeChanged(object sender, SizeChangedEventArgs e) => UpdateWorkspaceLayout();
+
+        private void UpdateWorkspaceLayout()
+        {
+            if (!IsInitialized) return;
+            DeviceWorkspaceLayout.Arrange(MultipleDevicesRootGrid, MultipleDeviceProfilePanelContentGrid, RunningActionsPanel,
+                MultipleDeviceConfigurationPanel, MultipleDeviceActionsPanel, MultipleDeviceToolbar, MultipleDeviceSearchInput);
         }
 
         private async void OnLoaded(object sender, RoutedEventArgs e)

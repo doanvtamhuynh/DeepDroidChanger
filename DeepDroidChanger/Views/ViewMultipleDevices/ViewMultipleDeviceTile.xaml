@@ -21,6 +21,8 @@
             <Style x:Key="ViewMultipleDeviceOpenViewButtonStyle"
                    TargetType="Button"
                    BasedOn="{StaticResource ViewDeviceIconButtonStyle}">
+                <Setter Property="Width" Value="{StaticResource ViewMultipleDevices.TileActionSize}"/>
+                <Setter Property="Height" Value="{StaticResource ViewMultipleDevices.TileActionSize}"/>
                 <Setter Property="Padding" Value="0"/>
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>

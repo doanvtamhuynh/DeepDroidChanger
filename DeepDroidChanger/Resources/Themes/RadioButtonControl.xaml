@@ -3,6 +3,7 @@
         <ResourceDictionary Source="DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
     <Style TargetType="{x:Type RadioButton}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
@@ -43,6 +44,7 @@
         </Setter>
     </Style>
     <Style x:Key="CardRadioButtonStyle" TargetType="{x:Type RadioButton}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisualStyle}"/>
         <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
         <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
         <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />

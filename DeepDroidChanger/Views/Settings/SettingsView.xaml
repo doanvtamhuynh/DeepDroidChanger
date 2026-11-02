@@ -61,7 +61,7 @@
                                         CornerRadius="{StaticResource Radius.Circle}" Background="{DynamicResource Brush.Accent}">
                                     <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
                                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                             Foreground="{DynamicResource Brush.AccentForeground}"/>
+                                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                 </Border>
                             </Grid>
                         </Border>
@@ -374,7 +374,7 @@
     </UserControl.Resources>
 
     <Grid Margin="{StaticResource Spacing.PageMargin}">
-        <Grid MaxWidth="1100" Margin="{StaticResource Spacing.PageMargin}">
+        <Grid MaxWidth="1100" HorizontalAlignment="Left">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/><RowDefinition Height="Auto"/>

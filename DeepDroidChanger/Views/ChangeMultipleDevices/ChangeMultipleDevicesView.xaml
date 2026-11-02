@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:DeepDroidChanger.Behaviors"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-             Background="Transparent">
+             FontSize="{DynamicResource Metric.FontSize.Body}" Background="Transparent" SizeChanged="OnWorkspaceSizeChanged">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <Thickness x:Key="MultipleDeviceProfilePanelContentMargin">0,0,16,0</Thickness>
@@ -27,8 +27,8 @@
             <Setter Property="MinHeight" Value="220"/>
             <Setter Property="RowHeight"
                     Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
-            <Setter Property="MaxHeight" Value="412"/>
-            <Setter Property="GridLinesVisibility" Value="All"/>
+
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="AlternationCount" Value="2"/>
             <Setter Property="HorizontalGridLinesBrush"
                     Value="{DynamicResource Brush.Border}"/>
@@ -40,7 +40,7 @@
                     Value="{StaticResource DeviceTableCellStyle}"/>
             <Setter Property="RowStyle"
                     Value="{StaticResource MultipleDeviceGridRowContextMenuStyle}"/>
-            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
 
@@ -74,14 +74,14 @@
         <Style x:Key="MultipleDeviceSectionBorderStyle"
                TargetType="Border">
             <Setter Property="Background"
-                    Value="{DynamicResource Brush.SurfaceAlt}"/>
+                    Value="{DynamicResource Brush.Surface}"/>
             <Setter Property="BorderBrush"
                     Value="{DynamicResource Brush.Border}"/>
             <Setter Property="BorderThickness"
                     Value="{StaticResource Metric.BorderThickness.Uniform}"/>
             <Setter Property="CornerRadius"
-                    Value="{StaticResource Radius.Medium}"/>
-            <Setter Property="Padding" Value="14,12"/>
+                    Value="{StaticResource Radius.Large}"/>
+            <Setter Property="Padding" Value="{StaticResource Spacing.CardPadding}"/>
         </Style>
 
         <Style x:Key="MultipleDevicePanelBorderStyle"
@@ -100,7 +100,7 @@
                TargetType="Grid">
             <!-- Keep every panel header at the tallest standard control height so
                  each separator lands on the same horizontal line. -->
-            <Setter Property="Height"
+            <Setter Property="MinHeight"
                     Value="{DynamicResource Metric.ControlHeight}"/>
             <!-- Leave a five-pixel breathing space between the title and line. -->
             <Setter Property="Margin" Value="0,0,0,5"/>
@@ -136,10 +136,10 @@
                     Value="{DynamicResource Metric.FontSize.Body}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextSecondary}"/>
+                    Value="{DynamicResource Brush.TextPrimary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-        </Style>
+            <Setter Property="TextTrimming" Value="None"/>
+        <Setter Property="TextWrapping" Value="Wrap"/></Style>
 
         <Style x:Key="RunningActionListBoxItemStyle"
                TargetType="ListBoxItem"
@@ -233,40 +233,18 @@
                     Value="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
         </Style>
 
-        <Style x:Key="MultipleDeviceActionButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
-            <Setter Property="Background"
-                    Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="BorderBrush"
-                    Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Margin" Value="0,0,5,4"/>
-            <Setter Property="Padding" Value="8,0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="materialDesign:ButtonAssist.CornerRadius"
-                    Value="{StaticResource Radius.Medium}"/>
-            <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="materialDesign:RippleAssist.RippleOnTop"
-                    Value="True"/>
-            <Setter Property="materialDesign:ElevationAssist.Elevation"
-                    Value="Dp1"/>
-        </Style>
+        <Style x:Key="MultipleDeviceActionButtonStyle" TargetType="Button" BasedOn="{StaticResource WorkspaceActionButtonStyle}"/>
 
         <Style x:Key="MultipleDeviceStopActionButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource MultipleDeviceActionButtonStyle}">
             <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.DangerForeground}"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
+                    Value="{DynamicResource Brush.DangerForeground}"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource Brush.DangerHover}"/>
@@ -283,14 +261,14 @@
         </Style>
 
         <Style x:Key="MultipleDeviceActionButtonTextStyle"
-               TargetType="TextBlock">
+               TargetType="TextBlock" BasedOn="{StaticResource PrimaryButtonTextStyle}">
             <Setter Property="FontFamily"
                     Value="{DynamicResource Metric.FontFamily}"/>
             <Setter Property="FontSize"
-                    Value="{DynamicResource Metric.FontSize.Small}"/>
+                    Value="{DynamicResource Metric.FontSize.Body}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="None"/>
             <Setter Property="TextAlignment" Value="Left"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -302,10 +280,8 @@
                     Value="{DynamicResource Brush.Warning}"/>
         </Style>
 
-        <Style x:Key="MultipleDeviceAdvancedConfigButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource MultipleDeviceActionButtonStyle}">
-            <Setter Property="Margin" Value="8,0,0,0"/>
+        <Style x:Key="MultipleDeviceAdvancedConfigButtonStyle" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
+            <Setter Property="Padding" Value="12,6"/>
         </Style>
 
         <Style x:Key="MultipleDeviceLoadToolbarStyle"
@@ -313,26 +289,7 @@
             <Setter Property="Margin" Value="0,0,0,14"/>
         </Style>
 
-        <Style x:Key="MultipleDeviceLoadButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
-            <Setter Property="Background"
-                    Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="BorderBrush"
-                    Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Padding" Value="16,0,16,0"/>
-            <Setter Property="materialDesign:ButtonAssist.CornerRadius"
-                    Value="{StaticResource Radius.ExtraSmall}"/>
-            <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="materialDesign:RippleAssist.RippleOnTop"
-                    Value="True"/>
-            <Setter Property="materialDesign:ElevationAssist.Elevation"
-                    Value="Dp2"/>
-        </Style>
+        <Style x:Key="MultipleDeviceLoadButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}"/>
 
         <Style x:Key="MultipleDeviceLoadButtonContentStyle"
                TargetType="StackPanel">
@@ -406,13 +363,21 @@
         <Grid x:Name="MultipleDevicesRootGrid"
               Style="{StaticResource PageRootGridStyle}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*" MinHeight="220"/>
-                <RowDefinition Height="312" MinHeight="312"/>
-            </Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="180"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1.1*" MinHeight="220"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal">
+                <materialDesign:PackIcon Kind="CellphoneLink" Width="24" Height="24" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Text="{DynamicResource Nav_ChangeMultipleDevices}" Style="{StaticResource AppTitleTextStyle}"/>
+            </StackPanel>
+            <TextBlock x:Name="WorkspaceDescription" Text="{DynamicResource Workspace_MultipleDescription}" Style="{StaticResource SecondaryTextStyle}" Margin="0,8,0,0"/>
+        </StackPanel>
 
-            <Grid Grid.Row="0"
-                  Style="{StaticResource MultipleDeviceLoadToolbarStyle}">
+            <Grid x:Name="MultipleDeviceToolbar" Grid.Row="1" Style="{StaticResource MultipleDeviceLoadToolbarStyle}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
@@ -437,8 +402,7 @@
                            Text="{Binding NewDeviceCountText}"
                            Style="{StaticResource MultipleDeviceLoadCountTextStyle}"/>
 
-                <TextBox Grid.Column="2"
-                         Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox x:Name="MultipleDeviceSearchInput" Grid.Column="2" Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="{DynamicResource Shared_TooltipSearch}"
                          AutomationProperties.Name="{DynamicResource ChangeMultipleDevices_DeviceSearchName}"
                          materialDesign:HintAssist.Hint="{DynamicResource ChangeMultipleDevices_DeviceSearchHint}"
@@ -491,7 +455,7 @@
             </Grid>
 
             <DataGrid x:Name="MultipleDeviceGrid"
-                      Grid.Row="1"
+                      Grid.Row="2"
                       ItemsSource="{Binding Devices}"
                       SelectionMode="Single"
                   SelectionUnit="FullRow"
@@ -659,7 +623,7 @@
                                         <materialDesign:PackIcon Kind="Stop"
                                                                  Width="14"
                                                                  Height="14"
-                                                                 Foreground="{DynamicResource Brush.AccentForeground}"
+                                                                 Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                                                  VerticalAlignment="Center"
                                                                  Margin="0,0,4,0"/>
                                         <TextBlock Grid.Column="1"
@@ -676,15 +640,24 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <ScrollViewer x:Name="MultipleDeviceProfilePanelScrollViewer"
-                          Grid.Row="2"
+            <GridSplitter Grid.Row="3" Height="12" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Focusable="True" ToolTip="{DynamicResource Workspace_ResizePanels}">
+            <GridSplitter.Template><ControlTemplate TargetType="GridSplitter"><Border Background="Transparent"><Border Height="3" Width="48" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="{StaticResource Radius.Small}"/></Border></ControlTemplate></GridSplitter.Template>
+        </GridSplitter>
+        <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" IsHitTestVisible="False">
+            <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Devices.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+            <materialDesign:PackIcon Kind="CellphoneLink" Width="36" Height="36" Foreground="{DynamicResource Brush.TextDisabled}" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+            <TextBlock Text="{DynamicResource Workspace_EmptyTitle}" Style="{StaticResource SubtitleTextStyle}" TextAlignment="Center"/>
+            <TextBlock Text="{DynamicResource Workspace_EmptyHint}" Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" Margin="0,8,0,0"/>
+        </StackPanel>
+        <ScrollViewer x:Name="MultipleDeviceProfilePanelScrollViewer"
+                          Grid.Row="4"
                           Margin="0,8,0,0"
-                          MinHeight="300"
+                          MinHeight="220"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <Grid x:Name="MultipleDeviceProfilePanelContentGrid"
                       Margin="{StaticResource MultipleDeviceProfilePanelContentMargin}"
-                      MinHeight="260">
+                      MinHeight="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2.2*"/>
                         <ColumnDefinition Width="1.35*"/>
@@ -756,7 +729,7 @@
                                                     <materialDesign:PackIcon Kind="Stop"
                                                                              Width="14"
                                                                              Height="14"
-                                                                             Foreground="{DynamicResource Brush.AccentForeground}"
+                                                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                                                              VerticalAlignment="Center"
                                                                              Margin="0,0,4,0"/>
                                                     <TextBlock Grid.Column="1"
@@ -991,7 +964,7 @@
                                         Grid.Column="1"
                                         Command="{Binding ChangeAndWipeMultipleDevicesCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeAndWipeTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource DangerOutlineButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="CellphoneCog" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -1002,7 +975,7 @@
                                         Grid.Column="0"
                                         Command="{Binding WipeMultipleDevicesWithoutChangeCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionWipeWithoutChangeTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource DangerOutlineButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="DeleteSweep" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -1013,7 +986,7 @@
                                         Grid.Column="1"
                                         Command="{Binding ChangeMultipleDevicesWithoutWipeCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeWithoutWipeTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource DangerOutlineButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="CellphoneText" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -1046,7 +1019,7 @@
                                         Grid.Column="0"
                                         Command="{Binding RandomizeChangeAndWipeMultipleDevicesCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomChangeAndWipeTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource DangerOutlineButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="Sync" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>

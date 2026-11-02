@@ -64,11 +64,11 @@
         <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Title}" />
     </Style>
     <Style x:Key="DialogHeaderTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Subtitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style x:Key="DialogInputLabelStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />

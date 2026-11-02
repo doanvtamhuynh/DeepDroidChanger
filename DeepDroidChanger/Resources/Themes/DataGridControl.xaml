@@ -121,7 +121,6 @@
     </Style>
     <Style x:Key="DeviceTableColumnHeaderStyle"
            TargetType="DataGridColumnHeader"
-           BasedOn="{StaticResource MaterialDesignDataGridColumnHeader}"
            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
            xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}" />
@@ -145,11 +144,11 @@
                                 Padding="{TemplateBinding Padding}"/>
                         <Border Height="1"
                                 VerticalAlignment="Bottom"
-                                Background="{DynamicResource Brush.BorderStrong}"
+                                Background="{DynamicResource Brush.Border}"
                                 IsHitTestVisible="False"/>
-                        <Border Width="2"
+                        <Border Width="1"
                                 HorizontalAlignment="Right"
-                                Background="{DynamicResource Brush.BorderStrong}"
+                                Background="{DynamicResource Brush.Border}"
                                 IsHitTestVisible="False"/>
                         <Grid Margin="{TemplateBinding Padding}">
                             <Grid.ColumnDefinitions>

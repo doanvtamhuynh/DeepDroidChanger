@@ -20,4 +20,9 @@
         <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
         <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
     </Style>
+    <Style x:Key="DialogWindowStyle" TargetType="Window" BasedOn="{StaticResource {x:Type Window}}">
+        <Setter Property="ResizeMode" Value="CanResize"/>
+        <Setter Property="MaxHeight" Value="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"/>
+        <Setter Property="MaxWidth" Value="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"/>
+    </Style>
 </ResourceDictionary>

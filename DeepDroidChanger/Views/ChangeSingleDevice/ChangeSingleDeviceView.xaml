@@ -5,7 +5,7 @@
              xmlns:behaviors="clr-namespace:DeepDroidChanger.Behaviors"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:models="clr-namespace:DeepDroidChanger.Models"
-             Background="Transparent">
+             FontSize="{DynamicResource Metric.FontSize.Body}" Background="Transparent" SizeChanged="OnWorkspaceSizeChanged">
 
     <UserControl.Resources>
 
@@ -18,10 +18,9 @@
                     Value="220"/>
             <Setter Property="RowHeight"
                     Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
-            <Setter Property="MaxHeight"
-                    Value="412"/>
+
             <Setter Property="GridLinesVisibility"
-                    Value="All"/>
+                    Value="Horizontal"/>
             <Setter Property="AlternationCount"
                     Value="2"/>
             <Setter Property="HorizontalGridLinesBrush"
@@ -33,7 +32,7 @@
             <Setter Property="CellStyle"
                     Value="{StaticResource DeviceTableCellStyle}"/>
             <Setter Property="HorizontalScrollBarVisibility"
-                    Value="Disabled"/>
+                    Value="Auto"/>
             <Setter Property="VerticalScrollBarVisibility"
                     Value="Auto"/>
             <Setter Property="RowStyle"
@@ -85,15 +84,15 @@
         <Style x:Key="DeviceSectionBorderStyle"
                TargetType="Border">
             <Setter Property="Background"
-                    Value="{DynamicResource Brush.SurfaceAlt}"/>
+                    Value="{DynamicResource Brush.Surface}"/>
             <Setter Property="BorderBrush"
                     Value="{DynamicResource Brush.Border}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="CornerRadius"
-                    Value="{StaticResource Radius.Medium}"/>
+                    Value="{StaticResource Radius.Large}"/>
             <Setter Property="Padding"
-                    Value="14,12"/>
+                    Value="{StaticResource Spacing.CardPadding}"/>
         </Style>
 
         <Style x:Key="DeviceInfoSectionBorderStyle"
@@ -114,7 +113,7 @@
                TargetType="Grid">
             <!-- Keep every panel header at the tallest standard control height so
                  each separator lands on the same horizontal line. -->
-            <Setter Property="Height"
+            <Setter Property="MinHeight"
                     Value="{DynamicResource Metric.ControlHeight}"/>
             <!-- Leave a five-pixel breathing space between the title and line. -->
             <Setter Property="Margin" Value="0,0,0,5"/>
@@ -155,12 +154,12 @@
             <Setter Property="FontWeight"
                     Value="SemiBold"/>
             <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.TextSecondary}"/>
+                    Value="{DynamicResource Brush.TextPrimary}"/>
             <Setter Property="VerticalAlignment"
                     Value="Center"/>
             <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis"/>
-        </Style>
+                    Value="None"/>
+        <Setter Property="TextWrapping" Value="Wrap"/></Style>
 
         <Style x:Key="DeviceInfoFormGridStyle"
                TargetType="Grid">
@@ -217,46 +216,18 @@
                     Value="{StaticResource DeviceComboBoxItemStyle}"/>
         </Style>
 
-        <Style x:Key="DeviceActionButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
-            <Setter Property="Background"
-                    Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="BorderBrush"
-
-                    Value="{DynamicResource Brush.Accent}"/>
-            <Setter Property="Foreground"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="Height"
-                    Value="36"/>
-            <Setter Property="Margin"
-                    Value="0,0,5,4"/>
-            <Setter Property="Padding"
-                    Value="8,0"/>
-            <Setter Property="HorizontalContentAlignment"
-                    Value="Stretch"/>
-            <Setter Property="VerticalContentAlignment"
-                    Value="Center"/>
-            <Setter Property="materialDesign:ButtonAssist.CornerRadius"
-                    Value="{StaticResource Radius.Medium}"/>
-            <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
-            <Setter Property="materialDesign:RippleAssist.RippleOnTop"
-                    Value="True"/>
-            <Setter Property="materialDesign:ElevationAssist.Elevation"
-                    Value="Dp1"/>
-        </Style>
+        <Style x:Key="DeviceActionButtonStyle" TargetType="Button" BasedOn="{StaticResource WorkspaceActionButtonStyle}"/>
 
         <Style x:Key="DeviceStopActionButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource DeviceActionButtonStyle}">
             <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.DangerForeground}"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.AccentForeground}"/>
+                    Value="{DynamicResource Brush.DangerForeground}"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource Brush.DangerHover}"/>
@@ -273,48 +244,31 @@
         </Style>
 
         <Style x:Key="DeviceActionButtonTextStyle"
-               TargetType="TextBlock">
+               TargetType="TextBlock" BasedOn="{StaticResource PrimaryButtonTextStyle}">
             <Setter Property="FontFamily"
                     Value="{DynamicResource Metric.FontFamily}"/>
             <Setter Property="FontSize"
-                    Value="{DynamicResource Metric.FontSize.Small}"/>
+                    Value="{DynamicResource Metric.FontSize.Body}"/>
             <Setter Property="FontWeight"
                     Value="SemiBold"/>
-            <Setter Property="TextWrapping"
-                    Value="NoWrap"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="TextTrimming"
-                    Value="CharacterEllipsis"/>
+                    Value="None"/>
             <Setter Property="TextAlignment"
                     Value="Left"/>
             <Setter Property="VerticalAlignment"
                     Value="Center"/>
         </Style>
 
-        <Style x:Key="DeviceInfoDetailsButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource DeviceActionButtonStyle}">
-            <Setter Property="Margin" Value="8,0,0,0"/>
+        <Style x:Key="DeviceInfoDetailsButtonStyle" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
+            <Setter Property="Padding" Value="12,6"/>
         </Style>
 
     <Style x:Key="DeviceLoadToolbarStyle" TargetType="Grid">
         <Setter Property="Margin" Value="0,0,0,14"/>
     </Style>
 
-    <Style x:Key="DeviceLoadButtonStyle"
-           TargetType="Button"
-           BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
-        <Setter Property="Background"
-                Value="{DynamicResource Brush.Accent}"/>
-        <Setter Property="BorderBrush"
-                Value="{DynamicResource Brush.Accent}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
-        <Setter Property="Height" Value="36"/>
-        <Setter Property="Padding" Value="16,0,16,0"/>
-        <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="{StaticResource Radius.ExtraSmall}"/>
-        <Setter Property="materialDesign:RippleAssist.Feedback" Value="{DynamicResource Brush.AccentForeground}"/>
-        <Setter Property="materialDesign:RippleAssist.RippleOnTop" Value="True"/>
-        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
-    </Style>
+    <Style x:Key="DeviceLoadButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}"/>
 
     <Style x:Key="DeviceLoadButtonContentStyle" TargetType="StackPanel">
         <Setter Property="Orientation" Value="Horizontal"/>
@@ -360,13 +314,19 @@
               Style="{StaticResource PageRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"
-                           MinHeight="220"/>
-            <RowDefinition Height="312"
-                           MinHeight="312"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="180"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1.1*" MinHeight="220"/>
         </Grid.RowDefinitions>
-        <Grid Grid.Row="0"
-              Style="{StaticResource DeviceLoadToolbarStyle}">
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal">
+                <materialDesign:PackIcon Kind="CellphoneCog" Width="24" Height="24" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Text="{DynamicResource Nav_ChangeSingleDevice}" Style="{StaticResource AppTitleTextStyle}"/>
+            </StackPanel>
+            <TextBlock x:Name="WorkspaceDescription" Text="{DynamicResource Workspace_SingleDescription}" Style="{StaticResource SecondaryTextStyle}" Margin="0,8,0,0"/>
+        </StackPanel>
+        <Grid x:Name="DeviceToolbar" Grid.Row="1" Style="{StaticResource DeviceLoadToolbarStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -390,8 +350,7 @@
                        Text="{Binding NewDeviceCountText}"
                        Style="{StaticResource DeviceLoadCountTextStyle}"/>
 
-            <TextBox Grid.Column="2"
-                     Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            <TextBox x:Name="DeviceSearchInput" Grid.Column="2" Text="{Binding DeviceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      ToolTip="{DynamicResource Shared_TooltipSearch}"
                      AutomationProperties.Name="{DynamicResource ChangeSingleDevice_DeviceSearchName}"
                      materialDesign:HintAssist.Hint="{DynamicResource ChangeSingleDevice_DeviceSearchHint}"
@@ -432,7 +391,7 @@
             </StackPanel>
         </Grid>
         <DataGrid x:Name="DeviceGrid"
-                  Grid.Row="1"
+                  Grid.Row="2"
                   ItemsSource="{Binding Devices}"
                   SelectionMode="Single"
                   SelectionUnit="FullRow"
@@ -596,7 +555,7 @@
                                     <materialDesign:PackIcon Kind="Stop"
                                                              Width="14"
                                                              Height="14"
-                                                             Foreground="{DynamicResource Brush.AccentForeground}"
+                                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                                              VerticalAlignment="Center"
                                                              Margin="0,0,4,0"/>
                                     <TextBlock Grid.Column="1"
@@ -613,23 +572,31 @@
             </DataGrid.Columns>
         </DataGrid>
 
+        <GridSplitter Grid.Row="3" Height="12" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Focusable="True" ToolTip="{DynamicResource Workspace_ResizePanels}">
+            <GridSplitter.Template><ControlTemplate TargetType="GridSplitter"><Border Background="Transparent"><Border Height="3" Width="48" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="{StaticResource Radius.Small}"/></Border></ControlTemplate></GridSplitter.Template>
+        </GridSplitter>
+        <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" IsHitTestVisible="False">
+            <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Devices.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+            <materialDesign:PackIcon Kind="CellphoneLink" Width="36" Height="36" Foreground="{DynamicResource Brush.TextDisabled}" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+            <TextBlock Text="{DynamicResource Workspace_EmptyTitle}" Style="{StaticResource SubtitleTextStyle}" TextAlignment="Center"/>
+            <TextBlock Text="{DynamicResource Workspace_EmptyHint}" Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" Margin="0,8,0,0"/>
+        </StackPanel>
         <ScrollViewer x:Name="DeviceProfilePanelScrollViewer"
-                      Grid.Row="2"
+                      Grid.Row="4"
                       Margin="0,8,0,0"
-                      MinHeight="300"
+                      MinHeight="220"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
                     <Grid x:Name="DeviceProfilePanelContentGrid"
                           Margin="{StaticResource DeviceProfilePanelContentMargin}"
-                          MinHeight="260">
+                          MinHeight="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2.2*"/>
                         <ColumnDefinition Width="1.35*"/>
                         <ColumnDefinition Width="1.45*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0"
-                            Style="{StaticResource DeviceInfoSectionBorderStyle}">
+                    <Border x:Name="DeviceInformationPanel" Grid.Column="0" Style="{StaticResource DeviceInfoSectionBorderStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -815,8 +782,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Column="1"
-                            Style="{StaticResource DeviceInfoSectionBorderStyle}">
+                    <Border x:Name="DeviceConfigurationPanel" Grid.Column="1" Style="{StaticResource DeviceInfoSectionBorderStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -972,8 +938,7 @@
                         </Grid>
                     </Border>
 
-                    <Border Grid.Column="2"
-                            Style="{StaticResource DeviceActionSectionBorderStyle}">
+                    <Border x:Name="DeviceActionsPanel" Grid.Column="2" Style="{StaticResource DeviceActionSectionBorderStyle}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -1081,7 +1046,7 @@
                                     Grid.Column="1"
                                     Command="{Binding ChangeSingleDeviceWithoutWipeCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeWithoutWipeTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource DangerOutlineButtonStyle}">
                                 <Grid>
 
                                     <Grid.ColumnDefinitions>
@@ -1103,7 +1068,7 @@
                                     Grid.Column="1"
                                     Command="{Binding ChangeAndWipeSingleDeviceCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeDeviceTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource DangerOutlineButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1124,7 +1089,7 @@
                                     Grid.Column="0"
                                     Command="{Binding WipeSingleDeviceWithoutChangeCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionWipeWithoutChangeTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource DangerOutlineButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1144,7 +1109,7 @@
                                     Grid.Column="0"
                                     Command="{Binding RandomizeChangeAndWipeSingleDeviceCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomChangeAndWipeTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource DangerOutlineButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
