@@ -5,5 +5,9 @@ namespace DeepDroidChanger.Services
     {
         Task<AppSettings> LoadAsync(CancellationToken cancellationToken);
         Task SaveAsync(AppSettings settings, CancellationToken cancellationToken);
+        Task SavePreferencesAsync(
+            AppSettings settings,
+            ApplicationPreferences preferences,
+            CancellationToken cancellationToken);
     }
 }

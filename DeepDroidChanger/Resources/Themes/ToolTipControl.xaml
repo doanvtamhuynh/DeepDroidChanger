@@ -5,6 +5,6 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="10,7" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
     </Style>
 </ResourceDictionary>

@@ -8,7 +8,5 @@ public enum AccountAuthenticationStatus
 {
     Success,
     AuthenticationFailed,
-    ConfigurationError,
-    ServiceUnavailable,
     InvalidInput
 }

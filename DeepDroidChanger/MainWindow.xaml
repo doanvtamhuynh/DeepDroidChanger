@@ -11,7 +11,7 @@
         MinHeight="720"
         Background="{DynamicResource Brush.WindowBackground}"
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
-        FontFamily="{StaticResource Metric.FontFamily}">
+        FontFamily="{DynamicResource Metric.FontFamily}">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
@@ -48,8 +48,8 @@
                                                          VerticalAlignment="Center"
                                                          Foreground="{TemplateBinding Foreground}"/>
                                 <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                           FontFamily="{StaticResource Metric.FontFamily}"
-                                           FontSize="{StaticResource Metric.FontSize.Body}"
+                                           FontFamily="{DynamicResource Metric.FontFamily}"
+                                           FontSize="{DynamicResource Metric.FontSize.Body}"
                                            FontWeight="SemiBold"
                                            Margin="12,0,0,0"
                                            VerticalAlignment="Center"
@@ -169,8 +169,8 @@
 
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                           FontFamily="{StaticResource Metric.FontFamily}"
-                                           FontSize="{StaticResource Metric.FontSize.Body}"
+                                           FontFamily="{DynamicResource Metric.FontFamily}"
+                                           FontSize="{DynamicResource Metric.FontSize.Body}"
                                            FontWeight="SemiBold"
                                            Margin="12,0,0,0"
                                            VerticalAlignment="Center"
@@ -248,7 +248,7 @@
         <Style x:Key="SidebarSubmenuButtonStyle"
                TargetType="Button">
             <Setter Property="Height"
-                    Value="{StaticResource Metric.ControlHeight}"/>
+                    Value="{DynamicResource Metric.ControlHeight}"/>
             <Setter Property="Background"
                     Value="{DynamicResource Brush.Surface}"/>
             <Setter Property="BorderThickness"
@@ -283,8 +283,8 @@
                                                          Foreground="{TemplateBinding Foreground}"/>
                                 <TextBlock Grid.Column="1"
                                            Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                           FontFamily="{StaticResource Metric.FontFamily}"
-                                           FontSize="{StaticResource Metric.FontSize.Small}"
+                                           FontFamily="{DynamicResource Metric.FontFamily}"
+                                           FontSize="{DynamicResource Metric.FontSize.Small}"
                                            FontWeight="SemiBold"
                                            Margin="8,0,0,0"
                                            VerticalAlignment="Center"
@@ -392,9 +392,9 @@
         <Style x:Key="SidebarFlyoutMenuItemStyle"
                TargetType="MenuItem">
             <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
+                    Value="{DynamicResource Metric.FontFamily}"/>
             <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
+                    Value="{DynamicResource Metric.FontSize.Body}"/>
             <Setter Property="FontWeight"
                     Value="SemiBold"/>
             <Setter Property="Foreground"
@@ -548,9 +548,9 @@
         <Style x:Key="SidebarFlyoutItemTextStyle"
                TargetType="TextBlock">
             <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
+                    Value="{DynamicResource Metric.FontFamily}"/>
             <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
+                    Value="{DynamicResource Metric.FontSize.Body}"/>
             <Setter Property="FontWeight"
                     Value="SemiBold"/>
             <Setter Property="VerticalAlignment"
@@ -612,7 +612,7 @@
         <Style x:Key="ShellLogoTextStyle"
                TargetType="TextBlock">
             <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Subtitle}"/>
+                    Value="{DynamicResource Metric.FontSize.Subtitle}"/>
             <Setter Property="FontWeight"
                     Value="Bold"/>
             <Setter Property="Foreground"
@@ -648,7 +648,7 @@
         <Style x:Key="ShellVersionTextStyle"
                TargetType="TextBlock">
             <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Micro}"/>
+                    Value="{DynamicResource Metric.FontSize.Micro}"/>
             <Setter Property="Foreground"
                     Value="{DynamicResource Brush.TextDisabled}"/>
             <Setter Property="VerticalAlignment"
@@ -887,7 +887,7 @@
                     <TextBlock Margin="0,14,0,0"
                                Text="{DynamicResource MainWindow_ShutdownStopping}"
                                HorizontalAlignment="Center"
-                               FontSize="{StaticResource Metric.FontSize.Body}"
+                               FontSize="{DynamicResource Metric.FontSize.Body}"
                                FontWeight="SemiBold"/>
                 </StackPanel>
             </Border>

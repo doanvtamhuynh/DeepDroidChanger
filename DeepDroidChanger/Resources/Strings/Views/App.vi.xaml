@@ -2,8 +2,6 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <sys:String x:Key="AppName">DeepDroidChanger</sys:String>
-    <sys:String x:Key="AppVersion">1.0.0</sys:String>
     <sys:String x:Key="Shared_DeviceNameHint">Nhập tên...</sys:String>
     <sys:String x:Key="Version">Phiên bản</sys:String>
     <sys:String x:Key="Shared_TooltipSearch">Lọc danh sách khi nhập; không thay đổi dữ liệu thiết bị.</sys:String>

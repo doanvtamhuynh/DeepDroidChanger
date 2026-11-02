@@ -75,4 +75,8 @@
     <SolidColorBrush x:Key="Brush.DeviceStatusInfoForeground" Color="{StaticResource Color.DeviceStatusInfoForeground}"/>
     <SolidColorBrush x:Key="Brush.DeviceStatusInfoBackground" Color="{StaticResource Color.DeviceStatusInfoBackground}"/>
 
+    <SolidColorBrush x:Key="Brush.PrimaryButtonBackground" Color="{StaticResource Color.Accent}"/>
+    <SolidColorBrush x:Key="Brush.PrimaryButtonForeground" Color="{StaticResource Color.AccentForeground}"/>
+    <SolidColorBrush x:Key="Brush.AccentHoverForeground" Color="{StaticResource Color.AccentForeground}"/>
+    <SolidColorBrush x:Key="Brush.AccentPressedForeground" Color="{StaticResource Color.AccentForeground}"/>
 </ResourceDictionary>

@@ -3,7 +3,7 @@
         <ResourceDictionary Source="DesignTokens.xaml" />
     </ResourceDictionary.MergedDictionaries>
     <Style TargetType="{x:Type DatePicker}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="MinHeight" Value="{StaticResource Metric.ControlHeight}" />
+        <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight}" />
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />

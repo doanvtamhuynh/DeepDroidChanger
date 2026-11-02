@@ -22,6 +22,17 @@ namespace DeepDroidChanger
         private readonly SettingsView _settingsView;
         private readonly IViewDeviceWindowService _viewDeviceWindowService;
         private readonly ILogger<MainWindow> _logger;
+        private readonly IApplicationPreferencesService? _preferences;
+        private TaskCompletionSource<bool>? _signOutCompletion;
+        internal Task<bool> CloseForSignOutAsync()
+        {
+            if (_isCloseCleanupInProgress) return Task.FromResult(false);
+            _signOutCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task<bool> result = _signOutCompletion.Task;
+            Close();
+            return result;
+        }
+
         private bool _isClosingAfterSave;
         private bool _isCloseCleanupInProgress;
         private AppView _lastSuccessfullyDisplayedView = AppView.ChangeSingleDevice;
@@ -36,7 +47,8 @@ namespace DeepDroidChanger
             Func<ViewMultipleDevicesView> viewMultipleDevicesViewFactory,
             SettingsView settingsView,
             IViewDeviceWindowService viewDeviceWindowService,
-            ILogger<MainWindow> logger)
+            ILogger<MainWindow> logger,
+            IApplicationPreferencesService? preferences = null)
         {
             _viewModel = viewModel;
             _changeSingleDeviceViewModel = changeSingleDeviceViewModel;
@@ -48,6 +60,7 @@ namespace DeepDroidChanger
             _settingsView = settingsView;
             _viewDeviceWindowService = viewDeviceWindowService;
             _logger = logger;
+            _preferences = preferences;
 
             try
             {
@@ -61,6 +74,7 @@ namespace DeepDroidChanger
 
             Loaded += MainWindow_Loaded;
             Closing += MainWindow_Closing;
+            Closed += (_, _) => _signOutCompletion?.TrySetResult(true);
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -127,6 +141,8 @@ namespace DeepDroidChanger
             ApplicationShutdownDecision decision;
             try
             {
+                if (_preferences is not null)
+                    await _preferences.WaitForSaveAsync().ConfigureAwait(true);
                 decision = await _viewModel.PrepareShutdownAsync(CancellationToken.None)
                     .ConfigureAwait(true);
             }
@@ -134,12 +150,14 @@ namespace DeepDroidChanger
             {
                 _logger.LogError(exception, "Failed to prepare active device actions for shutdown.");
                 _isCloseCleanupInProgress = false;
+                _signOutCompletion?.TrySetResult(false);
                 return;
             }
 
             if (decision == ApplicationShutdownDecision.Canceled)
             {
                 _isCloseCleanupInProgress = false;
+                _signOutCompletion?.TrySetResult(false);
                 return;
             }
 

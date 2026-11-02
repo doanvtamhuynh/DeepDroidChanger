@@ -1,3 +1,5 @@
+using DeepDroidChanger.Models;
+using DeepDroidChanger.Helpers;
 using System.IO;
 using System.Text;
 using DeepDroidChanger.ViewDevices.Contracts;
@@ -12,9 +14,14 @@ public sealed class ViewDeviceInteractionService(
     IViewDeviceClipboardService clipboard,
     IUiDispatcherService dispatcher,
     IAdbCommandService adb,
-    ILogger<ViewDeviceInteractionService> logger) : IViewDeviceInteractionService
+    ILogger<ViewDeviceInteractionService> logger, AppSettings? settings = null) : IViewDeviceInteractionService
 {
-    private sealed class Preferences { public ViewDeviceKeyboardMode Keyboard; public bool Audio; }
+    private sealed class Preferences
+    {
+        public ViewDeviceKeyboardMode Keyboard; public bool Audio;
+        public string DefaultKeyboard = ""; public bool DefaultAudio;
+    }
+    public bool AutoReconnect => settings?.Options.AutoReconnect ?? true;
     private sealed class Registration(
         ViewDeviceInteractionService owner, ISingleViewDeviceSession session,
         Func<Task> reconnect, Action<string> report) : IDisposable
@@ -39,16 +46,46 @@ public sealed class ViewDeviceInteractionService(
 
     private Preferences GetPreferences(string serial)
     {
-        if (!preferences.TryGetValue(serial, out Preferences? value)) preferences[serial] = value = new();
+        SettingsOptions defaults = settings?.Options ?? new();
+        if (!preferences.TryGetValue(serial, out Preferences? value))
+        {
+            preferences[serial] = value = new() { DefaultAudio = !defaults.EnableAudio };
+        }
+        if (value.DefaultKeyboard != defaults.KeyboardMode)
+        {
+            value.Keyboard = defaults.KeyboardMode == "Uhid" ? ViewDeviceKeyboardMode.Uhid : ViewDeviceKeyboardMode.Sdk;
+            value.DefaultKeyboard = defaults.KeyboardMode;
+        }
+        if (value.DefaultAudio != defaults.EnableAudio)
+        {
+            value.Audio = defaults.EnableAudio;
+            value.DefaultAudio = defaults.EnableAudio;
+        }
         return value;
     }
 
     public ViewDeviceLaunchOptions PrepareOptions(ViewDeviceLaunchOptions options)
     {
+        if (settings is not null)
+            options = SettingsOptionsPolicy.LaunchOptions(options.Serial, settings.Options, options.MaxSize == ViewDeviceLaunchOptions.MultiViewMaxSize) with { NoControl = options.NoControl };
         lock (gate)
         {
             Preferences value = GetPreferences(options.Serial);
+            if (value.Audio)
+            {
+                if (audioSerial is null) audioSerial = options.Serial;
+                else if (!string.Equals(audioSerial, options.Serial, StringComparison.OrdinalIgnoreCase)) value.Audio = false;
+            }
             return options with { KeyboardMode = value.Keyboard, NoAudio = !value.Audio };
+        }
+    }
+
+    public void ReleaseOptions(string serial)
+    {
+        lock (gate)
+        {
+            if (!registrations.ContainsKey(serial) && string.Equals(audioSerial, serial, StringComparison.OrdinalIgnoreCase))
+                audioSerial = null;
         }
     }
 
@@ -75,6 +112,7 @@ public sealed class ViewDeviceInteractionService(
         {
             if (!registrations.TryGetValue(registration.Session.Serial, out Registration? current) || !ReferenceEquals(current, registration)) return;
             registrations.Remove(registration.Session.Serial);
+            if (string.Equals(audioSerial, registration.Session.Serial, StringComparison.OrdinalIgnoreCase)) audioSerial = null;
             registration.Session.ClipboardChanged -= OnClipboardChanged;
             registration.Session.FeaturesChanged -= OnFeaturesChanged;
             registration.Cancellation.Cancel();
@@ -97,6 +135,7 @@ public sealed class ViewDeviceInteractionService(
 
     private void OnClipboardChanged(object? sender, ScrcpyClipboardChangedEventArgs args)
     {
+        if (settings?.Options.SyncClipboard == false) return;
         Registration registration;
         long generation;
         lock (gate)
@@ -111,6 +150,7 @@ public sealed class ViewDeviceInteractionService(
     private async Task PublishClipboardAsync(Registration registration, long generation, string text)
     {
         CancellationToken token = registration.Cancellation.Token;
+        if (settings?.Options.SyncClipboard == false) return;
         try
         {
             await clipboardGate.WaitAsync(token).ConfigureAwait(false);
@@ -122,7 +162,7 @@ public sealed class ViewDeviceInteractionService(
                 {
                     lock (gate)
                     {
-                        if (token.IsCancellationRequested || !ReferenceEquals(active, registration) || generation != activationGeneration ||
+                        if (settings?.Options.SyncClipboard == false || token.IsCancellationRequested || !ReferenceEquals(active, registration) || generation != activationGeneration ||
                             registration.Session.State != SingleViewDeviceSessionState.Running) return false;
                         write();
                         return true;

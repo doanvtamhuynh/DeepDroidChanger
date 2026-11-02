@@ -15,7 +15,7 @@
         ShowActivated="False"
         WindowStartupLocation="Manual"
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
-        FontFamily="{StaticResource Metric.FontFamily}">
+        FontFamily="{DynamicResource Metric.FontFamily}">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -58,8 +58,8 @@
             <Style x:Key="ViewDeviceToolQuickButtonStyle"
                    TargetType="Button"
                    BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
-                <Setter Property="Height" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
-                <Setter Property="MinHeight" Value="{StaticResource Metric.ControlHeight.Comfortable}"/>
+                <Setter Property="Height" Value="{DynamicResource Metric.ControlHeight.Comfortable}"/>
+                <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight.Comfortable}"/>
                 <Setter Property="Margin" Value="{StaticResource ViewDevice.ControlCellSpacing}"/>
                 <Setter Property="Padding" Value="5,0"/>
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -90,7 +90,7 @@
                 <Setter Property="MinHeight" Value="0"/>
                 <Setter Property="Padding" Value="10,0"/>
                 <Setter Property="Margin" Value="0,0,4,0"/>
-                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+                <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Small}"/>
                 <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
             </Style>
@@ -110,8 +110,8 @@
             </Style>
 
             <Style x:Key="ViewDeviceToolTitleStyle" TargetType="TextBlock">
-                <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}"/>
-                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+                <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}"/>
+                <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
                 <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
                 <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
@@ -127,14 +127,14 @@
             <Style x:Key="ViewDeviceToolQuickTitleStyle"
                    TargetType="TextBlock"
                    BasedOn="{StaticResource ViewDeviceToolTitleStyle}">
-                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Small}"/>
+                <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Small}"/>
                 <Setter Property="HorizontalAlignment" Value="Center"/>
             </Style>
 
             <Style x:Key="ViewDeviceToolScreenQuickTitleStyle"
                    TargetType="TextBlock"
                    BasedOn="{StaticResource ViewDeviceToolQuickTitleStyle}">
-                <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Micro}"/>
+                <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Micro}"/>
                 <Setter Property="TextTrimming" Value="None"/>
             </Style>
             </ResourceDictionary>
@@ -180,7 +180,7 @@
                     <TextBlock Grid.Column="1"
                                Text="{DynamicResource ViewDevice_DeviceTools}"
                                Margin="10,0,0,0"
-                               FontSize="{StaticResource Metric.FontSize.Subtitle}"
+                               FontSize="{DynamicResource Metric.FontSize.Subtitle}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource Brush.TextPrimary}"
                                VerticalAlignment="Center"/>

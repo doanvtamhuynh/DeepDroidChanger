@@ -1,20 +1,19 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
-    <sys:String x:Key="Login_WindowTitle">DeepDroidChanger Login</sys:String>
-    <sys:String x:Key="Login_WelcomeTitle">Sign In</sys:String>
-    <sys:String x:Key="Login_Subtitle">Please sign in to your account</sys:String>
-    <sys:String x:Key="Login_UsernameLabel">Username / Email</sys:String>
+    <sys:String x:Key="Login_WindowTitle">Sign in to DeepDroidChanger</sys:String>
+    <sys:String x:Key="Login_WelcomeTitle">Sign in</sys:String>
+    <sys:String x:Key="Login_Subtitle">Test account: admin / admin</sys:String>
+    <sys:String x:Key="Login_UsernameLabel">Username</sys:String>
     <sys:String x:Key="Login_PasswordLabel">Password</sys:String>
-    <sys:String x:Key="Login_UsernameHint">Enter your username or email</sys:String>
+    <sys:String x:Key="Login_UsernameHint">Enter your username</sys:String>
     <sys:String x:Key="Login_PasswordHint">Password</sys:String>
     <sys:String x:Key="Login_TogglePasswordVisibility">Show or hide the password while you enter it. Hide it again before leaving this screen.</sys:String>
-    <sys:String x:Key="Login_RememberAccount">Remember login information</sys:String>
-    <sys:String x:Key="Login_SignInButton">Login</sys:String>
+    <sys:String x:Key="Login_RememberAccount">Remember sign-in information</sys:String>
+    <sys:String x:Key="Login_SignInButton">Sign in</sys:String>
     <sys:String x:Key="Login_SigningIn">Signing in...</sys:String>
-    <sys:String x:Key="Login_ErrorMissingFields">Please enter username/email and password.</sys:String>
-    <sys:String x:Key="Login_ErrorServiceUnavailable">Login service is currently unavailable. Please try again later.</sys:String>
-    <sys:String x:Key="Login_ErrorAuthenticationFailed">Invalid username/email or password.</sys:String>
-    <sys:String x:Key="Login_ErrorAccountSaveFailed">Login succeeded, but saved account could not be updated.</sys:String>
-    <sys:String x:Key="Login_ErrorCanceled">Login was canceled.</sys:String>
+    <sys:String x:Key="Login_ErrorMissingFields">Please enter your username and password.</sys:String>
+    <sys:String x:Key="Login_ErrorAuthenticationFailed">Invalid username or password.</sys:String>
+    <sys:String x:Key="Login_ErrorAccountSaveFailed">Sign-in succeeded, but saved sign-in information could not be updated.</sys:String>
+    <sys:String x:Key="Login_ErrorCanceled">Sign-in was canceled.</sys:String>
 </ResourceDictionary>

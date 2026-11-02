@@ -9,7 +9,10 @@ namespace DeepDroidChanger.Services;
 public sealed partial class TwrpArchiveService
 {
     internal static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
-    public string DefaultDirectory => Path.Combine(AppContext.BaseDirectory, "Backup");
+    private readonly AppSettings? _settings;
+    public TwrpArchiveService(AppSettings? settings = null) => _settings = settings;
+    public string DefaultDirectory => _settings?.Options.BackupFolder is { } path && path != "Backup"
+        ? Path.GetFullPath(path) : Path.Combine(AppContext.BaseDirectory, "Backup");
     public string EnsureDefaultDirectory()
     {
         CheckDirectory(DefaultDirectory);

@@ -1204,16 +1204,20 @@ public sealed partial class ViewDeviceViewModel
         }
     }
 
+    private string? _lastAutomaticExportPath;
+
     private string? BrowseExportFile()
     {
         string defaultName = Path.GetFileName(AndroidFilePath.TrimEnd('/', '\\'));
         if (string.IsNullOrWhiteSpace(defaultName))
             defaultName = "device-file";
 
-        string? path = _filePicker.ShowSaveFileDialog(
+        string? automaticPath = _output?.GetFilePath(false, defaultName);
+        string? path = automaticPath ?? _filePicker.ShowSaveFileDialog(
             _localization.GetString("ViewDevice_FileFilter"),
             _localization.GetString("ViewDevice_ExportTitle"),
             defaultName);
+        _lastAutomaticExportPath = automaticPath;
         if (!string.IsNullOrWhiteSpace(path))
             ComputerFilePath = path;
 
@@ -1236,16 +1240,18 @@ public sealed partial class ViewDeviceViewModel
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(ComputerFilePath))
-        {
-            BrowseExportFile();
-            if (string.IsNullOrWhiteSpace(ComputerFilePath))
-                return;
-        }
-
-        IsFileTransferBusy = true;
         try
         {
+            // Refresh generated paths for each export, while honoring an explicit
+            // destination entered by the user in the file-transfer panel.
+            if (ComputerFilePath == _lastAutomaticExportPath || string.IsNullOrWhiteSpace(ComputerFilePath))
+            {
+                BrowseExportFile();
+                if (string.IsNullOrWhiteSpace(ComputerFilePath))
+                    return;
+            }
+
+            IsFileTransferBusy = true;
             CommandResult result = await _adbCommandService
                 .PullFileAsync(
                     Serial,

@@ -37,6 +37,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
     private readonly IPollingService _pollingService;
     private readonly IUiDispatcherService _uiDispatcher;
     private readonly IViewDeviceClipboardService _clipboardService;
+    private readonly ISettingsOutputService? _output;
     private readonly IViewDeviceInteractionService? _interactionService;
     public ViewDeviceControlsViewModel Controls { get; }
     private readonly ILogger<ViewDeviceViewModel> _logger;
@@ -82,7 +83,8 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         IDeviceActionService deviceActionService,
         IPackageInstallService packageInstallService,
         IPollingService pollingService,
-        IViewDeviceInteractionService? interactionService = null)
+        IViewDeviceInteractionService? interactionService = null,
+        ISettingsOutputService? output = null)
         : this(
             sessionFactory,
             deviceTracker,
@@ -97,7 +99,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
             deviceActionService,
             packageInstallService,
             pollingService,
-            DefaultRestartDelays, interactionService: interactionService)
+            DefaultRestartDelays, interactionService: interactionService, output: output)
     {
     }
 
@@ -118,7 +120,8 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         IReadOnlyList<TimeSpan> restartDelays,
         Func<TimeSpan, CancellationToken, Task>? powerCooldownDelay = null,
         Func<TimeSpan, CancellationToken, Task>? runtimeVerificationDelay = null,
-        IViewDeviceInteractionService? interactionService = null)
+        IViewDeviceInteractionService? interactionService = null,
+        ISettingsOutputService? output = null)
     {
         _sessionFactory = sessionFactory;
         _deviceTracker = deviceTracker;
@@ -133,6 +136,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         _uiDispatcher = uiDispatcher;
         _clipboardService = clipboardService;
         _interactionService = interactionService;
+        _output = output;
         Controls = new(interactionService, clipboardService, localization, uiDispatcher, logger,
             (path, _) => InstallPackageCommand.ExecuteAsync(path));
         _logger = logger;
@@ -495,7 +499,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         return generation;
     }
 
-    private Task QueueEvaluationAsync(TimeSpan delay, bool resetRestartAttempt = false)
+    private Task QueueEvaluationAsync(TimeSpan delay, bool resetRestartAttempt = false, bool automatic = false)
     {
         lock (_evaluationSchedulingGate)
         {
@@ -513,7 +517,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
                 cancellation);
             CancelEvaluation(previous);
 
-            Task task = EvaluateAfterDelayAsync(generation, delay, cancellation);
+            Task task = EvaluateAfterDelayAsync(generation, delay, cancellation, automatic);
             _pendingEvaluationTask = task;
             return task;
         }
@@ -522,13 +526,14 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
     private async Task EvaluateAfterDelayAsync(
         int generation,
         TimeSpan delay,
-        CancellationTokenSource cancellation)
+        CancellationTokenSource cancellation,
+        bool automatic)
     {
         try
         {
             if (delay > TimeSpan.Zero)
                 await Task.Delay(delay, cancellation.Token).ConfigureAwait(false);
-            await EvaluateDeviceAsync(generation, cancellation.Token).ConfigureAwait(false);
+            await EvaluateDeviceAsync(generation, cancellation.Token, automatic).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -613,7 +618,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         }
     }
 
-    private async Task EvaluateDeviceAsync(int generation, CancellationToken cancellationToken)
+    private async Task EvaluateDeviceAsync(int generation, CancellationToken cancellationToken, bool automatic = false)
     {
         await _transitionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -671,6 +676,11 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
             if (onlineSession?.State == SingleViewDeviceSessionState.Running)
                 return;
 
+            if (automatic && _interactionService?.AutoReconnect == false)
+            {
+                await SetStateAsync(ViewDeviceSessionState.Failed, cancellationToken).ConfigureAwait(false);
+                return;
+            }
             await StartSessionAsync(generation, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -892,6 +902,10 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
                 "View Device cleanup after startup failure failed for {Serial}.",
                 Serial);
             await TryEmergencyDetachScrcpyClientAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _interactionService?.ReleaseOptions(Serial);
         }
     }
 
@@ -1302,6 +1316,11 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         int failureGeneration,
         ISingleViewDeviceSession? sourceSession = null)
     {
+        if (_interactionService?.AutoReconnect == false)
+        {
+            _ = TrySetRecoveryFailedStateAsync(failureGeneration, sourceSession);
+            return;
+        }
         try
         {
             bool exhausted = false;
@@ -1336,7 +1355,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
                     // scheduling critical section. A newer tracker event
                     // cannot slip between validating this failure and
                     // canceling/replacing its pending evaluation.
-                    _ = QueueEvaluationAsync(delay);
+                    _ = QueueEvaluationAsync(delay, automatic: true);
                 }
             }
 
@@ -1366,7 +1385,7 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
     {
         try
         {
-            _ = QueueEvaluationAsync(delay, resetRestartAttempt);
+            _ = QueueEvaluationAsync(delay, resetRestartAttempt, automatic: true);
         }
         catch (Exception exception)
         {
@@ -1633,19 +1652,19 @@ public sealed partial class ViewDeviceViewModel : ObservableObject, IAsyncDispos
         if (session is null)
             return;
 
-        string defaultName = $"{SanitizeFileName(DeviceName)}-{DateTime.Now:yyyyMMdd-HHmmss}.png";
-        string? path = _filePicker.ShowSaveFileDialog(
-            _localization.GetString("ViewDevice_ScreenshotFilter"),
-            _localization.GetString("ViewDevice_ScreenshotTitle"),
-            defaultName);
-        if (string.IsNullOrWhiteSpace(path))
-            return;
-
-        if (!ReferenceEquals(session, GetInteractiveSession()))
-            return;
-
         try
         {
+            string defaultName = $"{SanitizeFileName(DeviceName)}-{DateTime.Now:yyyyMMdd-HHmmss}.png";
+            string? path = _output?.GetFilePath(true, defaultName) ?? _filePicker.ShowSaveFileDialog(
+                _localization.GetString("ViewDevice_ScreenshotFilter"),
+                _localization.GetString("ViewDevice_ScreenshotTitle"),
+                defaultName);
+            if (string.IsNullOrWhiteSpace(path))
+                return;
+
+            if (!ReferenceEquals(session, GetInteractiveSession()))
+                return;
+
             await _screenshotService
                 .CapturePngAsync(Serial, path, _lifetimeCancellation.Token)
                 .ConfigureAwait(true);

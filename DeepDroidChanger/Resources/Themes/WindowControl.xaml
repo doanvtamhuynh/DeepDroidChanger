@@ -5,17 +5,19 @@
     <Style TargetType="{x:Type Window}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Background" Value="{DynamicResource Brush.WindowBackground}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-        <Setter Property="FontFamily" Value="Segoe UI" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
     </Style>
     <Style TargetType="{x:Type UserControl}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Background" Value="{DynamicResource Brush.WindowBackground}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-        <Setter Property="FontFamily" Value="Segoe UI" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
     </Style>
 </ResourceDictionary>

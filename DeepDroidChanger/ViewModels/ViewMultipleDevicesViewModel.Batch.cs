@@ -6,8 +6,6 @@ namespace DeepDroidChanger.ViewModels;
 
 public sealed partial class ViewMultipleDevicesViewModel
 {
-    private const int MaxConcurrentTools = 4;
-
     private sealed record ToolRequest(ToolAction Action, string Text, string Shell, string Source, string AndroidPath, string OutputRoot, Guid SessionId);
     private sealed record ToolTarget(ViewMultipleDeviceItemViewModel Item, int Index, ViewMultipleDeviceToolResultViewModel Result);
 
@@ -64,7 +62,7 @@ public sealed partial class ViewMultipleDevicesViewModel
         }
         else if (action is ToolAction.Screenshot or ToolAction.Export)
         {
-            outputRoot = _toolPicker!.ShowOpenFolderDialog(_localization.GetString("ViewMultipleDevices_OutputFolder")) ?? string.Empty;
+            outputRoot = _output?.GetFolder(action == ToolAction.Screenshot) ?? _toolPicker!.ShowOpenFolderDialog(_localization.GetString("ViewMultipleDevices_OutputFolder")) ?? string.Empty;
             if (string.IsNullOrWhiteSpace(outputRoot)) return null;
         }
         return new ToolRequest(action, InputText, AdbShellCommand.Trim(), source, AndroidFilePath.Trim(), outputRoot, Guid.NewGuid());
@@ -107,9 +105,11 @@ public sealed partial class ViewMultipleDevicesViewModel
         try
         {
             string runDirectory = request.OutputRoot.Length == 0 ? string.Empty : _toolArtifacts!.CreateRunDirectory(request.OutputRoot);
-            using SemaphoreSlim throttle = new(MaxConcurrentTools, MaxConcurrentTools);
+            SettingsOptions options = _settings?.Options ?? new();
+            using ToolBatchScheduler scheduler = new(options, cancellation.Token);
             await Task.WhenAll(targets.Select(target => Task.Run(
-                () => RunToolTargetAsync(target, request, runDirectory, throttle, cancellation.Token)))).ConfigureAwait(false);
+                () => RunToolTargetAsync(target, request, runDirectory, scheduler, cancellation.Token))))
+                .ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -169,13 +169,13 @@ public sealed partial class ViewMultipleDevicesViewModel
         ToolTarget target,
         ToolRequest request,
         string runDirectory,
-        SemaphoreSlim throttle,
+        ToolBatchScheduler scheduler,
         CancellationToken token)
     {
         bool entered = false;
         try
         {
-            await throttle.WaitAsync(token).ConfigureAwait(false);
+            await scheduler.WaitForTurnAsync().ConfigureAwait(false);
             entered = true;
             token.ThrowIfCancellationRequested();
             string? unavailable = ToolUnavailableReason(target.Item);
@@ -195,6 +195,7 @@ public sealed partial class ViewMultipleDevicesViewModel
         }
         catch (Exception exception)
         {
+            scheduler.OnTargetFailed();
             _logger.LogWarning(exception, "Multiple device {Action} failed for {Serial}.", request.Action, target.Item.Serial);
             string? unavailable = ToolUnavailableReason(target.Item);
             string statusKey = unavailable is not null ? "ViewMultipleDevices_ToolSkipped" :
@@ -207,7 +208,71 @@ public sealed partial class ViewMultipleDevicesViewModel
         finally
         {
             if (entered)
-                throttle.Release();
+                scheduler.Release();
+        }
+    }
+
+    // Scheduling state belongs to one batch. Stopping after a failure cancels
+    // queued tasks while allowing already-started device operations to finish.
+    private sealed class ToolBatchScheduler : IDisposable
+    {
+        private readonly SemaphoreSlim _concurrency;
+        private readonly SemaphoreSlim _startGate = new(1, 1);
+        private readonly CancellationTokenSource _queuedCancellation;
+        private readonly int _delayMilliseconds;
+        private readonly bool _continueOnError;
+        private long _lastStart;
+
+        public ToolBatchScheduler(SettingsOptions options, CancellationToken cancellationToken)
+        {
+            int concurrency = int.Parse(options.MaxConcurrentTools, CultureInfo.InvariantCulture);
+            _delayMilliseconds = int.Parse(options.BatchDelay, CultureInfo.InvariantCulture);
+            _continueOnError = options.ContinueOnError;
+            _concurrency = new(concurrency, concurrency);
+            _queuedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        }
+
+        public async Task WaitForTurnAsync()
+        {
+            CancellationToken token = _queuedCancellation.Token;
+            await _concurrency.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                await _startGate.WaitAsync(token).ConfigureAwait(false);
+                try
+                {
+                    int remaining = _lastStart == 0 ? 0
+                        : (int)Math.Max(0, _delayMilliseconds - (Environment.TickCount64 - _lastStart));
+                    if (remaining > 0)
+                        await Task.Delay(remaining, token).ConfigureAwait(false);
+                    token.ThrowIfCancellationRequested();
+                    _lastStart = Environment.TickCount64;
+                }
+                finally
+                {
+                    _startGate.Release();
+                }
+            }
+            catch
+            {
+                _concurrency.Release();
+                throw;
+            }
+        }
+
+        public void Release() => _concurrency.Release();
+
+        public void OnTargetFailed()
+        {
+            if (!_continueOnError)
+                _queuedCancellation.Cancel();
+        }
+
+        public void Dispose()
+        {
+            _queuedCancellation.Dispose();
+            _startGate.Dispose();
+            _concurrency.Dispose();
         }
     }
 

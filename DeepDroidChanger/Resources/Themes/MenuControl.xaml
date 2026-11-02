@@ -10,7 +10,7 @@
         <Setter Property="Padding" Value="12,8" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Style.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
                 <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />

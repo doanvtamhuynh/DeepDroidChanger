@@ -115,7 +115,7 @@
             <!-- Keep every panel header at the tallest standard control height so
                  each separator lands on the same horizontal line. -->
             <Setter Property="Height"
-                    Value="{StaticResource Metric.ControlHeight}"/>
+                    Value="{DynamicResource Metric.ControlHeight}"/>
             <!-- Leave a five-pixel breathing space between the title and line. -->
             <Setter Property="Margin" Value="0,0,0,5"/>
         </Style>
@@ -149,9 +149,9 @@
         <Style x:Key="DeviceSectionTitleTextStyle"
                TargetType="TextBlock">
             <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
+                    Value="{DynamicResource Metric.FontFamily}"/>
             <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
+                    Value="{DynamicResource Metric.FontSize.Body}"/>
             <Setter Property="FontWeight"
                     Value="SemiBold"/>
             <Setter Property="Foreground"
@@ -275,9 +275,9 @@
         <Style x:Key="DeviceActionButtonTextStyle"
                TargetType="TextBlock">
             <Setter Property="FontFamily"
-                    Value="{StaticResource Metric.FontFamily}"/>
+                    Value="{DynamicResource Metric.FontFamily}"/>
             <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Small}"/>
+                    Value="{DynamicResource Metric.FontSize.Small}"/>
             <Setter Property="FontWeight"
                     Value="SemiBold"/>
             <Setter Property="TextWrapping"
@@ -322,14 +322,14 @@
     </Style>
 
     <Style x:Key="DeviceLoadCountTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}"/>
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Margin" Value="10,0,0,0"/>
     </Style>
 
     <Style x:Key="DeviceFilterLabelStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}"/>
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>

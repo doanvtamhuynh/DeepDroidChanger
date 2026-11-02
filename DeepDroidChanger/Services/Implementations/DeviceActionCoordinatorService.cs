@@ -6,6 +6,18 @@ namespace DeepDroidChanger.Services;
 public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorService
 {
     private readonly object _syncRoot = new();
+    private bool _signingOut;
+
+    public bool TryBeginSignOut()
+    {
+        lock (_syncRoot)
+        {
+            if (_signingOut || _activeOperations.Count != 0) return false;
+            _signingOut = true;
+            return true;
+        }
+    }
+    public void CancelSignOut() { lock (_syncRoot) _signingOut = false; }
     private readonly Dictionary<string, ActiveDeviceAction> _activeOperations =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<DeviceActionOperationSnapshot> _pendingNotifications = new();
@@ -76,7 +88,7 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         bool shouldPublish;
         lock (_syncRoot)
         {
-            if (_activeOperations.ContainsKey(normalizedSerial))
+            if (_signingOut || _activeOperations.ContainsKey(normalizedSerial))
             {
                 operation.DisposeResources();
                 return null;

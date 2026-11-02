@@ -1,50 +1,939 @@
-
 <UserControl x:Class="DeepDroidChanger.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="Transparent">
-
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             Background="Transparent" SizeChanged="OnSizeChanged"
+             FontFamily="{DynamicResource Metric.FontFamily}"
+             UseLayoutRounding="True">
     <UserControl.Resources>
+        <Style x:Key="SettingsBodyStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}"/>
+            <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}"/><Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="SettingsHeadingStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsBodyStyle}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+        </Style>
+        <Style x:Key="SettingsSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsHeadingStyle}">
+            <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Subtitle}"/>
+        </Style>
+        <Style x:Key="SettingsCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsBodyStyle}">
+            <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Small}"/>
+        </Style>
+        <Style x:Key="SettingsCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource Metric.BorderThickness.Uniform}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource Radius.Large}"/>
+            <Setter Property="Padding" Value="{StaticResource Spacing.CardPadding}"/>
+        </Style>
+        <Style x:Key="SettingsSectionIconStyle" TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+        <Style x:Key="SettingsDividerStyle" TargetType="Border">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource Brush.Border}"/>
+            <Setter Property="Margin" Value="0,20,0,20"/>
+            <Setter Property="Opacity" Value="0.6"/>
+        </Style>
+        <Style x:Key="SettingsThemeCardStyle" TargetType="RadioButton" BasedOn="{StaticResource CardRadioButtonStyle}">
+            <Setter Property="Padding" Value="{StaticResource Spacing.CardPadding.Compact}"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Card" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="2"
+                                Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Medium}"
+                                Padding="{TemplateBinding Padding}">
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Stretch"/>
+                                <Border x:Name="SelectedBadge" Visibility="Collapsed" Width="24" Height="24"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
+                                        CornerRadius="{StaticResource Radius.Circle}" Background="{DynamicResource Brush.Accent}">
+                                    <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
+                                                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                             Foreground="{DynamicResource Brush.AccentForeground}"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/>
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource Brush.BorderStrong}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                                <Setter TargetName="SelectedBadge" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="{DynamicResource Brush.SurfacePressed}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Card" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <ControlTemplate x:Key="SettingsThemePreviewTemplate" TargetType="ContentControl">
+            <Border Height="92" CornerRadius="{StaticResource Radius.Small}" Background="{DynamicResource Brush.WindowBackground}"
+                    BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" ClipToBounds="True" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Background="{DynamicResource Brush.SurfaceAlt}" CornerRadius="{StaticResource Radius.Small}">
+                        <StackPanel Margin="9,12">
+                            <Border Height="10" Width="10" HorizontalAlignment="Left" CornerRadius="{StaticResource Radius.ExtraSmall}"
+                                    Background="{DynamicResource Brush.Accent}" Margin="0,0,0,12"/>
+                            <Border Height="4" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="2" Margin="0,0,0,7"/>
+                            <Border Height="4" Background="{DynamicResource Brush.Accent}" CornerRadius="2" Margin="0,0,0,7"/>
+                            <Border Height="4" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="2"/>
+                        </StackPanel>
+                    </Border>
+                    <Grid Grid.Column="1" Margin="12">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <Border Height="6" Width="54" HorizontalAlignment="Left" Background="{DynamicResource Brush.TextPrimary}"
+                                Opacity="0.75" CornerRadius="2" Margin="0,0,0,10"/>
+                        <Border Grid.Row="1" Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Border}"
+                                BorderThickness="1" CornerRadius="{StaticResource Radius.ExtraSmall}" Padding="8">
+                            <StackPanel>
+                                <Border Height="4" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="2" Margin="0,0,16,8"/>
+                                <Border Height="4" Background="{DynamicResource Brush.Border}" CornerRadius="2" Margin="0,0,32,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+        </ControlTemplate>
+        <Style x:Key="SettingsToggleStyle" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="44" Height="26" Background="Transparent">
+                            <Border x:Name="Track" Background="{DynamicResource Brush.SurfacePressed}" BorderBrush="{DynamicResource Brush.BorderStrong}"
+                                    BorderThickness="1" CornerRadius="{StaticResource Radius.Circle}"/>
+                            <Ellipse x:Name="Thumb" Width="18" Height="18" Fill="{DynamicResource Brush.TextSecondary}"
+                                     HorizontalAlignment="Left" Margin="4,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Thumb" Property="Fill" Value="{DynamicResource Brush.AccentForeground}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource Brush.AccentPressed}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                                <Setter TargetName="Track" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SettingsStatusIconStyle" TargetType="materialDesign:PackIcon">
+            <Setter Property="Kind" Value="CheckCircleOutline"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="Width" Value="18"/><Setter Property="Height" Value="18"/>
+            <Setter Property="VerticalAlignment" Value="Top"/><Setter Property="Margin" Value="0,2,10,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasChanges}" Value="True">
+                    <Setter Property="Kind" Value="CircleEditOutline"/>
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsSaving}" Value="True"><Setter Property="Kind" Value="ContentSaveOutline"/></DataTrigger>
+                <DataTrigger Binding="{Binding HasError}" Value="True">
+                    <Setter Property="Kind" Value="AlertCircleOutline"/>
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SettingsStatusStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsHeadingStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasError}" Value="True"><Setter Property="Foreground" Value="{DynamicResource Brush.Danger}"/></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SettingsDraftStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsCaptionStyle}">
+            <Setter Property="Margin" Value="0,4,0,0"/><Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasChanges}" Value="True"/>
 
-        <Style x:Key="SettingsPlaceholderTitleTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource AppTitleTextStyle}">
-            <Setter Property="FontSize"
-                    Value="{StaticResource Metric.FontSize.Body}"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility" Value="Visible"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SettingsButtonTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsHeadingStyle}">
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+        </Style>
+        <Style x:Key="SettingsDraftChoiceStyle" TargetType="ComboBox" BasedOn="{StaticResource FlatComboBoxStyle}">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+
         </Style>
 
-        <Style x:Key="SettingsDescriptionTextStyle"
-               TargetType="TextBlock"
-               BasedOn="{StaticResource AppLabelTextStyle}">
-            <Setter Property="TextWrapping"
-                    Value="Wrap"/>
-            <Setter Property="Margin"
-                    Value="0,8,0,0"/>
+        <Style x:Key="SettingsAppearanceOnlyStyle" TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers><DataTrigger Binding="{Binding SelectedSection}" Value="Appearance"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="SettingsNavItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="{StaticResource Spacing.ItemPadding}"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Tab" Padding="{TemplateBinding Padding}" BorderThickness="1" BorderBrush="Transparent"
+                                Background="Transparent" CornerRadius="{StaticResource Radius.Medium}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Tab" Property="Background" Value="{DynamicResource Brush.SurfaceHover}"/></Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Tab" Property="Background" Value="{DynamicResource Brush.SurfaceSelected}"/>
+                                <Setter TargetName="Tab" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Tab" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Tab" Property="Opacity" Value="0.5"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+<BooleanToVisibilityConverter x:Key="SettingsBooleanToVisibility"/>
+        <DataTemplate x:Key="SettingsButtonLabelTemplate">
+            <TextBlock Text="{Binding}" Style="{StaticResource SettingsButtonTextStyle}"/>
+        </DataTemplate>
+        <Style x:Key="SettingsColorErrorStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsCaptionStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}"/>
+        </Style>
+        <Style x:Key="SettingsSliderRepeatStyle" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value><ControlTemplate TargetType="RepeatButton">
+                    <Grid Background="Transparent"><Border Height="4" Background="{TemplateBinding Background}" VerticalAlignment="Center" CornerRadius="{StaticResource Radius.Circle}"/></Grid>
+                </ControlTemplate></Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SettingsFontSizeSliderStyle" TargetType="Slider">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="SmallChange" Value="1"/>
+            <Setter Property="LargeChange" Value="2"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Border x:Name="FocusBorder" BorderBrush="Transparent" BorderThickness="1" CornerRadius="{StaticResource Radius.Medium}">
+                            <Track x:Name="PART_Track" Margin="8,0" Orientation="Horizontal" IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
+                                   Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                                   Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <Track.DecreaseRepeatButton><RepeatButton Command="{x:Static Slider.DecreaseLarge}" Background="{DynamicResource Brush.Accent}" Style="{StaticResource SettingsSliderRepeatStyle}"/></Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="16" Height="16">
+                                        <Thumb.Style>
+                                            <Style TargetType="Thumb">
+                                                <Setter Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                                                <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Thumb">
+                                                    <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Brush.Surface}" BorderThickness="2" CornerRadius="{StaticResource Radius.Circle}"/>
+                                                </ControlTemplate></Setter.Value></Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource Brush.AccentHover}"/></Trigger>
+                                                    <Trigger Property="IsDragging" Value="True"><Setter Property="Background" Value="{DynamicResource Brush.AccentPressed}"/></Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton><RepeatButton Command="{x:Static Slider.IncreaseLarge}" Background="{DynamicResource Brush.Border}" Style="{StaticResource SettingsSliderRepeatStyle}"/></Track.IncreaseRepeatButton>
+                            </Track>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="FocusBorder" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="FocusBorder" Property="Opacity" Value="0.5"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SettingsSampleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingsBodyStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
+            <Setter Property="FontFamily" Value="{Binding Draft.Appearance.FontFamily}"/>
+            <Setter Property="FontSize" Value="{Binding Draft.Appearance.FontSize}"/>
+            <Setter Property="FontWeight" Value="{Binding Draft.Appearance.SampleFontWeight}"/>
+            <Setter Property="FontStyle" Value="{Binding Draft.Appearance.SampleFontStyle}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Draft.Appearance.HasCustomTextColor}" Value="True">
+                    <Setter Property="Foreground" Value="{Binding Draft.Appearance.TextBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SettingsSampleButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Height" Value="{Binding Draft.Appearance.ButtonHeight}"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="FontFamily" Value="{Binding Draft.Appearance.FontFamily}"/>
+            <Setter Property="FontSize" Value="{Binding Draft.Appearance.FontSize}"/>
+            <Setter Property="FontWeight" Value="{Binding Draft.Appearance.SampleFontWeight}"/>
+            <Setter Property="FontStyle" Value="{Binding Draft.Appearance.SampleFontStyle}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   FontStyle="{Binding FontStyle, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="SampleBorder" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{StaticResource Radius.Medium}" Background="Transparent">
+                            <Grid>
+                                <Border x:Name="SampleFill" Background="{TemplateBinding Background}" CornerRadius="{StaticResource Radius.Medium}"/>
+                                <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Draft.Appearance.ButtonVariant}" Value="Soft"><Setter TargetName="SampleFill" Property="Opacity" Value="0.14"/></DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SampleBorder" Property="Opacity" Value="0.88"/></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="SampleBorder" Property="Opacity" Value="0.7"/></Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="SampleBorder" Property="BorderBrush" Value="{DynamicResource Brush.Focus}"/>
+                                <Setter TargetName="SampleBorder" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="SampleBorder" Property="Opacity" Value="0.5"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Draft.Appearance.HasCustomButtonColor}" Value="True">
+                    <Setter Property="Background" Value="{Binding Draft.Appearance.ButtonBrush}"/>
+                    <Setter Property="BorderBrush" Value="{Binding Draft.Appearance.ButtonBrush}"/>
+                    <Setter Property="Foreground" Value="{Binding Draft.Appearance.ButtonForeground}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Draft.Appearance.ButtonVariant}" Value="Outlined">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Draft.Appearance.ButtonVariant}" Value="Soft">
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Draft.Appearance.HasCustomButtonColor}" Value="True"/>
+                        <Condition Binding="{Binding Draft.Appearance.ButtonVariant}" Value="Outlined"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Foreground" Value="{Binding Draft.Appearance.ButtonTextBrush}"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding Draft.Appearance.HasCustomButtonColor}" Value="True"/>
+                        <Condition Binding="{Binding Draft.Appearance.ButtonVariant}" Value="Soft"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Foreground" Value="{Binding Draft.Appearance.ButtonTextBrush}"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Grid Style="{StaticResource PageRootGridStyle}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"
-                           MinHeight="{StaticResource Metric.ToolbarMinHeight}"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0"
-                   Text="{DynamicResource Settings_Title}"
-                   Style="{StaticResource PageHeaderTextStyle}"/>
-
-        <GroupBox Grid.Row="1"
-                  Header="{DynamicResource Settings_GeneralHeader}"
-                  Style="{StaticResource PagePanelGroupBoxStyle}"
-                  Margin="0,16,0,0"
-                  MaxWidth="520"
-                  HorizontalAlignment="Left">
-            <StackPanel>
-                <TextBlock Text="{DynamicResource Settings_PlaceholderTitle}"
-                           Style="{StaticResource SettingsPlaceholderTitleTextStyle}"/>
-                <TextBlock Text="{DynamicResource Settings_PlaceholderDescription}"
-                           Style="{StaticResource SettingsDescriptionTextStyle}"/>
+    <Grid Margin="{StaticResource Spacing.PageMargin}">
+        <Grid MaxWidth="1100" Margin="{StaticResource Spacing.PageMargin}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="0,0,0,20">
+                <TextBlock Text="{DynamicResource Settings_Title}" Foreground="{DynamicResource Brush.TextPrimary}"
+                           FontFamily="{DynamicResource Metric.FontFamily}" FontSize="{DynamicResource Metric.FontSize.Display}" FontWeight="Bold"/>
+                <TextBlock Text="{DynamicResource Settings_Description}" Style="{StaticResource SettingsBodyStyle}" Margin="0,8,0,0"/>
             </StackPanel>
-        </GroupBox>
+            <ListBox x:Name="SettingsSections" Grid.Row="1" SelectedValuePath="Tag" SelectedValue="{Binding SelectedSection, Mode=TwoWay}"
+                     Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,0,14"
+                     ItemContainerStyle="{StaticResource SettingsNavItemStyle}" IsEnabled="{Binding CanEdit}"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="{DynamicResource Settings_Sections}">
+                <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
+                <ListBoxItem Tag="Appearance" Content="{DynamicResource Settings_AppearanceHeader}">
+                    <ListBoxItem.ContentTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="PaletteOutline" Width="18" Height="18" Margin="0,0,8,0"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="{Binding}" Style="{StaticResource SettingsHeadingStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBoxItem.ContentTemplate>
+                </ListBoxItem>
+                <ListBoxItem Tag="Account" Content="{DynamicResource Settings_Account}">
+                    <ListBoxItem.ContentTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="AccountOutline" Width="18" Height="18" Margin="0,0,8,0"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="{Binding}" Style="{StaticResource SettingsHeadingStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBoxItem.ContentTemplate>
+                </ListBoxItem>
+                <ListBoxItem Tag="DeviceView" Content="{DynamicResource Settings_DeviceView}">
+                    <ListBoxItem.ContentTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="CellphoneLink" Width="18" Height="18" Margin="0,0,8,0"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="{Binding}" Style="{StaticResource SettingsHeadingStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBoxItem.ContentTemplate>
+                </ListBoxItem>
+                <ListBoxItem Tag="Batch" Content="{DynamicResource Settings_Batch}">
+                    <ListBoxItem.ContentTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ViewGridOutline" Width="18" Height="18" Margin="0,0,8,0"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="{Binding}" Style="{StaticResource SettingsHeadingStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBoxItem.ContentTemplate>
+                </ListBoxItem>
+                <ListBoxItem Tag="Storage" Content="{DynamicResource Settings_Storage}">
+                    <ListBoxItem.ContentTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="FolderOutline" Width="18" Height="18" Margin="0,0,8,0"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                                <TextBlock Text="{Binding}" Style="{StaticResource SettingsHeadingStyle}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBoxItem.ContentTemplate>
+                </ListBoxItem>
+
+            </ListBox>
+            <ScrollViewer x:Name="SettingsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" IsEnabled="{Binding CanEdit}">
+                <Grid VerticalAlignment="Top" Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="AboutColumn" Width="288"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <StackPanel x:Name="AppearancePanel" Style="{StaticResource SettingsAppearanceOnlyStyle}">
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="PaletteOutline" Style="{StaticResource SettingsSectionIconStyle}"/>
+                                    <TextBlock Text="{DynamicResource Settings_AppearanceHeader}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="{DynamicResource Settings_StylingShortcut}" Click="OnShowStylingClick"
+                                        Style="{StaticResource FlatButtonStyle}" ContentTemplate="{StaticResource SettingsButtonLabelTemplate}"/>
+                            </Grid>
+                            <StackPanel IsEnabled="{Binding CanEdit}">
+                                <TextBlock x:Name="ThemeLabel" Text="{DynamicResource Settings_ThemeLabel}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_ThemeDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,14"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <RadioButton x:Name="LightThemeChoice" GroupName="SettingsTheme" IsChecked="{Binding IsLightThemeSelected, Mode=TwoWay}"
+                                                 AutomationProperties.Name="{DynamicResource Settings_ThemeLight}" AutomationProperties.LabeledBy="{Binding ElementName=ThemeLabel}"
+                                                 ToolTip="{DynamicResource Settings_ChoiceTooltip}" Style="{StaticResource SettingsThemeCardStyle}">
+                                        <StackPanel>
+                                            <ContentControl Template="{StaticResource SettingsThemePreviewTemplate}" Focusable="False" IsHitTestVisible="False">
+                                                <ContentControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries>
+                                                    <ResourceDictionary Source="../../Resources/Themes/Theme.Light.xaml"/>
+                                                </ResourceDictionary.MergedDictionaries></ResourceDictionary></ContentControl.Resources>
+                                            </ContentControl>
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="WhiteBalanceSunny" Width="16" Height="16" Foreground="{DynamicResource Brush.TextPrimary}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{DynamicResource Settings_ThemeLight}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </RadioButton>
+                                    <RadioButton x:Name="DarkThemeChoice" Grid.Column="2" GroupName="SettingsTheme" IsChecked="{Binding IsDarkThemeSelected, Mode=TwoWay}"
+                                                 AutomationProperties.Name="{DynamicResource Settings_ThemeDark}" AutomationProperties.LabeledBy="{Binding ElementName=ThemeLabel}"
+                                                 ToolTip="{DynamicResource Settings_ChoiceTooltip}" Style="{StaticResource SettingsThemeCardStyle}">
+                                        <StackPanel>
+                                            <ContentControl Template="{StaticResource SettingsThemePreviewTemplate}" Focusable="False" IsHitTestVisible="False">
+                                                <ContentControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries>
+                                                    <ResourceDictionary Source="../../Resources/Themes/Theme.Dark.xaml"/>
+                                                </ResourceDictionary.MergedDictionaries></ResourceDictionary></ContentControl.Resources>
+                                            </ContentControl>
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="WeatherNight" Width="16" Height="16" Foreground="{DynamicResource Brush.TextPrimary}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{DynamicResource Settings_ThemeDark}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </RadioButton>
+                                </Grid>
+                                <Border Style="{StaticResource SettingsDividerStyle}"/>
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel>
+                                        <TextBlock x:Name="LanguageLabel" Text="{DynamicResource Settings_LanguageLabel}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                        <TextBlock Text="{DynamicResource Settings_LanguageDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,12"/>
+                                    </StackPanel>
+                                    <ComboBox x:Name="LanguageChoice" Grid.Row="1" SelectedValuePath="Tag"
+                                              SelectedValue="{Binding SelectedLanguage, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              AutomationProperties.LabeledBy="{Binding ElementName=LanguageLabel}"
+                                              ToolTip="{DynamicResource Settings_ChoiceTooltip}" HorizontalContentAlignment="Left"
+                                              Style="{StaticResource FlatComboBoxStyle}" FocusVisualStyle="{StaticResource AppFocusVisualStyle}">
+                                        <ComboBoxItem Tag="en" Content="English"/>
+                                        <ComboBoxItem Tag="vi" Content="Tiếng Việt"/>
+                                    </ComboBox>
+                                </Grid>
+                                <Border Style="{StaticResource SettingsDividerStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,16,0">
+                                        <TextBlock x:Name="SidebarLabel" Text="{DynamicResource Settings_CollapseSidebar}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                        <TextBlock Text="{DynamicResource Settings_SidebarDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <CheckBox x:Name="SidebarChoice" Grid.Column="1" IsChecked="{Binding IsSidebarCollapsed, Mode=TwoWay}"
+                                              AutomationProperties.LabeledBy="{Binding ElementName=SidebarLabel}"
+                                              ToolTip="{DynamicResource Settings_ChoiceTooltip}" Style="{StaticResource SettingsToggleStyle}"/>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+<Border x:Name="StylingPanel" Style="{StaticResource SettingsCardStyle}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <materialDesign:PackIcon Kind="FormatPaint" Style="{StaticResource SettingsSectionIconStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_StylingTitle}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                            </StackPanel>
+                            <Border Background="{DynamicResource Brush.BadgeInfoBackground}" Padding="{StaticResource Spacing.CardPadding.Compact}"
+                                    CornerRadius="{StaticResource Radius.Small}" Margin="0,8,0,20">
+                                <TextBlock Text="{DynamicResource Settings_StylingPreviewNotice}" Style="{StaticResource SettingsCaptionStyle}"/>
+                            </Border>
+                            <Grid x:Name="StylingFields">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <StackPanel x:Name="StyleButtonColorField" Grid.Row="0" Grid.Column="0" Margin="0,0,16,16"><TextBlock x:Name="StyleButtonColorChoiceLabel" Text="{DynamicResource Settings_ButtonColor}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,8"/>
+<ComboBox x:Name="StyleButtonColorChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.Appearance.SelectedButtonColor, Mode=TwoWay}"
+AutomationProperties.LabeledBy="{Binding ElementName=StyleButtonColorChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}"><ComboBoxItem Tag="Theme" Content="{DynamicResource Settings_ColorTheme}"/>
+<ComboBoxItem Tag="Blue" Content="{DynamicResource Settings_ColorBlue}"/>
+<ComboBoxItem Tag="Purple" Content="{DynamicResource Settings_ColorPurple}"/>
+<ComboBoxItem Tag="Teal" Content="{DynamicResource Settings_ColorTeal}"/>
+<ComboBoxItem Tag="Orange" Content="{DynamicResource Settings_ColorOrange}"/>
+<ComboBoxItem Tag="Rose" Content="{DynamicResource Settings_ColorRose}"/>
+<ComboBoxItem Tag="Custom" Content="{DynamicResource Settings_ColorCustom}"/></ComboBox>
+<StackPanel Margin="0,10,0,0" Visibility="{Binding Draft.Appearance.IsCustomButtonSelection, Converter={StaticResource SettingsBooleanToVisibility}}">
+    <TextBlock x:Name="CustomButtonHexLabel" Text="{DynamicResource Settings_HexColor}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,0,0,6"/>
+    <TextBox x:Name="CustomButtonHexInput" Text="{Binding Draft.Appearance.CustomButtonHex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+             MaxLength="7" AutomationProperties.LabeledBy="{Binding ElementName=CustomButtonHexLabel}"/>
+    <TextBlock Text="{DynamicResource Settings_InvalidColor}" Style="{StaticResource SettingsColorErrorStyle}" Margin="0,6,0,0"
+               Visibility="{Binding Draft.Appearance.IsButtonColorInvalid, Converter={StaticResource SettingsBooleanToVisibility}}"/>
+</StackPanel></StackPanel>
+<StackPanel x:Name="StyleTextColorField" Grid.Row="0" Grid.Column="1" Margin="0,0,16,16"><TextBlock x:Name="StyleTextColorChoiceLabel" Text="{DynamicResource Settings_TextColor}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,8"/>
+<ComboBox x:Name="StyleTextColorChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.Appearance.SelectedTextColor, Mode=TwoWay}"
+AutomationProperties.LabeledBy="{Binding ElementName=StyleTextColorChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}"><ComboBoxItem Tag="Theme" Content="{DynamicResource Settings_ColorTheme}"/>
+<ComboBoxItem Tag="Blue" Content="{DynamicResource Settings_ColorBlue}"/>
+<ComboBoxItem Tag="Purple" Content="{DynamicResource Settings_ColorPurple}"/>
+<ComboBoxItem Tag="Teal" Content="{DynamicResource Settings_ColorTeal}"/>
+<ComboBoxItem Tag="Orange" Content="{DynamicResource Settings_ColorOrange}"/>
+<ComboBoxItem Tag="Rose" Content="{DynamicResource Settings_ColorRose}"/>
+<ComboBoxItem Tag="Custom" Content="{DynamicResource Settings_ColorCustom}"/></ComboBox>
+<StackPanel Margin="0,10,0,0" Visibility="{Binding Draft.Appearance.IsCustomTextSelection, Converter={StaticResource SettingsBooleanToVisibility}}">
+    <TextBlock x:Name="CustomTextHexLabel" Text="{DynamicResource Settings_HexColor}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,0,0,6"/>
+    <TextBox x:Name="CustomTextHexInput" Text="{Binding Draft.Appearance.CustomTextHex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+             MaxLength="7" AutomationProperties.LabeledBy="{Binding ElementName=CustomTextHexLabel}"/>
+    <TextBlock Text="{DynamicResource Settings_InvalidColor}" Style="{StaticResource SettingsColorErrorStyle}" Margin="0,6,0,0"
+               Visibility="{Binding Draft.Appearance.IsTextColorInvalid, Converter={StaticResource SettingsBooleanToVisibility}}"/>
+</StackPanel></StackPanel>
+<StackPanel x:Name="StyleFontFamilyField" Grid.Row="1" Grid.Column="0" Margin="0,0,16,16"><TextBlock x:Name="StyleFontFamilyChoiceLabel" Text="{DynamicResource Settings_FontFamily}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,8"/>
+<ComboBox x:Name="StyleFontFamilyChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.Appearance.FontFamily, Mode=TwoWay}"
+AutomationProperties.LabeledBy="{Binding ElementName=StyleFontFamilyChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}"><ComboBoxItem Tag="Segoe UI Variable, Segoe UI" Content="Segoe UI Variable"/>
+<ComboBoxItem Tag="Segoe UI" Content="Segoe UI"/>
+<ComboBoxItem Tag="Arial" Content="Arial"/>
+<ComboBoxItem Tag="Tahoma" Content="Tahoma"/>
+<ComboBoxItem Tag="Consolas" Content="Consolas"/></ComboBox></StackPanel>
+<StackPanel x:Name="StyleTypeStyleField" Grid.Row="1" Grid.Column="1" Margin="0,0,16,16"><TextBlock x:Name="StyleTypeStyleChoiceLabel" Text="{DynamicResource Settings_TypeStyle}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,8"/>
+<ComboBox x:Name="StyleTypeStyleChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.Appearance.TypeStyle, Mode=TwoWay}"
+AutomationProperties.LabeledBy="{Binding ElementName=StyleTypeStyleChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}"><ComboBoxItem Tag="Regular" Content="{DynamicResource Settings_TypeRegular}"/>
+<ComboBoxItem Tag="Semibold" Content="{DynamicResource Settings_TypeSemibold}"/>
+<ComboBoxItem Tag="Bold" Content="{DynamicResource Settings_TypeBold}"/>
+<ComboBoxItem Tag="Italic" Content="{DynamicResource Settings_TypeItalic}"/>
+<ComboBoxItem Tag="BoldItalic" Content="{DynamicResource Settings_TypeBoldItalic}"/></ComboBox></StackPanel>
+<StackPanel x:Name="StyleFontSizeField" Grid.Row="2" Grid.Column="0" Margin="0,0,16,16"><Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+<TextBlock x:Name="StyleFontSizeLabel" Text="{DynamicResource Settings_FontSize}" Style="{StaticResource SettingsHeadingStyle}"/>
+<TextBlock Grid.Column="1" Text="{Binding Draft.Appearance.FontSize, StringFormat={}{0:0}}" Style="{StaticResource SettingsHeadingStyle}"/></Grid>
+<Slider x:Name="StyleFontSizeSlider" Style="{StaticResource SettingsFontSizeSliderStyle}" Minimum="12" Maximum="22" TickFrequency="1" IsSnapToTickEnabled="True"
+        Value="{Binding Draft.Appearance.FontSize, Mode=TwoWay}" Height="40" VerticalAlignment="Center" AutomationProperties.LabeledBy="{Binding ElementName=StyleFontSizeLabel}"/></StackPanel>
+<StackPanel x:Name="StyleButtonSizeField" Grid.Row="2" Grid.Column="1" Margin="0,0,16,16"><TextBlock x:Name="StyleButtonSizeChoiceLabel" Text="{DynamicResource Settings_ButtonSize}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,8"/>
+<ComboBox x:Name="StyleButtonSizeChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.Appearance.ButtonSize, Mode=TwoWay}"
+AutomationProperties.LabeledBy="{Binding ElementName=StyleButtonSizeChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}"><ComboBoxItem Tag="Compact" Content="{DynamicResource Settings_SizeCompact}"/>
+<ComboBoxItem Tag="Comfortable" Content="{DynamicResource Settings_SizeComfortable}"/>
+<ComboBoxItem Tag="Large" Content="{DynamicResource Settings_SizeLarge}"/></ComboBox></StackPanel>
+<StackPanel x:Name="StyleButtonVariantField" Grid.Row="3" Grid.Column="0" Margin="0,0,16,16"><TextBlock x:Name="StyleButtonVariantChoiceLabel" Text="{DynamicResource Settings_ButtonVariant}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,8"/>
+<ComboBox x:Name="StyleButtonVariantChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.Appearance.ButtonVariant, Mode=TwoWay}"
+AutomationProperties.LabeledBy="{Binding ElementName=StyleButtonVariantChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}"><ComboBoxItem Tag="Filled" Content="{DynamicResource Settings_ButtonFilled}"/>
+<ComboBoxItem Tag="Outlined" Content="{DynamicResource Settings_ButtonOutlined}"/>
+<ComboBoxItem Tag="Soft" Content="{DynamicResource Settings_ButtonSoft}"/></ComboBox></StackPanel>
+                            </Grid>
+                            <Border x:Name="StylingSample" Background="{DynamicResource Brush.SurfaceAlt}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Spacing.CardPadding}" Margin="0,4,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource Settings_SampleTitle}" Style="{StaticResource SettingsSampleTextStyle}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{DynamicResource Settings_SampleDescription}" Style="{StaticResource SettingsSampleTextStyle}" Margin="0,0,0,16"/>
+                                    <Button x:Name="StyleSampleButton" HorizontalAlignment="Left" Style="{StaticResource SettingsSampleButtonStyle}"
+                                            Content="{DynamicResource Settings_SampleButton}" ToolTip="{DynamicResource Settings_SampleButtonTooltip}"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="{DynamicResource Settings_ButtonContrastNotice}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,0,0,12"/>
+                            <Button HorizontalAlignment="Left" Command="{Binding Draft.Appearance.ResetCommand}" Style="{StaticResource FlatButtonStyle}"
+                                    Content="{DynamicResource Settings_ResetStyling}" ContentTemplate="{StaticResource SettingsButtonLabelTemplate}"/>
+                        </StackPanel>
+                    </Border>
+                    </StackPanel>
+<Border x:Name="AccountPanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource SettingsCardStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding SelectedSection}" Value="Account"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <materialDesign:PackIcon Kind="AccountOutline" Style="{StaticResource SettingsSectionIconStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_Account}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource Settings_AccountDescription}" Style="{StaticResource SettingsBodyStyle}" Margin="0,0,0,20"/>
+                            <Border Background="{DynamicResource Brush.SurfaceAlt}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Spacing.CardPadding}" Margin="0,0,0,20">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <Border Width="56" Height="56" Background="{DynamicResource Brush.BadgeInfoBackground}" CornerRadius="{StaticResource Radius.Circle}" Margin="0,0,16,0">
+                                        <materialDesign:PackIcon Kind="Account" Width="32" Height="32" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AccountName}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                                        <TextBlock Text="{DynamicResource Settings_LocalTestAccount}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="{DynamicResource Settings_LoginName}" Style="{StaticResource SettingsCaptionStyle}"/>
+                            <TextBlock Text="{Binding AccountUsername}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,6,0,20"/>
+                            <TextBlock x:Name="AccountDisplayNameLabel" Text="{DynamicResource Settings_DisplayName}" Style="{StaticResource SettingsHeadingStyle}"/>
+                            <TextBlock Text="{DynamicResource Settings_DisplayNameDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                            <TextBox x:Name="AccountDisplayNameInput" Text="{Binding Draft.AccountDisplayName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     MaxLength="64" AutomationProperties.LabeledBy="{Binding ElementName=AccountDisplayNameLabel}"/>
+                            <Border Style="{StaticResource SettingsDividerStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock x:Name="RememberAccountLabel" Text="{DynamicResource Settings_RememberAccount}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                    <TextBlock Text="{DynamicResource Settings_RememberAccountDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="RememberAccountChoice" Grid.Column="1" IsChecked="{Binding Draft.RememberAccount, Mode=TwoWay}"
+                                          Style="{StaticResource SettingsToggleStyle}" AutomationProperties.LabeledBy="{Binding ElementName=RememberAccountLabel}"/>
+                            </Grid>
+                            <Border Style="{StaticResource SettingsDividerStyle}"/>
+                            <TextBlock Text="{DynamicResource Settings_AccountActions}" Style="{StaticResource SettingsHeadingStyle}" Margin="0,0,0,12"/>
+                            <WrapPanel>
+                                <Button Content="{DynamicResource Settings_SignOut}" Command="{Binding SignOutCommand}" Style="{StaticResource FlatButtonStyle}" Margin="0,0,12,8"
+                                        ContentTemplate="{StaticResource SettingsButtonLabelTemplate}" ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="{DynamicResource Settings_AccountActionsNotice}"/>
+                                <Button Content="{DynamicResource Settings_ForgetAccount}" Command="{Binding ForgetAccountCommand}" Style="{StaticResource FlatButtonStyle}" Margin="0,0,0,8"
+                                        ContentTemplate="{StaticResource SettingsButtonLabelTemplate}" ToolTipService.ShowOnDisabled="True"
+                                        ToolTip="{DynamicResource Settings_AccountActionsNotice}"/>
+                            </WrapPanel>
+                            <TextBlock Text="{DynamicResource Settings_AccountActionsNotice}" Style="{StaticResource SettingsCaptionStyle}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="DeviceViewPanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource SettingsCardStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding SelectedSection}" Value="DeviceView"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <materialDesign:PackIcon Kind="CellphoneLink" Style="{StaticResource SettingsSectionIconStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_DeviceView}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource Settings_DeviceViewDescription}" Style="{StaticResource SettingsBodyStyle}" Margin="0,0,0,24"/>
+
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="SingleQualityChoiceLabel" Text="{DynamicResource Settings_SingleQuality}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_SingleQualityDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="SingleQualityChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.SingleViewQuality, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=SingleQualityChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="Lightweight" Content="{DynamicResource Settings_QualityLightweight}"/>
+                                    <ComboBoxItem Tag="Balanced" Content="{DynamicResource Settings_QualityBalanced}"/>
+                                    <ComboBoxItem Tag="Detailed" Content="{DynamicResource Settings_QualityDetailed}"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="MultiQualityChoiceLabel" Text="{DynamicResource Settings_MultiQuality}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_MultiQualityDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="MultiQualityChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.MultiViewQuality, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=MultiQualityChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="Lightweight" Content="{DynamicResource Settings_QualityLightweight}"/>
+                                    <ComboBoxItem Tag="Balanced" Content="{DynamicResource Settings_QualityBalanced}"/>
+                                    <ComboBoxItem Tag="Detailed" Content="{DynamicResource Settings_QualityDetailed}"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="KeyboardModeChoiceLabel" Text="{DynamicResource Settings_KeyboardMode}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_KeyboardDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="KeyboardModeChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.KeyboardMode, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=KeyboardModeChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="Sdk" Content="{DynamicResource Settings_KeyboardSdk}"/>
+                                    <ComboBoxItem Tag="Uhid" Content="{DynamicResource Settings_KeyboardUhid}"/>
+                                </ComboBox>
+                            </StackPanel><Border Style="{StaticResource SettingsDividerStyle}" Margin="0,0,0,20"/>
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock x:Name="ClipboardSyncChoiceLabel" Text="{DynamicResource Settings_ClipboardSync}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                    <TextBlock Text="{DynamicResource Settings_ClipboardDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="ClipboardSyncChoice" Grid.Column="1" IsChecked="{Binding Draft.SyncClipboard, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=ClipboardSyncChoiceLabel}"
+                                          Style="{StaticResource SettingsToggleStyle}"/>
+                            </Grid>
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock x:Name="AudioChoiceLabel" Text="{DynamicResource Settings_Audio}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                    <TextBlock Text="{DynamicResource Settings_AudioDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="AudioChoice" Grid.Column="1" IsChecked="{Binding Draft.EnableAudio, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=AudioChoiceLabel}"
+                                          Style="{StaticResource SettingsToggleStyle}"/>
+                            </Grid>
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock x:Name="AutoReconnectChoiceLabel" Text="{DynamicResource Settings_AutoReconnect}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                    <TextBlock Text="{DynamicResource Settings_ReconnectDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="AutoReconnectChoice" Grid.Column="1" IsChecked="{Binding Draft.AutoReconnect, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=AutoReconnectChoiceLabel}"
+                                          Style="{StaticResource SettingsToggleStyle}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="BatchPanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource SettingsCardStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding SelectedSection}" Value="Batch"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <materialDesign:PackIcon Kind="ViewGridOutline" Style="{StaticResource SettingsSectionIconStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_Batch}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource Settings_BatchDescription}" Style="{StaticResource SettingsBodyStyle}" Margin="0,0,0,24"/>
+
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="ConcurrentToolsChoiceLabel" Text="{DynamicResource Settings_ConcurrentTools}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_ConcurrentDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="ConcurrentToolsChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.MaxConcurrentTools, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=ConcurrentToolsChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="1" Content="1"/>
+                                    <ComboBoxItem Tag="2" Content="2"/>
+                                    <ComboBoxItem Tag="4" Content="4"/>
+                                    <ComboBoxItem Tag="8" Content="8"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="BatchDelayChoiceLabel" Text="{DynamicResource Settings_BatchDelay}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_BatchDelayDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="BatchDelayChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.BatchDelay, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=BatchDelayChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="0" Content="{DynamicResource Settings_NoDelay}"/>
+                                    <ComboBoxItem Tag="250" Content="250 ms"/>
+                                    <ComboBoxItem Tag="500" Content="500 ms"/>
+                                    <ComboBoxItem Tag="1000" Content="1 s"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <Grid Margin="0,0,0,20">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock x:Name="ContinueOnErrorChoiceLabel" Text="{DynamicResource Settings_ContinueOnError}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                    <TextBlock Text="{DynamicResource Settings_ContinueDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <CheckBox x:Name="ContinueOnErrorChoice" Grid.Column="1" IsChecked="{Binding Draft.ContinueOnError, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=ContinueOnErrorChoiceLabel}"
+                                          Style="{StaticResource SettingsToggleStyle}"/>
+                            </Grid><Border Background="{DynamicResource Brush.SurfaceAlt}" Padding="{StaticResource Spacing.CardPadding}" CornerRadius="{StaticResource Radius.Small}">
+<TextBlock Text="{DynamicResource Settings_BatchScope}" Style="{StaticResource SettingsCaptionStyle}"/></Border>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="StoragePanel">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource SettingsCardStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers><DataTrigger Binding="{Binding SelectedSection}" Value="Storage"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <materialDesign:PackIcon Kind="FolderOutline" Style="{StaticResource SettingsSectionIconStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_Storage}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource Settings_StorageDescription}" Style="{StaticResource SettingsBodyStyle}" Margin="0,0,0,24"/>
+
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="ScreenshotDestinationChoiceLabel" Text="{DynamicResource Settings_ScreenshotDestination}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_ScreenshotDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="ScreenshotDestinationChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.ScreenshotDestination, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=ScreenshotDestinationChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="Ask" Content="{DynamicResource Settings_AskEachTime}"/>
+                                    <ComboBoxItem Tag="Custom" Content="{DynamicResource Settings_UseFolder}"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="ScreenshotFolderInputLabel" Text="{DynamicResource Settings_ScreenshotFolder}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_FolderHint}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <Grid>
+                                    <DockPanel LastChildFill="True"><Button DockPanel.Dock="Right" Content="{DynamicResource Settings_Browse}" Command="{Binding BrowseFolderCommand}" CommandParameter="Screenshot" Style="{StaticResource FlatButtonStyle}" Margin="8,0,0,0"/><TextBox x:Name="ScreenshotFolderInput" Text="{Binding Draft.ScreenshotFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Draft.UseScreenshotFolder}"
+                                             AutomationProperties.LabeledBy="{Binding ElementName=ScreenshotFolderInputLabel}" ToolTip="{DynamicResource Settings_PathTooltip}"/></DockPanel>
+                                    <TextBlock Text="{DynamicResource Settings_PathPlaceholder}" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SettingsCaptionStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                                                <Style.Triggers><DataTrigger Binding="{Binding Draft.ScreenshotFolder}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="ExportDestinationChoiceLabel" Text="{DynamicResource Settings_ExportDestination}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_ExportDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <ComboBox x:Name="ExportDestinationChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.ExportDestination, Mode=TwoWay}"
+                                          AutomationProperties.LabeledBy="{Binding ElementName=ExportDestinationChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="Ask" Content="{DynamicResource Settings_AskEachTime}"/>
+                                    <ComboBoxItem Tag="Custom" Content="{DynamicResource Settings_UseFolder}"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="ExportFolderInputLabel" Text="{DynamicResource Settings_ExportFolder}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_FolderHint}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <Grid>
+                                    <DockPanel LastChildFill="True"><Button DockPanel.Dock="Right" Content="{DynamicResource Settings_Browse}" Command="{Binding BrowseFolderCommand}" CommandParameter="Export" Style="{StaticResource FlatButtonStyle}" Margin="8,0,0,0"/><TextBox x:Name="ExportFolderInput" Text="{Binding Draft.ExportFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding Draft.UseExportFolder}"
+                                             AutomationProperties.LabeledBy="{Binding ElementName=ExportFolderInputLabel}" ToolTip="{DynamicResource Settings_PathTooltip}"/></DockPanel>
+                                    <TextBlock Text="{DynamicResource Settings_PathPlaceholder}" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SettingsCaptionStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                                                <Style.Triggers><DataTrigger Binding="{Binding Draft.ExportFolder}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,20">
+                                <TextBlock x:Name="BackupFolderInputLabel" Text="{DynamicResource Settings_BackupFolder}" Style="{StaticResource SettingsHeadingStyle}"/>
+                                <TextBlock Text="{DynamicResource Settings_BackupDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
+                                <Grid>
+                                    <DockPanel LastChildFill="True"><Button DockPanel.Dock="Right" Content="{DynamicResource Settings_Browse}" Command="{Binding BrowseFolderCommand}" CommandParameter="Backup" Style="{StaticResource FlatButtonStyle}" Margin="8,0,0,0"/><TextBox x:Name="BackupFolderInput" Text="{Binding Draft.BackupFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+
+                                             AutomationProperties.LabeledBy="{Binding ElementName=BackupFolderInputLabel}" ToolTip="{DynamicResource Settings_PathTooltip}"/></DockPanel>
+                                    <TextBlock Text="{DynamicResource Settings_PathPlaceholder}" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource SettingsCaptionStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource Brush.TextDisabled}"/>
+                                                <Style.Triggers><DataTrigger Binding="{Binding Draft.BackupFolder}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </StackPanel><TextBlock Text="{DynamicResource Settings_StorageNotice}" Style="{StaticResource SettingsCaptionStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="AboutPanel" Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top" Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Settings_AboutHeader}" Style="{StaticResource SettingsSectionTitleStyle}" Margin="0,0,0,24"/>
+                            <Border Width="56" Height="56" HorizontalAlignment="Left" Background="{DynamicResource Brush.BadgeInfoBackground}"
+                                    CornerRadius="{StaticResource Radius.Large}" Margin="0,0,0,16">
+                                <materialDesign:PackIcon Kind="Robot" Width="30" Height="30" Foreground="{DynamicResource Brush.Accent}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{DynamicResource AppName}" Style="{StaticResource SettingsSectionTitleStyle}"/>
+                            <TextBlock Text="{DynamicResource Settings_AppDescription}" Style="{StaticResource SettingsBodyStyle}" Margin="0,6,0,16"/>
+                            <Border HorizontalAlignment="Left" Background="{DynamicResource Brush.SurfaceAlt}" CornerRadius="{StaticResource Radius.Small}" Padding="8,4">
+                                <TextBlock Style="{StaticResource SettingsCaptionStyle}"><Run Text="{DynamicResource Version}"/><Run Text=" "/><Run Text="{DynamicResource AppVersion}"/></TextBlock>
+                            </Border>
+                            <Border Style="{StaticResource SettingsDividerStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <materialDesign:PackIcon Kind="Laptop" Width="18" Height="18" Foreground="{DynamicResource Brush.TextSecondary}" Margin="0,2,10,0"/>
+                                <TextBlock Grid.Column="1" Text="{DynamicResource Settings_LocalNotice}" Style="{StaticResource SettingsCaptionStyle}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+            <Border Grid.Row="4" Background="{DynamicResource Brush.SurfaceAlt}" CornerRadius="{StaticResource Radius.Large}"
+                    BorderBrush="{DynamicResource Brush.Border}" BorderThickness="{StaticResource Metric.BorderThickness.Uniform}" Padding="{StaticResource Spacing.CardPadding}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid x:Name="FooterStatus">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <materialDesign:PackIcon Style="{StaticResource SettingsStatusIconStyle}"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource SettingsStatusStyle}"/>
+                            <TextBlock Text="{DynamicResource Settings_DraftNotice}" Style="{StaticResource SettingsDraftStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                    <WrapPanel x:Name="FooterActions" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <Button Command="{Binding DiscardChangesCommand}" ToolTip="{DynamicResource Settings_DiscardTooltip}" Style="{StaticResource FlatButtonStyle}" Margin="0,0,12,0"
+                                Content="{DynamicResource Settings_Discard}" ContentTemplate="{StaticResource SettingsButtonLabelTemplate}"/>
+                        <Button Command="{Binding SaveCommand}" ToolTip="{DynamicResource Settings_SaveTooltip}" Style="{StaticResource PrimaryButtonStyle}"
+                                Content="{DynamicResource Settings_Save}" ContentTemplate="{StaticResource SettingsButtonLabelTemplate}"/>
+                    </WrapPanel>
+                </Grid>
+            </Border>
+
+
+        </Grid>
     </Grid>
 </UserControl>

@@ -184,9 +184,9 @@
     <Style x:Key="DeviceActionsContextMenuToggleTextBaseStyle"
            TargetType="TextBlock">
         <Setter Property="FontFamily"
-                Value="{StaticResource Metric.FontFamily}"/>
+                Value="{DynamicResource Metric.FontFamily}"/>
         <Setter Property="FontSize"
-                Value="{StaticResource Metric.FontSize.Body}"/>
+                Value="{DynamicResource Metric.FontSize.Body}"/>
         <Setter Property="FontWeight"
                 Value="SemiBold"/>
         <Setter Property="Foreground"
@@ -280,9 +280,9 @@
     <Style x:Key="DeviceActionsContextMenuItemStyle"
            TargetType="MenuItem">
         <Setter Property="FontFamily"
-                Value="{StaticResource Metric.FontFamily}"/>
+                Value="{DynamicResource Metric.FontFamily}"/>
         <Setter Property="FontSize"
-                Value="{StaticResource Metric.FontSize.Body}"/>
+                Value="{DynamicResource Metric.FontSize.Body}"/>
         <Setter Property="Foreground"
                 Value="{DynamicResource Brush.TextPrimary}"/>
         <Setter Property="Background"
@@ -544,9 +544,9 @@
     <Style x:Key="DeviceActionsContextMenuButtonTextStyle"
            TargetType="TextBlock">
         <Setter Property="FontFamily"
-                Value="{StaticResource Metric.FontFamily}"/>
+                Value="{DynamicResource Metric.FontFamily}"/>
         <Setter Property="FontSize"
-                Value="{StaticResource Metric.FontSize.Body}"/>
+                Value="{DynamicResource Metric.FontSize.Body}"/>
         <Setter Property="FontWeight"
                 Value="SemiBold"/>
         <Setter Property="Foreground"
@@ -567,9 +567,9 @@
     <Style x:Key="DeviceActionsContextMenuShortcutTextStyle"
            TargetType="TextBlock">
         <Setter Property="FontFamily"
-                Value="{StaticResource Metric.FontFamily}"/>
+                Value="{DynamicResource Metric.FontFamily}"/>
         <Setter Property="FontSize"
-                Value="{StaticResource Metric.FontSize.Small}"/>
+                Value="{DynamicResource Metric.FontSize.Small}"/>
         <Setter Property="FontWeight"
                 Value="SemiBold"/>
         <Setter Property="Foreground"

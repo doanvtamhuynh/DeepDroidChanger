@@ -2,10 +2,10 @@ namespace DeepDroidChanger.Authentication;
 
 public sealed class AccountSession
 {
-    public AccountSession(string idToken)
+    public AccountSession(string username)
     {
-        IdToken = idToken;
+        Username = username;
     }
 
-    public string IdToken { get; }
+    public string Username { get; }
 }

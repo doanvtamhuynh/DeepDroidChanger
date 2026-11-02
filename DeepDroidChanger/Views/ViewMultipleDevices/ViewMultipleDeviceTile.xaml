@@ -8,7 +8,7 @@
              Width="{Binding TileWidth}"
              PreviewKeyDown="OnPreviewKeyDown"
              AllowDrop="True" PreviewDragOver="OnDragOver" Drop="OnDrop"
-             FontFamily="{StaticResource Metric.FontFamily}">
+             FontFamily="{DynamicResource Metric.FontFamily}">
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -85,7 +85,7 @@
                                Grid.Column="1"
                                Text="{Binding Serial}"
                                Style="{StaticResource AppLabelTextStyle}"
-                               FontSize="{StaticResource Metric.FontSize.Small}"
+                               FontSize="{DynamicResource Metric.FontSize.Small}"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding Serial}"
                                Margin="{StaticResource ViewMultipleDeviceSerialSpacing}"/>
@@ -131,7 +131,7 @@
                 </Grid>
                 <TextBlock Text="{Binding Controls.StatusText}" VerticalAlignment="Bottom" IsHitTestVisible="False"
                            Background="{DynamicResource Brush.Surface}" Foreground="{DynamicResource Brush.TextPrimary}"
-                           FontSize="{StaticResource Metric.FontSize.Small}" TextWrapping="Wrap"/>
+                           FontSize="{DynamicResource Metric.FontSize.Small}" TextWrapping="Wrap"/>
             </Grid>
         </Grid>
     </Border>

@@ -5,6 +5,8 @@ namespace DeepDroidChanger.Services;
 
 public interface IViewDeviceInteractionService
 {
+    bool AutoReconnect => true;
+    void ReleaseOptions(string serial) { }
     ViewDeviceLaunchOptions PrepareOptions(ViewDeviceLaunchOptions options);
     IDisposable Register(ISingleViewDeviceSession session, Func<Task> reconnect, Action<string> reportStatus);
     void Activate(ISingleViewDeviceSession session);

@@ -354,6 +354,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
         catch (OperationCanceledException)
         {
             await StopCurrentSessionCoreAsync(session).ConfigureAwait(false);
+            _interactionService?.ReleaseOptions(Serial);
             await SetDisplayStateAsync(DisplayState.Idle, CancellationToken.None)
                 .ConfigureAwait(false);
             throw;
@@ -365,6 +366,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
                 "Multiple View could not acquire the ScrcpyNet lease for {Serial}.",
                 Serial);
             await StopCurrentSessionCoreAsync(session).ConfigureAwait(false);
+            _interactionService?.ReleaseOptions(Serial);
             if (IsDedicatedViewActive())
             {
                 await SetDisplayStateAsync(DisplayState.DedicatedView, CancellationToken.None)
@@ -385,6 +387,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
                 Serial,
                 session is null ? string.Empty : string.Join(" | ", session.RecentDiagnostics));
             await StopCurrentSessionCoreAsync(session).ConfigureAwait(false);
+            _interactionService?.ReleaseOptions(Serial);
             await SetDisplayStateAsync(DisplayState.Failed, CancellationToken.None)
                 .ConfigureAwait(false);
             ScheduleRetryIfEligible();
@@ -753,6 +756,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
                 await SetDisplayStateAsync(DisplayState.Failed, CancellationToken.None)
                     .ConfigureAwait(false);
                 await StopCurrentSessionCoreAsync(session).ConfigureAwait(false);
+                _interactionService?.ReleaseOptions(Serial);
                 ScheduleRetryIfEligible();
             }
             finally
@@ -980,7 +984,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
 
     private void ScheduleRetryIfEligible()
     {
-        if (_retryRequest is null ||
+        if (_interactionService?.AutoReconnect == false || _retryRequest is null ||
             Volatile.Read(ref _disposed) != 0 ||
             !IsTrackerOnline() ||
             IsDedicatedViewActive())
@@ -1028,7 +1032,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel : ObservableObject, 
                     retryCancellation.Token)
                 .ConfigureAwait(false);
 
-            if (!retryCancellation.IsCancellationRequested &&
+            if (_interactionService?.AutoReconnect != false && !retryCancellation.IsCancellationRequested &&
                 Volatile.Read(ref _disposed) == 0 &&
                 IsTrackerOnline() &&
                 !IsDedicatedViewActive())

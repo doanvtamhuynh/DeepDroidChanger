@@ -43,9 +43,10 @@
         </Setter>
     </Style>
     <Style x:Key="CardRadioButtonStyle" TargetType="{x:Type RadioButton}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />

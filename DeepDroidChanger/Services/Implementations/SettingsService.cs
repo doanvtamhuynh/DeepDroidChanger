@@ -96,6 +96,35 @@ namespace DeepDroidChanger.Services
             }
         }
 
+        public async Task SavePreferencesAsync(
+            AppSettings settings,
+            ApplicationPreferences preferences,
+            CancellationToken cancellationToken)
+        {
+            Directory.CreateDirectory(_settingsDirectory);
+            await _fileLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                // Capture the latest runtime state under the same lock as other writers.
+                // Draft preferences must never enter the shared instance before a successful write.
+                var snapshot = new AppSettings
+                {
+                    DeviceTableColumnRatios = new(settings.DeviceTableColumnRatios),
+                    SelectedSingleDeviceSerial = settings.SelectedSingleDeviceSerial,
+                    SelectedMultipleDeviceSerials = [.. settings.SelectedMultipleDeviceSerials]
+                };
+                preferences.ApplyTo(snapshot);
+                await WriteSettingsAsync(snapshot, cancellationToken).ConfigureAwait(false);
+
+                // Publish before releasing the lock so a queued SaveAsync cannot restore old preferences.
+                ApplicationPreferences.FromSettings(snapshot).ApplyTo(settings);
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+
         private async Task WriteSettingsAsync(AppSettings settings, CancellationToken cancellationToken)
         {
             Normalize(settings);
@@ -127,6 +156,7 @@ namespace DeepDroidChanger.Services
 
         private void Normalize(AppSettings settings)
         {
+            settings.Options = SettingsOptionsPolicy.Normalize(settings.Options);
             settings.Theme = _themeService.NormalizeTheme(settings.Theme);
             settings.DeviceTableColumnRatios = NormalizeColumnRatios(
                 settings.DeviceTableColumnRatios,

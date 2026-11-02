@@ -4,9 +4,10 @@
     </ResourceDictionary.MergedDictionaries>
     <Style TargetType="{x:Type TextBlock}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
-        <Setter Property="FontFamily" Value="Segoe UI" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}, Path=IsSelected}" Value="True">
@@ -30,56 +31,60 @@
         </Style.Triggers>
     </Style>
     <Style x:Key="TitleTextStyle" TargetType="{x:Type TextBlock}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Title}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Title}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
     </Style>
     <Style x:Key="SubtitleTextStyle" TargetType="{x:Type TextBlock}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Subtitle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Subtitle}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
     </Style>
     <Style x:Key="SecondaryTextStyle" TargetType="{x:Type TextBlock}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
     </Style>
     <Style x:Key="AppTitleTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Display}" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Display}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style x:Key="AppLabelTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style x:Key="PageHeaderTextStyle" TargetType="TextBlock" BasedOn="{StaticResource AppTitleTextStyle}" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Title}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Title}" />
     </Style>
     <Style x:Key="DialogHeaderTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
     <Style x:Key="DialogInputLabelStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.TextSecondary}" />
         <Setter Property="Margin" Value="0,4,0,4" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style x:Key="PrimaryButtonTextStyle" TargetType="TextBlock" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-        <Setter Property="FontFamily" Value="{StaticResource Metric.FontFamily}" />
-        <Setter Property="FontSize" Value="{StaticResource Metric.FontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{DynamicResource Metric.FontFamily}" />
+        <Setter Property="FontStyle" Value="{DynamicResource Metric.FontStyle}" />
+        <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}" />
+        <Setter Property="FontWeight" Value="{DynamicResource Metric.FontWeight}" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}" />
+        <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
     </Style>
 </ResourceDictionary>

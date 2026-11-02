@@ -9,7 +9,7 @@ using MaterialDesignThemes.Wpf;
 
 namespace DeepDroidChanger.ViewModels
 {
-    public sealed partial class MainViewModel : ObservableObject
+    public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         private const double ExpandedWidth = 248;
         private const double CollapsedWidth = 56;
@@ -18,6 +18,7 @@ namespace DeepDroidChanger.ViewModels
         private readonly ILocalizationService _localizationService;
         private readonly IThemeService _themeService;
         private readonly ISettingsService _settingsService;
+        private readonly IApplicationPreferencesService _preferences;
         private readonly IDeviceActionCoordinatorService? _deviceActionCoordinatorService;
         private readonly IConfirmationDialogService? _confirmationDialogService;
         private bool _isSidebarCollapsed;
@@ -33,6 +34,7 @@ namespace DeepDroidChanger.ViewModels
             ILocalizationService localizationService,
             IThemeService themeService,
             ISettingsService settingsService,
+            IApplicationPreferencesService preferences,
             IDeviceActionCoordinatorService? deviceActionCoordinatorService = null,
             IConfirmationDialogService? confirmationDialogService = null)
         {
@@ -40,59 +42,27 @@ namespace DeepDroidChanger.ViewModels
             _localizationService = localizationService;
             _themeService = themeService;
             _settingsService = settingsService;
+            _preferences = preferences;
             _deviceActionCoordinatorService = deviceActionCoordinatorService;
             _confirmationDialogService = confirmationDialogService;
 
-            Language = _localizationService.NormalizeLanguage(_settings.Language ?? "en");
-            Theme = _themeService.NormalizeTheme(_settings.Theme ?? "Dark");
-            _isSidebarCollapsed = _settings.SidebarCollapsed;
+            _isSidebarCollapsed = _preferences.Current.SidebarCollapsed;
             _activeView = AppView.ChangeSingleDevice;
-
-            _localizationService.ApplyLanguage(Language);
-            _themeService.ApplyTheme(Theme);
+            _preferences.Changed += OnPreferencesChanged;
         }
 
         public event Action<AppView>? NavigationRequested;
 
-        public string Language
-        {
-            get => _settings.Language;
-            private set
-            {
-                if (_settings.Language == value)
-                    return;
-
-                _settings.Language = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(LanguageFlagSource));
-            }
-        }
-
-        public string Theme
-        {
-            get => _settings.Theme;
-            private set
-            {
-                if (_settings.Theme == value)
-                    return;
-
-                _settings.Theme = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ThemeIconKind));
-            }
-        }
+        public string Language => _preferences.Current.Language;
+        public string Theme => _preferences.Current.Theme;
+        private bool CanChangePreferences() => !_preferences.IsSaving;
 
         public bool IsSidebarCollapsed
         {
             get => _isSidebarCollapsed;
             set
             {
-                if (!SetProperty(ref _isSidebarCollapsed, value))
-                    return;
-
-                SynchronizeDevicesManagerMenuState();
-                _settings.SidebarCollapsed = value;
-                OnSidebarLayoutChanged();
+                _preferences.Apply(_preferences.Current with { SidebarCollapsed = value });
             }
         }
 
@@ -192,24 +162,22 @@ namespace DeepDroidChanger.ViewModels
             await _settingsService.SaveAsync(_settings, cancellationToken).ConfigureAwait(false);
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanChangePreferences))]
         private void ToggleSidebar()
         {
             IsSidebarCollapsed = !IsSidebarCollapsed;
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanChangePreferences))]
         private void ToggleLanguage()
         {
-            Language = Language == "vi" ? "en" : "vi";
-            _localizationService.ApplyLanguage(Language);
+            _preferences.Apply(_preferences.Current with { Language = Language == "vi" ? "en" : "vi" });
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanChangePreferences))]
         private void ToggleTheme()
         {
-            Theme = _themeService.ToggleTheme(Theme);
-            _themeService.ApplyTheme(Theme);
+            _preferences.Apply(_preferences.Current with { Theme = _themeService.ToggleTheme(Theme) });
         }
 
         [RelayCommand]
@@ -326,6 +294,24 @@ namespace DeepDroidChanger.ViewModels
             IsDevicesManagerSubmenuOpen = false;
             IsDevicesManagerFlyoutOpen = false;
         }
+
+        private void OnPreferencesChanged(object? sender, EventArgs e)
+        {
+            OnPropertyChanged(nameof(Language));
+            OnPropertyChanged(nameof(Theme));
+            OnPropertyChanged(nameof(LanguageFlagSource));
+            OnPropertyChanged(nameof(ThemeIconKind));
+            if (SetProperty(ref _isSidebarCollapsed, _preferences.Current.SidebarCollapsed, nameof(IsSidebarCollapsed)))
+            {
+                SynchronizeDevicesManagerMenuState();
+                OnSidebarLayoutChanged();
+            }
+            ToggleSidebarCommand.NotifyCanExecuteChanged();
+            ToggleLanguageCommand.NotifyCanExecuteChanged();
+            ToggleThemeCommand.NotifyCanExecuteChanged();
+        }
+
+        public void Dispose() => _preferences.Changed -= OnPreferencesChanged;
 
         private void OnSidebarLayoutChanged()
         {

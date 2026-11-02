@@ -17,17 +17,28 @@ namespace DeepDroidChanger;
 public sealed partial class App : Application
 {
     private IHost? _host;
+    private string[] _startupArgs = [];
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _startupArgs = e.Args;
+        await StartSessionAsync();
+    }
+
+    private async Task StartSessionAsync()
+    {
+
+        var assemblyName = typeof(App).Assembly.GetName();
+        Resources["AppName"] = assemblyName.Name!;
+        Resources["AppVersion"] = assemblyName.Version!.ToString(3);
 
         AppSettings settings = new();
         string startupStage = "creating the application host";
         try
         {
             startupStage = "building the application host";
-            _host = Host.CreateDefaultBuilder(e.Args)
+            _host = Host.CreateDefaultBuilder(_startupArgs)
                 .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Debug))
                 .ConfigureServices((_, services) => RegisterServices(services, settings))
                 .Build();
@@ -48,6 +59,7 @@ public sealed partial class App : Application
             startupStage = "applying localization and theme";
             _host.Services.GetRequiredService<ILocalizationService>().ApplyLanguage(settings.Language);
             _host.Services.GetRequiredService<IThemeService>().ApplyTheme(settings.Theme);
+            _host.Services.GetRequiredService<IApplicationAppearanceService>().Apply(settings.Options.Appearance);
 
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             startupStage = "showing the login dialog";
@@ -71,6 +83,7 @@ public sealed partial class App : Application
             MainWindow = mainWindow;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             startupStage = "showing MainWindow";
+            _host.Services.GetRequiredService<ICurrentAccountService>().SignOutRequested += SignOutAsync;
             mainWindow.Show();
         }
         catch (OperationCanceledException)
@@ -81,6 +94,46 @@ public sealed partial class App : Application
         {
             LogStartupFailure(startupStage, exception);
             Shutdown();
+        }
+    }
+
+    private async Task<bool> SignOutAsync()
+    {
+        if (_host is not { } host || MainWindow is not MainWindow window) return false;
+        var coordinator = host.Services.GetRequiredService<IDeviceActionCoordinatorService>();
+        if (!coordinator.TryBeginSignOut()) return false;
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        bool closed;
+        try { closed = await window.CloseForSignOutAsync(); }
+        catch
+        {
+            coordinator.CancelSignOut();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            throw;
+        }
+        if (!closed)
+        {
+            coordinator.CancelSignOut();
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+            return false;
+        }
+        try
+        {
+            host.Services.GetRequiredService<IAuthenticationSessionService>().ClearSession();
+            host.Services.GetRequiredService<ICurrentAccountService>().SignOutRequested -= SignOutAsync;
+            await host.StopAsync();
+            host.Dispose();
+            _host = null;
+            // Fresh singleton view models prevent subscriptions/drafts from crossing sessions.
+            await StartSessionAsync();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            // The old window is already closed; do not leave an invisible host running.
+            LogStartupFailure("returning to login after sign-out", exception);
+            Shutdown();
+            return false;
         }
     }
 
@@ -125,6 +178,9 @@ public sealed partial class App : Application
         services.AddSingleton(settings);
 
         services.AddSingleton<IThemeService, ThemeService>();
+        services.AddSingleton<ICurrentAccountService, CurrentAccountService>();
+        services.AddSingleton<IApplicationAppearanceService, ApplicationAppearanceService>();
+        services.AddSingleton<ISettingsOutputService, SettingsOutputService>();
         services.AddSingleton<ILocalizationService, LocalizationService>();
         services.AddTransient<IFilePickerDialogService, FilePickerDialogService>();
         services.AddSingleton<IRandomService, RandomService>();
@@ -149,6 +205,7 @@ public sealed partial class App : Application
         services.AddSingleton<IFileSystemService, FileSystemService>();
 
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IApplicationPreferencesService, ApplicationPreferencesService>();
         services.AddSingleton<IRuntimeDataMigrationService, RuntimeDataMigrationService>();
         services.AddSingleton<IDeviceStoreService, DeviceStoreService>();
         services.AddSingleton<ICarrierDataService, CarrierDataService>();
@@ -253,6 +310,7 @@ public sealed partial class App : Application
     {
         target.Language = source.Language;
         target.Theme = source.Theme;
+        target.Options = source.Options;
         target.SidebarCollapsed = source.SidebarCollapsed;
         target.DeviceTableColumnRatios = source.DeviceTableColumnRatios;
         target.SelectedSingleDeviceSerial = source.SelectedSingleDeviceSerial;

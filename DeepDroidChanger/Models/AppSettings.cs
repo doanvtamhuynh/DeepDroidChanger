@@ -5,6 +5,7 @@ namespace DeepDroidChanger.Models
         public string Language { get; set; } = "en";
         public string Theme { get; set; } = "Dark";
         public bool SidebarCollapsed { get; set; }
+        public SettingsOptions Options { get; set; } = new();
         public Dictionary<string, double> DeviceTableColumnRatios { get; set; } = new()
         {
             ["Index"] = 0.55,

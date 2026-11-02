@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:views="clr-namespace:DeepDroidChanger.Views"
-             FontFamily="{StaticResource Metric.FontFamily}"
+             FontFamily="{DynamicResource Metric.FontFamily}"
              Foreground="{DynamicResource Brush.TextPrimary}"
              PreviewKeyDown="OnPanelPreviewKeyDown">
     <UserControl.Resources>
@@ -72,7 +72,7 @@
                         <Thumb.Tag>
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource ViewMultipleDevices_ControlPanel}"
-                                           FontSize="{StaticResource Metric.FontSize.Subtitle}" FontWeight="SemiBold"
+                                           FontSize="{DynamicResource Metric.FontSize.Subtitle}" FontWeight="SemiBold"
                                            TextTrimming="CharacterEllipsis"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                     <TextBlock x:Name="OnlineSummary" Style="{StaticResource MultipleDevicesHint}">
@@ -372,14 +372,14 @@
                                         <TextBlock Text="{DynamicResource ViewDevice_InputTextPrompt}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
                                         <TextBox Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatTextBoxStyle}"
                                                  AcceptsReturn="True" TextWrapping="Wrap" Height="Auto" VerticalScrollBarVisibility="Auto"
-                                                 MinHeight="{StaticResource Metric.ControlHeight.Comfortable}" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
+                                                 MinHeight="{DynamicResource Metric.ControlHeight.Comfortable}" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
                                                  AutomationProperties.Name="{DynamicResource ViewDevice_InputTextPrompt}"/>
                                         <Button Command="{Binding SendInputTextCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,12"
                                                 Content="{DynamicResource ViewDevice_Input}"/>
                                         <TextBlock Text="{DynamicResource ViewDevice_AdbShellPrompt}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
                                         <TextBox Text="{Binding AdbShellCommand, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FlatTextBoxStyle}"
                                                  AcceptsReturn="True" TextWrapping="Wrap" Height="Auto" VerticalScrollBarVisibility="Auto"
-                                                 MinHeight="{StaticResource Metric.ControlHeight.Comfortable}" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
+                                                 MinHeight="{DynamicResource Metric.ControlHeight.Comfortable}" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
                                                  AutomationProperties.Name="{DynamicResource ViewDevice_AdbShellPrompt}"/>
                                         <Button Command="{Binding RunAdbShellCommand}" Style="{StaticResource MultipleDevicesPanelButton}" Margin="0,8,0,0"
                                                 Content="{DynamicResource ViewDevice_Run}"/>
@@ -418,7 +418,7 @@
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Serial}" Style="{StaticResource MultipleDevicesHint}" Margin="0,0,0,4"/>
                                                     <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True"
-                                                             Height="Auto" MinHeight="{StaticResource Metric.ControlHeight.Comfortable}"
+                                                             Height="Auto" MinHeight="{DynamicResource Metric.ControlHeight.Comfortable}"
                                                              VerticalScrollBarVisibility="Auto" MaxHeight="{StaticResource ViewMultipleDevices.ResultMaxHeight}"
                                                              Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="{Binding Serial}"/>
                                                 </StackPanel>

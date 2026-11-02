@@ -23,7 +23,8 @@ public sealed class MainViewModelNavigationTests
             settings,
             localization,
             theme,
-            settingsService);
+            settingsService,
+            new ApplicationPreferencesService(settings, settingsService, theme, localization));
         List<AppView> navigationRequests = [];
         viewModel.NavigationRequested += navigationRequests.Add;
 

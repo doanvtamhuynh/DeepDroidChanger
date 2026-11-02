@@ -235,6 +235,10 @@ public interface IDeviceActionCoordinatorService
     /// </summary>
     event Action<DeviceActionOperationSnapshot>? OperationStateChanged;
 
+    // Atomically prevent new actions before an idle sign-out.
+    bool TryBeginSignOut() => false;
+    void CancelSignOut() { }
+
     bool IsBusy(string serial);
 
     DeviceActionOperationSnapshot? GetOperation(string serial);

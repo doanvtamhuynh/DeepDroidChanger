@@ -11,7 +11,7 @@
         ResizeMode="CanResize"
         Background="{DynamicResource Brush.WindowBackground}"
         TextElement.Foreground="{DynamicResource Brush.TextPrimary}"
-        FontFamily="{StaticResource Metric.FontFamily}">
+        FontFamily="{DynamicResource Metric.FontFamily}">
 
     <Window.Resources>
 

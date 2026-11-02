@@ -1,5 +1,5 @@
-using DeepDroidChanger.Services;
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Services;
 using DeepDroidChanger.Authentication;
 using System.IO;
 using System.Security.Cryptography;
@@ -12,6 +12,8 @@ namespace DeepDroidChanger.ViewModels
     public sealed partial class LoginViewModel : ObservableObject
     {
         private readonly IAccountStoreService _accountStoreService;
+        private readonly ICurrentAccountService? _currentAccount;
+        private readonly AppSettings? _settings;
         private readonly IAccountAuthenticationService _accountAuthenticationService;
         private readonly IAuthenticationSessionService _authenticationSessionService;
         private readonly ILocalizationService _localizationService;
@@ -37,13 +39,15 @@ namespace DeepDroidChanger.ViewModels
             IAccountAuthenticationService accountAuthenticationService,
             IAuthenticationSessionService authenticationSessionService,
             ILocalizationService localizationService,
-            ILogger<LoginViewModel> logger)
+            ILogger<LoginViewModel> logger, ICurrentAccountService? currentAccount = null, AppSettings? settings = null)
         {
             _accountStoreService = accountStoreService;
             _accountAuthenticationService = accountAuthenticationService;
             _authenticationSessionService = authenticationSessionService;
             _localizationService = localizationService;
             _logger = logger;
+            _currentAccount = currentAccount;
+            _settings = settings;
         }
 
         public event EventHandler<bool>? CloseRequested;
@@ -83,11 +87,7 @@ namespace DeepDroidChanger.ViewModels
                     || authentication.Session == null)
                 {
                     _authenticationSessionService.ClearSession();
-                    ErrorMessage = authentication.Status is
-                        AccountAuthenticationStatus.ConfigurationError or
-                        AccountAuthenticationStatus.ServiceUnavailable
-                            ? GetText("Login_ErrorServiceUnavailable")
-                            : GetText("Login_ErrorAuthenticationFailed");
+                    ErrorMessage = GetText("Login_ErrorAuthenticationFailed");
                     return;
                 }
 
@@ -98,6 +98,9 @@ namespace DeepDroidChanger.ViewModels
                 else
                     await _accountStoreService.ClearAsync(cancellationToken).ConfigureAwait(true);
 
+                _currentAccount?.Capture(loginRequest);
+                if (_settings is not null) _settings.Options = _settings.Options with { RememberAccount = RememberAccount };
+                Password = string.Empty;
                 ErrorMessage = string.Empty;
                 CloseRequested?.Invoke(this, true);
             }

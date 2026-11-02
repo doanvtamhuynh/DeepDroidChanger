@@ -81,4 +81,7 @@
 <CornerRadius x:Key="Radius.TopMedium" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">8,8,0,0</CornerRadius>
 
 <CornerRadius x:Key="Radius.TopLeftMedium" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">8,0,0,0</CornerRadius>
+    <FontWeight x:Key="Metric.FontWeight">Normal</FontWeight>
+    <FontStyle x:Key="Metric.FontStyle">Normal</FontStyle>
+    <sys:Double x:Key="Metric.ButtonHeight">40</sys:Double>
 </ResourceDictionary>

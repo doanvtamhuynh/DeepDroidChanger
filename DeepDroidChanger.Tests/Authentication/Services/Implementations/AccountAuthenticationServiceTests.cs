@@ -3,7 +3,6 @@ using DeepDroidChanger.Tests.Fakes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace DeepDroidChanger.Tests.Authentication.Services.Implementations;
 
@@ -11,21 +10,15 @@ namespace DeepDroidChanger.Tests.Authentication.Services.Implementations;
 public sealed class AccountAuthenticationServiceTests
 {
     [TestMethod]
-    public void AddDeepDroidAuthentication_ConfiguresValidProductionDefaults()
+    public void AddDeepDroidAuthentication_RegistersLocalServicesAndAccountStoreDefaults()
     {
-        ServiceCollection services = new();
-        services.AddLogging();
-        services.AddDeepDroidAuthentication();
-        using ServiceProvider provider = services.BuildServiceProvider();
-
-        AuthenticationOptions authenticationOptions =
-            provider.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
+        using ServiceProvider provider = CreateProvider();
         AccountStoreOptions accountStoreOptions =
             provider.GetRequiredService<IOptions<AccountStoreOptions>>().Value;
 
-        Assert.IsFalse(string.IsNullOrWhiteSpace(authenticationOptions.UserPoolId));
-        Assert.IsFalse(string.IsNullOrWhiteSpace(authenticationOptions.ClientId));
-        Assert.IsFalse(string.IsNullOrWhiteSpace(authenticationOptions.Region));
+        Assert.IsNotNull(provider.GetRequiredService<IAccountAuthenticationService>());
+        Assert.IsNotNull(provider.GetRequiredService<IAuthenticationSessionService>());
+        Assert.IsNotNull(provider.GetRequiredService<IAccountStoreService>());
         Assert.EndsWith(
             Path.Combine("AppSettings", "account.json"),
             accountStoreOptions.AccountFilePath,
@@ -33,109 +26,39 @@ public sealed class AccountAuthenticationServiceTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsync_ValidToken_ReturnsSessionWithoutLoggingSensitiveValues()
+    public async Task AuthenticateAsync_AdminCredentials_ReturnsSessionWithoutLoggingCredentials()
     {
-        const string token = "sensitive-id-token";
-        const string username = "user@example.test";
-        const string password = "sensitive-password";
-        IIdentityProviderClient identityProvider = Substitute.For<IIdentityProviderClient>();
-        identityProvider
-            .AuthenticateAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new IdentityProviderAuthenticationResult(
-                IdentityProviderAuthenticationStatus.Success,
-                token));
         var loggerProvider = new RecordingLoggerProvider();
-        await using ServiceProvider provider = CreateProvider(identityProvider, loggerProvider);
+        await using ServiceProvider provider = CreateProvider(loggerProvider);
         IAccountAuthenticationService service =
             provider.GetRequiredService<IAccountAuthenticationService>();
 
         AccountAuthenticationResult result = await service.AuthenticateAsync(
-            new AccountLoginRequest
-            {
-                Username = username,
-                Password = password
-            },
+            CreateLogin(),
             CancellationToken.None);
 
         Assert.AreEqual(AccountAuthenticationStatus.Success, result.Status);
         Assert.IsNotNull(result.Session);
-        Assert.AreEqual(token, result.Session.IdToken);
+        Assert.AreEqual("admin", result.Session.Username);
         Assert.IsFalse(loggerProvider.Messages.Any(message =>
-            message.Contains(token, StringComparison.Ordinal)
-            || message.Contains(username, StringComparison.Ordinal)
-            || message.Contains(password, StringComparison.Ordinal)));
+            message.Contains("admin", StringComparison.Ordinal)));
     }
 
     [TestMethod]
-    public async Task AuthenticateAsync_InvalidConfiguration_DoesNotCallProvider()
+    [DataRow("admin", "wrong-password")]
+    [DataRow("other-user", "admin")]
+    [DataRow("Admin", "admin")]
+    [DataRow("admin", "Admin")]
+    public async Task AuthenticateAsync_InvalidCredentials_ReturnsAuthenticationFailed(
+        string username,
+        string password)
     {
-        IIdentityProviderClient identityProvider = Substitute.For<IIdentityProviderClient>();
-        await using ServiceProvider provider = CreateProvider(
-            identityProvider,
-            configure: options => options.Region = string.Empty);
+        await using ServiceProvider provider = CreateProvider();
         IAccountAuthenticationService service =
             provider.GetRequiredService<IAccountAuthenticationService>();
 
         AccountAuthenticationResult result = await service.AuthenticateAsync(
-            CreateLogin(),
-            CancellationToken.None);
-
-        Assert.AreEqual(AccountAuthenticationStatus.ConfigurationError, result.Status);
-        Assert.IsNull(result.Session);
-        await identityProvider.DidNotReceiveWithAnyArgs()
-            .AuthenticateAsync(default!, default!, default);
-    }
-
-    [TestMethod]
-    public async Task AuthenticateAsync_MissingCredentials_DoesNotCallProvider()
-    {
-        IIdentityProviderClient identityProvider = Substitute.For<IIdentityProviderClient>();
-        await using ServiceProvider provider = CreateProvider(identityProvider);
-        IAccountAuthenticationService service =
-            provider.GetRequiredService<IAccountAuthenticationService>();
-
-        AccountAuthenticationResult result = await service.AuthenticateAsync(
-            new AccountLoginRequest(),
-            CancellationToken.None);
-
-        Assert.AreEqual(AccountAuthenticationStatus.InvalidInput, result.Status);
-        await identityProvider.DidNotReceiveWithAnyArgs()
-            .AuthenticateAsync(default!, default!, default);
-    }
-
-    [TestMethod]
-    public async Task AuthenticateAsync_MissingToken_ReturnsServiceUnavailable()
-    {
-        IIdentityProviderClient identityProvider = CreateProviderResult(
-            IdentityProviderAuthenticationStatus.Success,
-            null);
-        await using ServiceProvider provider = CreateProvider(identityProvider);
-        IAccountAuthenticationService service =
-            provider.GetRequiredService<IAccountAuthenticationService>();
-
-        AccountAuthenticationResult result = await service.AuthenticateAsync(
-            CreateLogin(),
-            CancellationToken.None);
-
-        Assert.AreEqual(AccountAuthenticationStatus.ServiceUnavailable, result.Status);
-        Assert.IsNull(result.Session);
-    }
-
-    [TestMethod]
-    public async Task AuthenticateAsync_IdentityProviderFailure_ReturnsAuthenticationFailed()
-    {
-        IIdentityProviderClient identityProvider = CreateProviderResult(
-            IdentityProviderAuthenticationStatus.AuthenticationFailed,
-            null);
-        await using ServiceProvider provider = CreateProvider(identityProvider);
-        IAccountAuthenticationService service =
-            provider.GetRequiredService<IAccountAuthenticationService>();
-
-        AccountAuthenticationResult result = await service.AuthenticateAsync(
-            CreateLogin(),
+            new AccountLoginRequest { Username = username, Password = password },
             CancellationToken.None);
 
         Assert.AreEqual(AccountAuthenticationStatus.AuthenticationFailed, result.Status);
@@ -143,83 +66,40 @@ public sealed class AccountAuthenticationServiceTests
     }
 
     [TestMethod]
-    public async Task AuthenticateAsync_ServiceFailure_ReturnsServiceUnavailable()
+    [DataRow("", "admin")]
+    [DataRow("admin", "")]
+    [DataRow(" ", "admin")]
+    [DataRow("admin", " ")]
+    public async Task AuthenticateAsync_MissingCredentials_ReturnsInvalidInput(
+        string username,
+        string password)
     {
-        IIdentityProviderClient identityProvider = CreateProviderResult(
-            IdentityProviderAuthenticationStatus.ServiceUnavailable,
-            null);
-        await using ServiceProvider provider = CreateProvider(identityProvider);
+        await using ServiceProvider provider = CreateProvider();
         IAccountAuthenticationService service =
             provider.GetRequiredService<IAccountAuthenticationService>();
 
         AccountAuthenticationResult result = await service.AuthenticateAsync(
-            CreateLogin(),
+            new AccountLoginRequest { Username = username, Password = password },
             CancellationToken.None);
 
-        Assert.AreEqual(AccountAuthenticationStatus.ServiceUnavailable, result.Status);
-        Assert.IsNull(result.Session);
-    }
-
-    [TestMethod]
-    public async Task AuthenticateAsync_UnexpectedProviderFailure_ReturnsServiceUnavailable()
-    {
-        IIdentityProviderClient identityProvider = Substitute.For<IIdentityProviderClient>();
-        identityProvider
-            .AuthenticateAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns<Task<IdentityProviderAuthenticationResult>>(
-                _ => throw new InvalidOperationException("unexpected"));
-        await using ServiceProvider provider = CreateProvider(identityProvider);
-        IAccountAuthenticationService service =
-            provider.GetRequiredService<IAccountAuthenticationService>();
-
-        AccountAuthenticationResult result = await service.AuthenticateAsync(
-            CreateLogin(),
-            CancellationToken.None);
-
-        Assert.AreEqual(AccountAuthenticationStatus.ServiceUnavailable, result.Status);
+        Assert.AreEqual(AccountAuthenticationStatus.InvalidInput, result.Status);
         Assert.IsNull(result.Session);
     }
 
     [TestMethod]
     public async Task AuthenticateAsync_Canceled_PropagatesCancellation()
     {
-        IIdentityProviderClient identityProvider = Substitute.For<IIdentityProviderClient>();
-        identityProvider
-            .AuthenticateAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns<Task<IdentityProviderAuthenticationResult>>(
-                _ => throw new OperationCanceledException());
-        await using ServiceProvider provider = CreateProvider(identityProvider);
+        await using ServiceProvider provider = CreateProvider();
         IAccountAuthenticationService service =
             provider.GetRequiredService<IAccountAuthenticationService>();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(() =>
-            service.AuthenticateAsync(CreateLogin(), CancellationToken.None));
+            service.AuthenticateAsync(CreateLogin(), cancellation.Token));
     }
 
-    private static IIdentityProviderClient CreateProviderResult(
-        IdentityProviderAuthenticationStatus status,
-        string? idToken)
-    {
-        IIdentityProviderClient identityProvider = Substitute.For<IIdentityProviderClient>();
-        identityProvider
-            .AuthenticateAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new IdentityProviderAuthenticationResult(status, idToken));
-        return identityProvider;
-    }
-
-    private static ServiceProvider CreateProvider(
-        IIdentityProviderClient identityProvider,
-        RecordingLoggerProvider? loggerProvider = null,
-        Action<AuthenticationOptions>? configure = null)
+    private static ServiceProvider CreateProvider(RecordingLoggerProvider? loggerProvider = null)
     {
         ServiceCollection services = new();
         services.AddLogging(builder =>
@@ -227,17 +107,13 @@ public sealed class AccountAuthenticationServiceTests
             if (loggerProvider != null)
                 builder.AddProvider(loggerProvider);
         });
-        services.AddSingleton(identityProvider);
-        services.AddDeepDroidAuthentication(configureAuthentication: configure);
+        services.AddDeepDroidAuthentication();
         return services.BuildServiceProvider();
     }
 
-    private static AccountLoginRequest CreateLogin()
+    private static AccountLoginRequest CreateLogin() => new()
     {
-        return new AccountLoginRequest
-        {
-            Username = "user@example.test",
-            Password = "password"
-        };
-    }
+        Username = "admin",
+        Password = "admin"
+    };
 }

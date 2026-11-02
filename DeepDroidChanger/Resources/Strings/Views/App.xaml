@@ -2,8 +2,6 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <sys:String x:Key="AppName">DeepDroidChanger</sys:String>
-    <sys:String x:Key="AppVersion">1.0.0</sys:String>
     <sys:String x:Key="Shared_DeviceNameHint">Enter name...</sys:String>
     <sys:String x:Key="Version">Version</sys:String>
     <sys:String x:Key="Shared_TooltipSearch">Filter the list as you type; device data is unchanged.</sys:String>

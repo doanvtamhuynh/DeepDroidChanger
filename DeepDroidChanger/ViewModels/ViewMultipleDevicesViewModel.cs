@@ -10,6 +10,8 @@ namespace DeepDroidChanger.ViewModels;
 
 public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAsyncDisposable
 {
+    private readonly AppSettings? _settings;
+    private readonly ISettingsOutputService? _output;
     public const int PageSize = 8;
     private const int BaseTilesPerRow = 4;
 
@@ -85,7 +87,8 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
         IFileSystemService? fileSystem = null,
         IViewMultipleDeviceArtifactService? artifactService = null,
         IDeviceActionCoordinatorService? actionCoordinator = null,
-        IViewDeviceInteractionService? interactionService = null)
+        IViewDeviceInteractionService? interactionService = null,
+        AppSettings? settings = null, ISettingsOutputService? output = null)
     {
         ArgumentNullException.ThrowIfNull(deviceStoreService);
         ArgumentNullException.ThrowIfNull(deviceTracker);
@@ -110,6 +113,8 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
         _viewDeviceWindowService = viewDeviceWindowService;
         _presentationCoordinator = presentationCoordinator;
         _interactionService = interactionService;
+        _settings = settings;
+        _output = output;
         _zoomIndex = DefaultZoomIndex;
 
         ZoomOutCommand = new RelayCommand(ZoomOut, CanZoomOut);
@@ -1096,7 +1101,7 @@ public sealed partial class ViewMultipleDevicesViewModel : ObservableObject, IAs
             await _transitionGate.WaitAsync(retryCancellation.Token).ConfigureAwait(false);
             try
             {
-                if (!IsCurrentOperation(item.KeepSessionInBackground ? null : navigationGeneration, retryCancellation.Token) ||
+                if (_interactionService?.AutoReconnect == false || !IsCurrentOperation(item.KeepSessionInBackground ? null : navigationGeneration, retryCancellation.Token) ||
                     _deviceTracker.Health != AdbDeviceTrackerHealth.Connected ||
                     _deviceTracker.GetDevice(item.Serial)?.Status != AdbDeviceStatus.Online ||
                     !await IsVisibleItemAsync(item, retryCancellation.Token).ConfigureAwait(false))

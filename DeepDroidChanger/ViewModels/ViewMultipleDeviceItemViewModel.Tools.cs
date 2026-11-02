@@ -39,6 +39,7 @@ public sealed partial class ViewMultipleDeviceItemViewModel
         await _sessionGate.WaitAsync(token).ConfigureAwait(false);
         try
         {
+            if (_interactionService?.AutoReconnect == false && _displayState == DisplayState.Failed) return;
             if (IsInVisiblePage || KeepSessionInBackground)
                 await StartCoreAsync(token).ConfigureAwait(false);
         }
