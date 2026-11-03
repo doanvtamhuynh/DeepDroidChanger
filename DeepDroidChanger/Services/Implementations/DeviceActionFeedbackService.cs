@@ -32,10 +32,7 @@ public sealed class DeviceActionFeedbackService : IDeviceActionFeedbackService
         ArgumentException.ThrowIfNullOrWhiteSpace(serial);
         ArgumentException.ThrowIfNullOrWhiteSpace(resourceKey);
 
-        string template = _localizationService.GetString(resourceKey);
-        string message = arguments.Length == 0
-            ? template
-            : string.Format(template, arguments);
+        string message = FormatMessage(resourceKey, arguments);
         _deviceProcessStateService.SetProcess(serial, message, resourceKey);
         _logger.LogInformation("Device {Serial} action: {Message}", serial, message);
     }
@@ -128,10 +125,7 @@ public sealed class DeviceActionFeedbackService : IDeviceActionFeedbackService
             return;
         }
 
-        string template = _localizationService.GetString(resourceKey);
-        string message = arguments.Length == 0
-            ? template
-            : string.Format(template, arguments);
+        string message = FormatMessage(resourceKey, arguments);
         _deviceProcessStateService.ShowTemporaryProcess(
             serial,
             message,
@@ -171,5 +165,11 @@ public sealed class DeviceActionFeedbackService : IDeviceActionFeedbackService
 
         // External lifecycle cancellation is intentionally silent. It must not be
         // presented as either a user Stop request or a dismissed dialog.
+    }
+
+    private string FormatMessage(string resourceKey, object[] arguments)
+    {
+        string template = _localizationService.GetString(resourceKey);
+        return arguments.Length == 0 ? template : string.Format(template, arguments);
     }
 }

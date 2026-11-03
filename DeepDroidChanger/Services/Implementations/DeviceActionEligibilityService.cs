@@ -43,18 +43,9 @@ public sealed class DeviceActionEligibilityService : IDeviceActionEligibilitySer
         await _liveCheckLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            bool isConnected;
-            if (allowRecovery)
-            {
-                var devices = await _deviceListService.LoadDetectedDevicesAsync(cancellationToken).ConfigureAwait(false);
-                isConnected = devices.Any(device =>
-                    string.Equals(device.Serial, serial, StringComparison.OrdinalIgnoreCase)
-                    && device.Status is AdbDeviceStatus.Online or AdbDeviceStatus.Recovery);
-            }
-            else
-            {
-                isConnected = await _deviceListService.IsDeviceOnlineAsync(serial, cancellationToken).ConfigureAwait(false);
-            }
+            bool isConnected = allowRecovery
+                ? await IsOnlineOrInRecoveryAsync(serial, cancellationToken).ConfigureAwait(false)
+                : await _deviceListService.IsDeviceOnlineAsync(serial, cancellationToken).ConfigureAwait(false);
             return isConnected
                 ? DeviceActionEligibilityFailure.None
                 : DeviceActionEligibilityFailure.Offline;
@@ -75,5 +66,13 @@ public sealed class DeviceActionEligibilityService : IDeviceActionEligibilitySer
         {
             _liveCheckLimiter.Release();
         }
+    }
+
+    private async Task<bool> IsOnlineOrInRecoveryAsync(string serial, CancellationToken cancellationToken)
+    {
+        var devices = await _deviceListService.LoadDetectedDevicesAsync(cancellationToken).ConfigureAwait(false);
+        return devices.Any(device =>
+            string.Equals(device.Serial, serial, StringComparison.OrdinalIgnoreCase)
+            && device.Status is AdbDeviceStatus.Online or AdbDeviceStatus.Recovery);
     }
 }

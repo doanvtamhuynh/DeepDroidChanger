@@ -6,25 +6,31 @@ namespace DeepDroidChanger.Services;
 public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorService
 {
     private readonly object _syncRoot = new();
-    private bool _signingOut;
-
-    public bool TryBeginSignOut()
-    {
-        lock (_syncRoot)
-        {
-            if (_signingOut || _activeOperations.Count != 0) return false;
-            _signingOut = true;
-            return true;
-        }
-    }
-    public void CancelSignOut() { lock (_syncRoot) _signingOut = false; }
     private readonly Dictionary<string, ActiveDeviceAction> _activeOperations =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<DeviceActionOperationSnapshot> _pendingNotifications = new();
     private TaskCompletionSource? _idleCompletion;
     private bool _isPublishingNotifications;
+    private bool _signingOut;
 
     public event Action<DeviceActionOperationSnapshot>? OperationStateChanged;
+
+    public bool TryBeginSignOut()
+    {
+        lock (_syncRoot)
+        {
+            if (_signingOut || _activeOperations.Count != 0)
+                return false;
+
+            _signingOut = true;
+            return true;
+        }
+    }
+    public void CancelSignOut()
+    {
+        lock (_syncRoot)
+            _signingOut = false;
+    }
 
     public bool IsBusy(string serial)
     {
@@ -123,6 +129,16 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
 
     public bool TryRequestCancellation(string serial)
     {
+        return TryRequestUserCancellation(serial, expectedOperationId: null);
+    }
+
+    public bool TryRequestCancellation(string serial, Guid operationId)
+    {
+        return operationId != Guid.Empty && TryRequestUserCancellation(serial, operationId);
+    }
+
+    private bool TryRequestUserCancellation(string serial, Guid? expectedOperationId)
+    {
         if (string.IsNullOrWhiteSpace(serial))
             return false;
 
@@ -130,29 +146,18 @@ public sealed class DeviceActionCoordinatorService : IDeviceActionCoordinatorSer
         lock (_syncRoot)
         {
             if (!_activeOperations.TryGetValue(NormalizeSerial(serial), out operation)
+                || (expectedOperationId.HasValue && operation.OperationId != expectedOperationId.Value)
                 || !operation.CanCancel)
             {
                 return false;
             }
         }
 
+        // Recheck ownership after releasing the lookup lock.
         return RequestCancellation(
             operation,
             DeviceActionCancellationReason.UserStop,
             honorCanCancel: true);
-    }
-
-    public bool TryRequestCancellation(string serial, Guid operationId)
-    {
-        if (string.IsNullOrWhiteSpace(serial) || operationId == Guid.Empty) return false;
-        ActiveDeviceAction? operation;
-        lock (_syncRoot)
-        {
-            if (!_activeOperations.TryGetValue(NormalizeSerial(serial), out operation)
-                || operation.OperationId != operationId || !operation.CanCancel) return false;
-        }
-        // RequestCancellation operates on this handle and rechecks ownership.
-        return RequestCancellation(operation, DeviceActionCancellationReason.UserStop, honorCanCancel: true);
     }
 
     public bool TryRequestSessionCancellation(Guid sessionId)
