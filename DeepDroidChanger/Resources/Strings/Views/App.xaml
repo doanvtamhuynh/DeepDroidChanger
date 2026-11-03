@@ -20,7 +20,8 @@
     <sys:String x:Key="Shared_TooltipList">Select an item to use with the actions in this dialog.</sys:String>
     <sys:String x:Key="Workspace_SingleDescription">Manage a device profile, configure changes and run tools from one workspace.</sys:String>
     <sys:String x:Key="Workspace_MultipleDescription">Select devices, prepare a shared configuration and track your batch actions.</sys:String>
-    <sys:String x:Key="Workspace_ResizePanels">Drag to resize the device list and configuration panels.</sys:String>
+    <sys:String x:Key="Workspace_ResizePanelsName">Resize device panels</sys:String>
+    <sys:String x:Key="Workspace_ResizePanels">Drag or press the Up and Down arrow keys to resize the device panels.</sys:String>
     <sys:String x:Key="Workspace_EmptyTitle">No devices to display</sys:String>
     <sys:String x:Key="Workspace_EmptyHint">Add devices or adjust your search and filters to get started.</sys:String>
     <sys:String x:Key="Workspace_MonitorDescription">Keep your device screens and tools together in one workspace.</sys:String>

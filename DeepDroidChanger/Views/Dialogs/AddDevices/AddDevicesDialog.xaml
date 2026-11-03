@@ -88,21 +88,6 @@
         <Setter Property="Margin" Value="0,14,0,0"/>
     </Style>
 
-    <Style x:Key="AddDevicesActionButtonStyle"
-           TargetType="Button"
-           BasedOn="{StaticResource MaterialPrimaryButtonStyle}">
-        <Setter Property="Background"
-                Value="{DynamicResource Brush.Accent}"/>
-        <Setter Property="BorderBrush"
-                Value="{DynamicResource Brush.Accent}"/>
-        <Setter Property="Foreground" Value="{DynamicResource Brush.AccentForeground}"/>
-        <Setter Property="Height" Value="36"/>
-        <Setter Property="Padding" Value="16,0,16,0"/>
-        <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="{StaticResource Radius.Medium}"/>
-        <Setter Property="materialDesign:RippleAssist.Feedback" Value="{DynamicResource Brush.AccentForeground}"/>
-        <Setter Property="materialDesign:RippleAssist.RippleOnTop" Value="True"/>
-        <Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp2"/>
-    </Style>
     </Window.Resources>
     <Grid Style="{StaticResource DialogRootGridStyle}">
         <Grid.RowDefinitions>
@@ -213,7 +198,7 @@
             <Button Grid.Column="1"
                     Command="{Binding AddCommand}"
                     ToolTip="{DynamicResource Shared_TooltipAction}"
-                    Style="{StaticResource AddDevicesActionButtonStyle}">
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>

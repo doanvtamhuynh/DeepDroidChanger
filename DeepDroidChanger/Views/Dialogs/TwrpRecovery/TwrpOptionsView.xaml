@@ -48,14 +48,14 @@
                             <TextBox Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding BackupName, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding OutputPreview}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,0,8"/>
                             <TextBlock Grid.Row="1" Text="{DynamicResource Twrp_PcDirectory}" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
                             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BackupDirectory, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding OutputPreview}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,0,8"/>
-                            <Button Grid.Row="1" Grid.Column="3" Command="{Binding BrowseBackupCommand}" ToolTip="{DynamicResource Twrp_Browse}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                            <Button Grid.Row="1" Grid.Column="3" Command="{Binding BrowseBackupCommand}" ToolTip="{DynamicResource Twrp_Browse}" Style="{StaticResource FlatButtonStyle}">
                                 <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Grid Grid.Row="2" Grid.ColumnSpan="4" Style="{StaticResource RecoveryImageControls}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
                                 <TextBox Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
-                                <Button Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                <Button Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource FlatButtonStyle}">
                                     <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                 </Button>
                             </Grid>
@@ -71,7 +71,7 @@
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                             <TextBlock Text="{DynamicResource Twrp_ChooseArchive}" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
                             <TextBox Grid.Column="1" Text="{Binding ArchiveSource, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding ArchiveSource}" Style="{StaticResource FlatTextBoxStyle}" Margin="0,0,0,8"/>
-                            <Button Grid.Column="3" Command="{Binding BrowseArchiveCommand}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                            <Button Grid.Column="3" Command="{Binding BrowseArchiveCommand}" Style="{StaticResource FlatButtonStyle}">
                                 <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <TextBlock Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding BackupSummary}" TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" Margin="{StaticResource Spacing.ControlPadding}"/>
@@ -79,7 +79,7 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="TWRP" Style="{StaticResource DialogInputLabelStyle}" Margin="{StaticResource Spacing.InputPadding}"/>
                                 <TextBox Grid.Column="1" Text="{Binding RecoveryImagePath, Mode=OneWay}" IsReadOnly="True" ToolTip="{Binding RecoveryImagePath}" Style="{StaticResource FlatTextBoxStyle}" AutomationProperties.Name="TWRP"/>
-                                <Button Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource DialogPrimaryButtonStyle}">
+                                <Button Grid.Column="3" Command="{Binding BrowseRecoveryImageCommand}" ToolTip="{DynamicResource Twrp_ChooseImage}" Style="{StaticResource FlatButtonStyle}">
                                     <TextBlock Text="{DynamicResource Twrp_Browse}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                 </Button>
                             </Grid>

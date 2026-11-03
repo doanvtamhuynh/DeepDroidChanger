@@ -11,4 +11,36 @@
     <Style x:Key="DialogActionGridStyle" TargetType="Grid" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
         <Setter Property="Margin" Value="0,8,0,0" />
     </Style>
+    <Style x:Key="WorkspaceSplitterStyle" TargetType="GridSplitter">
+        <Setter Property="Height" Value="12"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="ResizeDirection" Value="Rows"/>
+        <Setter Property="ResizeBehavior" Value="PreviousAndNext"/>
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="AutomationProperties.Name" Value="{DynamicResource Workspace_ResizePanelsName}"/>
+        <Setter Property="ToolTip" Value="{DynamicResource Workspace_ResizePanels}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="Transparent">
+                        <Border x:Name="Handle" Height="3" Width="48"
+                                Background="{DynamicResource Brush.BorderStrong}" CornerRadius="{StaticResource Radius.Small}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Handle" Property="Background" Value="{DynamicResource Brush.Accent}"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Handle" Property="Background" Value="{DynamicResource Brush.AccentPressed}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Handle" Property="Height" Value="5"/>
+                            <Setter TargetName="Handle" Property="Background" Value="{DynamicResource Brush.Focus}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

@@ -25,6 +25,8 @@ namespace DeepDroidChanger.Views
             _viewModel = viewModel;
             _logger = logger;
             InitializeComponent();
+            RunningActionsPanel.SizeChanged += OnWorkspaceSizeChanged;
+            MultipleDeviceConfigurationPanel.SizeChanged += OnWorkspaceSizeChanged;
             DataContext = viewModel;
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;

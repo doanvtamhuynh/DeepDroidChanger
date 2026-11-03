@@ -80,4 +80,5 @@
     <SolidColorBrush x:Key="Brush.AccentHoverForeground" Color="{StaticResource Color.AccentForeground}"/>
     <SolidColorBrush x:Key="Brush.AccentPressedForeground" Color="{StaticResource Color.AccentForeground}"/>
     <SolidColorBrush x:Key="Brush.DangerForeground" Color="#FF17101A"/>
+    <SolidColorBrush x:Key="Brush.DangerPressedForeground" Color="#FFFFFFFF"/>
 </ResourceDictionary>

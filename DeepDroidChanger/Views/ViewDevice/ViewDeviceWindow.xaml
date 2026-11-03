@@ -56,7 +56,7 @@
             <Style x:Key="ViewDeviceNavigationButtonStyle"
                    TargetType="Button"
                    BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
-                <Setter Property="Height" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
+                <Setter Property="Height" Value="Auto"/>
                 <Setter Property="MinHeight" Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
                 <Setter Property="Margin" Value="0"/>
                 <Setter Property="Padding" Value="6,3"/>
@@ -97,34 +97,37 @@
 
             <Border x:Name="HeaderPanel"
                     Grid.Row="0"
-                    Height="{StaticResource Metric.ToolbarMinHeight}"
-                    Padding="12,0"
+                    MinHeight="{DynamicResource Metric.ControlHeight.Comfortable}"
+                    Padding="12,8"
                     Background="{DynamicResource Brush.Surface}"
                     BorderBrush="{DynamicResource Brush.Border}"
                     BorderThickness="0,0,0,1">
-                <Grid>
+                <Grid x:Name="HeaderContentGrid" SizeChanged="OnHeaderSizeChanged">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0"
+                    <Grid x:Name="DeviceIdentity" Grid.Column="0"
                           MinWidth="0"
+                          ToolTip="{Binding Serial}"
                           ClipToBounds="True">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
+                        <TextBlock x:Name="DeviceNameLabel" Grid.Column="0"
                                    Text="{Binding DeviceName}"
                                    MinWidth="0"
                                    MaxWidth="260"
                                    TextTrimming="CharacterEllipsis"
+                                   TextWrapping="NoWrap"
                                    FontSize="{DynamicResource Metric.FontSize.Body}"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Grid.Column="1"
+                        <TextBlock x:Name="DeviceSerial" Grid.Column="1"
                                    Text="{Binding Serial}"
                                    Margin="8,0,0,0"
                                    MinWidth="0"
@@ -136,7 +139,7 @@
                                    ToolTip="{Binding Serial}"/>
                     </Grid>
 
-                    <StackPanel Grid.Column="1"
+                    <StackPanel x:Name="DeviceStatus" Grid.Column="1"
                                 Margin="12,0,0,0"
                                 MaxWidth="206"
                                 Orientation="Horizontal"
@@ -149,6 +152,7 @@
                         <TextBlock Text="{Binding StatusText}"
                                    MaxWidth="190"
                                    TextTrimming="CharacterEllipsis"
+                                   TextWrapping="NoWrap" ToolTip="{Binding StatusText}"
                                    Foreground="{DynamicResource Brush.TextSecondary}"
                                    FontSize="{DynamicResource Metric.FontSize.Small}"/>
                     </StackPanel>
@@ -268,14 +272,16 @@
                     <Button x:Name="RecentButton"
                             Grid.Column="0"
                             Style="{StaticResource ViewDeviceNavigationButtonStyle}"
-                            Command="{Binding RecentCommand}">
+                            Command="{Binding RecentCommand}"
+                            ToolTip="{DynamicResource ViewDevice_Recent}" AutomationProperties.Name="{DynamicResource ViewDevice_Recent}">
                         <StackPanel HorizontalAlignment="Center">
                             <materialDesign:PackIcon Kind="Apps"
                                                      Width="16"
                                                      Height="16"
                                                      HorizontalAlignment="Center"
                                                      Margin="0,0,0,2"/>
-                            <TextBlock Text="{DynamicResource ViewDevice_Recent}"
+                            <TextBlock x:Name="RecentCaption" Text="{DynamicResource ViewDevice_Recent}" FontSize="{DynamicResource Metric.FontSize.Small}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                        TextAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -283,14 +289,16 @@
                     <Button x:Name="HomeButton"
                             Grid.Column="2"
                             Style="{StaticResource ViewDeviceNavigationButtonStyle}"
-                            Command="{Binding HomeCommand}">
+                            Command="{Binding HomeCommand}"
+                            ToolTip="{DynamicResource ViewDevice_Home}" AutomationProperties.Name="{DynamicResource ViewDevice_Home}">
                         <StackPanel HorizontalAlignment="Center">
                             <materialDesign:PackIcon Kind="Home"
                                                      Width="16"
                                                      Height="16"
                                                      HorizontalAlignment="Center"
                                                      Margin="0,0,0,2"/>
-                            <TextBlock Text="{DynamicResource ViewDevice_Home}"
+                            <TextBlock x:Name="HomeCaption" Text="{DynamicResource ViewDevice_Home}" FontSize="{DynamicResource Metric.FontSize.Small}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                        TextAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -298,14 +306,16 @@
                     <Button x:Name="BackButton"
                             Grid.Column="4"
                             Style="{StaticResource ViewDeviceNavigationButtonStyle}"
-                            Command="{Binding BackCommand}">
+                            Command="{Binding BackCommand}"
+                            ToolTip="{DynamicResource ViewDevice_Back}" AutomationProperties.Name="{DynamicResource ViewDevice_Back}">
                         <StackPanel HorizontalAlignment="Center">
                             <materialDesign:PackIcon Kind="ArrowLeft"
                                                      Width="16"
                                                      Height="16"
                                                      HorizontalAlignment="Center"
                                                      Margin="0,0,0,2"/>
-                            <TextBlock Text="{DynamicResource ViewDevice_Back}"
+                            <TextBlock x:Name="BackCaption" Text="{DynamicResource ViewDevice_Back}" FontSize="{DynamicResource Metric.FontSize.Small}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                        TextAlignment="Center"/>
                         </StackPanel>
                     </Button>

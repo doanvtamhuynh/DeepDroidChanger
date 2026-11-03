@@ -38,10 +38,10 @@
     <sys:String x:Key="Twrp_State_Completed">Hoàn tất</sys:String>
     <sys:String x:Key="Twrp_DirectResultUnknown">Chưa xác nhận được TWRP native đã kết thúc; thao tác có thể vẫn đang chạy. Dữ liệu trên thiết bị được giữ lại. Kiểm tra recovery và log trước khi chạy tiếp; ứng dụng không tự tiếp tục thao tác.</sys:String>
     <sys:String x:Key="Twrp_State_Failed">Thất bại</sys:String>
-    <sys:String x:Key="Twrp_BackupTitle">Backup TWRP</sys:String>
-    <sys:String x:Key="Twrp_RestoreTitle">Restore TWRP</sys:String>
-    <sys:String x:Key="Twrp_BackupButton">Backup</sys:String>
-    <sys:String x:Key="Twrp_RestoreButton">Restore</sys:String>
+    <sys:String x:Key="Twrp_BackupTitle">Sao lưu TWRP</sys:String>
+    <sys:String x:Key="Twrp_RestoreTitle">Khôi phục TWRP</sys:String>
+    <sys:String x:Key="Twrp_BackupButton">Sao lưu</sys:String>
+    <sys:String x:Key="Twrp_RestoreButton">Khôi phục</sys:String>
     <sys:String x:Key="Twrp_BackupName">Tên</sys:String>
     <sys:String x:Key="Twrp_PcDirectory">Thư mục</sys:String>
     <sys:String x:Key="Twrp_ChooseArchive">File ZIP</sys:String>
@@ -65,8 +65,8 @@
     <sys:String x:Key="Twrp_Part_vendor_image">Vendor Image</sys:String>
     <sys:String x:Key="Twrp_Part_recovery">Recovery</sys:String>
     <sys:String x:Key="Twrp_Part_cache">Cache</sys:String>
-    <sys:String x:Key="Twrp_BackupAction">Backup</sys:String>
-    <sys:String x:Key="Twrp_RestoreAction">Restore</sys:String>
+    <sys:String x:Key="Twrp_BackupAction">Sao lưu</sys:String>
+    <sys:String x:Key="Twrp_RestoreAction">Khôi phục</sys:String>
     <sys:String x:Key="Twrp_Part_efs">EFS</sys:String>
     <sys:String x:Key="Twrp_ChooseImage">Chọn ảnh TWRP</sys:String>
     <sys:String x:Key="Twrp_StartConfirm">Bắt đầu thao tác đã chọn?</sys:String>

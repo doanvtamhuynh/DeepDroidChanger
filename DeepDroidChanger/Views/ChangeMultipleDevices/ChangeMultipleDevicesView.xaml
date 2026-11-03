@@ -24,7 +24,7 @@
         <Style x:Key="MultipleDeviceGridStyle"
                TargetType="DataGrid"
                BasedOn="{StaticResource FlatDataGridStyle}">
-            <Setter Property="MinHeight" Value="220"/>
+            <Setter Property="MinHeight" Value="0"/>
             <Setter Property="RowHeight"
                     Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
 
@@ -233,63 +233,17 @@
                     Value="{StaticResource MultipleDeviceComboBoxItemStyle}"/>
         </Style>
 
-        <Style x:Key="MultipleDeviceActionButtonStyle" TargetType="Button" BasedOn="{StaticResource WorkspaceActionButtonStyle}"/>
-
-        <Style x:Key="MultipleDeviceStopActionButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource MultipleDeviceActionButtonStyle}">
-            <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.DangerForeground}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.DangerForeground}"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.DangerHover}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.DangerHover}"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.DangerPressed}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.DangerPressed}"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.6"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="MultipleDeviceActionButtonTextStyle"
-               TargetType="TextBlock" BasedOn="{StaticResource PrimaryButtonTextStyle}">
-            <Setter Property="FontFamily"
-                    Value="{DynamicResource Metric.FontFamily}"/>
-            <Setter Property="FontSize"
-                    Value="{DynamicResource Metric.FontSize.Body}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="TextTrimming" Value="None"/>
-            <Setter Property="TextAlignment" Value="Left"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
         <Style x:Key="RunningActionNameTextStyle"
                TargetType="TextBlock"
-               BasedOn="{StaticResource MultipleDeviceActionButtonTextStyle}">
+               BasedOn="{StaticResource WorkspaceActionTextStyle}">
             <Setter Property="Foreground"
                     Value="{DynamicResource Brush.Warning}"/>
-        </Style>
-
-        <Style x:Key="MultipleDeviceAdvancedConfigButtonStyle" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Padding" Value="12,6"/>
         </Style>
 
         <Style x:Key="MultipleDeviceLoadToolbarStyle"
                TargetType="Grid">
             <Setter Property="Margin" Value="0,0,0,14"/>
         </Style>
-
-        <Style x:Key="MultipleDeviceLoadButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}"/>
 
         <Style x:Key="MultipleDeviceLoadButtonContentStyle"
                TargetType="StackPanel">
@@ -372,7 +326,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
             <StackPanel Orientation="Horizontal">
                 <materialDesign:PackIcon Kind="CellphoneLink" Width="24" Height="24" Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                <TextBlock Text="{DynamicResource Nav_ChangeMultipleDevices}" Style="{StaticResource AppTitleTextStyle}"/>
+                <TextBlock Text="{DynamicResource Nav_ChangeMultipleDevice}" Style="{StaticResource AppTitleTextStyle}"/>
             </StackPanel>
             <TextBlock x:Name="WorkspaceDescription" Text="{DynamicResource Workspace_MultipleDescription}" Style="{StaticResource SecondaryTextStyle}" Margin="0,8,0,0"/>
         </StackPanel>
@@ -389,7 +343,7 @@
                         Grid.Column="0"
                         Command="{Binding AddNewDevicesCommand}"
                         ToolTip="{DynamicResource ChangeMultipleDevices_AddDevicesTooltip}"
-                        Style="{StaticResource MultipleDeviceLoadButtonStyle}">
+                        Style="{StaticResource PrimaryButtonStyle}">
                     <StackPanel Style="{StaticResource MultipleDeviceLoadButtonContentStyle}">
                         <materialDesign:PackIcon Kind="Plus"
                                                  Style="{StaticResource PrimaryButtonIconStyle}"/>
@@ -613,7 +567,7 @@
                                         HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Center"
                                         VerticalContentAlignment="Center"
-                                        Style="{StaticResource MultipleDeviceStopActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceStopButtonStyle}">
                                     <Grid HorizontalAlignment="Center"
                                           VerticalAlignment="Center">
                                         <Grid.ColumnDefinitions>
@@ -631,7 +585,7 @@
                                                    TextAlignment="Center"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                                   Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </DataTemplate>
@@ -640,9 +594,7 @@
                 </DataGrid.Columns>
             </DataGrid>
 
-            <GridSplitter Grid.Row="3" Height="12" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Focusable="True" ToolTip="{DynamicResource Workspace_ResizePanels}">
-            <GridSplitter.Template><ControlTemplate TargetType="GridSplitter"><Border Background="Transparent"><Border Height="3" Width="48" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="{StaticResource Radius.Small}"/></Border></ControlTemplate></GridSplitter.Template>
-        </GridSplitter>
+            <GridSplitter Grid.Row="3" Style="{StaticResource WorkspaceSplitterStyle}"/>
         <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" IsHitTestVisible="False">
             <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Devices.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
             <materialDesign:PackIcon Kind="CellphoneLink" Width="36" Height="36" Foreground="{DynamicResource Brush.TextDisabled}" HorizontalAlignment="Center" Margin="0,0,0,12"/>
@@ -652,7 +604,7 @@
         <ScrollViewer x:Name="MultipleDeviceProfilePanelScrollViewer"
                           Grid.Row="4"
                           Margin="0,8,0,0"
-                          MinHeight="220"
+                          MinHeight="0"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <Grid x:Name="MultipleDeviceProfilePanelContentGrid"
@@ -719,7 +671,7 @@
                                                     Width="118"
                                                     HorizontalContentAlignment="Center"
                                                     VerticalContentAlignment="Center"
-                                                    Style="{StaticResource MultipleDeviceStopActionButtonStyle}">
+                                                    Style="{StaticResource WorkspaceStopButtonStyle}">
                                                 <Grid HorizontalAlignment="Center"
                                                       VerticalAlignment="Center">
                                                     <Grid.ColumnDefinitions>
@@ -737,7 +689,7 @@
                                                                TextAlignment="Center"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"
-                                                               Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                                 </Grid>
                                             </Button>
                                         </Grid>
@@ -774,7 +726,7 @@
                                         Command="{Binding OpenMultipleDevicesAdvancedConfigCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_AdvancedConfigTooltip}"
                                         ToolTipService.ShowOnDisabled="True"
-                                        Style="{StaticResource MultipleDeviceAdvancedConfigButtonStyle}">
+                                        Style="{StaticResource WorkspaceDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -784,7 +736,7 @@
                                                                  Style="{StaticResource PrimaryButtonIconStyle}"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="{DynamicResource ChangeMultipleDevices_AdvancedConfig}"
-                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                                   Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>
@@ -953,11 +905,11 @@
                                         Grid.Column="0"
                                         Command="{Binding RandomizeMultipleDevicesInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomSelectedTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="Cellphone" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomSelected}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomSelected}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="0"
@@ -968,7 +920,7 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="CellphoneCog" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeAndWipe}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeAndWipe}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="1"
@@ -979,7 +931,7 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="DeleteSweep" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionWipeWithoutChange}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionWipeWithoutChange}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="1"
@@ -990,29 +942,29 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="CellphoneText" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeWithoutWipe}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeWithoutWipe}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="2"
                                         Grid.Column="0"
                                         Command="{Binding RandomizeMultipleDevicesSimInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionRandomSimTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomSim}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomSim}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="2"
                                         Grid.Column="1"
                                         Command="{Binding ChangeMultipleDevicesSimInfoCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeSimTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeSim}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeSim}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="3"
@@ -1023,88 +975,88 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="Sync" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomChangeAndWipe}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionRandomChangeAndWipe}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="3"
                                         Grid.Column="1"
                                         Command="{Binding StopMultipleDevicesChangeSimCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionStopChangeSimTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="SimCard" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="{DynamicResource ChangeMultipleDevices_ActionStopChangeSim}"
-                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                                   Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="4"
                                         Grid.Column="0"
                                         Command="{Binding ChangeMultipleDevicesLocationCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeLocationTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="MapMarker" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeLocation}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeLocation}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="4"
                                         Grid.Column="1"
                                         Command="{Binding ChangeMultipleDevicesTimezoneCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionChangeTimezoneTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="ClockOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeTimezone}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionChangeTimezone}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="5"
                                         Grid.Column="0"
                                         Command="{Binding StartMultipleDevicesFakeProxyCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionFakeProxyTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="Wifi" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionFakeProxy}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionFakeProxy}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="5"
                                         Grid.Column="1"
                                         Command="{Binding StopMultipleDevicesFakeProxyCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionStopFakeProxyTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="WifiOff" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionStopFakeProxy}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionStopFakeProxy}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="6"
                                         Grid.Column="0"
                                         Command="{Binding UpdateMultipleDevicesIntegrityCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionUpdateIntegrityTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="ShieldCheck" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionUpdateIntegrity}" Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                        <TextBlock Grid.Column="1" Text="{DynamicResource ChangeMultipleDevices_ActionUpdateIntegrity}" Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                                 <Button Grid.Row="6"
                                         Grid.Column="1"
                                         Command="{Binding InstallPackagesOnMultipleDevicesCommand}"
                                         ToolTip="{DynamicResource ChangeMultipleDevices_ActionInstallApkTooltip}"
-                                        Style="{StaticResource MultipleDeviceActionButtonStyle}">
+                                        Style="{StaticResource WorkspaceActionButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialDesign:PackIcon Kind="Android" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="{DynamicResource ChangeMultipleDevices_ActionInstallApk}"
-                                                   Style="{StaticResource MultipleDeviceActionButtonTextStyle}"/>
+                                                   Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>

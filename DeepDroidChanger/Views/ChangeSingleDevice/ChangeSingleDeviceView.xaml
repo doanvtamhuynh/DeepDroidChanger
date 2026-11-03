@@ -15,7 +15,7 @@
                TargetType="DataGrid"
                BasedOn="{StaticResource FlatDataGridStyle}">
             <Setter Property="MinHeight"
-                    Value="220"/>
+                    Value="0"/>
             <Setter Property="RowHeight"
                     Value="{StaticResource Metric.DataGridEditorRowHeight}"/>
 
@@ -216,59 +216,9 @@
                     Value="{StaticResource DeviceComboBoxItemStyle}"/>
         </Style>
 
-        <Style x:Key="DeviceActionButtonStyle" TargetType="Button" BasedOn="{StaticResource WorkspaceActionButtonStyle}"/>
-
-        <Style x:Key="DeviceStopActionButtonStyle"
-               TargetType="Button"
-               BasedOn="{StaticResource DeviceActionButtonStyle}">
-            <Setter Property="Background" Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}"/>
-            <Setter Property="Foreground" Value="{DynamicResource Brush.DangerForeground}"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="materialDesign:RippleAssist.Feedback"
-                    Value="{DynamicResource Brush.DangerForeground}"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.DangerHover}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.DangerHover}"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Brush.DangerPressed}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.DangerPressed}"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.6"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="DeviceActionButtonTextStyle"
-               TargetType="TextBlock" BasedOn="{StaticResource PrimaryButtonTextStyle}">
-            <Setter Property="FontFamily"
-                    Value="{DynamicResource Metric.FontFamily}"/>
-            <Setter Property="FontSize"
-                    Value="{DynamicResource Metric.FontSize.Body}"/>
-            <Setter Property="FontWeight"
-                    Value="SemiBold"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="TextTrimming"
-                    Value="None"/>
-            <Setter Property="TextAlignment"
-                    Value="Left"/>
-            <Setter Property="VerticalAlignment"
-                    Value="Center"/>
-        </Style>
-
-        <Style x:Key="DeviceInfoDetailsButtonStyle" TargetType="Button" BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Padding" Value="12,6"/>
-        </Style>
-
     <Style x:Key="DeviceLoadToolbarStyle" TargetType="Grid">
         <Setter Property="Margin" Value="0,0,0,14"/>
     </Style>
-
-    <Style x:Key="DeviceLoadButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}"/>
 
     <Style x:Key="DeviceLoadButtonContentStyle" TargetType="StackPanel">
         <Setter Property="Orientation" Value="Horizontal"/>
@@ -337,7 +287,7 @@
             <Button Grid.Column="0"
                     Command="{Binding AddNewDevicesCommand}"
                     ToolTip="{DynamicResource ChangeSingleDevice_AddDevicesTooltip}"
-                    Style="{StaticResource DeviceLoadButtonStyle}">
+                    Style="{StaticResource PrimaryButtonStyle}">
                 <StackPanel Style="{StaticResource DeviceLoadButtonContentStyle}">
                     <materialDesign:PackIcon Kind="Plus"
                                              Style="{StaticResource PrimaryButtonIconStyle}"/>
@@ -545,7 +495,7 @@
                                     HorizontalAlignment="Stretch"
                                     HorizontalContentAlignment="Center"
                                     VerticalContentAlignment="Center"
-                                    Style="{StaticResource DeviceStopActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceStopButtonStyle}">
                                 <Grid HorizontalAlignment="Center"
                                       VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
@@ -563,7 +513,7 @@
                                                TextAlignment="Center"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                         </DataTemplate>
@@ -572,9 +522,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <GridSplitter Grid.Row="3" Height="12" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Focusable="True" ToolTip="{DynamicResource Workspace_ResizePanels}">
-            <GridSplitter.Template><ControlTemplate TargetType="GridSplitter"><Border Background="Transparent"><Border Height="3" Width="48" Background="{DynamicResource Brush.BorderStrong}" CornerRadius="{StaticResource Radius.Small}"/></Border></ControlTemplate></GridSplitter.Template>
-        </GridSplitter>
+        <GridSplitter Grid.Row="3" Style="{StaticResource WorkspaceSplitterStyle}"/>
         <StackPanel Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" IsHitTestVisible="False">
             <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Devices.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
             <materialDesign:PackIcon Kind="CellphoneLink" Width="36" Height="36" Foreground="{DynamicResource Brush.TextDisabled}" HorizontalAlignment="Center" Margin="0,0,0,12"/>
@@ -584,7 +532,7 @@
         <ScrollViewer x:Name="DeviceProfilePanelScrollViewer"
                       Grid.Row="4"
                       Margin="0,8,0,0"
-                      MinHeight="220"
+                      MinHeight="0"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
                     <Grid x:Name="DeviceProfilePanelContentGrid"
@@ -621,7 +569,7 @@
                                         Grid.Column="2"
                                         Command="{Binding ViewSingleDeviceRandomizedInfoCommand}"
                                         ToolTip="{DynamicResource ChangeSingleDevice_ActionViewAllDeviceInfoTooltip}"
-                                        Style="{StaticResource DeviceInfoDetailsButtonStyle}">
+                                        Style="{StaticResource WorkspaceDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -631,7 +579,7 @@
                                                                  Style="{StaticResource PrimaryButtonIconStyle}"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="{DynamicResource ChangeSingleDevice_ActionViewAllDeviceInfo}"
-                                                   Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                                   Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>
@@ -807,7 +755,7 @@
                                         Grid.Column="2"
                                         Command="{Binding OpenSingleDeviceAdvancedConfigCommand}"
                                         ToolTip="{DynamicResource ChangeSingleDevice_AdvancedConfigTooltip}"
-                                        Style="{StaticResource DeviceInfoDetailsButtonStyle}">
+                                        Style="{StaticResource WorkspaceDetailsButtonStyle}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -817,7 +765,7 @@
                                                                  Style="{StaticResource PrimaryButtonIconStyle}"/>
                                         <TextBlock Grid.Column="1"
                                                    Text="{DynamicResource ChangeSingleDevice_ActionAdvancedChangeConfig}"
-                                                   Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                                   Style="{StaticResource WorkspaceActionTextStyle}"/>
                                     </Grid>
                                 </Button>
                             </Grid>
@@ -982,7 +930,7 @@
                                 </Grid.RowDefinitions>
 
                             <Button Grid.Row="7" Grid.Column="0" Command="{Binding OpenTwrpBackupCommand}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Button.ToolTip>
                                     <StackPanel>
                                         <TextBlock Text="{DynamicResource Twrp_BackupButton}"/>
@@ -1000,11 +948,11 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource Twrp_BackupButton}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="7" Grid.Column="1" Command="{Binding OpenTwrpRestoreCommand}"
-                                    ToolTip="{DynamicResource Twrp_RestoreButton}" Style="{StaticResource DeviceActionButtonStyle}">
+                                    ToolTip="{DynamicResource Twrp_RestoreButton}" Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1017,7 +965,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource Twrp_RestoreButton}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button x:Name="RandomDeviceButton"
@@ -1025,7 +973,7 @@
                                     Grid.Column="0"
                                     Command="{Binding RandomizeSingleDeviceInfoCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomDeviceTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1038,7 +986,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionRandomDevice}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button x:Name="ChangeWithoutWipeButton"
@@ -1060,7 +1008,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionChangeWithoutWipe}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button x:Name="ChangeDeviceButton"
@@ -1081,7 +1029,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionChangeDevice}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button x:Name="WipeWithoutChangeButton"
@@ -1102,7 +1050,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionWipeWithoutChange}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="3"
@@ -1122,7 +1070,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionRandomChangeAndWipe}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button x:Name="RandomSimButton"
@@ -1130,7 +1078,7 @@
                                     Grid.Column="0"
                                     Command="{Binding RandomizeSingleDeviceSimInfoCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionRandomSimTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1143,7 +1091,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionRandomSim}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button x:Name="ChangeSimButton"
@@ -1151,7 +1099,7 @@
                                     Grid.Column="1"
                                     Command="{Binding ChangeSingleDeviceSimInfoCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeSimTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1164,14 +1112,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionChangeSim}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="4"
                                     Grid.Column="0"
                                     Command="{Binding ChangeSingleDeviceLocationCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeLocationTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1184,14 +1132,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionChangeLocation}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="4"
                                     Grid.Column="1"
                                     Command="{Binding ChangeSingleDeviceTimezoneCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionChangeTimezoneTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1204,14 +1152,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionChangeTimezone}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="6"
                                     Grid.Column="0"
                                     Command="{Binding UpdateSingleDeviceIntegrityCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionUpdateIntegrityTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1224,14 +1172,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionUpdateIntegrity}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="3"
                                     Grid.Column="1"
                                     Command="{Binding StopSingleDeviceChangeSimCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionStopChangeSimTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1244,14 +1192,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionStopChangeSim}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="6"
                                     Grid.Column="1"
                                     Command="{Binding InstallPackagesOnSingleDeviceCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionInstallApkTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1264,14 +1212,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionInstallApk}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="5"
                                     Grid.Column="0"
                                     Command="{Binding StartSingleDeviceFakeProxyCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionFakeProxyTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1284,14 +1232,14 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionFakeProxy}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             <Button Grid.Row="5"
                                     Grid.Column="1"
                                     Command="{Binding StopSingleDeviceFakeProxyCommand}"
                                     ToolTip="{DynamicResource ChangeSingleDevice_ActionStopFakeProxyTooltip}"
-                                    Style="{StaticResource DeviceActionButtonStyle}">
+                                    Style="{StaticResource WorkspaceActionButtonStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -1305,7 +1253,7 @@
                                                              Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1"
                                                Text="{DynamicResource ChangeSingleDevice_ActionStopFakeProxy}"
-                                               Style="{StaticResource DeviceActionButtonTextStyle}"/>
+                                               Style="{StaticResource WorkspaceActionTextStyle}"/>
                                 </Grid>
                             </Button>
                             </Grid>

@@ -17,7 +17,7 @@
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     <Style x:Key="SidebarTabStyle"
                TargetType="Button">
-            <Setter Property="Height"
+            <Setter Property="MinHeight"
                     Value="44"/>
             <Setter Property="Background"
                     Value="Transparent"/>
@@ -39,23 +39,26 @@
                         <Border x:Name="SidebarItemBorder"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="{StaticResource Radius.Medium}"
-                                Padding="12,0">
-                            <StackPanel Orientation="Horizontal"
-                                        VerticalAlignment="Center">
+                                Padding="12,10">
+                            <Grid VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
                                 <materialDesign:PackIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
                                                          Width="20"
                                                          Height="20"
                                                          VerticalAlignment="Center"
                                                          Foreground="{TemplateBinding Foreground}"/>
-                                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                <TextBlock Grid.Column="1" TextWrapping="Wrap" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
                                            FontFamily="{DynamicResource Metric.FontFamily}"
                                            FontSize="{DynamicResource Metric.FontSize.Body}"
                                            FontWeight="SemiBold"
                                            Margin="12,0,0,0"
                                            VerticalAlignment="Center"
-                                           Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource TemplatedParent}}"
                                            Foreground="{TemplateBinding Foreground}"/>
-                            </StackPanel>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -153,7 +156,7 @@
                         <Border x:Name="SidebarItemBorder"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="{StaticResource Radius.Medium}"
-                                Padding="12,0">
+                                Padding="12,10">
                             <Grid VerticalAlignment="Center">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -167,23 +170,23 @@
                                                          VerticalAlignment="Center"
                                                          Foreground="{TemplateBinding Foreground}"/>
 
-                                <TextBlock Grid.Column="1"
+                                <TextBlock Grid.Column="1" TextWrapping="Wrap"
                                            Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
                                            FontFamily="{DynamicResource Metric.FontFamily}"
                                            FontSize="{DynamicResource Metric.FontSize.Body}"
                                            FontWeight="SemiBold"
                                            Margin="12,0,0,0"
                                            VerticalAlignment="Center"
-                                           Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource TemplatedParent}}"
                                            Foreground="{TemplateBinding Foreground}"/>
 
                                 <materialDesign:PackIcon Grid.Column="2"
-                                                         Kind="{Binding DataContext.DevicesManagerChevronIconKind, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Kind="{Binding DataContext.DevicesManagerChevronIconKind, RelativeSource={RelativeSource TemplatedParent}}"
                                                          Width="16"
                                                          Height="16"
                                                          Margin="8,0,0,0"
                                                          VerticalAlignment="Center"
-                                                         Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Visibility="{Binding DataContext.NavLabelVisibility, RelativeSource={RelativeSource TemplatedParent}}"
                                                          Foreground="{TemplateBinding Foreground}"/>
                             </Grid>
                         </Border>
@@ -247,7 +250,7 @@
 
         <Style x:Key="SidebarSubmenuButtonStyle"
                TargetType="Button">
-            <Setter Property="Height"
+            <Setter Property="MinHeight"
                     Value="{DynamicResource Metric.ControlHeight}"/>
             <Setter Property="Background"
                     Value="{DynamicResource Brush.Surface}"/>
@@ -269,7 +272,7 @@
                         <Border x:Name="SubmenuItemBorder"
                                 Background="{TemplateBinding Background}"
                                 CornerRadius="{StaticResource Radius.Interactive}"
-                                Padding="38,0,10,0">
+                                Padding="38,8,10,8">
                             <Grid VerticalAlignment="Center">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -288,7 +291,7 @@
                                            FontWeight="SemiBold"
                                            Margin="8,0,0,0"
                                            VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="Wrap"
                                            Foreground="{TemplateBinding Foreground}"/>
                             </Grid>
                         </Border>
@@ -667,7 +670,7 @@
                 Background="{DynamicResource Brush.Surface}"
                 BorderBrush="{DynamicResource Brush.Border}"
                 BorderThickness="0,0,1,0">
-            <DockPanel LastChildFill="False">
+            <DockPanel LastChildFill="True">
                 <Grid x:Name="HeaderPanel"
                       DockPanel.Dock="Top"
                       Margin="{Binding HeaderMargin}">
@@ -696,115 +699,32 @@
                                                  Style="{StaticResource ShellToggleIconStyle}"/>
                     </Button>
 
-                    <StackPanel x:Name="PnlLogo"
+                    <Grid x:Name="PnlLogo"
                                 Grid.Row="{Binding LogoRow}"
                                 Grid.Column="0"
                                 Grid.ColumnSpan="{Binding LogoColumnSpan}"
-                                Orientation="Horizontal"
                                 HorizontalAlignment="{Binding LogoHorizontalAlignment}"
                                 Margin="{Binding LogoMargin}"
                                 VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
                         <materialDesign:PackIcon Kind="Robot"
                                                  Style="{StaticResource ShellLogoIconStyle}"/>
-                        <TextBlock x:Name="TxtLogo"
+                        <TextBlock Grid.Column="1" x:Name="TxtLogo"
+                                   ToolTip="{DynamicResource AppName}"
                                    Text="{DynamicResource AppName}"
                                    Style="{StaticResource ShellLogoTextStyle}"
                                    Visibility="{Binding LogoTextVisibility}"
                                    TextTrimming="CharacterEllipsis"
                                    VerticalAlignment="Center"/>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
 
                 <Separator DockPanel.Dock="Top"
                            Background="{DynamicResource Brush.Border}"
                            Margin="12,4"/>
-
-                <StackPanel DockPanel.Dock="Top"
-                            Margin="6,6,6,0">
-                    <Button x:Name="BtnDevicesManager"
-                            Tag="{Binding DevicesManagerIconKind}"
-                            Content="{DynamicResource Nav_DevicesManager}"
-                            Command="{Binding ToggleDevicesManagerMenuCommand}"
-                            behaviors:ContextMenuOpenBehavior.IsOpen="{Binding IsDevicesManagerFlyoutOpen, Mode=TwoWay}"
-                             ContextMenuService.Placement="Right"
-                             ContextMenuService.IsEnabled="{Binding IsSidebarCollapsed}"
-                             ToolTip="{DynamicResource Nav_DevicesManagerTooltip}"
-                             Style="{StaticResource SidebarDevicesManagerGroupStyle}">
-                        <Button.ContextMenu>
-                            <ContextMenu Placement="Right"
-                                         StaysOpen="False"
-                                         Style="{StaticResource SidebarDevicesManagerFlyoutStyle}">
-                                <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeSingleDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          ToolTip="{DynamicResource Nav_ChangeSingleDeviceTooltip}"
-                                          Style="{StaticResource SidebarSingleDeviceFlyoutMenuItemStyle}">
-                                    <MenuItem.Header>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialDesign:PackIcon Kind="Cellphone"
-                                                                     Style="{StaticResource SidebarFlyoutItemIconStyle}"/>
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{DynamicResource Nav_ChangeSingleDevice}"
-                                                       Style="{StaticResource SidebarFlyoutItemTextStyle}"/>
-                                        </Grid>
-                                    </MenuItem.Header>
-                                </MenuItem>
-
-                                <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeMultipleDevicesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
-                                          Style="{StaticResource SidebarMultipleDevicesFlyoutMenuItemStyle}">
-                                    <MenuItem.Header>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialDesign:PackIcon Kind="ViewGrid"
-                                                                     Style="{StaticResource SidebarFlyoutItemIconStyle}"/>
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{DynamicResource Nav_ChangeMultipleDevice}"
-                                                       Style="{StaticResource SidebarFlyoutItemTextStyle}"/>
-                                        </Grid>
-                                    </MenuItem.Header>
-                                </MenuItem>
-                            </ContextMenu>
-                        </Button.ContextMenu>
-                    </Button>
-
-                    <StackPanel x:Name="DevicesManagerSubmenu"
-                                Style="{StaticResource SidebarDevicesManagerSubmenuStyle}">
-                        <Button x:Name="BtnChangeSingleDevice"
-                                Tag="Cellphone"
-                                Content="{DynamicResource Nav_ChangeSingleDevice}"
-                                Command="{Binding NavigateChangeSingleDeviceCommand}"
-                                ToolTip="{DynamicResource Nav_ChangeSingleDeviceTooltip}"
-                                Style="{StaticResource SidebarSingleDeviceSubmenuButtonStyle}"/>
-                        <Button x:Name="BtnChangeMultipleDevices"
-                                Tag="ViewGrid"
-                                Content="{DynamicResource Nav_ChangeMultipleDevice}"
-                                Command="{Binding NavigateChangeMultipleDevicesCommand}"
-                                ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
-                                Style="{StaticResource SidebarMultipleDevicesSubmenuButtonStyle}"/>
-                    </StackPanel>
-
-                    <Button x:Name="BtnViewMultipleDevices"
-                            Tag="ViewGrid"
-                            Content="{DynamicResource Nav_ViewMultipleDevices}"
-                            Command="{Binding NavigateViewMultipleDevicesCommand}"
-                            ToolTip="{DynamicResource Nav_ViewMultipleDevicesTooltip}"
-                            Style="{StaticResource SidebarViewMultipleDevicesTabStyle}"/>
-
-                    <Button x:Name="BtnSettings"
-                            Tag="Cog"
-                            Content="{DynamicResource Nav_Settings}"
-                            Command="{Binding NavigateSettingsCommand}"
-                            ToolTip="{DynamicResource Nav_SettingsTooltip}"
-                            Style="{StaticResource SidebarSettingsTabStyle}"/>
-                </StackPanel>
-
-                <Grid DockPanel.Dock="Top"/>
 
                 <Border x:Name="BottomActionsPanel"
                         DockPanel.Dock="Bottom"
@@ -863,6 +783,93 @@
                         </DockPanel>
                     </StackPanel>
                 </Border>
+                <ScrollViewer x:Name="SidebarNavigationScroll" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <StackPanel
+                                Margin="6,6,6,0">
+                        <Button x:Name="BtnDevicesManager"
+                                Tag="{Binding DevicesManagerIconKind}"
+                                Content="{DynamicResource Nav_DevicesManager}"
+                                Command="{Binding ToggleDevicesManagerMenuCommand}"
+                                behaviors:ContextMenuOpenBehavior.IsOpen="{Binding IsDevicesManagerFlyoutOpen, Mode=TwoWay}"
+                                 ContextMenuService.Placement="Right"
+                                 ContextMenuService.IsEnabled="{Binding IsSidebarCollapsed}"
+                                 ToolTip="{DynamicResource Nav_DevicesManagerTooltip}"
+                                 Style="{StaticResource SidebarDevicesManagerGroupStyle}">
+                            <Button.ContextMenu>
+                                <ContextMenu Placement="Right"
+                                             StaysOpen="False"
+                                             Style="{StaticResource SidebarDevicesManagerFlyoutStyle}">
+                                    <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeSingleDeviceCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              ToolTip="{DynamicResource Nav_ChangeSingleDeviceTooltip}"
+                                              Style="{StaticResource SidebarSingleDeviceFlyoutMenuItemStyle}">
+                                        <MenuItem.Header>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <materialDesign:PackIcon Kind="Cellphone"
+                                                                         Style="{StaticResource SidebarFlyoutItemIconStyle}"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{DynamicResource Nav_ChangeSingleDevice}"
+                                                           Style="{StaticResource SidebarFlyoutItemTextStyle}"/>
+                                            </Grid>
+                                        </MenuItem.Header>
+                                    </MenuItem>
+
+                                    <MenuItem Command="{Binding PlacementTarget.DataContext.NavigateChangeMultipleDevicesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
+                                              Style="{StaticResource SidebarMultipleDevicesFlyoutMenuItemStyle}">
+                                        <MenuItem.Header>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <materialDesign:PackIcon Kind="ViewGrid"
+                                                                         Style="{StaticResource SidebarFlyoutItemIconStyle}"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{DynamicResource Nav_ChangeMultipleDevice}"
+                                                           Style="{StaticResource SidebarFlyoutItemTextStyle}"/>
+                                            </Grid>
+                                        </MenuItem.Header>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+
+                        <StackPanel x:Name="DevicesManagerSubmenu"
+                                    Style="{StaticResource SidebarDevicesManagerSubmenuStyle}">
+                            <Button x:Name="BtnChangeSingleDevice"
+                                    Tag="Cellphone"
+                                    Content="{DynamicResource Nav_ChangeSingleDevice}"
+                                    Command="{Binding NavigateChangeSingleDeviceCommand}"
+                                    ToolTip="{DynamicResource Nav_ChangeSingleDeviceTooltip}"
+                                    Style="{StaticResource SidebarSingleDeviceSubmenuButtonStyle}"/>
+                            <Button x:Name="BtnChangeMultipleDevices"
+                                    Tag="ViewGrid"
+                                    Content="{DynamicResource Nav_ChangeMultipleDevice}"
+                                    Command="{Binding NavigateChangeMultipleDevicesCommand}"
+                                    ToolTip="{DynamicResource Nav_ChangeMultipleDeviceTooltip}"
+                                    Style="{StaticResource SidebarMultipleDevicesSubmenuButtonStyle}"/>
+                        </StackPanel>
+
+                        <Button x:Name="BtnViewMultipleDevices"
+                                Tag="ViewGrid"
+                                Content="{DynamicResource Nav_ViewMultipleDevices}"
+                                Command="{Binding NavigateViewMultipleDevicesCommand}"
+                                ToolTip="{DynamicResource Nav_ViewMultipleDevicesTooltip}"
+                                Style="{StaticResource SidebarViewMultipleDevicesTabStyle}"/>
+
+                        <Button x:Name="BtnSettings"
+                                Tag="Cog"
+                                Content="{DynamicResource Nav_Settings}"
+                                Command="{Binding NavigateSettingsCommand}"
+                                ToolTip="{DynamicResource Nav_SettingsTooltip}"
+                                Style="{StaticResource SidebarSettingsTabStyle}"/>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 

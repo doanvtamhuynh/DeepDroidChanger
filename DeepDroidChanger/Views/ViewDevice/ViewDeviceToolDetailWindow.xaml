@@ -21,9 +21,9 @@
         <Style x:Key="DetailButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight}"/>
+            <Setter Property="Padding" Value="10,6"/>
             <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Small}"/>
             <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
@@ -39,9 +39,9 @@
         <Style x:Key="DetailFileActionButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource FlatButtonStyle}">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="MinHeight" Value="36"/>
-            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight}"/>
+            <Setter Property="Padding" Value="8,6"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -53,6 +53,7 @@
         <Style x:Key="DetailLabelStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Small}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
         </Style>
 
@@ -151,7 +152,7 @@
                                      Margin="0,0,4,0"/>
                             <Button x:Name="BrowseComputerFileButton"
                                     Grid.Column="1"
-                                    Width="78"
+                                    MinWidth="78"
                                     Style="{StaticResource DetailButtonStyle}"
                                     Command="{Binding BrowseComputerFileCommand}"
                                     Content="{DynamicResource ViewDevice_Browse}"/>
@@ -172,27 +173,25 @@
                                     Grid.Column="0"
                                     Style="{StaticResource DetailFileActionButtonStyle}"
                                     Command="{Binding ImportFileCommand}">
-                                <StackPanel Orientation="Horizontal"
-                                            HorizontalAlignment="Center">
+                                <DockPanel LastChildFill="True">
                                     <materialDesign:PackIcon Kind="Upload"
-                                                             Width="15"
+                                                             VerticalAlignment="Center" Width="15"
                                                              Height="15"
                                                              Margin="0,0,5,0"/>
-                                    <TextBlock Text="{DynamicResource ViewDevice_Import}"/>
-                                </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" TextAlignment="Center" FontSize="{DynamicResource Metric.FontSize.Small}" Text="{DynamicResource ViewDevice_Import}"/>
+                                </DockPanel>
                             </Button>
                             <Button x:Name="ExportButton"
                                     Grid.Column="2"
                                     Style="{StaticResource DetailFileActionButtonStyle}"
                                     Command="{Binding ExportFileCommand}">
-                                <StackPanel Orientation="Horizontal"
-                                            HorizontalAlignment="Center">
+                                <DockPanel LastChildFill="True">
                                     <materialDesign:PackIcon Kind="Download"
-                                                             Width="15"
+                                                             VerticalAlignment="Center" Width="15"
                                                              Height="15"
                                                              Margin="0,0,5,0"/>
-                                    <TextBlock Text="{DynamicResource ViewDevice_Export}"/>
-                                </StackPanel>
+                                    <TextBlock TextWrapping="Wrap" TextAlignment="Center" FontSize="{DynamicResource Metric.FontSize.Small}" Text="{DynamicResource ViewDevice_Export}"/>
+                                </DockPanel>
                             </Button>
                         </Grid>
                     </StackPanel>

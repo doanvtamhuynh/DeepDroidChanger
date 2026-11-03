@@ -13,9 +13,28 @@ namespace DeepDroidChanger.Views
             SettingsSections.SelectionChanged += (_, _) => SettingsScroll.ScrollToTop();
         }
 
-        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+        protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
         {
-            bool compact = ActualWidth < 860;
+            base.OnPropertyChanged(e);
+            if (e.Property == FontSizeProperty && IsInitialized)
+                UpdateLayoutForViewport();
+        }
+
+        private void OnSizeChanged(object sender, SizeChangedEventArgs e) => UpdateLayoutForViewport();
+
+        private void OnCompactSectionChanged(object sender, SelectionChangedEventArgs e) => SettingsScroll?.ScrollToTop();
+
+        private void UpdateLayoutForViewport()
+        {
+            if (!IsInitialized) return;
+            double scale = (double)FindResource("Metric.FontSize.Body") / 14;
+            bool shortViewport = ActualHeight < 560 * scale;
+            bool compactNavigation = ActualWidth < 720 * scale || shortViewport;
+            SettingsSections.Visibility = compactNavigation ? Visibility.Collapsed : Visibility.Visible;
+            CompactSettingsSections.Visibility = compactNavigation ? Visibility.Visible : Visibility.Collapsed;
+            SettingsDescription.Visibility = shortViewport ? Visibility.Collapsed : Visibility.Visible;
+            SettingsHeader.Margin = new Thickness(0, 0, 0, shortViewport ? 12 : 20);
+            bool compact = ActualWidth < 860 * scale;
             double gap = ((Thickness)FindResource("Spacing.PageMargin")).Left;
             AboutColumn.Width = compact ? new GridLength(0) : new GridLength(288);
             Grid.SetColumn(AboutPanel, compact ? 0 : 1);
@@ -26,7 +45,7 @@ namespace DeepDroidChanger.Views
             Grid.SetColumnSpan(FooterActions, compact ? 2 : 1);
             Grid.SetColumnSpan(FooterStatus, compact ? 2 : 1);
             FooterActions.Margin = compact ? new Thickness(0, gap, 0, 0) : new Thickness(gap, 0, 0, 0);
-            bool narrow = ActualWidth < 640;
+            bool narrow = ActualWidth < 640 * scale;
             StylingFields.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
             FrameworkElement[] fields = [StyleButtonColorField, StyleTextColorField, StyleFontFamilyField,
                 StyleTypeStyleField, StyleFontSizeField, StyleButtonSizeField, StyleButtonVariantField];

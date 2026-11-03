@@ -58,10 +58,10 @@
             <Style x:Key="ViewDeviceToolQuickButtonStyle"
                    TargetType="Button"
                    BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
-                <Setter Property="Height" Value="{DynamicResource Metric.ControlHeight.Comfortable}"/>
+                <Setter Property="Height" Value="Auto"/>
                 <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight.Comfortable}"/>
                 <Setter Property="Margin" Value="{StaticResource ViewDevice.ControlCellSpacing}"/>
-                <Setter Property="Padding" Value="5,0"/>
+                <Setter Property="Padding" Value="6,8"/>
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
                 <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
@@ -86,9 +86,9 @@
             <Style x:Key="ViewDeviceToolInlineButtonStyle"
                    TargetType="Button"
                    BasedOn="{StaticResource ViewDeviceOutlinedButtonStyle}">
-                <Setter Property="Height" Value="32"/>
-                <Setter Property="MinHeight" Value="0"/>
-                <Setter Property="Padding" Value="10,0"/>
+                <Setter Property="Height" Value="Auto"/>
+                <Setter Property="MinHeight" Value="{DynamicResource Metric.ControlHeight}"/>
+                <Setter Property="Padding" Value="10,6"/>
                 <Setter Property="Margin" Value="0,0,4,0"/>
                 <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Small}"/>
                 <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}"/>
@@ -114,7 +114,7 @@
                 <Setter Property="FontSize" Value="{DynamicResource Metric.FontSize.Body}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
                 <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}"/>
-                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsEnabled, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
@@ -162,8 +162,8 @@
 
             <Border x:Name="HeaderPanel"
                     Grid.Row="0"
-                    Height="{StaticResource Metric.ToolbarMinHeight}"
-                    Padding="12,0"
+                    MinHeight="{StaticResource Metric.ToolbarMinHeight}"
+                    Padding="12,8"
                     Background="{DynamicResource Brush.Surface}"
                     BorderBrush="{DynamicResource Brush.Border}"
                     BorderThickness="0,0,0,1">
@@ -212,7 +212,7 @@
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding VolumeDownCommand}"
                                 ToolTip="{DynamicResource ViewDevice_VolumeDownDescription}">
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="Minus"
                                                          Width="15"
                                                          Height="15"
@@ -220,7 +220,7 @@
                                                          Foreground="{DynamicResource Brush.Accent}"/>
                                 <TextBlock Text="{DynamicResource ViewDevice_VolumeShort}"
                                            Style="{StaticResource ViewDeviceToolQuickTitleStyle}"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Button>
                         <Button x:Name="VolumeUpButton"
                                 Grid.Row="1"
@@ -228,7 +228,7 @@
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding VolumeUpCommand}"
                                 ToolTip="{DynamicResource ViewDevice_VolumeUpDescription}">
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="Plus"
                                                          Width="15"
                                                          Height="15"
@@ -236,7 +236,7 @@
                                                          Foreground="{DynamicResource Brush.Accent}"/>
                                 <TextBlock Text="{DynamicResource ViewDevice_VolumeShort}"
                                            Style="{StaticResource ViewDeviceToolQuickTitleStyle}"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Button>
                         <Button x:Name="PowerButton"
                                 Grid.Row="0"
@@ -244,7 +244,7 @@
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding PowerCommand}"
                                 ToolTip="{DynamicResource ViewDevice_PowerDescription}">
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="Power"
                                                          Width="15"
                                                          Height="15"
@@ -252,7 +252,7 @@
                                                          Foreground="{DynamicResource Brush.Accent}"/>
                                 <TextBlock Text="{DynamicResource ViewDevice_Power}"
                                            Style="{StaticResource ViewDeviceToolQuickTitleStyle}"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Button>
                         <Button x:Name="ReconnectButton"
                                 Grid.Row="0"
@@ -260,7 +260,7 @@
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding ReconnectCommand}"
                                 ToolTip="{DynamicResource ViewDevice_ReconnectDescription}">
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="Refresh"
                                                          Width="14"
                                                          Height="14"
@@ -268,7 +268,7 @@
                                                          Foreground="{DynamicResource Brush.Accent}"/>
                                 <TextBlock Text="{DynamicResource ViewDevice_Reconnect}"
                                            Style="{StaticResource ViewDeviceToolQuickTitleStyle}"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Button>
                         <Button x:Name="ScreenButton"
                                 Grid.Row="2"
@@ -277,7 +277,7 @@
                                 Command="{Binding ToggleScreenCommand}"
                                 IsEnabled="{Binding IsScreenActionAvailable}"
                                 ToolTip="{DynamicResource ViewDevice_ScreenToggleDescription}">
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="Monitor"
                                                          Width="14"
                                                          Height="14"
@@ -285,7 +285,7 @@
                                                          Foreground="{DynamicResource Brush.Accent}"/>
                                 <TextBlock Text="{DynamicResource ViewDevice_ScreenOnOff}"
                                            Style="{StaticResource ViewDeviceToolScreenQuickTitleStyle}"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Button>
                         <Button x:Name="RebootButton"
                                 Grid.Row="2"
@@ -293,7 +293,7 @@
                                 Style="{StaticResource ViewDeviceToolQuickButtonStyle}"
                                 Command="{Binding RebootDeviceCommand}"
                                 ToolTip="{DynamicResource ViewDevice_RestartDescription}">
-                            <StackPanel Orientation="Horizontal">
+                            <DockPanel LastChildFill="True">
                                 <materialDesign:PackIcon Kind="Restart"
                                                          Width="14"
                                                          Height="14"
@@ -301,7 +301,7 @@
                                                          Foreground="{DynamicResource Brush.Warning}"/>
                                 <TextBlock Text="{DynamicResource ViewDevice_Reboot}"
                                            Style="{StaticResource ViewDeviceToolQuickTitleStyle}"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Button>
                     </Grid>
 
@@ -309,103 +309,103 @@
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding RenameConfigCommand}"
                             ToolTip="{DynamicResource ViewDevice_RenameConfigDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="Pencil"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{DynamicResource ViewDevice_RenameConfig}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="InputAdbButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding InputAdbCommand}"
                             ToolTip="{DynamicResource ViewDevice_InputAdbDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="Console"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{DynamicResource ViewDevice_InputAdb}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="RotateScreenButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding RotateViewCommand}"
                             ToolTip="{DynamicResource ViewDevice_RotateScreenDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="RotateRight"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{DynamicResource ViewDevice_RotateScreen}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="FileTransferButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding FileTransferCommand}"
                             ToolTip="{DynamicResource ViewDevice_ImportExportDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="SwapHorizontal"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{DynamicResource ViewDevice_ImportExport}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="WifiButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding ToggleWifiCommand}"
                             IsEnabled="{Binding IsWifiActionAvailable}"
                             ToolTip="{DynamicResource ViewDevice_WifiDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="Wifi"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{Binding WifiActionText}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="ScreenshotButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding ScreenshotCommand}"
                             ToolTip="{DynamicResource ViewDevice_ScreenshotDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="Camera"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{DynamicResource ViewDevice_Screenshot}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="InstallPackageButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding InstallPackageCommand}"
                             ToolTip="{DynamicResource ViewDevice_InstallPackageDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="PackageVariant"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{DynamicResource ViewDevice_InstallPackage}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="GmsButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding ToggleGmsCommand}"
                             IsEnabled="{Binding IsGmsActionAvailable}"
                             ToolTip="{DynamicResource ViewDevice_GmsDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="Google"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{Binding GmsActionText}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
                     <Button x:Name="PlayStoreButton"
                             Style="{StaticResource ViewDeviceToolActionStyle}"
                             Command="{Binding TogglePlayStoreCommand}"
                             IsEnabled="{Binding IsPlayStoreActionAvailable}"
                             ToolTip="{DynamicResource ViewDevice_PlayStoreDescription}">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
                             <materialDesign:PackIcon Kind="GooglePlay"
                                                      Style="{StaticResource ViewDeviceToolIconStyle}"/>
                             <TextBlock Text="{Binding PlayStoreActionText}"
                                        Style="{StaticResource ViewDeviceToolTitleStyle}"/>
-                        </StackPanel>
+                        </DockPanel>
                     </Button>
 
                     <TextBlock x:Name="ToolStatusText"

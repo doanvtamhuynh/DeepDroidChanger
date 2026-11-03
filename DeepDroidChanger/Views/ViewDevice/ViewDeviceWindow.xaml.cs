@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using DeepDroidChanger.Services;
@@ -18,6 +19,32 @@ public sealed partial class ViewDeviceWindow : Window
     private bool _toolsEnabled;
     private bool _isLoaded;
     private bool _isClosing;
+
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.Property == FontSizeProperty && IsInitialized)
+            UpdateHeaderLayout();
+    }
+
+    private void OnHeaderSizeChanged(object sender, SizeChangedEventArgs e) => UpdateHeaderLayout();
+
+    private void UpdateHeaderLayout()
+    {
+        if (!IsInitialized) return;
+        double scale = (double)FindResource("Metric.FontSize.Body") / 14;
+        bool compact = HeaderContentGrid.ActualWidth < 560 * scale;
+        Grid.SetColumnSpan(DeviceIdentity, compact ? 2 : 1);
+        DeviceSerial.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        Grid.SetRow(DeviceStatus, compact ? 1 : 0);
+        Grid.SetColumn(DeviceStatus, compact ? 0 : 1);
+        Grid.SetColumnSpan(DeviceStatus, compact ? 2 : 1);
+        DeviceStatus.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+        DeviceStatus.Margin = compact ? new Thickness(0, 4, 0, 0) : new Thickness(12, 0, 0, 0);
+        Grid.SetRowSpan(SettingsButton, compact ? 2 : 1);
+        Visibility captions = HeaderContentGrid.ActualWidth < 420 * scale ? Visibility.Collapsed : Visibility.Visible;
+        RecentCaption.Visibility = HomeCaption.Visibility = BackCaption.Visibility = captions;
+    }
 
     public ViewDeviceWindow(ViewDeviceViewModel viewModel)
     {

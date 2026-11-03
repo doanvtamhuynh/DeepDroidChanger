@@ -253,6 +253,8 @@
                 Value="True"/>
         <Setter Property="OverridesDefaultStyle"
                 Value="True"/>
+        <Setter Property="MaxHeight"
+                Value="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
@@ -268,9 +270,13 @@
                                               Direction="270"
                                               Opacity="{StaticResource Metric.Elevation.FloatingShadowOpacity}"/>
                         </Border.Effect>
-                        <StackPanel ClipToBounds="False"
-                                    IsItemsHost="True"
-                                    KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        <ScrollViewer x:Name="MenuScrollViewer"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Focusable="False">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </ScrollViewer>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>

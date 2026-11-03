@@ -18,7 +18,11 @@
                         <Border x:Name="Box" Width="20" Height="20" Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource Radius.Small}" VerticalAlignment="Center" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
                             <Path x:Name="CheckMark" Width="10" Height="7" Data="M 1 4 L 4 7 L 9 1" Stroke="{DynamicResource Brush.AccentForeground}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed" />
                         </Border>
-                        <ContentPresenter Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        <ContentPresenter Grid.Column="1" Margin="9,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True">
+                            <ContentPresenter.Resources>
+                                <DataTemplate DataType="{x:Type sys:String}"><AccessText Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -53,12 +57,17 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
-                    <StackPanel Orientation="Horizontal">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <Border x:Name="CheckBorder" Width="16" Height="16" Background="Transparent" BorderBrush="{DynamicResource Brush.Border}" BorderThickness="1" CornerRadius="3" VerticalAlignment="Center">
                             <materialDesign:PackIcon x:Name="CheckIcon" Kind="Check" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource Brush.AccentForeground}" Visibility="Collapsed" xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" />
                         </Border>
-                        <ContentPresenter Margin="7,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
-                    </StackPanel>
+                        <ContentPresenter Grid.Column="1" Margin="7,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True">
+                            <ContentPresenter.Resources>
+                                <DataTemplate DataType="{x:Type sys:String}"><AccessText Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="CheckBorder" Property="Background" Value="{DynamicResource Brush.Accent}" />
@@ -76,6 +85,7 @@
                             <Setter TargetName="CheckBorder" Property="Background" Value="{DynamicResource Brush.AccentHover}" />
                             <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{DynamicResource Brush.AccentHover}" />
                             <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="CheckIcon" Property="Foreground" Value="{DynamicResource Brush.AccentHoverForeground}" />
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="CheckBorder" Property="Background" Value="{DynamicResource Brush.SurfacePressed}" />

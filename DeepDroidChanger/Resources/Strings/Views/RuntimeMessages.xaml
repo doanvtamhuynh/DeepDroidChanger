@@ -203,6 +203,8 @@
     <sys:String x:Key="ViewDevice_AndroidFilePath">Android path</sys:String>
     <sys:String x:Key="ViewDevice_InputTextPrompt">Input text</sys:String>
     <sys:String x:Key="ViewDevice_AdbShellPrompt">ADB shell command</sys:String>
+    <sys:String x:Key="ViewDevice_Import">Send file</sys:String>
+    <sys:String x:Key="ViewDevice_Export">Receive file</sys:String>
     <sys:String x:Key="ViewDevice_ImportTitle">Import file</sys:String>
     <sys:String x:Key="ViewDevice_ExportTitle">Export file</sys:String>
     <sys:String x:Key="ViewDevice_InstallTitle">Install APK/XAPK</sys:String>

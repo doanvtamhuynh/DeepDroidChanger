@@ -20,7 +20,8 @@
     <sys:String x:Key="Shared_TooltipList">Chọn một mục để dùng với các nút thao tác trong hộp thoại này.</sys:String>
     <sys:String x:Key="Workspace_SingleDescription">Quản lý hồ sơ, cấu hình thay đổi và thao tác với từng thiết bị.</sys:String>
     <sys:String x:Key="Workspace_MultipleDescription">Chọn thiết bị, thiết lập cấu hình chung và theo dõi tác vụ hàng loạt.</sys:String>
-    <sys:String x:Key="Workspace_ResizePanels">Kéo để thay đổi chiều cao danh sách và khu vực cấu hình.</sys:String>
+    <sys:String x:Key="Workspace_ResizePanelsName">Đổi chiều cao vùng thiết bị</sys:String>
+    <sys:String x:Key="Workspace_ResizePanels">Kéo hoặc dùng phím mũi tên lên và xuống để đổi chiều cao vùng thiết bị.</sys:String>
     <sys:String x:Key="Workspace_EmptyTitle">Chưa có thiết bị để hiển thị</sys:String>
     <sys:String x:Key="Workspace_EmptyHint">Thêm thiết bị hoặc thay đổi từ khóa và bộ lọc để bắt đầu.</sys:String>
     <sys:String x:Key="Workspace_MonitorDescription">Theo dõi màn hình thiết bị và sử dụng công cụ trong cùng một khu vực.</sys:String>
