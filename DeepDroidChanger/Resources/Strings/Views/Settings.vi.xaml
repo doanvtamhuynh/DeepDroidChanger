@@ -49,8 +49,9 @@
     <sys:String x:Key="Settings_ReconnectDescription">Tự động kết nối lại khi phiên xem gặp lỗi. Cài đặt chất lượng, bàn phím và âm thanh được áp dụng khi mở hoặc kết nối lại phiên.</sys:String>
     <sys:String x:Key="Settings_Batch">Tác vụ hàng loạt</sys:String>
     <sys:String x:Key="Settings_BatchDescription">Cân bằng tốc độ xử lý và tải máy tính khi dùng công cụ trên nhiều thiết bị.</sys:String>
-    <sys:String x:Key="Settings_ConcurrentTools">Số tác vụ chạy đồng thời</sys:String>
-    <sys:String x:Key="Settings_ConcurrentDescription">Giới hạn số tác vụ công cụ chạy đồng thời trong lưới thiết bị.</sys:String>
+    <sys:String x:Key="Settings_ConcurrentTools">Số tác vụ đồng thời mỗi đợt</sys:String>
+    <sys:String x:Key="Settings_ConcurrentDescription">Áp dụng cho Batch Tools và thao tác nhiều thiết bị. Chọn mức thấp hơn nếu máy tính hoặc kết nối USB bị quá tải.</sys:String>
+    <sys:String x:Key="Settings_UnlimitedConcurrency">Không giới hạn</sys:String>
     <sys:String x:Key="Settings_BatchDelay">Khoảng nghỉ giữa các tác vụ</sys:String>
     <sys:String x:Key="Settings_BatchDelayDescription">Giãn thời điểm bắt đầu tác vụ để giảm tải đột ngột cho máy tính và kết nối USB.</sys:String>
     <sys:String x:Key="Settings_NoDelay">Không có khoảng nghỉ</sys:String>

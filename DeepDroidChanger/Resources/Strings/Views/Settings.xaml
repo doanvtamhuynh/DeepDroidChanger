@@ -49,8 +49,9 @@
     <sys:String x:Key="Settings_ReconnectDescription">Retry failed sessions automatically. Quality, keyboard and audio settings apply to new or reconnected sessions.</sys:String>
     <sys:String x:Key="Settings_Batch">Batch tools</sys:String>
     <sys:String x:Key="Settings_BatchDescription">Balance throughput and computer load when using tools on several devices.</sys:String>
-    <sys:String x:Key="Settings_ConcurrentTools">Concurrent tool tasks</sys:String>
-    <sys:String x:Key="Settings_ConcurrentDescription">Limit the number of tool tasks running at the same time in the device grid.</sys:String>
+    <sys:String x:Key="Settings_ConcurrentTools">Concurrent tasks per batch</sys:String>
+    <sys:String x:Key="Settings_ConcurrentDescription">Applies to Batch Tools and multi-device actions. Choose a lower limit if the computer or USB connection is overloaded.</sys:String>
+    <sys:String x:Key="Settings_UnlimitedConcurrency">Unlimited</sys:String>
     <sys:String x:Key="Settings_BatchDelay">Delay between task starts</sys:String>
     <sys:String x:Key="Settings_BatchDelayDescription">Stagger task starts to reduce sudden load on the computer and USB connection.</sys:String>
     <sys:String x:Key="Settings_NoDelay">No delay</sys:String>

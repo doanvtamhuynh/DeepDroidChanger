@@ -29,7 +29,8 @@ public sealed record SettingsOptions
     public bool SyncClipboard { get; init; } = true;
     public bool EnableAudio { get; init; }
     public bool AutoReconnect { get; init; } = true;
-    public string MaxConcurrentTools { get; init; } = "4";
+    public const string UnlimitedBatchConcurrency = "Unlimited";
+    public string MaxConcurrentTools { get; init; } = UnlimitedBatchConcurrency;
     public string BatchDelay { get; init; } = "0";
     public bool ContinueOnError { get; init; } = true;
     public string ScreenshotDestination { get; init; } = "Ask";

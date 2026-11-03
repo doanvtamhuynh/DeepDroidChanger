@@ -770,6 +770,7 @@ AutomationProperties.LabeledBy="{Binding ElementName=StyleButtonVariantChoiceLab
                                 <TextBlock Text="{DynamicResource Settings_ConcurrentDescription}" Style="{StaticResource SettingsCaptionStyle}" Margin="0,4,0,10"/>
                                 <ComboBox x:Name="ConcurrentToolsChoice" SelectedValuePath="Tag" SelectedValue="{Binding Draft.MaxConcurrentTools, Mode=TwoWay}"
                                           AutomationProperties.LabeledBy="{Binding ElementName=ConcurrentToolsChoiceLabel}" Style="{StaticResource SettingsDraftChoiceStyle}">
+                                    <ComboBoxItem Tag="Unlimited" Content="{DynamicResource Settings_UnlimitedConcurrency}"/>
                                     <ComboBoxItem Tag="1" Content="1"/>
                                     <ComboBoxItem Tag="2" Content="2"/>
                                     <ComboBoxItem Tag="4" Content="4"/>

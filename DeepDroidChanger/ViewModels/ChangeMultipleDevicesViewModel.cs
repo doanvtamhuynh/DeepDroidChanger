@@ -15,7 +15,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
 {
     private const int NewDevicePollSeconds = 3;
     private const int SaveDebounceMilliseconds = 300;
-    private const int MaxConcurrentBatchActions = 4;
     private const string DefaultCountryIso = "us";
 
     private readonly IAddDevicesDialogService _addDevicesDialogService;
@@ -56,8 +55,6 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
     private readonly ILogger<ChangeMultipleDevicesViewModel> _logger;
     private readonly SemaphoreSlim _deviceRefreshLock = new(1, 1);
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
-    private readonly SemaphoreSlim _batchActionThrottle =
-        new(MaxConcurrentBatchActions, MaxConcurrentBatchActions);
     private readonly object _activeBatchTargetsLock = new();
     private readonly HashSet<BatchActionTarget> _activeBatchTargets = [];
     private readonly object _pendingDeviceEditsLock = new();
@@ -631,10 +628,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 return;
 
 
-            await Task.WhenAll(targets.Select(target =>
-                    StartBatchTargetWorker(
-                        target,
-                        () => RandomSelectedDeviceAsync(target, batchToken))))
+            await RunBatchTargetWorkersAsync(targets, target => RandomSelectedDeviceAsync(target, batchToken))
                 .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
@@ -822,14 +816,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             }
 
 
-            Task[] operations = targets
-                .Select(target => StartBatchTargetWorker(
-                    target,
-                    () => isLocation
+            await RunBatchTargetWorkersAsync(targets, target => isLocation
                         ? ExecuteLocationBatchTargetAsync(target, locationResult!, cancellationToken)
-                        : ExecuteTimezoneBatchTargetAsync(target, timezoneResult!, cancellationToken)))
-                .ToArray();
-            await Task.WhenAll(operations).ConfigureAwait(true);
+                        : ExecuteTimezoneBatchTargetAsync(target, timezoneResult!, cancellationToken))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -947,15 +937,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 return;
             }
 
-            Task[] operations = successfulTargets
-                .Select(target => StartBatchTargetWorker(
-                    target,
-                    () => ExecuteUpdateIntegrityBatchTargetAsync(
+            await RunBatchTargetWorkersAsync(successfulTargets, target => ExecuteUpdateIntegrityBatchTargetAsync(
                         target,
                         result.Action,
-                        preparedData)))
-                .ToArray();
-            await Task.WhenAll(operations).ConfigureAwait(true);
+                        preparedData))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -1009,14 +995,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             }
 
 
-            Task[] operations = targets
-                .Select(target => StartBatchTargetWorker(
-                    target,
-                    () => ExecuteInstallPackageTargetAsync(
+            await RunBatchTargetWorkersAsync(targets, target => ExecuteInstallPackageTargetAsync(
                         target,
-                        filePaths)))
-                .ToArray();
-            await Task.WhenAll(operations).ConfigureAwait(true);
+                        filePaths))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -1085,16 +1067,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 targets.Remove(target);
             }
 
-            Task[] workers = assignments
-                .Select(assignment => StartBatchTargetWorker(
-                    assignment.Target,
-                    () => ExecuteFakeProxyBatchTargetAsync(
-                        assignment.Target,
-                        assignment.Proxy,
-                        configuration,
-                        cancellationToken)))
-                .ToArray();
-            await Task.WhenAll(workers).ConfigureAwait(true);
+            await RunBatchTargetWorkersAsync(assignments, assignment => assignment.Target,
+                    assignment => ExecuteFakeProxyBatchTargetAsync(
+                        assignment.Target, assignment.Proxy, configuration, cancellationToken))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -1131,14 +1107,10 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             if (targets.Count == 0)
                 return;
 
-            Task[] workers = targets
-                .Select(target => StartBatchTargetWorker(
-                    target,
-                    () => ExecuteStopFakeProxyBatchTargetAsync(
+            await RunBatchTargetWorkersAsync(targets, target => ExecuteStopFakeProxyBatchTargetAsync(
                         target,
-                        cancellationToken)))
-                .ToArray();
-            await Task.WhenAll(workers).ConfigureAwait(true);
+                        cancellationToken))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -1188,12 +1160,8 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 return;
             }
 
-            Task[] workers = targets
-                .Select(target => StartBatchTargetWorker(
-                    target,
-                    () => ExecuteStopChangeSimBatchTargetAsync(target)))
-                .ToArray();
-            await Task.WhenAll(workers).ConfigureAwait(true);
+            await RunBatchTargetWorkersAsync(targets, target => ExecuteStopChangeSimBatchTargetAsync(target))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -1221,66 +1189,58 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
+                return;
+            }
 
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                {
-                    return;
-                }
+            if (!IsCurrentTarget(target))
+                return;
 
-                if (!IsCurrentTarget(target))
-                    return;
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StartingProxy"))
+                .ConfigureAwait(false);
+            var deviceConfiguration = new FakeProxyDialogResult(
+                proxy.Host,
+                proxy.Port,
+                proxy.Username,
+                proxy.Password,
+                batchConfiguration.ProxyType,
+                batchConfiguration.ChangeLocationByIp,
+                batchConfiguration.ChangeTimezoneByIp);
+            ProxyWorkflowResult workflowResult = await _proxyWorkflowService
+                .ApplyAsync(target.Serial, deviceConfiguration, targetCancellation.Token)
+                .ConfigureAwait(false);
+            targetCancellation.Token.ThrowIfCancellationRequested();
 
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StartingProxy"))
-                    .ConfigureAwait(false);
-                var deviceConfiguration = new FakeProxyDialogResult(
-                    proxy.Host,
-                    proxy.Port,
-                    proxy.Username,
-                    proxy.Password,
-                    batchConfiguration.ProxyType,
-                    batchConfiguration.ChangeLocationByIp,
-                    batchConfiguration.ChangeTimezoneByIp);
-                ProxyWorkflowResult workflowResult = await _proxyWorkflowService
-                    .ApplyAsync(target.Serial, deviceConfiguration, targetCancellation.Token)
-                    .ConfigureAwait(false);
-                targetCancellation.Token.ThrowIfCancellationRequested();
-
-                if (workflowResult.LocationUpdateFailed)
-                {
-                    await RunOnUiContextAsync(() => SetTargetLog(
-                            target,
-                            "Log_ProxyLocationByIpFailed"))
-                        .ConfigureAwait(false);
-                }
-
-                if (workflowResult.TimezoneUpdateFailed)
-                {
-                    await RunOnUiContextAsync(() => SetTargetLog(
-                            target,
-                            "Log_ProxyTimezoneByIpFailed"))
-                        .ConfigureAwait(false);
-                }
-
-                targetCancellation.Token.ThrowIfCancellationRequested();
-
+            if (workflowResult.LocationUpdateFailed)
+            {
                 await RunOnUiContextAsync(() => SetTargetLog(
                         target,
-                        workflowResult.IsSuccess
-                            ? "Log_FakeProxySuccess"
-                            : "Log_FakeProxyPartialSuccess"))
+                        "Log_ProxyLocationByIpFailed"))
                     .ConfigureAwait(false);
             }
-            finally
+
+            if (workflowResult.TimezoneUpdateFailed)
             {
-                _batchActionThrottle.Release();
+                await RunOnUiContextAsync(() => SetTargetLog(
+                        target,
+                        "Log_ProxyTimezoneByIpFailed"))
+                    .ConfigureAwait(false);
             }
+
+            targetCancellation.Token.ThrowIfCancellationRequested();
+
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    workflowResult.IsSuccess
+                        ? "Log_FakeProxySuccess"
+                        : "Log_FakeProxyPartialSuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -1314,35 +1274,27 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
-
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                {
-                    return;
-                }
-
-                if (!IsCurrentTarget(target))
-                    return;
-
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StoppingProxy"))
-                    .ConfigureAwait(false);
-                await _proxyService
-                    .StopProxyAsync(target.Serial, targetCancellation.Token)
-                    .ConfigureAwait(false);
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopFakeProxySuccess"))
-                    .ConfigureAwait(false);
+                return;
             }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+
+            if (!IsCurrentTarget(target))
+                return;
+
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StoppingProxy"))
+                .ConfigureAwait(false);
+            await _proxyService
+                .StopProxyAsync(target.Serial, targetCancellation.Token)
+                .ConfigureAwait(false);
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopFakeProxySuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -1376,35 +1328,27 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
-
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                {
-                    return;
-                }
-
-                if (!IsCurrentTarget(target))
-                    return;
-
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopChangeSim"))
-                    .ConfigureAwait(false);
-                await _deviceChangeService
-                    .StopChangeSimAsync(target.Serial, targetCancellation.Token)
-                    .ConfigureAwait(false);
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopChangeSimSuccess"))
-                    .ConfigureAwait(false);
+                return;
             }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+
+            if (!IsCurrentTarget(target))
+                return;
+
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopChangeSim"))
+                .ConfigureAwait(false);
+            await _deviceChangeService
+                .StopChangeSimAsync(target.Serial, targetCancellation.Token)
+                .ConfigureAwait(false);
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_StopChangeSimSuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -1440,45 +1384,37 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
-
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                {
-                    return;
-                }
-
-                if (!IsCurrentTarget(target))
-                    return;
-
-                await RunOnUiContextAsync(() => SetTargetLog(
-                        target,
-                        "Log_InstallPackageInstalling"))
-                    .ConfigureAwait(false);
-                InstallPackageSetResult result = await _packageInstallService
-                    .InstallManyAsync(
-                        target.Serial,
-                        filePaths,
-                        new InstallPackageOptions(
-                            grantPermissions: false,
-                            allowDowngrade: false),
-                        targetCancellation.Token)
-                    .ConfigureAwait(false);
-                await RunOnUiContextAsync(() => SetTargetLog(
-                        target,
-                        result.MessageResourceKey,
-                        result.MessageArguments.ToArray()))
-                    .ConfigureAwait(false);
+                return;
             }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+
+            if (!IsCurrentTarget(target))
+                return;
+
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_InstallPackageInstalling"))
+                .ConfigureAwait(false);
+            InstallPackageSetResult result = await _packageInstallService
+                .InstallManyAsync(
+                    target.Serial,
+                    filePaths,
+                    new InstallPackageOptions(
+                        grantPermissions: false,
+                        allowDowngrade: false),
+                    targetCancellation.Token)
+                .ConfigureAwait(false);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    result.MessageResourceKey,
+                    result.MessageArguments.ToArray()))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -1694,53 +1630,45 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
-            {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
 
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                    return;
-                if (!IsCurrentTarget(target))
-                    return;
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
+                return;
+            if (!IsCurrentTarget(target))
+                return;
 
-                await RunOnUiContextAsync(() => SetTargetLog(
-                        target,
-                        result.Mode == ChangeLocationMode.DeviceIp
-                            ? "Log_ResolvingByIp"
-                            : "Log_ApplyingLocation"))
-                    .ConfigureAwait(false);
-                DeviceLocationResult applied = result.Mode == ChangeLocationMode.DeviceIp
-                    ? await _deviceLocationService
-                        .ApplyAsync(target.Serial, result, targetCancellation.Token)
-                        .ConfigureAwait(false)
-                    : result.SelectedLocation == null
-                        ? throw new InvalidOperationException("Batch Location selection is missing.")
-                        : await _deviceLocationService
-                            .ApplyCatalogLocationAsync(
-                                target.Serial,
-                                result.SelectedLocation,
-                                targetCancellation.Token)
-                            .ConfigureAwait(false);
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    result.Mode == ChangeLocationMode.DeviceIp
+                        ? "Log_ResolvingByIp"
+                        : "Log_ApplyingLocation"))
+                .ConfigureAwait(false);
+            DeviceLocationResult applied = result.Mode == ChangeLocationMode.DeviceIp
+                ? await _deviceLocationService
+                    .ApplyAsync(target.Serial, result, targetCancellation.Token)
+                    .ConfigureAwait(false)
+                : result.SelectedLocation == null
+                    ? throw new InvalidOperationException("Batch Location selection is missing.")
+                    : await _deviceLocationService
+                        .ApplyCatalogLocationAsync(
+                            target.Serial,
+                            result.SelectedLocation,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false);
 
-                bool saved = await PersistLocationConfigAsync(
-                        target.Serial,
-                        result.Mode,
-                        applied,
-                        targetCancellation.Token)
-                    .ConfigureAwait(false);
-                if (!saved)
-                    throw new InvalidOperationException("The device Location configuration could not be saved.");
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeLocationSuccess"))
-                    .ConfigureAwait(false);
-            }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+            bool saved = await PersistLocationConfigAsync(
+                    target.Serial,
+                    result.Mode,
+                    applied,
+                    targetCancellation.Token)
+                .ConfigureAwait(false);
+            if (!saved)
+                throw new InvalidOperationException("The device Location configuration could not be saved.");
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeLocationSuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -1775,43 +1703,35 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
-            {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
 
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                    return;
-                if (!IsCurrentTarget(target))
-                    return;
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
+                return;
+            if (!IsCurrentTarget(target))
+                return;
 
-                await RunOnUiContextAsync(() => SetTargetLog(
-                        target,
-                        result.Mode == ChangeTimezoneMode.DeviceIp
-                            ? "Log_ResolvingByIp"
-                            : "Log_ApplyingTimezone"))
-                    .ConfigureAwait(false);
-                string appliedTimezone = await _deviceTimezoneService
-                    .ApplyAsync(target.Serial, result, targetCancellation.Token)
-                    .ConfigureAwait(false);
-                bool saved = await PersistTimezoneConfigAsync(
-                        target.Serial,
-                        result.Mode,
-                        appliedTimezone,
-                        targetCancellation.Token)
-                    .ConfigureAwait(false);
-                if (!saved)
-                    throw new InvalidOperationException("The device Timezone configuration could not be saved.");
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeTimezoneSuccess"))
-                    .ConfigureAwait(false);
-            }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    result.Mode == ChangeTimezoneMode.DeviceIp
+                        ? "Log_ResolvingByIp"
+                        : "Log_ApplyingTimezone"))
+                .ConfigureAwait(false);
+            string appliedTimezone = await _deviceTimezoneService
+                .ApplyAsync(target.Serial, result, targetCancellation.Token)
+                .ConfigureAwait(false);
+            bool saved = await PersistTimezoneConfigAsync(
+                    target.Serial,
+                    result.Mode,
+                    appliedTimezone,
+                    targetCancellation.Token)
+                .ConfigureAwait(false);
+            if (!saved)
+                throw new InvalidOperationException("The device Timezone configuration could not be saved.");
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_ChangeTimezoneSuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -1846,60 +1766,52 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
+                    .ConfigureAwait(false))
+                return;
+            if (!IsCurrentTarget(target))
+                return;
+
+            string statusKey = action switch
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
+                UpdateIntegrityDialogAction.ClearIntegrity => "Log_UpdatingIntegrity",
+                UpdateIntegrityDialogAction.ClearKeybox => "Log_UpdatingKeybox",
+                _ => preparedData.IntegrityCandidates.Count > 0
+                    ? "Log_UpdatingIntegrity"
+                    : "Log_UpdatingKeybox"
+            };
+            await RunOnUiContextAsync(() => SetTargetLog(target, statusKey))
+                .ConfigureAwait(false);
 
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token)
-                        .ConfigureAwait(false))
-                    return;
-                if (!IsCurrentTarget(target))
-                    return;
-
-                string statusKey = action switch
-                {
-                    UpdateIntegrityDialogAction.ClearIntegrity => "Log_UpdatingIntegrity",
-                    UpdateIntegrityDialogAction.ClearKeybox => "Log_UpdatingKeybox",
-                    _ => preparedData.IntegrityCandidates.Count > 0
-                        ? "Log_UpdatingIntegrity"
-                        : "Log_UpdatingKeybox"
-                };
-                await RunOnUiContextAsync(() => SetTargetLog(target, statusKey))
-                    .ConfigureAwait(false);
-
-                switch (action)
-                {
-                    case UpdateIntegrityDialogAction.ClearIntegrity:
-                        await _deviceIntegrityService
-                            .ClearIntegrityAsync(target.Serial, targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        break;
-                    case UpdateIntegrityDialogAction.ClearKeybox:
-                        await _deviceIntegrityService
-                            .ClearKeyboxAsync(target.Serial, targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        break;
-                    default:
-                        await _deviceIntegrityService
-                            .ApplyPreparedAsync(
-                                target.Serial,
-                                preparedData,
-                                targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        break;
-                }
-                await RunOnUiContextAsync(() => SetTargetLog(
-                        target,
-                        "Log_UpdateIntegritySuccess"))
-                    .ConfigureAwait(false);
-            }
-            finally
+            switch (action)
             {
-                _batchActionThrottle.Release();
+                case UpdateIntegrityDialogAction.ClearIntegrity:
+                    await _deviceIntegrityService
+                        .ClearIntegrityAsync(target.Serial, targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    break;
+                case UpdateIntegrityDialogAction.ClearKeybox:
+                    await _deviceIntegrityService
+                        .ClearKeyboxAsync(target.Serial, targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    break;
+                default:
+                    await _deviceIntegrityService
+                        .ApplyPreparedAsync(
+                            target.Serial,
+                            preparedData,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    break;
             }
+            await RunOnUiContextAsync(() => SetTargetLog(
+                    target,
+                    "Log_UpdateIntegritySuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -2532,15 +2444,11 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 }
             }
 
-            Task[] operations = targets
-                .Select(target => StartBatchTargetWorker(
-                    target,
-                    () => ExecuteBatchActionTargetAsync(
+            await RunBatchTargetWorkersAsync(targets, target => ExecuteBatchActionTargetAsync(
                         action,
                         target,
-                        cancellationToken)))
-                .ToArray();
-            await Task.WhenAll(operations).ConfigureAwait(true);
+                        cancellationToken))
+                .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
@@ -2632,10 +2540,7 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
                 return;
             }
 
-            await Task.WhenAll(targets.Select(target =>
-                    StartBatchTargetWorker(
-                        target,
-                        () => ExecuteRandomChangeAndWipeTargetAsync(target, cancellationToken))))
+            await RunBatchTargetWorkersAsync(targets, target => ExecuteRandomChangeAndWipeTargetAsync(target, cancellationToken))
                 .ConfigureAwait(true);
         }
         catch (OperationCanceledException)
@@ -2663,81 +2568,73 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
+                return;
+
+            await RunOnUiContextAsync(() => SetTargetLog(target, GetStartLogKey(action)))
+                .ConfigureAwait(false);
+            IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(target, action);
+            switch (action)
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
-
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
-                    return;
-
-                await RunOnUiContextAsync(() => SetTargetLog(target, GetStartLogKey(action)))
-                    .ConfigureAwait(false);
-                IProgress<DeviceChangeStage> progress = CreateDeviceChangeProgress(target, action);
-                switch (action)
+                case DeviceActionKind.ChangeDevice:
+                    await _deviceChangeService.ChangeAsync(
+                            target.Serial,
+                            target.DeviceProfile!,
+                            target.ChangeSimEnabled,
+                            target.ChangeOptions!,
+                            progress,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    break;
+                case DeviceActionKind.ChangeWithoutWipe:
+                    await _deviceChangeService.ChangeWithoutWipeAsync(
+                            target.Serial,
+                            target.DeviceProfile!,
+                            target.ChangeSimEnabled,
+                            target.ChangeOptions!,
+                            progress,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    break;
+                case DeviceActionKind.Wipe:
+                    await _deviceChangeService.WipeWithoutChangeAsync(
+                            target.Serial,
+                            target.ChangeOptions!,
+                            progress,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    break;
+                case DeviceActionKind.ChangeSim:
                 {
-                    case DeviceActionKind.ChangeDevice:
-                        await _deviceChangeService.ChangeAsync(
-                                target.Serial,
-                                target.DeviceProfile!,
-                                target.ChangeSimEnabled,
-                                target.ChangeOptions!,
-                                progress,
-                                targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        break;
-                    case DeviceActionKind.ChangeWithoutWipe:
-                        await _deviceChangeService.ChangeWithoutWipeAsync(
-                                target.Serial,
-                                target.DeviceProfile!,
-                                target.ChangeSimEnabled,
-                                target.ChangeOptions!,
-                                progress,
-                                targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        break;
-                    case DeviceActionKind.Wipe:
-                        await _deviceChangeService.WipeWithoutChangeAsync(
-                                target.Serial,
-                                target.ChangeOptions!,
-                                progress,
-                                targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        break;
-                    case DeviceActionKind.ChangeSim:
-                    {
-                        SimProfile editedProfile = target.SimProfile!;
-                        await _deviceChangeService.ChangeSimAsync(
-                                target.Serial,
-                                editedProfile,
-                                targetCancellation.Token)
-                            .ConfigureAwait(false);
-                        await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, editedProfile))
-                            .ConfigureAwait(false);
-                        break;
-                    }
-                    case DeviceActionKind.RandomSim:
-                    {
-                        SimProfile randomSim = _simProfileService.CreateRandomProfile(
-                            target.Country,
-                            target.Carrier);
-                        await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, randomSim))
-                            .ConfigureAwait(false);
-                        break;
-                    }
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(action), action, null);
+                    SimProfile editedProfile = target.SimProfile!;
+                    await _deviceChangeService.ChangeSimAsync(
+                            target.Serial,
+                            editedProfile,
+                            targetCancellation.Token)
+                        .ConfigureAwait(false);
+                    await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, editedProfile))
+                        .ConfigureAwait(false);
+                    break;
                 }
+                case DeviceActionKind.RandomSim:
+                {
+                    SimProfile randomSim = _simProfileService.CreateRandomProfile(
+                        target.Country,
+                        target.Carrier);
+                    await RunOnUiContextAsync(() => ApplyRandomSimInfo(target, randomSim))
+                        .ConfigureAwait(false);
+                    break;
+                }
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
+            }
 
-                await RunOnUiContextAsync(() => SetTargetLog(target, GetSuccessLogKey(action)))
-                    .ConfigureAwait(false);
-            }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+            await RunOnUiContextAsync(() => SetTargetLog(target, GetSuccessLogKey(action)))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -2768,57 +2665,49 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution()
+                || !await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
             {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution()
-                    || !await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
-                {
-                    return;
-                }
-
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDevice"))
-                    .ConfigureAwait(false);
-                RandomDeviceResult randomResult = await _randomDeviceService
-                    .CreateRandomProfileAsync(target.RandomDeviceRequest!, targetCancellation.Token)
-                    .ConfigureAwait(false);
-                if (randomResult.Status == RandomDeviceStatus.LoginRequired)
-                {
-                    await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDeviceLoginRequired"))
-                        .ConfigureAwait(false);
-                    return;
-                }
-
-                if (randomResult.Status != RandomDeviceStatus.Created || randomResult.Profile == null)
-                {
-                    await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDeviceFailed"))
-                        .ConfigureAwait(false);
-                    return;
-                }
-
-                DeviceInfoApiDevice profile = CloneDeviceProfile(randomResult.Profile)!;
-                await RunOnUiContextAsync(() => ApplyRandomDeviceInfo(target, profile.Clone()))
-                    .ConfigureAwait(false);
-
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
-                    return;
-
-                await _deviceChangeService.ChangeAsync(
-                        target.Serial,
-                        profile,
-                        target.ChangeSimEnabled,
-                        target.ChangeOptions!,
-                        CreateDeviceChangeProgress(target, DeviceActionKind.RandomChangeAndWipe),
-                        targetCancellation.Token)
-                    .ConfigureAwait(false);
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDeviceSuccess"))
-                    .ConfigureAwait(false);
+                return;
             }
-            finally
+
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDevice"))
+                .ConfigureAwait(false);
+            RandomDeviceResult randomResult = await _randomDeviceService
+                .CreateRandomProfileAsync(target.RandomDeviceRequest!, targetCancellation.Token)
+                .ConfigureAwait(false);
+            if (randomResult.Status == RandomDeviceStatus.LoginRequired)
             {
-                _batchActionThrottle.Release();
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDeviceLoginRequired"))
+                    .ConfigureAwait(false);
+                return;
             }
+
+            if (randomResult.Status != RandomDeviceStatus.Created || randomResult.Profile == null)
+            {
+                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDeviceFailed"))
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            DeviceInfoApiDevice profile = CloneDeviceProfile(randomResult.Profile)!;
+            await RunOnUiContextAsync(() => ApplyRandomDeviceInfo(target, profile.Clone()))
+                .ConfigureAwait(false);
+
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
+                return;
+
+            await _deviceChangeService.ChangeAsync(
+                    target.Serial,
+                    profile,
+                    target.ChangeSimEnabled,
+                    target.ChangeOptions!,
+                    CreateDeviceChangeProgress(target, DeviceActionKind.RandomChangeAndWipe),
+                    targetCancellation.Token)
+                .ConfigureAwait(false);
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomAndChangeDeviceSuccess"))
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -2991,45 +2880,37 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
             target.InvalidationToken);
         try
         {
-            await _batchActionThrottle.WaitAsync(targetCancellation.Token).ConfigureAwait(false);
-            try
-            {
-                targetCancellation.Token.ThrowIfCancellationRequested();
-                if (!target.TryStartExecution())
-                    return;
+            targetCancellation.Token.ThrowIfCancellationRequested();
+            if (!target.TryStartExecution())
+                return;
 
-                if (!await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
+            if (!await CanStartBatchTargetAsync(target, targetCancellation.Token).ConfigureAwait(false))
+            {
+                return;
+            }
+
+            await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDevice"))
+                .ConfigureAwait(false);
+            RandomDeviceResult result = await _randomDeviceService
+                .CreateRandomProfileAsync(target.RandomDeviceRequest!, targetCancellation.Token)
+                .ConfigureAwait(false);
+
+            await RunOnUiContextAsync(() =>
+            {
+                switch (result.Status)
                 {
-                    return;
+                    case RandomDeviceStatus.Created when result.Profile != null:
+                        ApplyRandomDeviceInfo(target, result.Profile.Clone());
+                        SetTargetLog(target, "Log_RandomDeviceSuccess");
+                        break;
+                    case RandomDeviceStatus.LoginRequired:
+                        SetTargetLog(target, "Log_RandomDeviceLoginRequired");
+                        break;
+                    default:
+                        SetTargetLog(target, "Log_RandomDeviceFailed");
+                        break;
                 }
-
-                await RunOnUiContextAsync(() => SetTargetLog(target, "Log_RandomDevice"))
-                    .ConfigureAwait(false);
-                RandomDeviceResult result = await _randomDeviceService
-                    .CreateRandomProfileAsync(target.RandomDeviceRequest!, targetCancellation.Token)
-                    .ConfigureAwait(false);
-
-                await RunOnUiContextAsync(() =>
-                {
-                    switch (result.Status)
-                    {
-                        case RandomDeviceStatus.Created when result.Profile != null:
-                            ApplyRandomDeviceInfo(target, result.Profile.Clone());
-                            SetTargetLog(target, "Log_RandomDeviceSuccess");
-                            break;
-                        case RandomDeviceStatus.LoginRequired:
-                            SetTargetLog(target, "Log_RandomDeviceLoginRequired");
-                            break;
-                        default:
-                            SetTargetLog(target, "Log_RandomDeviceFailed");
-                            break;
-                    }
-                }).ConfigureAwait(false);
-            }
-            finally
-            {
-                _batchActionThrottle.Release();
-            }
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (target.IsInvalidated)
         {
@@ -4466,10 +4347,56 @@ public sealed partial class ChangeMultipleDevicesViewModel : ObservableObject, I
         NotifySelectionChanged();
     }
 
-    private static Task StartBatchTargetWorker(BatchActionTarget target, Func<Task> worker)
+    private Task RunBatchTargetWorkersAsync(IEnumerable<BatchActionTarget> targets, Func<BatchActionTarget, Task> worker) =>
+        RunBatchTargetWorkersAsync(targets, target => target, worker);
+
+    private async Task RunBatchTargetWorkersAsync<T>(
+        IEnumerable<T> items,
+        Func<T, BatchActionTarget> getTarget,
+        Func<T, Task> worker)
     {
-        target.TransferCompletionOwnershipToWorker();
-        return worker();
+        using SemaphoreSlim? gate = SettingsOptionsPolicy.CreateBatchConcurrencyGate(_settings.Options);
+        await Task.WhenAll(items.Select(RunAsync)).ConfigureAwait(false);
+
+        async Task RunAsync(T item)
+        {
+            BatchActionTarget target = getTarget(item);
+            target.TransferCompletionOwnershipToWorker();
+            if (gate is null)
+            {
+                await worker(item).ConfigureAwait(false);
+                return;
+            }
+
+            using var queuedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                target.OperationToken, target.InvalidationToken);
+            try
+            {
+                await gate.WaitAsync(queuedCancellation.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    await ReportTargetCancellationAsync(target).ConfigureAwait(false);
+                }
+                finally
+                {
+                    CompleteBatchTarget(target);
+                }
+
+                return;
+            }
+
+            try
+            {
+                await worker(item).ConfigureAwait(false);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
     }
 
     private void CompleteBatchOwnedTargets(IEnumerable<BatchActionTarget> targets)

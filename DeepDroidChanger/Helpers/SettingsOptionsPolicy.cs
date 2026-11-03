@@ -18,7 +18,9 @@ internal static class SettingsOptionsPolicy
             SingleViewQuality = Choice(value.SingleViewQuality, "Balanced", "Lightweight", "Balanced", "Detailed"),
             MultiViewQuality = Choice(value.MultiViewQuality, "Lightweight", "Lightweight", "Balanced", "Detailed"),
             KeyboardMode = Choice(value.KeyboardMode, "Sdk", "Sdk", "Uhid"),
-            MaxConcurrentTools = Choice(value.MaxConcurrentTools, "4", "1", "2", "4", "8"),
+            MaxConcurrentTools = GetBatchConcurrencyLimit(value.MaxConcurrentTools).HasValue
+                ? value.MaxConcurrentTools
+                : SettingsOptions.UnlimitedBatchConcurrency,
             BatchDelay = Choice(value.BatchDelay, "0", "0", "250", "500", "1000"),
             ScreenshotDestination = Choice(value.ScreenshotDestination, "Ask", "Ask", "Custom"),
             ExportDestination = Choice(value.ExportDestination, "Ask", "Ask", "Custom"),
@@ -28,6 +30,19 @@ internal static class SettingsOptionsPolicy
             Appearance = AppearanceOptionsPolicy.Normalize(value.Appearance)
         };
     }
+
+    public static SemaphoreSlim? CreateBatchConcurrencyGate(SettingsOptions options) =>
+        GetBatchConcurrencyLimit(options.MaxConcurrentTools) is int limit ? new SemaphoreSlim(limit, limit) : null;
+
+    private static int? GetBatchConcurrencyLimit(string? value) =>
+        value switch
+        {
+            "1" => 1,
+            "2" => 2,
+            "4" => 4,
+            "8" => 8,
+            _ => null
+        };
 
     public static bool IsDirectoryPath(string? path)
     {

@@ -1,5 +1,6 @@
 using System.Globalization;
 using DeepDroidChanger.Models;
+using DeepDroidChanger.Helpers;
 using Microsoft.Extensions.Logging;
 
 namespace DeepDroidChanger.ViewModels;
@@ -216,7 +217,7 @@ public sealed partial class ViewMultipleDevicesViewModel
     // queued tasks while allowing already-started device operations to finish.
     private sealed class ToolBatchScheduler : IDisposable
     {
-        private readonly SemaphoreSlim _concurrency;
+        private readonly SemaphoreSlim? _concurrency;
         private readonly SemaphoreSlim _startGate = new(1, 1);
         private readonly CancellationTokenSource _queuedCancellation;
         private readonly int _delayMilliseconds;
@@ -225,19 +226,25 @@ public sealed partial class ViewMultipleDevicesViewModel
 
         public ToolBatchScheduler(SettingsOptions options, CancellationToken cancellationToken)
         {
-            int concurrency = int.Parse(options.MaxConcurrentTools, CultureInfo.InvariantCulture);
             _delayMilliseconds = int.Parse(options.BatchDelay, CultureInfo.InvariantCulture);
             _continueOnError = options.ContinueOnError;
-            _concurrency = new(concurrency, concurrency);
+            _concurrency = SettingsOptionsPolicy.CreateBatchConcurrencyGate(options);
             _queuedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         }
 
         public async Task WaitForTurnAsync()
         {
             CancellationToken token = _queuedCancellation.Token;
-            await _concurrency.WaitAsync(token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            if (_concurrency is not null)
+                await _concurrency.WaitAsync(token).ConfigureAwait(false);
+
             try
             {
+                token.ThrowIfCancellationRequested();
+                if (_delayMilliseconds == 0)
+                    return;
+
                 await _startGate.WaitAsync(token).ConfigureAwait(false);
                 try
                 {
@@ -255,12 +262,12 @@ public sealed partial class ViewMultipleDevicesViewModel
             }
             catch
             {
-                _concurrency.Release();
+                _concurrency?.Release();
                 throw;
             }
         }
 
-        public void Release() => _concurrency.Release();
+        public void Release() => _concurrency?.Release();
 
         public void OnTargetFailed()
         {
@@ -272,7 +279,7 @@ public sealed partial class ViewMultipleDevicesViewModel
         {
             _queuedCancellation.Dispose();
             _startGate.Dispose();
-            _concurrency.Dispose();
+            _concurrency?.Dispose();
         }
     }
 

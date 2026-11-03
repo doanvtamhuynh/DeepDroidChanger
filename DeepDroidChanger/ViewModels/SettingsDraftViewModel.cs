@@ -15,7 +15,7 @@ public sealed partial class SettingsDraftViewModel : ObservableObject
     [ObservableProperty] private bool _syncClipboard = true;
     [ObservableProperty] private bool _enableAudio;
     [ObservableProperty] private bool _autoReconnect = true;
-    [ObservableProperty] private string _maxConcurrentTools = "4";
+    [ObservableProperty] private string _maxConcurrentTools = SettingsOptions.UnlimitedBatchConcurrency;
     [ObservableProperty] private string _batchDelay = "0";
     [ObservableProperty] private bool _continueOnError = true;
     [ObservableProperty]
